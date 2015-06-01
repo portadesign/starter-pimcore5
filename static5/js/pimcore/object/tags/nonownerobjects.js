@@ -141,7 +141,7 @@ pimcore.object.tags.nonownerobjects = Class.create(pimcore.object.tags.objects, 
                     }
                 ]
             },
-            cls: cls,
+            componentCls: cls,
             width: this.fieldConfig.width,
             height: this.fieldConfig.height,
             tbar: {
@@ -219,7 +219,7 @@ pimcore.object.tags.nonownerobjects = Class.create(pimcore.object.tags.objects, 
                     try {
                         var record = data.records[0];
                         var data = record.data;
-                        var fromTree = this.isFromTree(ddSource);
+                        var fromTree = this.isFromTree(dd);
 
                         if (data.elementType != "object") {
                             return false;
@@ -322,11 +322,11 @@ pimcore.object.tags.nonownerobjects = Class.create(pimcore.object.tags.objects, 
                         Ext.MessageBox.confirm(t("element_is_locked"), t("element_lock_message") + lockDetails,
                                 function (lock, buttonValue) {
                                     if (buttonValue == "yes") {
-                                        this.store.add(new this.store.recordType({
+                                        this.store.add({
                                             id: item.id,
                                             path: item.fullpath,
                                             type: item.classname
-                                        }, this.store.getCount() + 1));
+                                        });
                                     }
                                 }.bind(this, arguments));
 
@@ -335,11 +335,11 @@ pimcore.object.tags.nonownerobjects = Class.create(pimcore.object.tags.objects, 
                             url: "/admin/element/lock-element",
                             params: {id: item.id, type: 'object'}
                         });
-                        this.store.add(new this.store.recordType({
+                        this.store.add({
                             id: item.id,
                             path: item.fullpath,
                             type: item.classname
-                        }, this.store.getCount() + 1));
+                        });
                     }
 
                 }.bind(this, item)
@@ -351,11 +351,11 @@ pimcore.object.tags.nonownerobjects = Class.create(pimcore.object.tags.objects, 
             Ext.MessageBox.confirm(t("element_is_open"), t("element_open_message") + lockDetails,
                     function (item, buttonValue) {
                         if (buttonValue == "yes") {
-                            this.store.add(new this.store.recordType({
+                            this.store.add({
                                 id: item.id,
                                 path: item.fullpath,
                                 type: item.classname
-                            }, this.store.getCount() + 1));
+                            });
 
                         }
                     }.bind(this, item));

@@ -81,16 +81,15 @@ Ext.require([
     'Ext.toolbar.Spacer',
     'Ext.tree.plugin.TreeViewDragDrop',
     'Ext.tree.Panel',
+    'Ext.ux.DataTip',
     'Ext.ux.form.MultiSelect',
     'Ext.ux.TabCloseMenu',
-    'Ext.ux.DataTip',
+    'Ext.ux.TabReorderer',
     'Ext.window.Toast'
 ]);
 
 
 Ext.onReady(function () {
-
-    //console.log("ready");
 
     // confirmation to close pimcore
     window.onbeforeunload = function () {
@@ -109,7 +108,6 @@ Ext.onReady(function () {
         }
     };
 
-
     // define some globals
     //Ext.chart.Chart.CHART_URL = '/pimcore/static/js/lib/ext/resources/charts.swf';
 
@@ -127,20 +125,19 @@ Ext.onReady(function () {
         console.log("xhr request failed");
 
         if (response.status == 503) {
-            // show wait info
-            //if (!pimcore.maintenanceWindow) {
-            //    pimcore.maintenanceWindow = new Ext.Window({
-            //        closable:false,
-            //        title:t("please_wait"),
-            //        bodyStyle:"padding: 20px;",
-            //        html:t("the_system_is_in_maintenance_mode_please_wait"),
-            //        closeAction:"close",
-            //        modal:true
-            //    });
-            //    pimcore.viewport.add(pimcore.maintenanceWindow);
-            //    pimcore.maintenanceWindow.show();
-            //}
-
+            //show wait info
+            if (!pimcore.maintenanceWindow) {
+                pimcore.maintenanceWindow = new Ext.Window({
+                    closable:false,
+                    title:t("please_wait"),
+                    bodyStyle:"padding: 20px;",
+                    html:t("the_system_is_in_maintenance_mode_please_wait"),
+                    closeAction:"close",
+                    modal:true
+                });
+                pimcore.viewport.add(pimcore.maintenanceWindow);
+                pimcore.maintenanceWindow.show();
+            }
         } else {
             //do not remove notification, otherwise user is never informed about server exception (e.g. element cannot
             // be saved due to HTTP 500 Response)
@@ -169,17 +166,31 @@ Ext.onReady(function () {
         if (xhrActive < 1) {
             Ext.get("pimcore_logo").dom.innerHTML = '<img class="logo" src="/pimcore/static/img/logo.png"/>';
         }
-    });
+        var sb = pimcore.globalmanager.get("statusbar");
+        if (sb) {
+            sb.clearStatus();
+        }
+        });
     Ext.Ajax.on("beforerequest", function () {
         if (xhrActive < 1) {
             Ext.get("pimcore_logo").dom.innerHTML = '<img class="activity" src="/pimcore/static/img/loading.gif"/>';
         }
         xhrActive++;
+        var sb = pimcore.globalmanager.get("statusbar");
+        if (sb) {
+            sb.setStatus({
+                text: t('loading')
+            });
+        }
     });
     Ext.Ajax.on("requestcomplete", function (conn, response, options) {
         xhrActive--;
         if (xhrActive < 1) {
             Ext.get("pimcore_logo").dom.innerHTML = '<img class="logo" src="/pimcore/static/img/logo.png"/>';
+        }
+        var sb = pimcore.globalmanager.get("statusbar");
+        if (sb) {
+            sb.clearStatus();
         }
 
         // redirect to login-page if session is expired
@@ -386,8 +397,9 @@ Ext.onReady(function () {
 
     // STATUSBAR
     var statusbar = Ext.create('Ext.ux.StatusBar', {
-        id:'pimcore_statusbar',
-        statusAlign:'right'
+        id: 'pimcore_statusbar',
+        statusAlign: 'left',
+        cls: 'pimcore_statusbar_text'
     });
     pimcore.globalmanager.add("statusbar", statusbar);
 
@@ -402,6 +414,13 @@ Ext.onReady(function () {
         statusbar.add('<div class="pimcore_statusbar_debug">' + t("debug_mode_on") + "</div>");
         statusbar.add("-");
     }
+
+    // check for debug
+    if (pimcore.settings.debug) {
+        statusbar.add('<div class="pimcore_statusbar_extjs5">ExtJS ' + Ext.getVersion().getMajor() + '.' + Ext.getVersion().getMinor() + '.' + Ext.getVersion().getPatch() + ' - Beta Feauture </div>');
+        statusbar.add("-");
+    }
+
     // check for maintenance
     if (!pimcore.settings.maintenance_active) {
         statusbar.add('<div class="pimcore_statusbar_maintenance">'
@@ -484,11 +503,16 @@ Ext.onReady(function () {
                             enableTabScroll:true,
                             hideMode:"offsets",
                             cls:"tab_panel",
-                            plugins: Ext.create('Ext.ux.TabCloseMenu', {
-                                showCloseAll: false,
-                                showCloseOthers: false,
-                                extraItemsTail: pimcore.helpers.getMainTabMenuItems()
-                            })
+                            plugins:
+                                [
+                                Ext.create('Ext.ux.TabCloseMenu', {
+                                        pluginId: 'tabclosemenu',
+                                        showCloseAll: false,
+                                        showCloseOthers: false,
+                                        extraItemsTail: pimcore.helpers.getMainTabMenuItems()
+                                    }),
+                                    Ext.create('Ext.ux.TabReorderer', {})
+                                ]
                         })
                         ,
                         {

@@ -480,7 +480,7 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract {
                 $list->setOrderKey("priority");
                 $this->redirects = $list->load();
 
-                Cache::save($this->redirects, $cacheKey, array("system","redirect","route","output"), null, 998);
+                Cache::save($this->redirects, $cacheKey, array("system","redirect","route"), null, 998);
             }
 
             $requestScheme = ($_SERVER['HTTPS'] == 'on') ? \Zend_Controller_Request_Http::SCHEME_HTTPS : \Zend_Controller_Request_Http::SCHEME_HTTP;
@@ -499,8 +499,8 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract {
                     if (@preg_match($redirect->getSource(), $matchAgainst, $matches)) {
 
                         // check for a site
-                        if($redirect->getSourceSite()) {
-                            if(!$sourceSite || $sourceSite->getId() != $redirect->getSourceSite()) {
+                        if($sourceSite) {
+                            if($sourceSite->getId() != $redirect->getSourceSite()) {
                                 continue;
                             }
                         }

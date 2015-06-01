@@ -148,7 +148,9 @@ pimcore.settings.email.blacklist = Class.create({
             triggerAction:"all",
             listeners:{
                 select:function (box, rec, index) {
-                    this.pagingtoolbar.pageSize = intval(rec.data.field1);
+                    var pageSize = intval(rec.data.field1);
+                    this.store.getProxy().extraParams.limit = pageSize;
+                    this.pagingtoolbar.pageSize = pageSize;
                     this.pagingtoolbar.moveFirst();
                 }.bind(this)
             }
@@ -158,6 +160,7 @@ pimcore.settings.email.blacklist = Class.create({
             {header:t("email_address"), flex:50, sortable:true, dataIndex:'address', editable: false},
             {header: t("creationDate"), sortable: true, dataIndex: 'creationDate', editable: false,
                 hidden: false,
+                width: 150,
                 renderer: function(d) {
                     if (d !== undefined) {
                         var date = new Date(d * 1000);
@@ -169,6 +172,7 @@ pimcore.settings.email.blacklist = Class.create({
             },
             {header: t("modificationDate"), sortable: true, dataIndex: 'modificationDate', editable: false,
                 hidden: true,
+                width: 150,
                 renderer: function(d) {
                     if (d !== undefined) {
                         var date = new Date(d * 1000);

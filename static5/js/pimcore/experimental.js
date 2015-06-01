@@ -1,11 +1,141 @@
+Ext.define('overrides.Component', {
+    override: 'Ext.Component'
+
+    //initComponent: function() {
+    //    this.callParent(arguments);
+    //    this.on('enable', function(cmp) {
+    //        // workaround for http://www.sencha.com/forum/showthread.php?295910
+    //        // [5.1.0.107] setDisabled(true) on formpanel doesn't enable buttons
+    //        // ...
+    //        // Success! Looks like we've fixed this one. According to our records the fix was applied for EXTJS-16180 in 5.1.1.
+    //        //..
+    //        try {
+    //            if (typeof cmp.isMasked == "function") {
+    //                if (cmp.isMasked()) {
+    //                    cmp.unmask();
+    //                }
+    //            }
+    //        } catch (e) {
+    //
+    //        }
+    //    })
+    //}
+});
+
+// See https://www.sencha.com/forum/showthread.php?288385
+Ext.define('Ext.overrides.grid.View', {
+        extend: 'Ext.grid.View',
+
+        alias: 'widget.patchedgridview'
+
+    //    handleUpdate: function(store, record, operation, changedFieldNames) {
+    //        var me = this,
+    //            rowTpl = me.rowTpl,
+    //            oldItem, oldItemDom, oldDataRow,
+    //            newItemDom,
+    //            newAttrs, attLen, attName, attrIndex,
+    //            overItemCls,
+    //            focusedItemCls,
+    //            selectedItemCls,
+    //            columns,
+    //            column,
+    //            columnsToUpdate = [],
+    //            len, i,
+    //            hasVariableRowHeight = me.variableRowHeight,
+    //            cellUpdateFlag,
+    //            updateTypeFlags = 0,
+    //            cell,
+    //            fieldName,
+    //            value,
+    //            defaultRenderer,
+    //            scope,
+    //            ownerCt = me.ownerCt;
+    //
+    //
+    //        if (me.viewReady) {
+    //            oldItemDom = me.getNodeByRecord(record);
+    //
+    //            if (oldItemDom) {
+    //                overItemCls = me.overItemCls;
+    //                focusedItemCls = me.focusedItemCls;
+    //                selectedItemCls = me.selectedItemCls;
+    //                columns = me.ownerCt.getVisibleColumnManager().getColumns();
+    //
+    //                if (!me.getRowFromItem(oldItemDom) || (updateTypeFlags & 1) || (oldItemDom.tBodies[0].childNodes.length > 1)) {
+    //                    oldItem = Ext.fly(oldItemDom, '_internal');
+    //                    newItemDom = me.createRowElement(record, me.dataSource.indexOf(record), columnsToUpdate);
+    //                    if (oldItem.hasCls(overItemCls)) {
+    //                        Ext.fly(newItemDom).addCls(overItemCls);
+    //                    }
+    //                    if (oldItem.hasCls(focusedItemCls)) {
+    //                        Ext.fly(newItemDom).addCls(focusedItemCls);
+    //                    }
+    //                    if (oldItem.hasCls(selectedItemCls)) {
+    //                        Ext.fly(newItemDom).addCls(selectedItemCls);
+    //                    }
+    //
+    //                    if (Ext.isIE9m && oldItemDom.mergeAttributes) {
+    //                        oldItemDom.mergeAttributes(newItemDom, true);
+    //                    } else {
+    //                        newAttrs = newItemDom.attributes;
+    //                        attLen = newAttrs.length;
+    //                        for (attrIndex = 0; attrIndex < attLen; attrIndex++) {
+    //                            attName = newAttrs[attrIndex].name;
+    //                            if (attName !== 'id') {
+    //                                oldItemDom.setAttribute(attName, newAttrs[attrIndex].value);
+    //                            }
+    //                        }
+    //                    }
+    //
+    //
+    //                    if (columns.length && (oldDataRow = me.getRow(oldItemDom))) {
+    //                        me.updateColumns(oldDataRow, Ext.fly(newItemDom).down(me.rowSelector, true), columnsToUpdate);
+    //                    }
+    //
+    //                    while (rowTpl) {
+    //                        if (rowTpl.syncContent) {
+    //                            if (rowTpl.syncContent(oldItemDom, newItemDom, changedFieldNames ? columnsToUpdate : null) === false) {
+    //                                break;
+    //                            }
+    //                        }
+    //                        rowTpl = rowTpl.nextTpl;
+    //                    }
+    //                }
+    //                else {
+    //                    this.refresh();
+    //                }
+    //
+    //                if (hasVariableRowHeight) {
+    //                    Ext.suspendLayouts();
+    //                }
+    //
+    //
+    //                me.fireEvent('itemupdate', record, me.store.indexOf(record), oldItemDom);
+    //
+    //                if (hasVariableRowHeight) {
+    //                    me.refreshSize();
+    //
+    //                    Ext.resumeLayouts(true);
+    //                }
+    //            }
+    //        }
+    //    }
+    //}, function() {
+    //    if (!Ext.getVersion().match('5.1.0.107')) {
+    //        console.warn('This patch has not been tested with this version of ExtJS');
+    //    }
+
+    }
+
+    );
+
     Ext.define('pimcore.tree.Panel', {
         extend: 'Ext.tree.Panel'
     });
 
     Ext.define('pimcore.tree.View', {
         extend: 'Ext.tree.View',
-        alias: 'widget.pimcoretreeview'
-        ,
+        alias: 'widget.pimcoretreeview',
         listeners: {
             refresh: function() {
                 this.updatePaging();
@@ -16,7 +146,6 @@
 
         renderRow: function(record, rowIdx, out) {
             var me = this;
-            console.log("renderRow " + record.id);
             if (record.needsPaging) {
                 me.queue[record.id] = record;
             }
@@ -25,8 +154,6 @@
         },
 
         updatePaging: function() {
-            console.log("Update Paging");
-
             var me = this;
             var queue = me.queue;
 
@@ -34,7 +161,7 @@
 
             for (i = 0; i < names.length; i++) {
                 var node = queue[names[i]];
-                console.log("create toolbar for " + node.id + " " + node.data.expanded);
+                //console.log("create toolbar for " + node.id + " " + node.data.expanded);
 
                 if (node.data.expanded) {
                     node.ptb = ptb = Ext.create('pimcore.toolbar.Paging', {
@@ -101,7 +228,6 @@
             //}
 
             node.addListener("expand", function(node) {
-                console.log("expand " + node.id);
                 var tree = node.getOwnerTree();
                 if (tree) {
                     var view = tree.getView();
@@ -466,4 +592,5 @@
             this.callParent();
         }
     });
+
 

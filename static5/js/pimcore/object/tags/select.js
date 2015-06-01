@@ -28,7 +28,7 @@ pimcore.object.tags.select = Class.create(pimcore.object.tags.abstract, {
             this.applyPermissionStyle(key, value, metaData, record);
 
             if (record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                metaData.css += " grid_value_inherited";
+                metaData.tdCls += " grid_value_inherited";
             }
 
             for(var i=0; i<field.layout.options.length; i++) {
@@ -142,13 +142,20 @@ pimcore.object.tags.select = Class.create(pimcore.object.tags.abstract, {
             selectOnFocus: true,
             fieldLabel: this.fieldConfig.title,
             store: store,
-            itemCls: "object_field",
-            width: 300
+            componentCls: "object_field",
+            width: 300,
+            labelWidth: 100
         };
+
+        if (this.fieldConfig.labelWidth) {
+            options.labelWidth = this.fieldConfig.labelWidth;
+        }
 
         if (this.fieldConfig.width) {
             options.width = this.fieldConfig.width;
         }
+
+        options.width += options.labelWidth;
 
         if (typeof this.data == "string" || typeof this.data == "number") {
             if (in_array(this.data, validValues)) {

@@ -98,7 +98,7 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
             }
 
             if (add) {
-                this.store.add(new this.store.recordType(pair));
+                this.store.add(pair);
             }
         }
 
@@ -199,10 +199,10 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
         var gridHeight = 150;
         var keyWidth = 150;
         var descWidth = 300;
-        var groupWidth = 200;
-        var groupDescWidth = 200;
+        var groupWidth = 190;
+        var groupDescWidth = 190;
         var valueWidth = 600;
-        var metaWidth = 200;
+        var metaWidth = 190;
         var maxHeight = 190;
         var metawidth = 100;
 
@@ -240,7 +240,6 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
 
         var columns = [];
 
-        // var visibleFields = ['key','description', 'value','type','possiblevalues'];
         var visibleFields = ['group', 'groupDesc', 'keyName', 'keyDesc', 'value', 'unit'];
         if (this.fieldConfig.metaVisible) {
             visibleFields.push('metadata');
@@ -317,8 +316,8 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                 xtype: 'actioncolumn',
                 width: actionColWidth,
                 hideable: false,
-                items: [
-                    {
+                //items: [
+                //    {
                         getClass: function (v, meta, rec) {
                             var klass = "pimcore_action_column";
                             if (!rec.data.inherited) {
@@ -364,7 +363,7 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                                                 var pair = this.originalData[i];
                                                 if (pair.key == key && pair.inherited) {
                                                     var newpair = JSON.parse(JSON.stringify(pair));
-                                                    this.store.add(new this.store.recordType(newpair));
+                                                    this.store.add(newpair);
                                                 }
                                             }
                                         }
@@ -372,36 +371,12 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                                 }
                             }
                         }.bind(this)
-                    }
-                ]
+                //    }
+                //]
             });
         }
 
         gridWidth += actionColWidth;
-
-        //var configuredFilters = [
-        //    {
-        //        type: "string",
-        //        dataIndex: "group"
-        //    },
-        //    {
-        //        type: "string",
-        //        dataIndex: "description"
-        //    },
-        //    {
-        //        type: "string",
-        //        dataIndex: "value"
-        //    }
-        //];
-
-        //if (this.fieldConfig.metaVisible) {
-        //    configuredFilters.push(            {
-        //            type: "string",
-        //            dataIndex: "metadata"
-        //        }
-        //    );
-        //}
-
 
         this.cellEditing = Ext.create('Ext.grid.plugin.CellEditing', {
             clicksToEdit: 1
@@ -417,10 +392,12 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                 items: columns
             },
             viewConfig: {
-                markDirty: false
+                markDirty: false,
+                forceFit: true,
+                xtype: 'patchedgridview'
             },
-            cls: cls,
-            width: gridWidth,
+            componentCls: cls,
+            //width: gridWidth,
             stripeRows: true,
             plugins: [
                 this.cellEditing
@@ -448,9 +425,9 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                         iconCls: "pimcore_icon_add",
                         handler: this.openSearchEditor.bind(this)
                     }
-                ],
-                ctCls: "pimcore_force_auto_width",
-                cls: "pimcore_force_auto_width"
+                ]
+
+
             },
             autoHeight: autoHeight,
             //maxHeight: 10,
@@ -476,7 +453,7 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
         pimcore.helpers.openObject(data.source, "object");
     },
 
-    cellMousedown: function (col, grid, rowIndex, event) {
+    cellMousedown: function (grid, el, rowIndex, colIndex, event, record) {
 
 
         var store = grid.getStore();
@@ -497,14 +474,14 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
 
         if (colIndex == 0) {
             if (record.data.inherited) {
-                metaData.css += " grid_value_inherited";
+                metaData.tdCls += " grid_value_inherited";
             }
         } else {
             if (colIndex == 3) {
-                metaData.css += " grid_value_noedit";
+                metaData.tdCls += " grid_value_noedit";
             }
             if (this.isInvalid(record)) {
-                metaData.css += " keyvalue_mandatory_violation";
+                metaData.tdCls += " keyvalue_mandatory_violation";
             }
 
             if (type == "translated") {
@@ -512,8 +489,12 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                     return data.translated;
                 }
             } else if (type == "bool") {
-                metaData.css += ' x-grid3-check-col-td';
-                return String.format('<div class="x-grid3-check-col{0}" style="background-position:10px center;">&#160;</div>', value ? '-on' : '');
+                if (value) {
+                    return '<div style="text-align: center"><img class="x-grid-checkcolumn x-grid-checkcolumn-checked" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+
+                } else {
+                    return '<div style="text-align: center"><img class="x-grid-checkcolumn" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+                }
             } else if (type == "range") {
                 // render range value for list view [YouWe]
                 var rangeObject = Ext.util.JSON.decode(value);
@@ -751,7 +732,7 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                     colData.groupDesc = keyDef.groupdescription;
                     colData.unit = keyDef.unit;
                     colData.mandatory = keyDef.mandatory;
-                    this.store.add(new this.store.recordType(colData));
+                    this.store.add(colData);
 
                     if (this.fieldConfig.multivalent) {
                         // iterate over the store and remove all inherited pairs
@@ -845,15 +826,19 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                     var inherited = record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited;
 
                     if (inherited && multivalent) {
-                        metaData.css += " grid_value_inherited_locked";
+                        metaData.tdCls += " grid_value_inherited_locked";
                     } else if (inherited) {
-                        metaData.css += " grid_value_inherited";
+                        metaData.tdCls += " grid_value_inherited";
                     } else if (multivalent) {
-                        metaData.css += " grid_value_locked";
+                        metaData.tdCls += " grid_value_locked";
                     }
 
-                    metaData.css += ' x-grid3-check-col-td';
-                    return String.format('<div class="x-grid3-check-col{0}">&#160;</div>', value ? '-on' : '');
+                    if (value) {
+                        return '<div style="text-align: center"><img class="x-grid-checkcolumn x-grid-checkcolumn-checked" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+
+                    } else {
+                        return '<div style="text-align: center"><img class="x-grid-checkcolumn" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+                    }
                 }.bind(this, field.key)
             });
         } else if (field.layout.gridType == "translated") {
@@ -862,11 +847,11 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                 var inherited = record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited;
 
                 if (inherited && multivalent) {
-                    metaData.css += " grid_value_inherited_locked";
+                    metaData.tdCls += " grid_value_inherited_locked";
                 } else if (inherited) {
-                    metaData.css += " grid_value_inherited";
+                    metaData.tdCls += " grid_value_inherited";
                 } else if (multivalent) {
-                    metaData.css += " grid_value_locked";
+                    metaData.tdCls += " grid_value_locked";
                 }
 
                 if (record.data["#kv-tr"][key] !== undefined) {
@@ -883,15 +868,15 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                 var inherited = record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited;
 
                 if (inherited && multivalent) {
-                    metaData.css += " grid_value_inherited_locked";
+                    metaData.tdCls += " grid_value_inherited_locked";
                 } else if (inherited) {
-                    metaData.css += " grid_value_inherited";
+                    metaData.tdCls += " grid_value_inherited";
                 } else if (multivalent) {
-                    metaData.css += " grid_value_locked";
+                    metaData.tdCls += " grid_value_locked";
                 }
 
                 if (record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                    metaData.css += " grid_value_inherited";
+                    metaData.tdCls += " grid_value_inherited";
                 }
                 return value;
             }.bind(this, field.key);

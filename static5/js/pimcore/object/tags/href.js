@@ -35,7 +35,7 @@ pimcore.object.tags.href = Class.create(pimcore.object.tags.abstract, {
             this.applyPermissionStyle(key, value, metaData, record);
 
             if (record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                metaData.css += " grid_value_inherited";
+                metaData.tdCls += " grid_value_inherited";
             }
             return value;
 
@@ -49,7 +49,6 @@ pimcore.object.tags.href = Class.create(pimcore.object.tags.abstract, {
     getLayoutEdit: function () {
 
         var href = {
-            fieldLabel: this.fieldConfig.title,
             name: this.fieldConfig.name
         };
 
@@ -63,7 +62,7 @@ pimcore.object.tags.href = Class.create(pimcore.object.tags.abstract, {
             href.width = this.fieldConfig.width;
         }
         href.enableKeyEvents = true;
-        href.cls = "pimcore_droptarget_input";
+        href.fieldCls = "pimcore_droptarget_input";
         this.component = new Ext.form.TextField(href);
 
         this.component.on("render", function (el) {
@@ -128,10 +127,11 @@ pimcore.object.tags.href = Class.create(pimcore.object.tags.abstract, {
         }
 
 
-        this.composite = Ext.create('Ext.form.FieldSet', {
+        this.composite = Ext.create('Ext.form.FieldContainer', {
+            fieldLabel: this.fieldConfig.title,
             layout: 'hbox',
             items: items,
-            itemCls: "object_field",
+            componentCls: "object_field",
             border: false,
             style: {
                 padding: 0
@@ -163,14 +163,14 @@ pimcore.object.tags.href = Class.create(pimcore.object.tags.abstract, {
 
         this.component = new Ext.form.TextField(href);
 
-        this.composite = Ext.create('Ext.form.FieldSet', {
-            layout: 'hbox',
+        this.composite = Ext.create('Ext.form.FieldContainer', {
+            layout: 'vbox',
             items: [this.component, {
                 xtype: "button",
                 iconCls: "pimcore_icon_edit",
                 handler: this.openElement.bind(this)
             }],
-            itemCls: "object_field",
+            componentCls: "object_field",
             border: false,
             style: {
                 padding: 0
@@ -377,7 +377,7 @@ pimcore.object.tags.href = Class.create(pimcore.object.tags.abstract, {
             }
 
         } else if (type == "document" && this.fieldConfig.documentsAllowed) {
-            subType = data.node.attributes.type;
+            subType = data.type;
             isAllowed = false;
             if (this.fieldConfig.documentTypes != null && this.fieldConfig.documentTypes.length > 0) {
                 for (i = 0; i < this.fieldConfig.documentTypes.length; i++) {

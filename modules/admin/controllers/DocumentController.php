@@ -79,8 +79,10 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
                                         (select list from users_workspaces_document where userId in (" . implode(',', $userIds) . ") and LOCATE(cpath,CONCAT(path,`key`))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
                                         )", $document->getId());
             }
-            $list->setOrderKey("index");
-            $list->setOrder("asc");
+
+            $list->setOrderKey(["index", "id"]);
+            $list->setOrder(["asc","asc"]);
+
             $list->setLimit($limit);
             $list->setOffset($offset);
 
@@ -187,7 +189,7 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
                             }
                         }
 
-                        if (class_exists($classname)) {
+                        if (Tool::classExists($classname)) {
                             $document = $classname::create($this->getParam("parentId"), $createValues);
                             try {
                                 $document->save();
@@ -859,9 +861,13 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
         $this->removeViewRenderer();
     }
 
-
-    protected function getTreeNodeConfig($childDocument)
+    /**
+     * @param $element
+     * @return array
+     */
+    protected function getTreeNodeConfig($element)
     {
+        $childDocument = $element;
 
         $tmpDocument = array(
             "id" => $childDocument->getId(),
@@ -1129,7 +1135,7 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
 
         $type = $this->getParam("type");
         $class = "\\Pimcore\\Model\\Document\\" . ucfirst($type);
-        if (class_exists($class)) {
+        if (Tool::classExists($class)) {
             $new = new $class;
 
             // overwrite internal store to avoid "duplicate full path" error

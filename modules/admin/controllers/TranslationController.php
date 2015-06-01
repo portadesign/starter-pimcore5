@@ -81,9 +81,9 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
         $list->setOrder("asc");
         $list->setOrderKey("key");
 
-        if ($this->getParam("filter")) {
-            $filterTerm = $list->quote("%".mb_strtolower($this->getParam("filter"))."%");
-            $list->setCondition("lower(`key`) LIKE " . $filterTerm . " OR lower(`text`) LIKE " . $filterTerm);
+        $condition = $this->getGridFilterCondition();
+        if($condition) {
+            $list->setCondition($condition);
         }
 
         $list->load();
@@ -293,19 +293,37 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
             $list->setOrder("asc");
             $list->setOrderKey("key");
 
-            if($this->getParam("dir")) {
-                $list->setOrder($this->getParam("dir"));
-            }
-            if($this->getParam("sort")) {
-                $list->setOrderKey($this->getParam("sort"));
+            if (\Pimcore\Tool\Admin::isExtJS5()) {
+                $sortParam = $this->getParam("sort");
+                if ($sortParam) {
+                    $sortParam = json_decode($sortParam, true);
+                    $sortParam = $sortParam[0];
+                    $orderKey = $sortParam["property"];
+                    $order = $sortParam["direction"];
+
+                    $list->setOrderKey($orderKey);
+                    $list->setOrder($order);
+
+                }
+            } else {
+
+                if($this->getParam("dir")) {
+                    $list->setOrder($this->getParam("dir"));
+                }
+
+                if($this->getParam("sort")) {
+                    $list->setOrderKey($this->getParam("sort"));
+                }
             }
 
             $list->setLimit($this->getParam("limit"));
             $list->setOffset($this->getParam("start"));
-            if ($this->getParam("filter")) {
-                $filterTerm = $list->quote("%".mb_strtolower($this->getParam("filter"))."%");
-                $list->setCondition("lower(`key`) LIKE " . $filterTerm . " OR lower(`text`) LIKE " . $filterTerm);
+
+            $condition = $this->getGridFilterCondition();
+            if($condition) {
+                $list->setCondition($condition);
             }
+
             $list->load();
 
             $translations = array();
@@ -319,10 +337,56 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
         }
     }
 
+    protected function getGridFilterCondition() {
+
+        $db = \Pimcore\Resource::get();
+        $conditionFilters = [];
+
+        $filterJson = $this->getParam("filter");
+        if ($filterJson) {
+
+            $filters = \Zend_Json::decode($filterJson);
+            foreach ($filters as $filter) {
+
+                $operator = "=";
+                $field = null;
+                $value = null;
+
+                if ($filter["type"] == "date") {
+                    if($filter["comparison"] == "lt") {
+                        $operator = "<";
+                    } else if($filter["comparison"] == "gt") {
+                        $operator = ">";
+                    } else if($filter["comparison"] == "eq") {
+                        $operator = "=";
+                    }
+                    $filter["value"] = strtotime($filter["value"]);
+                    $field = "`" . $filter["field"] . "` ";
+                    $value = $filter["value"];
+                }
+
+                if($field && $value) {
+                    $conditionFilters[] =  $field . $operator . " " . $db->quote($value);
+                }
+            }
+        }
+
+        if ($this->getParam("searchString")) {
+            $filterTerm = $db->quote("%".mb_strtolower($this->getParam("searchString"))."%");
+            $conditionFilters[] = "(lower(`key`) LIKE " . $filterTerm . " OR lower(`text`) LIKE " . $filterTerm.")";
+        }
+
+        if(!empty($conditionFilters)) {
+            return implode(" AND ", $conditionFilters);
+        }
+
+        return null;
+    }
+
     public function cleanupAction() {
 
         $listClass = "\\Pimcore\\Model\\Translation\\" . ucfirst($this->getParam("type")) . "\\Listing";
-        if(class_exists($listClass)) {
+        if(Tool::classExists($listClass)) {
 
             $list = new $listClass();
             $list->cleanup();

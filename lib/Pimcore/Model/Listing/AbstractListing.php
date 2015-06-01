@@ -190,7 +190,11 @@ abstract class AbstractListing extends AbstractModel {
      * @return $this
      */
     public function addConditionParam($key, $value = null, $concatenator = 'AND'){
-        $this->conditionParams[$key] = array('value' => $value,'concatenator' => $concatenator);
+        $this->conditionParams[$key] = [
+            'value' => $value,
+            'concatenator' => $concatenator,
+            'ignore-value' => (strpos($key, '?') === FALSE), // If there is not a placeholder, ignore value!
+        ];
         return $this;
     }
 
@@ -227,14 +231,15 @@ abstract class AbstractListing extends AbstractModel {
                     $conditionString .= ' ' . $value['concatenator'] . ' ' . $key . ' ';
                 }
 
-                /* check value because of calls like
-                 *
-                 * if($key = $this->_getParam('key')){
-                 *   $list->addConditionParam(" `key` LIKE " . Pimcore_Resource::get()->quote("%" . $key . "%"),'');
-                 * }
-                 */
-                if($value['value'] != ''){
-                    $params[] = $value['value'];
+                // If there is not a placeholder, ignore value!
+                if(!$value['ignore-value']){
+                    if(is_array($value['value'])){
+                        foreach($value['value'] as $v){
+                            $params[] = $v;
+                        }
+                    }else{
+                        $params[] = $value['value'];
+                    }
                 }
                 $i++;
             }
@@ -282,7 +287,7 @@ abstract class AbstractListing extends AbstractModel {
     public function setGroupBy($groupBy, $qoute = true) {
         if($groupBy) {
             $this->groupBy = $groupBy;
-    
+
             if ($qoute) {
                 $this->groupBy = "`" . $this->groupBy . "`";
             }
@@ -301,7 +306,7 @@ abstract class AbstractListing extends AbstractModel {
 
     /**
      * @param  $value
-     * @return void
+     * @return string
      */
     public function quote ($value, $type = null) {
         $db = Resource::get();

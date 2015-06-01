@@ -118,7 +118,6 @@ pimcore.object.helpers.gridConfigDialog = Class.create({
 
         if(!this.languagePanel) {
             this.languagePanel = new Ext.form.FormPanel({
-                layout: "pimcoreform",
                 region: "north",
                 bodyStyle: "padding: 5px;",
                 height: 35,
@@ -156,7 +155,6 @@ pimcore.object.helpers.gridConfigDialog = Class.create({
                     id: "0",
                     root: true,
                     text: t("selected_grid_columns"),
-                    //reference: this,
                     leaf: false,
                     isTarget: true,
                     expanded: true,
@@ -170,6 +168,33 @@ pimcore.object.helpers.gridConfigDialog = Class.create({
                         //enableDrop: false,
                         //appendOnly: true,
                         ddGroup: "columnconfigelement"
+                    },
+                    listeners: {
+                        beforedrop: function (node, data, overModel, dropPosition, dropHandlers, eOpts) {
+                            var target = eOpts.options.target;
+                            var source = data.view;
+
+                            if (target != source) {
+                                var record = data.records[0];
+
+                                if (this.selectionPanel.getRootNode().findChild("key", record.data.key)) {
+                                    dropHandlers.cancelDrop();
+                                } else {
+                                    var copy = record.createNode(Ext.apply({}, record.data));
+
+                                    if (record.data.dataType == "keyValue") {
+                                        var ccd = new pimcore.object.keyvalue.columnConfigDialog();
+                                        ccd.getConfigDialog(copy, this.selectionPanel);
+                                        return;
+                                    }
+
+                                    data.records = [copy]; // assign the copy as the new dropNode
+                                }
+                            }
+                        }.bind(this),
+                        options: {
+                            target: this.selectionPanel
+                        }
                     }
                 },
                 id:'tree',
@@ -180,26 +205,6 @@ pimcore.object.helpers.gridConfigDialog = Class.create({
                 split:true,
                 autoScroll:true,
                 listeners:{
-                    beforenodedrop: function(e) {
-                        if(e.source.tree.el != e.target.ownerTree.el) {
-                            if(this.selectionPanel.getRootNode().findChild("key", e.dropNode.attributes.key)) {
-                                e.cancel= true;
-                            } else {
-                                var n = e.dropNode; // the node that was dropped
-                                var copy = new Ext.tree.TreeNode( // copy it
-                                    Ext.apply({}, n.attributes)
-                                );
-                                e.dropNode = copy; // assign the copy as the new dropNode
-
-                                if (e.dropNode.attributes.dataType == "keyValue") {
-
-                                    var ccd = new pimcore.object.keyvalue.columnConfigDialog();
-                                    ccd.getConfigDialog(copy, this.selectionPanel);
-                                    return;
-                                }
-                            }
-                        }
-                    }.bind(this),
                     itemcontextmenu: this.onTreeNodeContextmenu.bind(this)
                 },
                 buttons: [{
@@ -210,8 +215,14 @@ pimcore.object.helpers.gridConfigDialog = Class.create({
                     }.bind(this)
                 }]
             });
-
+            var store = this.selectionPanel.getStore();
+            var model = store.getModel();
+            model.setProxy({
+                type: 'memory'
+            });
         }
+
+
 
         return this.selectionPanel;
     },

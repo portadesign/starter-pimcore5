@@ -88,7 +88,6 @@ pimcore.document.properties = Class.create(pimcore.element.properties,{
             });
 
             this.languagesPanel = new Ext.form.FormPanel({
-                layout: "pimcoreform",
                 title: t("language_settings"),
                 bodyStyle: "padding: 10px;",
                 autoWidth: true,
@@ -183,7 +182,6 @@ pimcore.document.properties = Class.create(pimcore.element.properties,{
             });
 
             this.navigationPanel =  new Ext.form.FormPanel({
-                layout: "pimcoreform",
                 title: t("navigation_settings"),
                 bodyStyle: "padding: 10px;",
                 autoWidth: true,

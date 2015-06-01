@@ -26,6 +26,7 @@ abstract class Data {
     /**
      * @param $object
      * @param null $options
+     * @throws \Exception
      */
     public function map($object, $options = null) {
         $keys = get_object_vars($this);
@@ -141,7 +142,7 @@ abstract class Data {
                     $dat = $propertyWs["data"];
                 }
 
-                $object->setProperty($propertyWs["name"], $propertyWs["type"], $dat, $propertyWs["inherited"]);
+                $object->setProperty($propertyWs["name"], $propertyWs["type"], $dat, $propertyWs["inherited"], $propertyWs["inheritable"]);
             }
         }
     }

@@ -1,3 +1,7 @@
+
+SET NAMES UTF8;
+
+
 DROP TABLE IF EXISTS `assets`;
 CREATE TABLE `assets` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
@@ -11,6 +15,7 @@ CREATE TABLE `assets` (
   `userOwner` int(11) unsigned DEFAULT NULL,
   `userModification` int(11) unsigned DEFAULT NULL,
   `customSettings` text,
+  `hasMetaData` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `fullpath` (`path`,`filename`),
   KEY `parentId` (`parentId`),
@@ -507,6 +512,7 @@ CREATE TABLE `search_backend_data` (
   FULLTEXT KEY `properties` (`properties`),
   FULLTEXT KEY `fulltext` (`data`,`properties`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+/* Engine is changed to InnoDB (if available) in Pimcore\Model\Tool\Setup\Resource::database() - not here because all comments are removed */
 
 DROP TABLE IF EXISTS `sites`;
 CREATE TABLE `sites` (

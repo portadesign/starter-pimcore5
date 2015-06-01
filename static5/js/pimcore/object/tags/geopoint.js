@@ -28,7 +28,7 @@ pimcore.object.tags.geopoint = Class.create(pimcore.object.tags.geo.abstract, {
                 this.applyPermissionStyle(key, value, metaData, record);
 
                 if(record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                    metaData.css += ' grid_value_inherited';
+                    metaData.tdCls += ' grid_value_inherited';
                 }
 
                 if (value && value.latitude && value.longitude) {
@@ -76,7 +76,7 @@ pimcore.object.tags.geopoint = Class.create(pimcore.object.tags.geo.abstract, {
             title: this.fieldConfig.title,
             height: 370,
             width: 490,
-            cls: "object_field",
+            componentCls: "object_field",
             html: '<div id="google_maps_container_' + this.mapImageID + '" align="center">'
                   + '<img align="center" width="300" height="300" src="'
                   + this.getMapUrl() + '" /></div>',

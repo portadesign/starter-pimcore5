@@ -58,7 +58,6 @@ pimcore.settings.thumbnail.item = Class.create({
         });
 
         this.settings = new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             border: false,
             labelWidth: 150,
             items: [{
@@ -71,14 +70,14 @@ pimcore.settings.thumbnail.item = Class.create({
                 name: "name",
                 value: this.data.name,
                 fieldLabel: t("name"),
-                width: 300,
+                width: 450,
                 disabled: true
             }, {
                 xtype: "textarea",
                 name: "description",
                 value: this.data.description,
                 fieldLabel: t("description"),
-                width: 300,
+                width: 450,
                 height: 100
             }, {
                 xtype: "combo",
@@ -89,19 +88,19 @@ pimcore.settings.thumbnail.item = Class.create({
                 editable: false,
                 store: [["SOURCE", "Auto (Web-optimized - recommended)"], ["PNG","PNG"],["GIF","GIF"], ["JPEG","JPEG"], ["PJPEG","JPEG (progressive)"],["TIFF","TIFF"],
                         ["PRINT","Print (PNG,JPG,SVG,TIFF)"]],
-                width: 300
+                width: 450
             }, {
                 xtype: "numberfield",
                 name: "quality",
                 value: this.data.quality,
                 fieldLabel: t("quality"),
-                width: 60
+                width: 210
             }, {
                 xtype: "numberfield",
                 name: "highResolution",
                 value: this.data.highResolution,
                 fieldLabel: t("high_resolution") + "<br /><small>(2x Retina, 3.2x Print, ...)</small>",
-                width: 60,
+                width: 210,
                 decimalPrecision: 1
             }],
             buttons: [{
@@ -344,7 +343,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -358,14 +356,14 @@ pimcore.settings.thumbnail.items = {
                     xtype: 'numberfield',
                     name: "width",
                     fieldLabel: t("width"),
-                    width: 60,
+                    width: 210,
                     value: data.width
                 },
                 {
                     xtype: 'numberfield',
                     name: "height",
                     fieldLabel: t("height"),
-                    width: 60,
+                    width: 210,
                     value: data.height
                 }]
             },{
@@ -391,7 +389,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -400,7 +397,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'numberfield',
                 name: "height",
                 fieldLabel: t("height"),
-                width: 60,
+                width: 210,
                 value: data.height
             },{
                 xtype: "hidden",
@@ -425,7 +422,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -434,7 +430,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'numberfield',
                 name: "width",
                 fieldLabel: t("width"),
-                width: 60,
+                width: 210,
                 value: data.width
             },{
                 xtype: "hidden",
@@ -459,7 +455,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -473,14 +468,14 @@ pimcore.settings.thumbnail.items = {
                     xtype: 'numberfield',
                     name: "width",
                     fieldLabel: t("width"),
-                    width: 60,
+                    width: 210,
                     value: data.width
                 },
                 {
                     xtype: 'numberfield',
                     name: "height",
                     fieldLabel: t("height"),
-                    width: 60,
+                    width: 210,
                     value: data.height
                 }]
             },{
@@ -507,7 +502,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -521,14 +515,14 @@ pimcore.settings.thumbnail.items = {
                     xtype: 'numberfield',
                     name: "width",
                     fieldLabel: t("width"),
-                    width: 60,
+                    width: 210,
                     value: data.width
                 },
                 {
                     xtype: 'numberfield',
                     name: "height",
                     fieldLabel: t("height"),
-                    width: 60,
+                    width: 210,
                     value: data.height
                 }]
             },{
@@ -540,14 +534,14 @@ pimcore.settings.thumbnail.items = {
                     xtype: 'numberfield',
                     name: "x",
                     fieldLabel: "X",
-                    width: 60,
+                    width: 210,
                     value: data.x
                 },
                 {
                     xtype: 'numberfield',
                     name: "y",
                     fieldLabel: "Y",
-                    width: 60,
+                    width: 210,
                     value: data.y
                 }]
             },{
@@ -584,14 +578,14 @@ pimcore.settings.thumbnail.items = {
                     xtype: 'numberfield',
                     name: "width",
                     fieldLabel: t("width"),
-                    width: 200,
+                    width: 210,
                     value: data.width
                 },
                 {
                     xtype: 'numberfield',
                     name: "height",
                     fieldLabel: t("height"),
-                    width: 200,
+                    width: 210,
                     value: data.height
                 }]
             },{
@@ -632,7 +626,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -646,14 +639,14 @@ pimcore.settings.thumbnail.items = {
                     xtype: 'numberfield',
                     name: "width",
                     fieldLabel: t("width"),
-                    width: 60,
+                    width: 210,
                     value: data.width
                 },
                 {
                     xtype: 'numberfield',
                     name: "height",
                     fieldLabel: t("height"),
-                    width: 60,
+                    width: 210,
                     value: data.height
                 }]
             },{
@@ -679,7 +672,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -690,7 +682,7 @@ pimcore.settings.thumbnail.items = {
                 minValue: 0,
                 maxValue: 100,
                 fieldLabel: t("tolerance"),
-                width: 60,
+                width: 210,
                 value: data.tolerance ? data.tolerance : 0
             },{
                 xtype: "hidden",
@@ -715,7 +707,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -724,7 +715,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'numberfield',
                 name: "angle",
                 fieldLabel: t("angle"),
-                width: 50,
+                width: 210,
                 value: data.angle
             },{
                 xtype: "hidden",
@@ -749,7 +740,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -758,7 +748,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'textfield',
                 name: "color",
                 fieldLabel: t("color") + " (#hex)",
-                width: 70,
+                width: 210,
                 value: data.color
             },{
                 xtype: "hidden",
@@ -784,7 +774,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -799,14 +788,14 @@ pimcore.settings.thumbnail.items = {
                     xtype: 'numberfield',
                     name: "width",
                     fieldLabel: t("width"),
-                    width: 60,
+                    width: 210,
                     value: data.width
                 },
                 {
                     xtype: 'numberfield',
                     name: "height",
                     fieldLabel: t("height"),
-                    width: 60,
+                    width: 210,
                     value: data.height
                 }]
             },{
@@ -832,7 +821,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -884,7 +872,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -904,14 +891,14 @@ pimcore.settings.thumbnail.items = {
                     xtype: 'numberfield',
                     name: "x",
                     fieldLabel: "X",
-                    width: 50,
+                    width: 210,
                     value: data.x
                 },
                 {
                     xtype: 'numberfield',
                     name: "y",
                     fieldLabel: "Y",
-                    width: 50,
+                    width: 210,
                     value: data.y
                 }]
             },{
@@ -927,7 +914,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'numberfield',
                 name: "alpha",
                 fieldLabel: t("opacity") + " (0-100)",
-                width: 50,
+                width: 210,
                 value: data.alpha
             },{
                 xtype: "combo",
@@ -948,6 +935,54 @@ pimcore.settings.thumbnail.items = {
         return item;
     },
 
+    itemAddOverlayFit: function (panel, data, getName) {
+
+        var niceName = t("addoverlay_fit") + " (Imagick)";
+        if(typeof getName != "undefined" && getName) {
+            return niceName;
+        }
+
+        if(typeof data == "undefined") {
+            data = {};
+        }
+
+        //set some sane default values, maybe the data parameter should already contain these values?
+        if(typeof data.composite == "undefined" || data.composite == "") {
+            data.composite = "COMPOSITE_DEFAULT";
+        }
+
+        var myId = Ext.id();
+
+        var item =  new Ext.form.FormPanel({
+            id: myId,
+            //style: "margin: 10px 0 0 0",
+            bodyStyle: "padding: 10px;",
+            tbar: this.getTopBar(niceName, myId, panel),
+            items: [{
+                xtype: 'textfield',
+                fieldLabel: t("path") + " <br />(rel. to doc-root)",
+                name: "path",
+                value: data.path,
+                width: 350
+            },{
+                xtype: "combo",
+                name: "composite",
+                fieldLabel: t("composite"),
+                value: data.composite,
+                triggerAction: 'all',
+                editable: false,
+                store: ["COMPOSITE_DEFAULT", "COMPOSITE_HARDLIGHT", "COMPOSITE_EXCLUSION"],
+                width: 200
+            },{
+                xtype: "hidden",
+                name: "type",
+                value: "addOverlayFit"
+            }]
+        });
+
+        return item;
+    },
+
     itemApplyMask: function (panel, data, getName) {
 
         var niceName = t("applymask") + " (Imagick)";
@@ -961,7 +996,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -995,7 +1029,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -1024,7 +1057,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -1053,7 +1085,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",
@@ -1062,7 +1093,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'numberfield',
                 name: 'radius',
                 fieldLabel: t('radius'),
-                width: 50,
+                width: 210,
                 decimalPrecision: 1,
                 minValue: 0,
                 allowDecimals: true,
@@ -1072,7 +1103,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'numberfield',
                 name: 'sigma',
                 fieldLabel: t('sigma'),
-                width: 50,
+                width: 210,
                 decimalPrecision: 1,
                 minValue: 0,
                 allowDecimals: true,
@@ -1082,7 +1113,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'numberfield',
                 name: 'amount',
                 fieldLabel: t('amount'),
-                width: 50,
+                width: 210,
                 decimalPrecision: 1,
                 minValue: 0,
                 allowDecimals: true,
@@ -1092,7 +1123,7 @@ pimcore.settings.thumbnail.items = {
                 xtype: 'numberfield',
                 name: 'threshold',
                 fieldLabel: t('threshold'),
-                width: 50,
+                width: 210,
                 decimalPrecision: 2,
                 minValue: 0,
                 allowDecimals: true,
@@ -1121,7 +1152,6 @@ pimcore.settings.thumbnail.items = {
         var myId = Ext.id();
 
         var item =  new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             id: myId,
             //style: "margin: 10px 0 0 0",
             bodyStyle: "padding: 10px;",

@@ -318,9 +318,6 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin {
 
         $values = \Zend_Json::decode($this->getParam("data"));
 
-        // convert all special characters to their entities so the xml writer can put it into the file
-        $values = array_htmlspecialchars($values);
-
         // email settings
         $oldConfig = Config::getSystemConfig();
         $oldValues = $oldConfig->toArray();
@@ -339,14 +336,18 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin {
             }
         }
 
-        // delete views from old languages
-        $oldLanguages = explode(",",$oldConfig->get("general")->toArray()["validLanguages"]);
-        $newLanguages = $languages;
+
+        // delete views if fallback languages has changed or the language is no more available
+        $fallbackLanguagesChanged = array_diff_assoc ($oldValues['general']['fallbackLanguages'], $fallbackLanguages);
         $dbName = $oldConfig->get("database")->toArray()["params"]["dbname"];
-        foreach ($oldLanguages as $oldLanguage){
-            if (!in_array($oldLanguage, $newLanguages)) {
-                $this->deleteViews($oldLanguage, $dbName);
-            }
+        foreach($fallbackLanguagesChanged as $language => $dummy)
+        {
+            $this->deleteViews($language, $dbName);
+        }
+
+        $cacheExcludePatterns = $values["cache.excludePatterns"];
+        if (is_array($cacheExcludePatterns)) {
+            $cacheExcludePatterns = implode(',', $cacheExcludePatterns);
         }
 
         $settings = array(
@@ -358,8 +359,10 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin {
                 "language" => $values["general.language"],
                 "validLanguages" => implode(",", $filteredLanguages),
                 "fallbackLanguages" => $fallbackLanguages,
+                "defaultLanguage" => $values["general.defaultLanguage"],
                 "theme" => $values["general.theme"],
                 "contactemail" => $values["general.contactemail"],
+                "extjs5" => $values["general.extjs5"],
                 "loginscreencustomimage" => $values["general.loginscreencustomimage"],
                 "disableusagestatistics" => $values["general.disableusagestatistics"],
                 "debug" => $values["general.debug"],
@@ -436,7 +439,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin {
             "cache" => array(
                 "enabled" => $values["cache.enabled"],
                 "lifetime" => $values["cache.lifetime"],
-                "excludePatterns" => $values["cache.excludePatterns"],
+                "excludePatterns" => $cacheExcludePatterns,
                 "excludeCookie" => $values["cache.excludeCookie"]
             ),
             "outputfilters" => array(
@@ -503,6 +506,9 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin {
             }
         }
         $settings["newsletter"]["usespecific"] = $values["newsletter.usespecific"];
+
+        // convert all special characters to their entities so the xml writer can put it into the file
+        $settings = array_htmlspecialchars($settings);
 
         $config = new \Zend_Config($settings, true);
         $writer = new \Zend_Config_Writer_Xml(array(

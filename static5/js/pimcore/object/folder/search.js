@@ -98,7 +98,7 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
             });
 
             if (this.currentClass) {
-                //this.layout.on("afterrender", this.setClass.bind(this, this.currentClass));
+                this.layout.on("afterrender", this.setClass.bind(this, this.currentClass));
             }
         }
 
@@ -209,7 +209,6 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                     "change": function (field, checked) {
                         this.grid.filters.clearFilters();
 
-                        this.store.baseparams = {};
                         this.store.getProxy().setExtraParam("only_direct_children", checked);
 
                         this.onlyDirectChildren = checked;
@@ -231,7 +230,8 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                 loadMask: true,
                 plugins: plugins,
                 viewConfig: {
-                    forceFit: false
+                    forceFit: false,
+                    xtype: 'patchedgridview'
                 },
                 tbar: [this.languageInfo, "-", this.toolbarFilterInfo, "->", this.checkboxOnlyDirectChildren, t("only_children"), "-", this.sqlEditor, this.sqlButton, "-", {
                     text: t("search_and_move"),
@@ -316,6 +316,8 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                 triggerAction: "all",
                 listeners: {
                     select: function (box, rec, index) {
+                        this.store.setPageSize(intval(rec.data.field1));
+                        this.store.getProxy().extraParams.limit = intval(rec.data.field1);
                         this.pagingtoolbar.pageSize = intval(rec.data.field1);
                         this.pagingtoolbar.moveFirst();
                     }.bind(this)

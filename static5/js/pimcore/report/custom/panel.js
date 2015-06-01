@@ -39,7 +39,26 @@ pimcore.report.custom.panel = Class.create({
     
     getTree: function () {
         if (!this.tree) {
+            var store = Ext.create('Ext.data.TreeStore', {
+                autoLoad: false,
+                autoSync: true,
+                proxy: {
+                    type: 'ajax',
+                    url: '/admin/reports/custom-report/tree',
+                    reader: {
+                        type: 'json'
+                        //,
+                        //totalProperty : 'total',
+                        //rootProperty: 'nodes'
+                    }
+                },
+                root: {
+                    iconCls: "pimcore_icon_thumbnails"
+                }
+            });
+
             this.tree = new Ext.tree.TreePanel({
+                store: store,
                 region: "west",
                 useArrows:true,
                 autoScroll:true,
@@ -49,23 +68,11 @@ pimcore.report.custom.panel = Class.create({
                 width: 250,
                 split: true,
                 root: {
-                    nodeType: 'async',
-                    id: '0'
+                    id: '0',
+                    expanded: true
                 },
-                loader: new Ext.tree.TreeLoader({
-                    dataUrl: '/admin/reports/custom-report/tree',
-                    requestMethod: "GET",
-                    baseAttrs: {
-                        listeners: this.getTreeNodeListeners(),
-                        reference: this,
-                        allowDrop: false,
-                        allowChildren: false,
-                        isTarget: false,
-                        iconCls: "pimcore_icon_sql",
-                        leaf: true
-                    }
-                }),
                 rootVisible: false,
+                listeners: this.getTreeNodeListeners(),
                 tbar: {
                     items: [
                         {
@@ -88,7 +95,8 @@ pimcore.report.custom.panel = Class.create({
     getEditPanel: function () {
         if (!this.editPanel) {
             this.editPanel = new Ext.TabPanel({
-                region: "center"
+                region: "center",
+                plugins: ['tabclosemenu']
             });
         }
 
@@ -97,22 +105,27 @@ pimcore.report.custom.panel = Class.create({
 
     getTreeNodeListeners: function () {
         var treeNodeListeners = {
-            'click' : this.onTreeNodeClick.bind(this),
-            "contextmenu": this.onTreeNodeContextmenu
+            'itemclick' : this.onTreeNodeClick.bind(this),
+            "itemcontextmenu": this.onTreeNodeContextmenu.bind(this),
+            'beforeitemappend': function( thisNode, newChildNode, index, eOpts ) {
+                newChildNode.data.leaf = true;
+                newChildNode.data.expaned = true;
+                newChildNode.data.iconCls = "pimcore_icon_sql"
+            }
         };
 
         return treeNodeListeners;
     },
 
-    onTreeNodeClick: function (node) {
-        this.openConfig(node.id);
+    onTreeNodeClick: function (tree, record, item, index, e, eOpts ) {
+        this.openConfig(record.data.id);
     },
 
     openConfig: function (id) {
 
         var existingPanel = Ext.getCmp("pimcore_sql_panel_" + id);
         if(existingPanel) {
-            this.editPanel.activate(existingPanel);
+            this.editPanel.setActiveTab(existingPanel);
             return;
         }
 
@@ -130,17 +143,19 @@ pimcore.report.custom.panel = Class.create({
         });
     },
 
-    onTreeNodeContextmenu: function () {
-        this.select();
+    onTreeNodeContextmenu: function (tree, record, item, index, e, eOpts ) {
+        e.stopEvent();
+
+        tree.select();
 
         var menu = new Ext.menu.Menu();
         menu.add(new Ext.menu.Item({
             text: t('delete'),
             iconCls: "pimcore_icon_delete",
-            handler: this.attributes.reference.deleteField.bind(this)
+            handler: this.deleteField.bind(this, tree, record)
         }));
 
-        menu.show(this.ui.getAnchor());
+        menu.showAt(e.pageX, e.pageY);
     },
 
     addField: function () {
@@ -170,7 +185,9 @@ pimcore.report.custom.panel = Class.create({
                 success: function (response) {
                     var data = Ext.decode(response.responseText);
 
-                    this.tree.getRootNode().reload();
+                    this.tree.getStore().load({
+                        node: this.tree.getRootNode()
+                    });
 
                     if(!data || !data.success) {
                         Ext.Msg.alert(t('add_custom_report'), t('problem_creating_new_custom_report'));
@@ -188,16 +205,16 @@ pimcore.report.custom.panel = Class.create({
         }
     },
 
-    deleteField: function () {
+    deleteField: function (tree, record) {
         Ext.Ajax.request({
             url: "/admin/reports/custom-report/delete",
             params: {
-                name: this.id
+                name: record.data.id
             }
         });
 
-        this.attributes.reference.getEditPanel().removeAll();
-        this.remove();
+        this.getEditPanel().removeAll();
+        record.remove();
     }
 });
 

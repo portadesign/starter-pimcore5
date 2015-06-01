@@ -52,7 +52,6 @@ pimcore.settings.targeting.personas.item = Class.create({
     getSettings: function () {
 
         this.settingsForm = new Ext.form.FormPanel({
-            layout: "pimcoreform",
             title: t("settings"),
             bodyStyle: "padding:10px;",
             autoScroll: true,
@@ -61,14 +60,14 @@ pimcore.settings.targeting.personas.item = Class.create({
                 xtype: "textfield",
                 fieldLabel: t("name"),
                 name: "name",
-                width: 250,
+                width: 350,
                 disabled: true,
                 value: this.data.name
             }, {
                 name: "description",
                 fieldLabel: t("description"),
                 xtype: "textarea",
-                width: 400,
+                width: 500,
                 height: 100,
                 value: this.data.description
             }, {
@@ -142,7 +141,7 @@ pimcore.settings.targeting.personas.item = Class.create({
             // open
             leftBracket.on("click", function (ev, el) {
                 var bracket = Ext.get(el);
-                bracket.toggleClass("pimcore_targeting_bracket_active");
+                bracket.toggleCls("pimcore_targeting_bracket_active");
 
                 tab.recalculateBracketIdent(tab.conditionsContainer.items);
             });
@@ -150,7 +149,7 @@ pimcore.settings.targeting.personas.item = Class.create({
             // close
             rightBracket.on("click", function (ev, el) {
                 var bracket = Ext.get(el);
-                bracket.toggleClass("pimcore_targeting_bracket_active");
+                bracket.toggleCls("pimcore_targeting_bracket_active");
 
                 tab.recalculateBracketIdent(tab.conditionsContainer.items);
             });
@@ -180,7 +179,7 @@ pimcore.settings.targeting.personas.item = Class.create({
             condition = conditions[i].getForm().getFieldValues();
 
             // get the operator (AND, OR, AND_NOT)
-            tb = conditions[i].getTopToolbar();
+            var tb = conditions[i].getDockedItems()[0];
             if (tb.getComponent("toggle_or").pressed) {
                 operator = "or";
             } else if (tb.getComponent("toggle_and_not").pressed) {
@@ -192,9 +191,9 @@ pimcore.settings.targeting.personas.item = Class.create({
 
             // get the brackets
             condition["bracketLeft"] = Ext.get(conditions[i].getEl().query(".pimcore_targeting_bracket_left")[0])
-                                                                .hasClass("pimcore_targeting_bracket_active");
+                                                                .hasCls("pimcore_targeting_bracket_active");
             condition["bracketRight"] = Ext.get(conditions[i].getEl().query(".pimcore_targeting_bracket_right")[0])
-                                                                .hasClass("pimcore_targeting_bracket_active");
+                                                                .hasCls("pimcore_targeting_bracket_active");
 
             conditionsData.push(condition);
         }
@@ -217,7 +216,7 @@ pimcore.settings.targeting.personas.item = Class.create({
         var conditions = this.conditionsContainer.items.getRange();
         var tb;
         for (var i=0; i<conditions.length; i++) {
-            tb = conditions[i].getTopToolbar();
+            var tb = conditions[i].getDockedItems()[0];
             if(i==0) {
                 tb.getComponent("toggle_and").hide();
                 tb.getComponent("toggle_or").hide();
@@ -287,7 +286,7 @@ pimcore.settings.targeting.personas.item = Class.create({
                 });
 
 
-            // remeber current ident
+            // remember current ident
             lastIdent = ident;
 
 

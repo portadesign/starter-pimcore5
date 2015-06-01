@@ -30,7 +30,7 @@ pimcore.object.tags.checkbox = Class.create(pimcore.object.tags.abstract, {
     },
 
     getGridColumnConfig:function (field) {
-        return new Ext.grid.column.Check({
+        return {
             header:ts(field.label),
             dataIndex:field.key,
             renderer:function (key, value, metaData, record, rowIndex, colIndex, store) {
@@ -39,16 +39,16 @@ pimcore.object.tags.checkbox = Class.create(pimcore.object.tags.abstract, {
                 this.applyPermissionStyle(key, value, metaData, record);
 
                 if (record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                    metaData.css += " grid_value_inherited";
+                    metaData.tdCls += " grid_value_inherited";
                 }
                 if (noteditable) {
-                    metaData.css += ' grid_cbx_noteditable';
+                    metaData.tdCls += ' grid_cbx_noteditable';
 
                 }
-                metaData.css += ' x-grid3-check-col-td';
-                return String.format('<div class="x-grid3-check-col{0}">&#160;</div>', value ? '-on' : '');
+                metaData.tdCls += ' x-grid-check-col-td';
+                return Ext.String.format('<div class="x-grid-checkcolumn{0}">&#160;</div>', value ? '-checked' : '');
             }.bind(this, field)
-        });
+        };
     },
 
     getGridColumnFilter:function (field) {
@@ -60,7 +60,7 @@ pimcore.object.tags.checkbox = Class.create(pimcore.object.tags.abstract, {
         var checkbox = {
             fieldLabel:this.fieldConfig.title,
             name:this.fieldConfig.name,
-            itemCls:"object_field"
+            componentCls:"object_field"
         };
 
 

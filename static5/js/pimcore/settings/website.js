@@ -64,7 +64,7 @@ pimcore.settings.website = Class.create({
             var url = '/admin/settings/website-settings?';
             Ext.define(this.modelName, {
                 extend: 'Ext.data.Model',
-                idProperty: 'key',
+                idProperty: 'id',
                 fields:
                     ["id", 'name','type',{name: "data", type: "string", convert: function (v, rec) {
                         return v;
@@ -123,7 +123,6 @@ pimcore.settings.website = Class.create({
 
         }
 
-
         this.store = new Ext.data.Store({
             id:'settings_website_store',
             model: this.modelName,
@@ -131,17 +130,16 @@ pimcore.settings.website = Class.create({
             remoteSort:true
         });
 
-
         this.filterField = new Ext.form.TextField({
-            xtype:"textfield",
-            width:200,
-            style:"margin: 0 10px 0 0;",
+            width: 200,
+            style: "margin: 0 10px 0 0;",
             enableKeyEvents:true,
             listeners:{
                 "keydown":function (field, key) {
                     if (key.getKey() == key.ENTER) {
                         var input = field;
-                        this.store.baseParams.filter = input.getValue();
+                        var proxy = this.store.getProxy();
+                        proxy.extraParams.filter = input.getValue();
                         this.store.load();
                     }
                 }.bind(this)
@@ -177,7 +175,9 @@ pimcore.settings.website = Class.create({
             triggerAction:"all",
             listeners:{
                 select:function (box, rec, index) {
-                    this.pagingtoolbar.pageSize = intval(rec.data.field1);
+                    var limit = intval(rec.data.field1);
+                    this.store.getProxy().extraParams.limit = limit;
+                    this.pagingtoolbar.pageSize = limit;
                     this.pagingtoolbar.moveFirst();
                 }.bind(this)
             }
@@ -201,7 +201,6 @@ pimcore.settings.website = Class.create({
                 sortable: true
             },
             {
-                //id: "property_value_col",
                 header: t("value"),
                 dataIndex: 'data',
                 getCellEditor: this.getCellEditor.bind(this),
@@ -225,6 +224,7 @@ pimcore.settings.website = Class.create({
                         var val = store.getAt(pos).get("domain");
                         return val;
                     }
+                    return null;
                 }
             }
             ,
@@ -233,7 +233,7 @@ pimcore.settings.website = Class.create({
                 renderer: function(d) {
                     if (d !== undefined) {
                         var date = new Date(d * 1000);
-                        return date.format("Y-m-d H:i:s");
+                        return Ext.Date.format(date, "Y-m-d H:i:s");
                     } else {
                         return "";
                     }
@@ -245,7 +245,7 @@ pimcore.settings.website = Class.create({
                 renderer: function(d) {
                     if (d !== undefined) {
                         var date = new Date(d * 1000);
-                        return date.format("Y-m-d H:i:s");
+                        return Ext.Date.format(date, "Y-m-d H:i:s");
                     } else {
                         return "";
                     }
@@ -255,29 +255,22 @@ pimcore.settings.website = Class.create({
             {
                 xtype:'actioncolumn',
                 width:30,
-                items:[
-                    {
-                        tooltip:t('empty'),
-                        icon: "/pimcore/static/img/icon/bin_empty.png",
-                        handler:function (grid, rowIndex) {
-                            grid.getStore().getAt(rowIndex).set("data","");
-                        }.bind(this)
-                    }
-                ]
+                tooltip:t('empty'),
+                icon: "/pimcore/static/img/icon/bin_empty.png",
+                handler:function (grid, rowIndex) {
+                    grid.getStore().getAt(rowIndex).set("data","");
+                }.bind(this)
+
             }
             ,
             {
                 xtype:'actioncolumn',
                 width:30,
-                items:[
-                    {
-                        tooltip:t('delete'),
-                        icon:"/pimcore/static/img/icon/cross.png",
-                        handler:function (grid, rowIndex) {
-                            grid.getStore().removeAt(rowIndex);
-                        }.bind(this)
-                    }
-                ]
+                tooltip:t('delete'),
+                icon:"/pimcore/static/img/icon/cross.png",
+                handler:function (grid, rowIndex) {
+                    grid.getStore().removeAt(rowIndex);
+                }.bind(this)
             }
         ];
 
@@ -334,11 +327,6 @@ pimcore.settings.website = Class.create({
             bbar:this.pagingtoolbar,
             plugins: [
                 this.cellEditing
-                //,
-                //{
-                //    ptype: 'datatip',
-                //    tpl: t('click_to_edit')
-                //}
             ],
             tbar:[
                 {
@@ -365,7 +353,8 @@ pimcore.settings.website = Class.create({
                     rowupdated: this.updateRows.bind(this, "rowupdated"),
                     refresh: this.updateRows.bind(this, "refresh")
                 },
-                forceFit:true
+                forceFit:true,
+                xtype: 'patchedgridview'
             }
         });
 
@@ -495,10 +484,12 @@ pimcore.settings.website = Class.create({
         if (type == "document" || type == "asset" || type == "object") {
             return '<div class="pimcore_property_droptarget">' + value + '</div>';
         } else if (type == "bool") {
-            metaData.css += ' x-grid3-check-col-td';
-            return String.format(
-                '<div class="x-grid3-check-col{0}" style="background-position:10px center;">&#160;</div>',
-                value ? '-on' : '');
+            if (value) {
+                return '<div style="text-align: center"><img class="x-grid-checkcolumn x-grid-checkcolumn-checked" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+
+            } else {
+                return '<div style="text-align: center"><img class="x-grid-checkcolumn" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+            }
         }
 
         return value;

@@ -201,7 +201,8 @@ pimcore.settings.redirects = Class.create({
             passThroughParametersCheck,
             {header: t("target"), flex: 200, sortable: false, dataIndex: 'target',
                 editor: new Ext.form.TextField({}),
-                css: "background: url(/pimcore/static/img/icon/drop-16.png) right 2px no-repeat;"},
+                tdCls: "input_drop_target"
+            },
             {header: t("target_site"), flex: 200, sortable:true, dataIndex: "targetSite",
                 editor: new Ext.form.ComboBox({
                 store: pimcore.globalmanager.get("sites"),
@@ -249,18 +250,19 @@ pimcore.settings.redirects = Class.create({
                 forceSelection: true,
                 triggerAction: "all"
             })},
-            {header: t("expiry"), width: 60, sortable:true, dataIndex: "expiry", editor: new Ext.form.DateField(),
+            {header: t("expiry"), width: 80, sortable:true, dataIndex: "expiry", editor: new Ext.form.DateField(),
                                                                             renderer: function(d) {
                 if(d instanceof Date) {
-                    return d.format("Y-m-d");
+                    return Ext.Date.format(d, "Y-m-d");
                 }
             }},
             {header: t("creationDate"), sortable: true, dataIndex: 'creationDate', editable: false,
                 hidden: true,
+                width: 150,
                 renderer: function(d) {
                     if (d !== undefined) {
                         var date = new Date(d * 1000);
-                        return date.format("Y-m-d H:i:s");
+                        return Ext.Date.format(date, "Y-m-d H:i:s");
                     } else {
                         return "";
                     }
@@ -268,10 +270,11 @@ pimcore.settings.redirects = Class.create({
             },
             {header: t("modificationDate"), sortable: true, dataIndex: 'modificationDate', editable: false,
                 hidden: true,
+                width: 150,
                 renderer: function(d) {
                     if (d !== undefined) {
                         var date = new Date(d * 1000);
-                        return date.format("Y-m-d H:i:s");
+                        return Ext.Date.format(date, "Y-m-d H:i:s");
                     } else {
                         return "";
                     }
@@ -378,9 +381,9 @@ pimcore.settings.redirects = Class.create({
                     try {
                         var record = data.records[0];
                         var data = record.data;
-                        if (in_array(data.node.attributes.type, ["page", "link", "hardlink"])) {
+                        if (in_array(data.type, ["page", "link", "hardlink"])) {
                             var rec = this.grid.getStore().getAt(myRowIndex);
-                            rec.set("target", data.node.attributes.path);
+                            rec.set("target", data.path);
                             this.updateRows();
                             return true;
                         }
@@ -408,7 +411,10 @@ pimcore.settings.redirects = Class.create({
         this.wizardForm = new Ext.form.FormPanel({
             bodyStyle: "padding:10px;",
             items: [{
-                xtype:"compositefield",
+                xtype:"fieldset",
+                layout: 'hbox',
+                border: false,
+                padding: 0,
                 items: [{
                     xtype: "combo",
                     name: "mode",
@@ -424,12 +430,13 @@ pimcore.settings.redirects = Class.create({
                     editable: false,
                     forceSelection: true,
                     triggerAction: "all",
+                    fieldLabel: t("pattern"),
                     emptyText: t("select")
                 }, {
                     xtype: "textfield",
                     name: "pattern",
-                    fieldLabel: t("pattern"),
-                    width: 320,
+                    margin: "0 0 0 20",
+                    width: 330,
                     emptyText: "/some/example/path"
                 }]
             }]
@@ -481,11 +488,11 @@ pimcore.settings.redirects = Class.create({
             priority = 99;
         }
 
-        var u = new this.grid.store.recordType({
+        var u = {
             source: source,
             sourceEntireUrl: sourceEntireUrl,
             priority: priority
-        });
+        };
         this.grid.store.insert(0, u);
 
 		this.updateRows();

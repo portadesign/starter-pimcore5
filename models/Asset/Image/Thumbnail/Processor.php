@@ -39,6 +39,7 @@ class Processor {
         "roundCorners" => array("width","height"),
         "setBackgroundImage" => array("path"),
         "addOverlay" => array("path", "x", "y", "alpha", "composite", "origin"),
+        "addOverlayFit" => array("path", "composite"),
         "applyMask" => array("path"),
         "cropPercent" => array("width","height","x","y"),
         "grayscale" => array(),
@@ -162,7 +163,7 @@ class Processor {
         // so that it can be used also with dynamic configurations
         if($deferred) {
             $configId = "thumb_" . $id . "__" . md5($path);
-            \Pimcore\Model\Tool\TmpStore::add($configId, $config, "thumbnail_deferred");
+            TmpStore::add($configId, $config, "thumbnail_deferred");
 
             return $path;
         }

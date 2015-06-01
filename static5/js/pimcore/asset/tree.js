@@ -62,6 +62,7 @@ pimcore.asset.tree = Class.create({
 
         rootNodeConfig.text = t("home");
         rootNodeConfig.draggable = true;
+        rootNodeConfig.id = "" +  rootNodeConfig.id;
         rootNodeConfig.iconCls = "pimcore_icon_home";
         rootNodeConfig.expanded = true;
 
@@ -102,13 +103,6 @@ pimcore.asset.tree = Class.create({
             rootVisible: this.config.rootVisible,
             forceLayout: true,
             border: false,
-            //dockedItems: [{
-            //    xtype: 'pagingtoolbar',
-            //    store: store,   // same store GridPanel is using
-            //    //dock: 'bottom',
-            //    displayInfo: true,
-            //    pageSize: itemsPerPage
-            //}],
             viewConfig: {
                 plugins: {
                     ptype: 'treeviewdragdrop',
@@ -173,8 +167,6 @@ pimcore.asset.tree = Class.create({
                         msg: t("please_wait"),
                         hidden: true
                     });
-                //TODO loadmask
-                //this.tree.loadMask.enable();
 
                 // hadd listener to root node -> other nodes are added om the "append" event -> see this.enableHtml5Upload()
                 this.addHtml5DragListener(this.tree.getRootNode());
@@ -394,8 +386,6 @@ pimcore.asset.tree = Class.create({
 
 
     onTreeNodeOver: function (targetNode, position, dragData, e, eOpts ) {
-        console.log("onTreeNodeOver");
-
         var node = dragData.records[0];
         // check for permission
         try {
@@ -569,7 +559,7 @@ pimcore.asset.tree = Class.create({
                 iconCls: "pimcore_icon_paste",
                 handler: function() {
                     this.pasteCutAsset(this.cutAsset,
-                        this.cutParentNode, this, this.tree);
+                        this.cutParentNode, record, this.tree);
                     this.cutParentNode = null;
                     this.cutAsset = null;
                 }.bind(this)
@@ -683,33 +673,33 @@ pimcore.asset.tree = Class.create({
     },
 
     pasteCutAsset: function(asset, oldParent, newParent, tree) {
-        asset.attributes.reference.updateAsset(asset.id, {
+        this.updateAsset(asset.id, {
             parentId: newParent.id
-        }, function (newParent, oldParent, tree, response) {
+        }, function (asset, newParent, oldParent, tree, response) {
             try{
                 var rdata = Ext.decode(response.responseText);
                 if (rdata && rdata.success) {
                     // set new pathes
-                    var newBasePath = newParent.attributes.path;
+                    var newBasePath = newParent.data.path;
                     if (newBasePath == "/") {
                         newBasePath = "";
                     }
-                    this.attributes.basePath = newBasePath;
-                    this.attributes.path = this.attributes.basePath + "/" + this.attributes.text;
+                    asset.data.basePath = newBasePath;
+                    asset.data.path = asset.data.basePath + "/" + asset.data.text;
                 }
                 else {
-                    tree.loadMask.hide();
+                    this.tree.loadMask.hide();
                     pimcore.helpers.showNotification(t("error"), t("cant_move_node_to_target"),
                         "error",t(rdata.message));
                 }
             } catch(e){
-                tree.loadMask.hide();
+                this.tree.loadMask.hide();
                 pimcore.helpers.showNotification(t("error"), t("cant_move_node_to_target"), "error");
             }
-            tree.loadMask.hide();
-            oldParent.reload();
-            newParent.reload();
-        }.bind(asset, newParent, oldParent, tree));
+            this.tree.loadMask.hide();
+            this.refresh(oldParent);
+            this.refresh(newParent);
+        }.bind(this, asset, newParent, oldParent, tree));
 
     },
 
@@ -971,7 +961,19 @@ pimcore.asset.tree = Class.create({
         //}
     },
 
-    importFromServer: function () {
+    importFromServer: function (tree, record) {
+
+        var store = Ext.create('Ext.data.TreeStore', {
+            proxy: {
+                type: 'ajax',
+                url: "/admin/misc/fileexplorer-tree"
+            },
+            folderSort: true,
+            sorters: [{
+                property: 'text',
+                direction: 'ASC'
+            }]
+        });
 
         this.treePanel = new Ext.tree.TreePanel({
             region: "west",
@@ -981,6 +983,7 @@ pimcore.asset.tree = Class.create({
             enableDD: false,
             useArrows: true,
             autoScroll: true,
+            store: store,
             root: {
                 nodeType: 'async',
                 text: t("document_root"),
@@ -989,18 +992,12 @@ pimcore.asset.tree = Class.create({
                 expanded: true,
                 type: "folder"
             },
-            dataUrl: "/admin/misc/fileexplorer-tree",
             listeners: {
-                click: function(n) {
-                    Ext.getCmp("pimcore_asset_server_import_button").disable();
-                    if(n.attributes.type == "folder") {
-                        Ext.getCmp("pimcore_asset_server_import_button").enable();
-                    }
+                itemclick: function(tree, record, item, index, e, eOpts ) {
+                    Ext.getCmp("pimcore_asset_server_import_button").setDisabled(record.data.type != "folder");
                 }.bind(this)
             }
         });
-
-        new Ext.tree.TreeSorter(this.treePanel, {folderSort:true});
 
         this.uploadWindow = new Ext.Window({
             layout: 'fit',
@@ -1014,11 +1011,12 @@ pimcore.asset.tree = Class.create({
                 text: t("import"),
                 disabled: true,
                 id: "pimcore_asset_server_import_button",
-                handler: function () {
+                handler: function (tree, record) {
 
                     try {
                         Ext.getCmp("pimcore_asset_server_import_button").disable();
-                        var selectedNode = this.treePanel.getSelectionModel().getSelectedNode();
+                        var selModel =  this.treePanel.getSelectionModel();
+                        var selectedNode = selModel.getSelected().getAt(0);
                         this.uploadWindow.removeAll();
 
                         this.uploadWindow.add({
@@ -1031,15 +1029,12 @@ pimcore.asset.tree = Class.create({
                         Ext.Ajax.request({
                             url: "/admin/asset/import-server",
                             params: {
-                                parentId: this.id,
+                                parentId: record.id,
                                 serverPath: selectedNode.id
                             },
-                            success: function (response) {
+                            success: function (tree, record, response) {
                                 this.uploadWindow.close();
                                 this.uploadWindow = null;
-
-
-                                this.attributes.reference;
 
                                 var res = Ext.decode(response.responseText);
 
@@ -1069,7 +1064,7 @@ pimcore.asset.tree = Class.create({
                                         this.downloadProgressBar = null;
                                         this.downloadProgressWin = null;
 
-                                        this.reload();
+                                        this.refresh(record);
                                     }.bind(this),
                                     update: function (currentStep, steps, percent) {
                                         if(this.downloadProgressBar) {
@@ -1084,12 +1079,14 @@ pimcore.asset.tree = Class.create({
                                     }.bind(this),
                                     jobs: res.jobs
                                 });
-                            }.bind(this)
+                            }.bind(this, tree, record)
                         });
 
 
-                    } catch (e) { }
-                }.bind(this)
+                    } catch (e) {
+                        console.log(e)
+                    }
+                }.bind(this, tree, record)
             }]
         });
 
@@ -1171,11 +1168,7 @@ pimcore.asset.tree = Class.create({
                             var rdata = Ext.decode(response.responseText);
 
                             if (rdata && rdata.success) {
-                                var tabPanel = Ext.getCmp("pimcore_panel_tabs");
-                                var tabId = "asset_" + record.data.id;
-                                tabPanel.remove(tabId);
-                                pimcore.globalmanager.remove("asset_" + record.data.id);
-
+                                pimcore.helpers.closeAsset(record.data.id);
                                 pimcore.helpers.openAsset(record.data.id, record.data.type);
                             }
                             else {

@@ -46,14 +46,7 @@ pimcore.settings.targeting.personas.panel= Class.create({
                     url: this.treeDataUrl,
                     reader: {
                         type: 'json'
-                        //,
-                        //totalProperty : 'total',
-                        //rootProperty: 'nodes'
-
                     }
-                },
-                root: {
-                    iconCls: "pimcore_icon_personas"
                 }
             });
 
@@ -128,7 +121,7 @@ pimcore.settings.targeting.personas.panel= Class.create({
 
 
     onTreeNodeClick: function (tree, record, item, index, e, eOpts ) {
-        this.openPersona.bind(record.data);
+        this.openPersona(record.data);
     },
 
 
@@ -206,7 +199,15 @@ pimcore.settings.targeting.personas.panel= Class.create({
         if (!this.panel) {
             this.panel = new Ext.TabPanel({
                 region: "center",
-                border: false
+                border: false,
+                plugins:
+                    [
+                        Ext.create('Ext.ux.TabCloseMenu', {
+                            showCloseAll: true,
+                            showCloseOthers: true
+                        }),
+                        Ext.create('Ext.ux.TabReorderer', {})
+                    ]
             });
         }
 

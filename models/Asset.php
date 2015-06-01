@@ -146,6 +146,11 @@ class Asset extends Element\AbstractElement {
     public $customSettings = array();
 
     /**
+     * @var bool
+     */
+    public $hasMetaData = false;
+
+    /**
      * Dependencies of this asset
      *
      * @var Dependency
@@ -729,7 +734,9 @@ class Asset extends Element\AbstractElement {
 
         // hook should be also called if "save only new version" is selected
         if($callPluginHook) {
-            \Pimcore::getEventManager()->trigger("asset.preUpdate", $this);
+            \Pimcore::getEventManager()->trigger("asset.preUpdate", $this, [
+                "saveVersionOnly" => true
+            ]);
         }
 
         // set date
@@ -757,7 +764,9 @@ class Asset extends Element\AbstractElement {
 
         // hook should be also called if "save only new version" is selected
         if($callPluginHook) {
-            \Pimcore::getEventManager()->trigger("asset.postUpdate", $this);
+            \Pimcore::getEventManager()->trigger("asset.postUpdate", $this, [
+                "saveVersionOnly" => true
+            ]);
         }
 
         return $version;
@@ -1227,9 +1236,10 @@ class Asset extends Element\AbstractElement {
      * @param $type
      * @param $data
      * @param bool $inherited
+     * @param bool $inheritable
      * @return $this
      */
-    public function setProperty($name, $type, $data, $inherited = false) {
+    public function setProperty($name, $type, $data, $inherited = false, $inheritable = false) {
 
         $this->getProperties();
 
@@ -1240,6 +1250,7 @@ class Asset extends Element\AbstractElement {
         $property->setCtype("asset");
         $property->setData($data);
         $property->setInherited($inherited);
+        $property->setInheritable($inheritable);
 
         $this->properties[$name] = $property;
         return $this;
@@ -1401,8 +1412,27 @@ class Asset extends Element\AbstractElement {
     public function setMetadata($metadata)
     {
         $this->metadata = $metadata;
+
+        if(!empty($metadata)) {
+            $this->setHasMetaData(true);
+        }
     }
 
+    /**
+     * @return boolean
+     */
+    public function getHasMetaData()
+    {
+        return $this->hasMetaData;
+    }
+
+    /**
+     * @param boolean $hasMetaData
+     */
+    public function setHasMetaData($hasMetaData)
+    {
+        $this->hasMetaData = (bool) $hasMetaData;
+    }
 
     /**
      * @param $name
@@ -1429,6 +1459,8 @@ class Asset extends Element\AbstractElement {
                 "language" => $language
             );
             $this->metadata = $tmp;
+
+            $this->setHasMetaData(true);
         }
     }
 

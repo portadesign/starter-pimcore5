@@ -36,11 +36,14 @@ pimcore.report.custom.item = Class.create({
 
         this.columnStore = new Ext.data.JsonStore({
             autoDestroy: false,
+            proxy: {
+                type: 'memory'
+            },
             data: [],
             fields: ["name", "filter", "filter_drilldown", "display", "export", "order", "width", "label"]
         });
 
-        var checkDisplay = new Ext.grid.CheckColumn({
+        var checkDisplay = new Ext.grid.column.Check({
             header: t("display"),
             dataIndex: "display",
             width: 50
@@ -58,8 +61,15 @@ pimcore.report.custom.item = Class.create({
             width: 50
         });
 
-        this.columnGrid = new Ext.grid.EditorGridPanel({
+        this.cellEditing = Ext.create('Ext.grid.plugin.CellEditing', {
+            clicksToEdit: 1
+        });
+
+        this.columnGrid = Ext.create('Ext.grid.Panel', {
             store: this.columnStore,
+            plugins: [
+                this.cellEditing
+            ],
             columns: [
                 {header: t("name"), sortable: false, dataIndex: 'name', editable: false, width: 200},
                 checkDisplay,
@@ -92,7 +102,7 @@ pimcore.report.custom.item = Class.create({
                     forceSelection: true,
                     triggerAction: "all"
                 })},
-                {header: t("width"), sortable: false, dataIndex: 'width', editable: true, width: 70, editor: new Ext.ux.form.SpinnerField({
+                {header: t("width"), sortable: false, dataIndex: 'width', editable: true, width: 70, editor: new Ext.form.field.Number({
                     decimalPrecision: 0
                 })},
                 {header: t("label"), sortable: false, dataIndex: 'label', editable: true, width: 150, editor: new Ext.form.TextField({})},
@@ -135,14 +145,12 @@ pimcore.report.custom.item = Class.create({
             trackMouseOver: true,
             stripeRows: true,
             autoHeight: true,
-            plugins: [checkDisplay,checkExport, checkOrder],
             title: t('column_configuration')
         });
 
         this.panel = new Ext.Panel({
             region: "center",
             id: "pimcore_sql_panel_" + this.data.name,
-            bodyStyle: "padding:10px",
             labelWidth: 150,
             autoScroll: true,
             border:false,
@@ -162,7 +170,7 @@ pimcore.report.custom.item = Class.create({
         });
 
         this.parentPanel.getEditPanel().add(this.panel);
-        this.parentPanel.getEditPanel().activate(this.panel);
+        this.parentPanel.getEditPanel().setActiveTab(this.panel);
 
         pimcore.layout.refresh();
     },
@@ -170,49 +178,45 @@ pimcore.report.custom.item = Class.create({
     getGeneralDefinitionPanel: function() {
         this.generalDefinitionForm = new Ext.form.FormPanel({
             border:false,
-            layout: "pimcoreform",
             items: [{
                 xtype: "fieldset",
                 itemId: "generalFieldset",
                 title: t("general"),
                 collapsible: false,
+                defaults: {
+                    width: 400
+                },
                 items: [{
                     xtype: "textfield",
                     name: "name",
                     value: this.data.name,
                     fieldLabel: t("name"),
-                    width: 300,
                     disabled: true
                 },{
                     xtype: "textfield",
                     name: "niceName",
                     value: this.data.niceName,
-                    fieldLabel: t("nice_name"),
-                    width: 300
+                    fieldLabel: t("nice_name")
                 },{
                     xtype: "textfield",
                     name: "iconClass",
                     value: this.data.iconClass,
-                    fieldLabel: t("icon_class"),
-                    width: 300
+                    fieldLabel: t("icon_class")
                 },{
                     xtype: "textfield",
                     name: "group",
                     value: this.data.group,
-                    fieldLabel: t("group"),
-                    width: 300
+                    fieldLabel: t("group")
                 },{
                     xtype: "textfield",
                     name: "groupIconClass",
                     value: this.data.groupIconClass,
-                    fieldLabel: t("group_icon_class"),
-                    width: 300
+                    fieldLabel: t("group_icon_class")
                 },{
                     xtype: "checkbox",
                     name: "menuShortcut",
                     checked: this.data.menuShortcut,
-                    fieldLabel: t("create_menu_shortcut"),
-                    width: 300
+                    fieldLabel: t("create_menu_shortcut")
                 }]
             }]
         });
@@ -254,7 +258,6 @@ pimcore.report.custom.item = Class.create({
 
         this.chartDefinitionForm = new Ext.form.FormPanel({
             border:false,
-            layout: "pimcoreform",
             items: [{
                 xtype: 'fieldset',
                 itemId: "chartdefinitionFieldset",
@@ -299,7 +302,7 @@ pimcore.report.custom.item = Class.create({
                 name: 'pieLabelColumn',
                 value: this.data.pieLabelColumn,
                 mode: 'local',
-                width: 300,
+                width: 400,
                 fieldLabel: t('custom_report_labelcolumn'),
                 store: this.columnStore,
                 valueField: 'name',
@@ -311,7 +314,7 @@ pimcore.report.custom.item = Class.create({
                     name: 'pieColumn',
                     value: this.data.pieColumn,
                     mode: 'local',
-                    width: 300,
+                    width: 400,
                     fieldLabel: t('custom_report_datacolumn'),
                     store: this.columnStore,
                     valueField: 'name',
@@ -322,7 +325,7 @@ pimcore.report.custom.item = Class.create({
     },
 
     getLineChartDefinitionPanel: function() {
-        return new Ext.form.FieldSet({
+        return new Ext.form.FieldContainer({
             title: t("custom_report_chart_options"),
             hidden: true,
             style: "margin-top: 20px;margin-bottom: 20px",
@@ -342,23 +345,23 @@ pimcore.report.custom.item = Class.create({
                     lazyRender:true,
                     name: 'xAxis',
                     mode: 'local',
-                    width: 300,
+                    width: 400,
                     value: this.data.xAxis,
                     fieldLabel: t('custom_report_x_axis'),
                     store: this.columnStore,
                     valueField: 'name',
                     displayField: 'name'
                 }),{
-                    xtype: "compositefield",
+                    xtype: "fieldcontainer",
+                    layout: 'hbox',
                     fieldLabel: t("custom_report_y_axis"),
-                    width: 360,
                     items: [{
                         xtype: "combo",
                         triggerAction: 'all',
                         lazyRender:true,
                         name: 'yAxis',
                         mode: 'local',
-                        width: 300,
+                        width: 295,
                         store: this.columnStore,
                         value: this.data.yAxis ? this.data.yAxis[0] : null,
                         valueField: 'name',
@@ -377,16 +380,16 @@ pimcore.report.custom.item = Class.create({
 
     addAdditionalYAxis: function(value) {
         this.lineChartDefinitionPanel.add({
-            xtype: "compositefield",
+            xtype: "fieldcontainer",
+            layout: 'hbox',
             fieldLabel: t("custom_report_y_axis"),
-            width: 360,
             items: [{
                 xtype: "combo",
                 triggerAction: 'all',
                 lazyRender:true,
                 name: 'yAxis',
                 mode: 'local',
-                width: 300,
+                width: 295,
                 store: this.columnStore,
                 value: value ? value : null,
                 valueField: 'name',
@@ -395,7 +398,7 @@ pimcore.report.custom.item = Class.create({
                 xtype: "button",
                 iconCls: "pimcore_icon_delete",
                 handler: function (button) {
-                    this.lineChartDefinitionPanel.remove(button.findParentByType('compositefield'));
+                    this.lineChartDefinitionPanel.remove(button.findParentByType('fieldcontainer'));
                     this.lineChartDefinitionPanel.doLayout();
                 }.bind(this)
             }]
@@ -407,7 +410,6 @@ pimcore.report.custom.item = Class.create({
 
         this.sourceDefinitionsItems = new Ext.Panel({
             style: "margin-bottom: 20px",
-            layout: "pimcoreform",
             items: [
                 this.getAddControl()
             ]
@@ -424,7 +426,7 @@ pimcore.report.custom.item = Class.create({
                     xtype: "displayfield",
                     name: "errorMessage",
                     itemId: "errorMessage",
-                    style: "color: red;"
+                    fieldStyle: "color: red;"
                 }
             ]
         });
@@ -464,7 +466,7 @@ pimcore.report.custom.item = Class.create({
             }
         }
         this.currentElementCount--;
-        this.sourceDefinitionsItems.remove(this.sourceDefinitionsItems.get(0));
+        this.sourceDefinitionsItems.remove(this.sourceDefinitionsItems.getComponent(0));
         this.sourceDefinitionsItems.insert(0, this.getAddControl());
         this.sourceDefinitionsItems.doLayout();
     },
@@ -516,7 +518,7 @@ pimcore.report.custom.item = Class.create({
     },
 
     addSourceDefinition: function (sourceDefinitionData) {
-        this.sourceDefinitionsItems.remove(this.sourceDefinitionsItems.get(0));
+        this.sourceDefinitionsItems.remove(this.sourceDefinitionsItems.getComponent(0));
 
         var currentData = {};
 
@@ -605,8 +607,7 @@ pimcore.report.custom.item = Class.create({
                         }
                     }
 
-                    var u = new this.columnStore.recordType(insertData);
-                    this.columnStore.add([u]);
+                    this.columnStore.add(insertData);
                 }
             }
         }

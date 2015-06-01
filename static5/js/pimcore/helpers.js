@@ -124,12 +124,17 @@ pimcore.helpers.openAsset = function (id, type, options) {
 
 pimcore.helpers.closeAsset = function (id) {
 
-    var tabPanel = Ext.getCmp("pimcore_panel_tabs");
-    var tabId = "asset_" + id;
-    tabPanel.remove(tabId);
+    try {
+        var tabPanel = Ext.getCmp("pimcore_panel_tabs");
+        var tabId = "asset_" + id;
+        var panel = Ext.getCmp(tabId);
+        panel.close();
 
-    pimcore.helpers.removeTreeNodeLoadingIndicator("asset", id);
-    pimcore.globalmanager.remove("asset_" + id);
+        pimcore.helpers.removeTreeNodeLoadingIndicator("asset", id);
+        pimcore.globalmanager.remove("asset_" + id);
+    } catch (e) {
+        console.log(e);
+    }
 };
 
 pimcore.helpers.openDocument = function (id, type, options) {
@@ -153,20 +158,22 @@ pimcore.helpers.openDocument = function (id, type, options) {
 
 
 pimcore.helpers.closeDocument = function (id) {
+    try {
+        var tabPanel = Ext.getCmp("pimcore_panel_tabs");
+        var tabId = "document_" + id;
+        var panel = Ext.getCmp(tabId);
+        panel.close();
 
-    var tabPanel = Ext.getCmp("pimcore_panel_tabs");
-    var tabId = "document_" + id;
-    tabPanel.remove(tabId);
 
-    pimcore.helpers.removeTreeNodeLoadingIndicator("document", id);
-    pimcore.globalmanager.remove("document_" + id);
+        pimcore.helpers.removeTreeNodeLoadingIndicator("document", id);
+        pimcore.globalmanager.remove("document_" + id);
+    } catch (e) {
+        console.log(e);
+    }
+
 };
 
 pimcore.helpers.openObject = function (id, type, options) {
-    //TODO EXT5 if we currently attempt to open a folder the whole system breaks apart
-    //if (type == "folder") {
-    //    return;
-    //}
     if (pimcore.globalmanager.exists("object_" + id) == false) {
 
         if(type != "folder" && type != "variant" && type != "object") {
@@ -190,13 +197,17 @@ pimcore.helpers.openObject = function (id, type, options) {
 };
 
 pimcore.helpers.closeObject = function (id) {
+    try {
+        var tabPanel = Ext.getCmp("pimcore_panel_tabs");
+        var tabId = "object_" + id;
+        var panel = Ext.getCmp(tabId);
+        panel.close();
 
-    var tabPanel = Ext.getCmp("pimcore_panel_tabs");
-    var tabId = "object_" + id;
-    tabPanel.remove(tabId);
-
-    pimcore.helpers.removeTreeNodeLoadingIndicator("object", id);
-    pimcore.globalmanager.remove("object_" + id);
+        pimcore.helpers.removeTreeNodeLoadingIndicator("object", id);
+        pimcore.globalmanager.remove("object_" + id);
+    } catch (e) {
+        console.log(e);
+    }
 };
 
 pimcore.helpers.getHistory = function() {
@@ -254,7 +265,7 @@ pimcore.helpers.recordElement = function(id, type, name) {
                 }
             }
 
-            historyPanel.store.insert(0, new historyPanel.store.recordType(thePair));
+            historyPanel.store.insert(0, thePair);
             historyPanel.resultpanel.getView().refresh();
         }
     }
@@ -727,7 +738,6 @@ pimcore.helpers.deleteAssetFromServer = function (id, r, callback, button) {
                         tree.getStore().load( {
                             node: node.parentNode
                         });
-
                     }
                 }
 
@@ -756,7 +766,9 @@ pimcore.helpers.deleteAssetFromServer = function (id, r, callback, button) {
 
                 var node = pimcore.globalmanager.get("layout_asset_tree").tree.getNodeById(id);
                 if(node) {
-                    node.parentNode.reload();
+                    tree.getStore().load( {
+                        node: node.parentNode
+                    });
                 }
             }.bind(this, id),
             jobs: r.deletejobs
@@ -895,7 +907,9 @@ pimcore.helpers.deleteDocumentFromServer = function (id, r, callback, button) {
 
                 var node = pimcore.globalmanager.get("layout_document_tree").tree.getNodeById(id);
                 if(node) {
-                    node.parentNode.reload();
+                    tree.getStore().load( {
+                        node: node.parentNode
+                    });
                 }
             }.bind(this, id),
             jobs: r.deletejobs
@@ -1003,7 +1017,6 @@ pimcore.helpers.deleteObjectFromServer = function (id, r, callback, button) {
                         tree.getStore().load( {
                             node: node.parentNode
                         });
-
                     }
                 }
 
@@ -1031,7 +1044,9 @@ pimcore.helpers.deleteObjectFromServer = function (id, r, callback, button) {
 
                 var node = pimcore.globalmanager.get("layout_object_tree").tree.getNodeById(id);
                 if(node) {
-                    node.parentNode.reload();
+                    tree.getStore().load( {
+                        node: node.parentNode
+                    });
                 }
             }.bind(this, id),
             jobs: r.deletejobs
@@ -1141,7 +1156,6 @@ pimcore.helpers.assetSingleUploadDialog = function (parent, parentType, success,
     });
 
     var uploadForm = new Ext.form.FormPanel({
-        layout: "pimcoreform",
         fileUpload: true,
         width: 400,
         bodyStyle: 'padding: 10px;',
@@ -1149,7 +1163,7 @@ pimcore.helpers.assetSingleUploadDialog = function (parent, parentType, success,
             xtype: 'fileuploadfield',
             emptyText: t("select_a_file"),
             fieldLabel: t("asset"),
-            width: 230,
+            width: 330,
             name: 'Filedata',
             buttonText: "",
             buttonConfig: {
@@ -1207,7 +1221,6 @@ pimcore.helpers.uploadDialog = function (url, filename, success, failure) {
     });
 
     var uploadForm = new Ext.form.FormPanel({
-        layout: "pimcoreform",
         fileUpload: true,
         width: 400,
         bodyStyle: 'padding: 10px;',
@@ -1215,7 +1228,7 @@ pimcore.helpers.uploadDialog = function (url, filename, success, failure) {
             xtype: 'fileuploadfield',
             emptyText: t("select_a_file"),
             fieldLabel: t("file"),
-            width: 230,
+            width: 330,
             name: filename,
             buttonText: "",
             buttonConfig: {
@@ -1561,7 +1574,10 @@ pimcore.helpers.getMainTabMenuItems = function () {
     items = [{
         text: t('close_others'),
         iconCls: "",
-        handler: function (item) {
+        handler: function (menuItem) {
+            var tabPanel = Ext.getCmp("pimcore_panel_tabs");
+            var plugin = tabPanel.getPlugin("tabclosemenu");
+            el = plugin.item;
             pimcore.helpers.closeAllElements(el);
             // clear the opentab store, so that also non existing elements are flushed
             pimcore.helpers.clearOpenTab();
@@ -1764,7 +1780,11 @@ pimcore.helpers.searchAndMove = function (parentId, callback, type) {
 
                 try {
                     var node = pimcore.globalmanager.get("layout_object_tree").tree.getNodeById(this.object.id);
-                    node.reload();
+                    if (node) {
+                        tree.getStore().load( {
+                            node: node
+                        });
+                    }
                 } catch (e) {
                     // node is not present
                 }
@@ -1798,7 +1818,6 @@ pimcore.helpers.sendTestEmail = function () {
         items: [{
             xtype: "form",
             bodyStyle: "padding:10px;",
-            layout: "pimcoreform",
             itemId: "form",
             items: [{
                 xtype: "textfield",
@@ -1872,8 +1891,8 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
         fieldLabel: t('path'),
         value: data.path,
         name: "path",
-        width: 320,
-        cls: "pimcore_droptarget_input",
+        width: 420,
+        fieldCls: "pimcore_droptarget_input",
         enableKeyEvents: true,
         listeners: {
             keyup: function (el) {
@@ -1899,8 +1918,9 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
             }.bind(this),
 
             onNodeDrop : function (target, dd, e, data) {
-                if (data.node.attributes.elementType == "asset" || data.node.attributes.elementType == "document") {
-                    fieldPath.setValue(data.node.attributes.path);
+                var record = data.records[0];
+                if (record.data.elementType == "asset" || record.data.elementType == "document") {
+                    fieldPath.setValue(record.data.path);
                     return true;
                 }
                 return false;
@@ -1918,7 +1938,6 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
         items: [
             {
                 xtype:'tabpanel',
-                activeTab: 0,
                 deferredRender: false,
                 defaults:{autoHeight:true, bodyStyle:'padding:10px'},
                 border: false,
@@ -1935,7 +1954,7 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
                                 value: data.text
                             },
                             {
-                                xtype: "fieldset",
+                                xtype: "fieldcontainer",
                                 layout: 'hbox',
                                 border: false,
                                 items: [fieldPath, {
@@ -1958,10 +1977,10 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
                                 layout: 'vbox',
                                 title: t('properties'),
                                 collapsible: false,
-                                autoHeight:true,
                                 defaultType: 'textfield',
+                                width: '100%',
                                 defaults: {
-                                    width: 300
+                                    width: 250
                                 },
                                 items :[
                                     {
@@ -1972,7 +1991,8 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
                                         editable: true,
                                         mode: "local",
                                         store: ["","_blank","_self","_top","_parent"],
-                                        value: data.target
+                                        value: data.target,
+                                        width: 300
                                     },
                                     {
                                         fieldLabel: t('parameters'),
@@ -2078,8 +2098,8 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
         fieldLabel: t('path'),
         value: data.path,
         name: "path",
-        width: 320,
-        cls: "pimcore_droptarget_input",
+        width: 420,
+        fieldCls: "pimcore_droptarget_input",
         enableKeyEvents: true,
         listeners: {
             keyup: function (el) {
@@ -2096,8 +2116,8 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
         fieldLabel: t('poster_image'),
         value: data.poster,
         name: "poster",
-        width: 320,
-        cls: "pimcore_droptarget_input",
+        width: 420,
+        fieldCls: "pimcore_droptarget_input",
         enableKeyEvents: true,
         listeners: {
             keyup: function (el) {
@@ -2116,12 +2136,13 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
             },
 
             onNodeOver : function(target, dd, e, data) {
-                if (target && target.getAttribute("name") == "poster") {
-                    if (data.node.attributes.elementType == "asset" && data.node.attributes.type == "image") {
+                data = data.records[0].data;
+                if (target && target.getId() == poster.getId()) {
+                    if (data.elementType == "asset" && data.type == "image") {
                         return Ext.dd.DropZone.prototype.dropAllowed;
                     }
                 } else {
-                    if (data.node.attributes.elementType == "asset" && data.node.attributes.type == "video") {
+                    if (data.elementType == "asset" && data.type == "video") {
                         return Ext.dd.DropZone.prototype.dropAllowed;
                     }
                 }
@@ -2130,15 +2151,17 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
 
             onNodeDrop : function (target, dd, e, data) {
                 if(target) {
-                    if(target.getAttribute("name") == "path") {
-                        if (data.node.attributes.elementType == "asset" && data.node.attributes.type == "video") {
-                            fieldPath.setValue(data.node.attributes.path);
+                    data = data.records[0].data;
+
+                    if(target.getId() == fieldPath.getId()) {
+                        if (data.elementType == "asset" && data.type == "video") {
+                            fieldPath.setValue(data.path);
                             form.getComponent("type").setValue("asset");
                             return true;
                         }
-                    } else if (target.getAttribute("name") == "poster") {
-                        if (data.node.attributes.elementType == "asset" && data.node.attributes.type == "image") {
-                            poster.setValue(data.node.attributes.path);
+                    } else if (target.getId() == poster.getId()) {
+                        if (data.elementType == "asset" && data.type == "image") {
+                            poster.setValue(data.path);
                             return true;
                         }
                     }
@@ -2171,7 +2194,8 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
 
     var updateType = function (type) {
         searchButton.enable();
-        var labelEl = form.getComponent("pathContainer").label;
+
+        var labelEl = form.getComponent("pathContainer").labelEl;
         labelEl.update(t("path"));
 
         if(type != "asset") {
@@ -2202,6 +2226,7 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
             name: 'type',
             triggerAction: 'all',
             editable: true,
+            width: 270,
             mode: "local",
             store: ["asset","youtube","vimeo"],
             value: data.type,
@@ -2212,7 +2237,7 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
                 }.bind(this)
             }
         }, {
-            xtype: "fieldset",
+            xtype: "fieldcontainer",
             layout: 'hbox',
             border: false,
             itemId: "pathContainer",
@@ -2221,13 +2246,13 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
             xtype: "textfield",
             name: "title",
             fieldLabel: t('title'),
-            width: 320,
+            width: 420,
             value: data.title
         },{
             xtype: "textarea",
             name: "description",
             fieldLabel: t('description'),
-            width: 320,
+            width: 420,
             height: 50,
             value: data.description
         }],
@@ -2264,4 +2289,640 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
     window.show();
 
     return window;
+};
+
+pimcore.helpers.editmode.openPdfEditPanel = function () {
+
+
+    // FUNCTIONS
+
+    var editMarkerHotspotData = function (id) {
+
+        var hotspotMetaDataWin = new Ext.Window({
+            width: 600,
+            height: 440,
+            closeAction: "close",
+            resizable: false,
+            autoScroll: true,
+            items: [{
+                xtype: "form",
+                itemId: "form",
+                bodyStyle: "padding: 10px;"
+            }],
+            tbar: [{
+                xtype: "button",
+                iconCls: "pimcore_icon_add",
+                menu: [{
+                    text: t("link"),
+                    iconCls: "pimcore_icon_input",
+                    handler: function () {
+                        addItem("link");
+                    }
+                },"-",{
+                    text: t("textfield"),
+                    iconCls: "pimcore_icon_input",
+                    handler: function () {
+                        addItem("textfield");
+                    }
+                }, {
+                    text: t("textarea"),
+                    iconCls: "pimcore_icon_textarea",
+                    handler: function () {
+                        addItem("textarea");
+                    }
+                }, {
+                    text: t("checkbox"),
+                    iconCls: "pimcore_icon_checkbox",
+                    handler: function () {
+                        addItem("checkbox");
+                    }
+                }, {
+                    text: t("object"),
+                    iconCls: "pimcore_icon_object",
+                    handler: function () {
+                        addItem("object");
+                    }
+                }, {
+                    text: t("document"),
+                    iconCls: "pimcore_icon_document",
+                    handler: function () {
+                        addItem("document");
+                    }
+                }, {
+                    text: t("asset"),
+                    iconCls: "pimcore_icon_asset",
+                    handler: function () {
+                        addItem("asset");
+                    }
+                }]
+            }],
+            buttons: [{
+                text: t("save"),
+                iconCls: "pimcore_icon_apply",
+                handler: function (id) {
+
+                    var data = hotspotMetaDataWin.getComponent("form").getForm().getFieldValues();
+                    var normalizedData = [];
+
+                    // when only one item is in the form
+                    if(typeof data["name"] == "string") {
+                        data = {
+                            name: [data["name"]],
+                            type: [data["type"]],
+                            value: [data["value"]]
+                        };
+                    }
+
+                    if(data && data["name"] && data["name"].length > 0) {
+                        for(var i=0; i<data["name"].length; i++) {
+                            normalizedData.push({
+                                name: data["name"][i],
+                                value: data["value"][i],
+                                type: data["type"][i]
+                            });
+                        }
+                    }
+
+                    this.hotspotMetaData[id] = normalizedData;
+
+                    hotspotMetaDataWin.close();
+                }.bind(this, id)
+            }],
+            listeners: {
+                afterrender: function (id) {
+                    if(this.hotspotMetaData && this.hotspotMetaData[id]) {
+                        var data = this.hotspotMetaData[id];
+                        for(var i=0; i<data.length; i++) {
+                            addItem(data[i]["type"], data[i]);
+                        }
+                    }
+                }.bind(this, id)
+            }
+        });
+
+        var addItem = function (hotspotMetaDataWin, type, data) {
+
+            var id = "item-" + uniqid();
+            var valueField;
+
+            if(!data || !data["name"]) {
+                data = {
+                    name: "",
+                    value: ""
+                };
+            }
+
+            if(type == "textfield") {
+                valueField = {
+                    xtype: "textfield",
+                    name: "value",
+                    fieldLabel: t("value"),
+                    width: 500,
+                    value: data["value"]
+                };
+            } else if(type == "textarea") {
+                valueField = {
+                    xtype: "textarea",
+                    name: "value",
+                    fieldLabel: t("value"),
+                    width: 500,
+                    value: data["value"]
+                };
+            } else if(type == "checkbox") {
+                valueField = {
+                    xtype: "checkbox",
+                    name: "value",
+                    fieldLabel: t("value"),
+                    checked: data["value"]
+                };
+            } else if(type == "object") {
+                valueField = {
+                    xtype: "textfield",
+                    fieldCls: "pimcore_droptarget_input",
+                    name: "value",
+                    fieldLabel: t("value"),
+                    value: data["value"],
+                    width: 500,
+                    listeners: {
+                        render: function (el) {
+                            new Ext.dd.DropZone(el.getEl(), {
+                                reference: this,
+                                ddGroup: "element",
+                                getTargetFromEvent: function(e) {
+                                    return this.getEl();
+                                }.bind(el),
+
+                                onNodeOver : function (target, dd, e, data) {
+                                    var data = data.records[0].data;
+                                    if(data.elementType == "object") {
+                                        return Ext.dd.DropZone.prototype.dropAllowed;
+                                    }
+                                    return Ext.dd.DropZone.prototype.dropNotAllowed;
+                                },
+
+                                onNodeDrop : function (target, dd, e, data) {
+                                    var data = data.records[0].data;
+                                    if(data.elementType == "object") {
+                                        var id = target.getId();
+                                        var textfield = Ext.getCmp(id);
+                                        textfield.setValue(data.path);
+                                        return true;
+                                    } else {
+                                        return false;
+                                    }
+                                }
+                            });
+                        }.bind(this)
+                    }
+                };
+            } else if(type == "asset") {
+                valueField = {
+                    xtype: "textfield",
+                    fieldCls: "pimcore_droptarget_input",
+                    name: "value",
+                    fieldLabel: t("value"),
+                    value: data["value"],
+                    width: 500,
+                    listeners: {
+                        render: function (el) {
+                            new Ext.dd.DropZone(el.getEl(), {
+                                reference: this,
+                                ddGroup: "element",
+                                getTargetFromEvent: function(e) {
+                                    return this.getEl();
+                                }.bind(el),
+
+                                onNodeOver : function (target, dd, e, data) {
+                                    var data = data.records[0].data;
+                                    if(data.elementType == "asset") {
+                                        return Ext.dd.DropZone.prototype.dropAllowed;
+                                    }
+                                    return Ext.dd.DropZone.prototype.dropNotAllowed;
+                                },
+
+                                onNodeDrop : function (target, dd, e, data) {
+                                    var data = data.records[0].data;
+                                    if(data.elementType == "asset") {
+                                        var id = target.getId();
+                                        var textfield = Ext.getCmp(id);
+                                        textfield.setValue(data.path);
+                                        return true;
+                                    } else {
+                                        return false;
+                                    }
+                                }
+                            });
+                        }.bind(this)
+                    }
+                };
+            } else if(type == "document" || type == "link") {
+
+                if(type == "link") {
+                    data["name"] = "link";
+                }
+
+                valueField = {
+                    xtype: "textfield",
+                    fieldCls: "pimcore_droptarget_input",
+                    name: "value",
+                    fieldLabel: t("value"),
+                    value: data["value"],
+                    width: 500,
+                    listeners: {
+                        render: function (el) {
+                            new Ext.dd.DropZone(el.getEl(), {
+                                reference: this,
+                                ddGroup: "element",
+                                getTargetFromEvent: function(e) {
+                                    return this.getEl();
+                                }.bind(el),
+
+                                onNodeOver : function (target, dd, e, data) {
+                                    var data = data.records[0].data;
+                                    if(data.elementType == "document") {
+                                        return Ext.dd.DropZone.prototype.dropAllowed;
+                                    }
+                                    return Ext.dd.DropZone.prototype.dropNotAllowed;
+                                },
+
+                                onNodeDrop : function (target, dd, e, data) {
+                                    var data = data.records[0].data;
+                                    if(data.elementType == "document") {
+                                        var id = target.getId();
+                                        var textfield = Ext.getCmp(id);
+                                        textfield.setValue(data.path);
+                                        return true;
+                                    } else {
+                                        return false;
+                                    }
+                                }
+                            });
+                        }.bind(this)
+                    }
+                };
+            } else {
+                // no valid type
+                return;
+            }
+
+            hotspotMetaDataWin.getComponent("form").add({
+                xtype: 'panel',
+                layout: 'fit',
+                itemId: id,
+                items: [
+                    {
+                        xtype: "fieldcontainer",
+                        style: "padding: 0;",
+                        bodyStyle: "padding: 5px;",
+                        items: [{
+                            xtype: "hidden",
+                            name: "type",
+                            value: type
+                        }, {
+                            xtype: "textfield",
+                            name: "name",
+                            value: data["name"],
+                            fieldLabel: t("name")
+                        }, valueField]
+                    }],
+                tbar: ["->", {
+                    iconCls: "pimcore_icon_delete",
+                    handler: function (hotspotMetaDataWin) {
+                        var form = hotspotMetaDataWin.getComponent("form");
+                        var component = form.queryById(id);
+                        form.remove(component);
+                        hotspotMetaDataWin.doLayout();
+                    }.bind(this, hotspotMetaDataWin)
+                }]
+            });
+
+            hotspotMetaDataWin.doLayout();
+        }.bind(this, hotspotMetaDataWin);
+
+        hotspotMetaDataWin.show();
+    }.bind(this);
+
+    var addHotspot = function (config) {
+        var hotspotId = "pdf-hotspot-" + uniqid();
+
+        var pageContainerDiv = Ext.get(this.metaDataWindow.getComponent("pageContainer").body.query(".page")[0]);
+        pageContainerDiv.insertHtml("beforeEnd", '<div id="' + hotspotId + '" class="pimcore_pdf_hotspot"></div>');
+
+        var hotspotEl = Ext.get(hotspotId);
+
+        // default dimensions
+        hotspotEl.applyStyles({
+            position: "absolute",
+            cursor: "pointer",
+            top: 0,
+            left: 0,
+            width: "50px",
+            height: "50px"
+        });
+
+        if(typeof config == "object") {
+            var imgEl = Ext.get(this.metaDataWindow.getComponent("pageContainer").body.query("img")[0]);
+            var originalWidth = imgEl.getWidth();
+            var originalHeight = imgEl.getHeight();
+
+            hotspotEl.applyStyles({
+                top: (originalHeight * (config["top"]/100)) + "px",
+                left: (originalWidth * (config["left"]/100)) + "px",
+                width: (originalWidth * (config["width"]/100)) + "px",
+                height: (originalHeight * (config["height"]/100)) + "px"
+            });
+
+            if(config["data"]) {
+                this.hotspotMetaData[hotspotId] = config["data"];
+            }
+        }
+
+        hotspotEl.on("contextmenu", function (id, e) {
+            var menu = new Ext.menu.Menu();
+
+            menu.add(new Ext.menu.Item({
+                text: t("add_data"),
+                iconCls: "pimcore_icon_add_data",
+                handler: function (id, item) {
+                    item.parentMenu.destroy();
+
+                    editMarkerHotspotData(id);
+                }.bind(this, id)
+            }));
+
+            menu.add(new Ext.menu.Item({
+                text: t("remove"),
+                iconCls: "pimcore_icon_delete",
+                handler: function (id, item) {
+                    item.parentMenu.destroy();
+                    Ext.get(id).remove();
+                }.bind(this, id)
+            }));
+
+            menu.showAt(e.getXY());
+            e.stopEvent();
+        }.bind(this, hotspotId));
+
+
+        var resizer = new Ext.Resizable(hotspotId, {
+            pinned:true,
+            minWidth:20,
+            minHeight: 20,
+            preserveRatio: false,
+            dynamic:true,
+            handles: 'all',
+            draggable:true
+        });
+
+
+        return hotspotId;
+    }.bind(this);
+
+
+
+    var editTextVersion = function(config){
+
+        var text = null;
+        if (this.data.texts) {
+            text = this.data.texts[this.currentPage];
+        }
+        if(!text){
+            text = this.requestTextForCurrentPage();
+        }
+        this.textArea = new Ext.form.TextArea(
+            {
+                fieldLabel: t("pimcore_lable_text"),
+                name : "text",
+                width : 670,
+                height: 305,
+                value: text
+            });
+
+        var panel = new Ext.form.FormPanel({
+            labelWidth: 80,
+            bodyStyle: "padding: 10px;",
+            items: [
+                this.textArea
+            ]
+        });
+
+
+        this.editTextVersionWindow = new Ext.Window({
+            width: 800,
+            height: 400,
+            iconCls: "pimcore_icon_edit_pdf_text",
+            title: t('pimcore_icon_edit_pdf_text'),
+            layout: "fit",
+            closeAction:'close',
+            plain: true,
+            maximized: false,
+            items : [panel],
+            scrollable : false,
+            modal: true,
+            buttons: [
+                {
+                    text: t("apply"),
+                    iconCls: "pimcore_icon_apply",
+                    handler: function () {
+                        this.textStore[this.currentPage] = this.textArea.getValue();
+                        this.editTextVersionWindow.close();
+                    }.bind(this)
+                },
+                {
+                    text: t("cancel"),
+                    iconCls: "pimcore_icon_delete",
+                    handler: function () {
+                        this.editTextVersionWindow.close();
+                    }.bind(this)
+                }
+            ]
+        });
+
+        this.editTextVersionWindow.show();
+    }.bind(this);
+
+    var hotspotEditPage = function (page) {
+        this.saveCurrentPage();
+        this.currentPage = page;
+
+        var pageContainer = this.metaDataWindow.getComponent("pageContainer");
+        pageContainer.removeAll();
+
+        var thumbUrl = "/admin/asset/get-document-thumbnail/id/"
+            + this.data.id +
+            "/width/400/height/400/contain/true/page/" + page;
+        var page = new Ext.Panel({
+            border: false,
+            bodyStyle: "background: #e5e5e5; ",
+            html: '<div style="margin:0 auto; position:relative; overflow: hidden;" ' +
+            'class="page"><img src="' + thumbUrl + '" /></div>',
+            tbar: [{
+                xtype: "button",
+                text: t("add_hotspot"),
+                iconCls: "pimcore_icon_add_hotspot",
+                handler: addHotspot
+            },
+                {
+                    xtype: "button",
+                    text: t("pimcore_icon_edit_pdf_text"),
+                    iconCls: "pimcore_icon_edit_pdf_text",
+                    handler: editTextVersion
+                },
+                "->",
+                {
+                    text: t("chapter"),
+                    xtype: "tbtext",
+                    style: "margin: 0 10px 0 0;"
+                },
+                {
+                    xtype: "textfield",
+                    name: "chapter",
+                    width: 200,
+                    style: "margin: 0 10px 0 0;",
+                    value: this.chapterStore[page]
+                }
+            ],
+            listeners: {
+                afterrender: function (el) {
+                    var el = el.body;
+                    var checks = 0;
+                    var detailInterval = window.setInterval(function () {
+
+                        try {
+                            checks++;
+
+                            var div = Ext.get(el.query(".page")[0]);
+                            var img = Ext.get(el.query("img")[0]);
+
+                            if((img.getHeight() > 100 && img.getWidth() > 100) || checks > 300 || !div || !img) {
+                                window.clearInterval(detailInterval);
+                            }
+
+                            if(img.getHeight() > 100 && img.getWidth() > 100) {
+                                div.applyStyles({
+                                    width: img.getWidth() + "px",
+                                    height: img.getHeight() + "px",
+                                    visibility: "visible",
+                                    "margin-left": ((el.getWidth()-img.getWidth())/2) + "px",
+                                    "margin-top": ((el.getHeight()-img.getHeight())/2) + "px"
+                                });
+                            }
+                        } catch (e) {
+                            // stop the timer when an error occours
+                            window.clearInterval(detailInterval);
+                        }
+                    }, 200);
+
+                    // add hotspots
+                    var hotspots = this.hotspotStore[this.currentPage];
+                    if(hotspots) {
+                        for(var i=0; i<hotspots.length; i++) {
+                            addHotspot(hotspots[i]);
+                        }
+                    }
+                }.bind(this)
+            }
+        });
+
+        pageContainer.add(page);
+
+        pageContainer.doLayout();
+    };
+
+    // START
+    var thumbUrl = "";
+    var pages = [];
+
+    this.hotspotStore = {};
+    this.hotspotMetaData = {};
+    this.textStore = {};
+    this.chapterStore = {};
+    if(this.data["hotspots"]) {
+        this.hotspotStore = this.data["hotspots"];
+    }
+
+    if(this.data["texts"]){
+        this.textStore = this.data["texts"];
+    }
+
+    if(this.data["chapters"]){
+        this.chapterStore = this.data["chapters"];
+    }
+
+
+    this.currentPage = null;
+
+    for(var i=1; i<=this.data.pageCount; i++) {
+        thumbUrl = "/admin/asset/get-document-thumbnail/id/"
+        + this.data.id + "/width/400/height/400/contain/true/page/" + i;
+
+
+        pages.push({
+            style: "margin-bottom: 10px; text-align: center; cursor:pointer; ",
+            bodyStyle: "min-height: 150px;",
+            html: '<span id="' + this.getName() + '-page-' + i + '" style="font-size:35px; line-height: 150px;" data-src="' + thumbUrl + '">' + i + '</span>' , // blank gif image
+            listeners: {
+                afterrender: function (page, el) {
+                    // unfortunately the panel element has no click event, so we have to add it to the image
+                    // after the panel was rendered
+                    var body = Ext.get(el.body);
+                    body.on("click", hotspotEditPage.bind(this, page));
+                }.bind(this, i)
+            }
+        });
+    }
+
+    this.pagesContainer = new Ext.Panel({
+        width: 150,
+        region: "west",
+        autoScroll: true,
+        bodyStyle: "padding: 10px;",
+        items: pages
+    });
+
+
+    var loadingInterval = window.setInterval(function () {
+
+        if(!this.pagesContainer || !this.pagesContainer.body || !this.pagesContainer.body.dom) {
+            clearInterval(loadingInterval);
+        } else {
+            var el;
+            var scroll = this.pagesContainer.body.getScroll();
+            var startPage = Math.floor(scroll.top / 162); // 162 is the height of one thumbnail incl. border and margin
+            for(var i=startPage; i<(startPage+5); i++) {
+                el = Ext.get(this.getName() + "-page-" + i);
+                if(el) {
+                    // el.parent().update('<img src="' + el.getAttribute("data-src") + '" height="150" />');
+                    el.parent().update('<div class="pdf-image-wrapper"><img src="' + el.getAttribute("data-src") + '" height="150" /><div class="nr ' + (this.hasMetaData(i) ? 'hasMetadata'  : '') +'" style="font-size:35px; line-height:150px; position: absolute;top:0px;width: 100%;">' + i + '</div></div>');
+                }
+            }
+        }
+    }.bind(this), 1000);
+
+    this.metaDataWindow = new Ext.Window({
+        width: 700,
+        height: 510,
+        closeAction: "close",
+        resizable: false,
+        layout: "border",
+        items: [this.pagesContainer, {
+            region: "center",
+            layout: "fit",
+            itemId: "pageContainer"
+        }],
+        bbar: ["->", {
+            xtype: "button",
+            iconCls: "pimcore_icon_apply",
+            text: t("save"),
+            handler: function () {
+                this.saveCurrentPage();
+                this.data["hotspots"] = this.hotspotStore;
+                this.data["texts"] = this.textStore;
+                this.data["chapters"] = this.chapterStore;
+                this.metaDataWindow.close();
+            }.bind(this)
+        }]
+    });
+
+    this.metaDataWindow.show();
 };

@@ -162,7 +162,7 @@ class KeyValue extends Model\AbstractModel {
         $parent = Object\Service::hasInheritableParentObject($object);
         while ($parent) {
             $kv = $parent->getKeyvaluepairs();
-            $parentProperties = $kv->getInternalProperties();
+            $parentProperties = $kv ? $kv->getInternalProperties() : [];
 
             $addedKeys = array();
 
@@ -218,6 +218,7 @@ class KeyValue extends Model\AbstractModel {
                     $parentPair["source"] = $parent->getId();
                     $parentPair["altSource"] = $parent->getId();
                     $parentPair["altValue"] = $parentPair["value"];
+                    $parentPair["groupId"] = Object\KeyValue\KeyConfig::getById($parentPair['key'])->getGroup();
                     $result[] = $parentPair;
                 }
             }

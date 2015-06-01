@@ -102,7 +102,7 @@ pimcore.asset.metadata = Class.create({
                         fields: ['name', "type", {
                             name: "data",
                             convert: function (v, r) {
-                                if (r.type == "date") {
+                                if (r.data.type == "date") {
                                     var d = new Date(intval(v) * 1000);
                                     return d;
                                 }
@@ -358,9 +358,12 @@ pimcore.asset.metadata = Class.create({
                 return value.format("Y-m-d");
             }
         } else if (type == "checkbox") {
-            metaData.css += ' x-grid3-check-col-td';
-            return String.format('<div class="x-grid3-check-col{0}" '
-            + 'style="background-position:10px center;">&#160;</div>', value ? '-on' : '');
+            if (value) {
+                return '<div style="text-align: center"><img class="x-grid-checkcolumn x-grid-checkcolumn-checked" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+
+            } else {
+                return '<div style="text-align: center"><img class="x-grid-checkcolumn" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+            }
         }
 
         return value;
@@ -555,13 +558,13 @@ pimcore.asset.metadata = Class.create({
                 if (item.type == "date" && value) {
                     value = new Date(intval(value) * 1000);
                 }
-                var newRecord = new store.recordType({
+                var newRecord = {
                     name: key,
                     data: value,
                     type: item.type,
                     config: item.config,
                     language: language
-                });
+                };
 
                 store.add(newRecord);
                 added = true;

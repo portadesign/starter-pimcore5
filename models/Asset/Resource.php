@@ -21,25 +21,6 @@ use Pimcore\Model;
 
 class Resource extends Model\Element\Resource
 {
-
-    /**
-     * List of valid columns in database table
-     * This is used for automatic matching the objects properties to the database
-     *
-     * @var array
-     */
-    protected $validColumns = array();
-
-    /**
-     * Get the valid columns from the database
-     *
-     * @return void
-     */
-    public function init()
-    {
-        $this->validColumns = $this->getValidTableColumns("assets");
-    }
-
     /**
      * Get the data for the object by id from database and assign it to the object (model)
      * @param $id
@@ -54,22 +35,15 @@ class Resource extends Model\Element\Resource
         if ($data["id"] > 0) {
             $this->assignVariablesToModel($data);
 
-            $metadataRaw = $this->db->fetchAll("SELECT * FROM assets_metadata WHERE cid = ?", array($data["id"]));
-            $metadata = array();
-            foreach ($metadataRaw as $md) {
-                unset($md["cid"]);
-
-
-                //get the config from an predefined property-set (eg. select)
-                $predefined = \Pimcore\Model\Metadata\Predefined::getByName($md['name']);
-
-                if ($predefined && $predefined->getType() == $md['type'] && $predefined->getConfig()) {
-                    $md['config'] = $predefined->getConfig();
+            if($data["hasMetaData"]) {
+                $metadataRaw = $this->db->fetchAll("SELECT * FROM assets_metadata WHERE cid = ?", array($data["id"]));
+                $metadata = array();
+                foreach ($metadataRaw as $md) {
+                    unset($md["cid"]);
+                    $metadata[] = $md;
                 }
-
-                $metadata[] = $md;
+                $this->model->setMetadata($metadata);
             }
-            $this->model->setMetadata($metadata);
         } else {
             throw new \Exception("Asset with ID " . $id . " doesn't exists");
         }
@@ -135,7 +109,7 @@ class Resource extends Model\Element\Resource
             $asset = get_object_vars($this->model);
 
             foreach ($asset as $key => $value) {
-                if (in_array($key, $this->validColumns)) {
+                if (in_array($key, $this->getValidTableColumns("assets"))) {
 
                     if (is_array($value)) {
                         $value = \Pimcore\Tool\Serialize::serialize($value);
@@ -144,12 +118,10 @@ class Resource extends Model\Element\Resource
                 }
             }
 
-            // first try to insert a new record, this is because of the recyclebin restore
-            $this->db->insertOrUpdate("assets", $data);
-
             // metadata
             $this->db->delete("assets_metadata", "cid = " . $this->model->getId());
             $metadata = $this->model->getMetadata();
+            $data["hasMetaData"] = 0;
             if(!empty($metadata)) {
                 foreach ($metadata as $metadataItem) {
                     $metadataItem["cid"] = $this->model->getId();
@@ -159,9 +131,14 @@ class Resource extends Model\Element\Resource
                         $metadataItem["data"] = $metadataItem["data"]->getId();
                     }
 
-                    $this->db->insert("assets_metadata", $metadataItem);
+                    if(strlen($metadataItem["data"]) > 0) {
+                        $this->db->insert("assets_metadata", $metadataItem);
+                        $data["hasMetaData"] = 1;
+                    }
                 }
             }
+
+            $this->db->insertOrUpdate("assets", $data);
 
             // tree_locks
             $this->db->delete("tree_locks", "id = " . $this->model->getId() . " AND type = 'asset'");

@@ -50,16 +50,25 @@ pimcore.object.keyvalue.propertiespanel = Class.create({
             readerFields.push({name: this.fields[i]});
         }
 
+        var url = "/admin/key-value/properties?";
 
         var proxy = {
             type: 'ajax',
-            url: "/admin/key-value/properties",
             reader: {
                 type: 'json',
                 rootProperty: 'data'
             },
+            api: {
+                create  : url + "xaction=create",
+                read    : url + "xaction=read",
+                update  : url + "xaction=update",
+                destroy : url + "xaction=destroy"
+            },
             writer: {
-                type: 'json'
+                type: 'json',
+                writeAllFields: true,
+                rootProperty: 'data',
+                encode: 'true'
             },
             extraParams: this.baseParams
         };
@@ -79,8 +88,7 @@ pimcore.object.keyvalue.propertiespanel = Class.create({
             autoSync: true,
             proxy: proxy,
             fields: readerFields,
-            listeners: listeners,
-
+            listeners: listeners
         });
 
         var gridColumns = [];
@@ -277,12 +285,7 @@ pimcore.object.keyvalue.propertiespanel = Class.create({
                     handler: this.onAdd.bind(this),
                     iconCls: "pimcore_icon_add"
                 }
-            ],
-            listeners: {
-                rowdblclick: function (grid, record, tr, rowIndex, e, eOpts ) {
-
-                }.bind(this)
-            }
+            ]
         } ;
 
         this.grid = Ext.create('Ext.grid.Panel' ,gridConfig);
@@ -467,23 +470,21 @@ pimcore.object.keyvalue.propertiespanel = Class.create({
 
 
 
-        var proxy = new Ext.data.HttpProxy({
+        var proxy = {
+            type: 'ajax',
             url: "/admin/key-value/groups",
-            method: 'post'
-        });
-
-        var reader = new Ext.data.JsonReader({
-            totalProperty: 'total',
-            successProperty: 'success',
-            root: 'data'
-        }, readerFields);
+            reader: {
+                type: 'json',
+                totalProperty: 'total',
+                successProperty: 'success',
+                rootProperty: 'data'
+            }
+        };
 
         this.groupStore = new Ext.data.Store({
-            restful: false,
-            idProperty: 'id',
             remoteSort: true,
             proxy: proxy,
-            reader: reader
+            fields: readerFields
         });
 
         this.groupPagingtoolbar = new Ext.PagingToolbar({
@@ -501,7 +502,7 @@ pimcore.object.keyvalue.propertiespanel = Class.create({
             loadMask: true,
             columnLines: true,
             stripeRows: true,
-            sm: new Ext.grid.RowSelectionModel({singleSelect:true}),
+            selModel: Ext.create('Ext.selection.RowModel', {}),
             bbar: this.groupPagingtoolbar,
             listeners: {
                 rowdblclick: function (grid, record, tr, rowIndex, e, eOpts ) {

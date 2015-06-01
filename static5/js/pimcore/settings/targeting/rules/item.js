@@ -51,7 +51,6 @@ pimcore.settings.targeting.rules.item = Class.create({
 
     getActions: function () {
         this.actionsForm = new Ext.form.FormPanel({
-            //layout: "pimcoreform",
             bodyStyle: "padding: 10px",
             title: t("actions"),
             autoScroll: true,
@@ -64,7 +63,7 @@ pimcore.settings.targeting.rules.item = Class.create({
                 collapsed: !this.data.actions.redirectEnabled,
                 items: [{
                     xtype: "textfield",
-                    width: 350,
+                    width: 450,
                     fieldLabel: "URL",
                     name: "redirect.url",
                     value: this.data.actions.redirectUrl,
@@ -83,8 +82,9 @@ pimcore.settings.targeting.rules.item = Class.create({
                                 },
 
                                 onNodeDrop : function (target, dd, e, data) {
-                                    if (data.node.attributes.elementType == "document") {
-                                        this.setValue(data.node.attributes.path);
+                                    var data = data.records[0].data;
+                                    if (data.elementType == "document") {
+                                        this.setValue(data.path);
                                         return true;
                                     }
                                     return false;
@@ -112,13 +112,13 @@ pimcore.settings.targeting.rules.item = Class.create({
                 items: [{
                     xtype: "textfield",
                     name: "event.key",
-                    width: 200,
+                    width: 300,
                     fieldLabel: t("key"),
                     value: this.data.actions.eventKey
                 }, {
                     xtype: "textfield",
                     name: "event.value",
-                    width: 100,
+                    width: 200,
                     fieldLabel: t("value"),
                     value: this.data.actions.eventValue
                 }]
@@ -130,7 +130,7 @@ pimcore.settings.targeting.rules.item = Class.create({
                 collapsed: !this.data.actions.codesnippetEnabled,
                 items: [{
                     xtype: "textarea",
-                    width: 500,
+                    width: 600,
                     height: 200,
                     fieldLabel: t("code"),
                     name: "codesnippet.code",
@@ -143,7 +143,7 @@ pimcore.settings.targeting.rules.item = Class.create({
                     store: [["body","body"],["head","head"]],
                     triggerAction: "all",
                     mode: "local",
-                    width: 250,
+                    width: 350,
                     value: this.data.actions.codesnippetSelector
                 },{
                     xtype:'combo',
@@ -155,7 +155,7 @@ pimcore.settings.targeting.rules.item = Class.create({
                     editable: false,
                     forceSelection: true,
                     mode: "local",
-                    width: 250,
+                    width: 350,
                     value: this.data.actions.codesnippetPosition
                 }]
             }, {
@@ -171,7 +171,7 @@ pimcore.settings.targeting.rules.item = Class.create({
                     valueField: "id",
                     store: pimcore.globalmanager.get("personas"),
                     editable: false,
-                    width: 300,
+                    width: 400,
                     triggerAction: 'all',
                     listWidth: 200,
                     mode: "local",
@@ -187,7 +187,6 @@ pimcore.settings.targeting.rules.item = Class.create({
     getSettings: function () {
 
         this.settingsForm = new Ext.form.FormPanel({
-            layout: "pimcoreform",
             title: t("settings"),
             bodyStyle: "padding:10px;",
             autoScroll: true,
@@ -196,14 +195,14 @@ pimcore.settings.targeting.rules.item = Class.create({
                 xtype: "textfield",
                 fieldLabel: t("name"),
                 name: "name",
-                width: 250,
+                width: 350,
                 disabled: true,
                 value: this.data.name
             }, {
                 name: "description",
                 fieldLabel: t("description"),
                 xtype: "textarea",
-                width: 400,
+                width: 500,
                 height: 100,
                 value: this.data.description
             }, {
@@ -276,7 +275,7 @@ pimcore.settings.targeting.rules.item = Class.create({
             // open
             leftBracket.on("click", function (ev, el) {
                 var bracket = Ext.get(el);
-                bracket.toggleClass("pimcore_targeting_bracket_active");
+                bracket.toggleCls("pimcore_targeting_bracket_active");
 
                 tab.recalculateBracketIdent(tab.conditionsContainer.items);
             });
@@ -284,7 +283,7 @@ pimcore.settings.targeting.rules.item = Class.create({
             // close
             rightBracket.on("click", function (ev, el) {
                 var bracket = Ext.get(el);
-                bracket.toggleClass("pimcore_targeting_bracket_active");
+                bracket.toggleCls("pimcore_targeting_bracket_active");
 
                 tab.recalculateBracketIdent(tab.conditionsContainer.items);
             });
@@ -321,7 +320,7 @@ pimcore.settings.targeting.rules.item = Class.create({
             condition = conditions[i].getForm().getFieldValues();
 
             // get the operator (AND, OR, AND_NOT)
-            tb = conditions[i].getTopToolbar();
+            var tb = conditions[i].getDockedItems()[0];
             if (tb.getComponent("toggle_or").pressed) {
                 operator = "or";
             } else if (tb.getComponent("toggle_and_not").pressed) {
@@ -333,9 +332,9 @@ pimcore.settings.targeting.rules.item = Class.create({
 
             // get the brackets
             condition["bracketLeft"] = Ext.get(conditions[i].getEl().query(".pimcore_targeting_bracket_left")[0])
-                                                                .hasClass("pimcore_targeting_bracket_active");
+                                                                .hasCls("pimcore_targeting_bracket_active");
             condition["bracketRight"] = Ext.get(conditions[i].getEl().query(".pimcore_targeting_bracket_right")[0])
-                                                                .hasClass("pimcore_targeting_bracket_active");
+                                                                .hasCls("pimcore_targeting_bracket_active");
 
             conditionsData.push(condition);
         }
@@ -358,7 +357,7 @@ pimcore.settings.targeting.rules.item = Class.create({
         var conditions = this.conditionsContainer.items.getRange();
         var tb;
         for (var i=0; i<conditions.length; i++) {
-            tb = conditions[i].getTopToolbar();
+            var tb = conditions[i].getDockedItems()[0];
             if(i==0) {
                 tb.getComponent("toggle_and").hide();
                 tb.getComponent("toggle_or").hide();

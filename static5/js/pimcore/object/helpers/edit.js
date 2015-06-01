@@ -69,7 +69,6 @@ pimcore.object.helpers.edit = {
                 defaults: {
                     width: "auto"
                 },
-                //layout: "pimcoreform",
                 hideMode: "offsets",
                 listeners: panelListenerConfig
             },
@@ -120,17 +119,15 @@ pimcore.object.helpers.edit = {
                 if (l.childs.length > 0) {
                     l.items = [];
                     for (var i = 0; i < l.childs.length; i++) {
-                        tmpItems = this.getRecursiveLayout(l.childs[i], noteditable);
+
+                        var childConfig = l.childs[i];
+                        if (typeof childConfig.labelWidth == "undefined" && l.labelWidth != "undefined") {
+                            childConfig.labelWidth = l.labelWidth;
+                        }
+
+                        tmpItems = this.getRecursiveLayout(childConfig, noteditable);
 
                         if (tmpItems) {
-                            if (typeof tmpItems.width != "undefined") {
-                                if (typeof l.labelWidth != "undefined") {
-                                    tmpItems.width += l.labelWidth;
-                                } else {
-                                    tmpItems.width += 100;
-                                }
-                            }
-
                             l.items.push(tmpItems);
                         }
                     }
@@ -192,6 +189,7 @@ pimcore.object.helpers.edit = {
         }
         else if (l.datatype == "data") {
 
+
             //// if invisible return false
             //if (l.fieldtype == "image" || l.fieldtpye == "datetime") {
             //    return false;
@@ -236,6 +234,10 @@ pimcore.object.helpers.edit = {
                 field.setName(l.name);
                 field.setTitle(l.titleOriginal);
                 field.setInitialData(data);
+
+                if (typeof l.labelWidth != "undefined") {
+                    field.labelWidth = l.labelWidth;
+                }
 
                 this.addToDataFields(field, l.name);
 

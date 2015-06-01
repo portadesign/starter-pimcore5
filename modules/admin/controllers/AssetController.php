@@ -57,7 +57,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
             $this->_helper->json(array("success" => false, "message" => "asset doesn't exist"));
         }
 
-        $asset->setMetadata(Asset\Service::expandMetadata($asset->getMetadata()));
+        $asset->setMetadata(Asset\Service::expandMetadataForEditmode($asset->getMetadata()));
         $asset->setProperties(Element\Service::minimizePropertiesForEditmode($asset->getProperties()));
         //$asset->getVersions();
         $asset->getScheduledTasks();
@@ -210,6 +210,13 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
             $parent = Asset::getById($this->getParam("parentId"));
             $newPath = $parent->getFullPath() . "/" . trim($this->getParam("dir"), "/ ");
 
+            // check if the path is outside of the asset directory
+            $newRealPath = PIMCORE_ASSET_DIRECTORY . $newPath;
+            $newRealPath= realpath($newRealPath);
+            if (strpos($newRealPath, PIMCORE_ASSET_DIRECTORY) !== 0) {
+                throw new \Exception("not allowed");
+            }
+
             $maxRetries = 5;
             for ($retries=0; $retries<$maxRetries; $retries++) {
                 try {
@@ -314,7 +321,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
 
             // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
             // Ext.form.Action.Submit and mark the submission as failed
-            $this->getResponse()->setHeader("Content-Type", "text/html");
+            $this->getResponse()->setHeader("Content-Type", "text/html", true);
 
         } else {
             throw new \Exception("missing permission");
@@ -468,11 +475,13 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
     }
 
     /**
-     * @param Asset $asset
-     * @return array|string
+     * @param $element
+     * @return array
      */
-    protected function getTreeNodeConfig($asset)
+    protected function getTreeNodeConfig($element)
     {
+        $asset = $element;
+
         $tmpAsset = array(
             "id" => $asset->getId(),
             "text" => $asset->getFilename(),
@@ -504,8 +513,10 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
             $children->setLimit(35);
 
             foreach ($children as $child) {
-                if ($thumbnailUrl = $this->getThumbnailUrl($child)) {
-                    $folderThumbs[] = $thumbnailUrl;
+                if($child->isAllowed("list")) {
+                    if ($thumbnailUrl = $this->getThumbnailUrl($child)) {
+                        $folderThumbs[] = $thumbnailUrl;
+                    }
                 }
             }
 
@@ -1061,9 +1072,11 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
         if ($this->getParam("start")) {
             $start = $this->getParam("start");
         }
+        
+        $condition = "path LIKE '" . ($folder->getFullPath() == "/" ? "/%'" : $folder->getFullPath() . "/%'") ." AND type != 'folder'";
 
         $list = Asset::getList(array(
-            "condition" => "path LIKE '" . $folder->getFullPath() . "/%' AND type != 'folder'",
+            "condition" => $condition,
             "limit" => $limit,
             "offset" => $start,
             "orderKey" => "filename",
@@ -1289,7 +1302,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
                 }
 
                 $assetList = new Asset\Listing();
-                $assetList->setCondition("path LIKE ?", $parentPath . "/%");
+                $assetList->setCondition("type != 'folder' AND path LIKE ?", $parentPath . "/%");
                 $assetList->setOrderKey("LENGTH(path) ASC, id ASC", false);
                 $assetList->setOffset((int)$this->getParam("offset"));
                 $assetList->setLimit((int)$this->getParam("limit"));
@@ -1577,7 +1590,8 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
                 //TODO probably not needed
             }
         } else {
-            // get list of objects
+            $db = \Pimcore\Resource::get();
+                // get list of objects
             $folder = Asset::getById($this->getParam("folderId"));
 
 
@@ -1609,7 +1623,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
             if($this->getParam("only_direct_children") == "true") {
                 $conditionFilters[] = "parentId = " . $folder->getId();
             } else {
-                $conditionFilters[] = "path LIKE '" . $folder->getFullPath() . "/%'";
+                $conditionFilters[] = "path LIKE '" . ($folder->getFullPath() == "/" ? "/%'" : $folder->getFullPath() . "/%'");
             }
 
             $conditionFilters[] = "type != 'folder'";
@@ -1658,7 +1672,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
                         $field = "CONCAT(path,filename)";
                     }
 
-                    $conditionFilters[] =  $field . $operator . " '" . $value . "' ";
+                    $conditionFilters[] =  $field . $operator . " " . $db->quote($value);
                 }
             }
 

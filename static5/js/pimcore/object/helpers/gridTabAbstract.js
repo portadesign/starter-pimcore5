@@ -58,44 +58,48 @@ pimcore.object.helpers.gridTabAbstract = Class.create({
 
 
     updateGridHeaderContextMenu: function(grid) {
-        //TODO EXTJS5
-        //var columnConfig = new Ext.menu.Item({
-        //    text: t("grid_column_config"),
-        //    iconCls: "pimcore_icon_grid_column_config",
-        //    handler: this.openColumnConfig.bind(this)
-        //});
-        //var view = grid.getView();
-        //view.headerCt.add(columnConfig);
+
+        var columnConfig = new Ext.menu.Item({
+            text: t("grid_column_config"),
+            iconCls: "pimcore_icon_grid_column_config",
+            handler: this.openColumnConfig.bind(this)
+        });
+        var menu = grid.headerCt.getMenu();
+        menu.add(columnConfig);
         //
-        //var batchAllMenu = new Ext.menu.Item({
-        //    text: t("batch_change"),
-        //    iconCls: "pimcore_icon_batch",
-        //    handler: function (view) {
-        //        this.batchPrepare(view.hdCtxIndex, false);
-        //    }.bind(this, grid.getView())
-        //});
-        //view.headerCt.add(batchAllMenu);
+        var batchAllMenu = new Ext.menu.Item({
+            text: t("batch_change"),
+            iconCls: "pimcore_icon_batch",
+            handler: function (view) {
+                this.batchPrepare(view.hdCtxIndex, false);
+            }.bind(this, grid.getView())
+        });
+        menu.add(batchAllMenu);
+
+        var batchSelectedMenu = new Ext.menu.Item({
+            text: t("batch_change_selected"),
+            iconCls: "pimcore_icon_batch",
+            handler: function (view) {
+                this.batchPrepare(view.hdCtxIndex, true);
+            }.bind(this, grid.getView())
+        });
+        menu.add(batchSelectedMenu);
         //
-        //var batchSelectedMenu = new Ext.menu.Item({
-        //    text: t("batch_change_selected"),
-        //    iconCls: "pimcore_icon_batch",
-        //    handler: function (view) {
-        //        this.batchPrepare(view.hdCtxIndex, true);
-        //    }.bind(this, grid.getView())
-        //});
-        //view.headerCt.add(batchSelectedMenu);
-        //
-        //view.headerCt.on('beforeshow', function (batchAllMenu, batchSelectedMenu, view) {
-        //    // no batch for system properties
-        //    if(this.systemColumns.indexOf(view.cm.config[view.hdCtxIndex].dataIndex) < 0) {
-        //        batchAllMenu.show();
-        //        batchSelectedMenu.show();
-        //    } else {
-        //        batchAllMenu.hide();
-        //        batchSelectedMenu.hide();
-        //    }
-        //
-        //}.bind(this, batchAllMenu, batchSelectedMenu, grid.getView()));
+        menu.on('beforeshow', function (batchAllMenu, batchSelectedMenu, grid) {
+            var menu = grid.headerCt.getMenu();
+            var columnDataIndex = menu.activeHeader.dataIndex;
+
+            var view = grid.getView();
+            // no batch for system properties
+            if (Ext.Array.contains(this.systemColumns,columnDataIndex)) {
+                batchAllMenu.hide();
+                batchSelectedMenu.hide();
+            } else {
+                batchAllMenu.show();
+                batchSelectedMenu.show();
+            }
+
+        }.bind(this, batchAllMenu, batchSelectedMenu, grid));
     },
 
     batchPrepare: function(columnIndex, onlySelected){
@@ -435,8 +439,9 @@ pimcore.object.helpers.gridTabAbstract = Class.create({
                     if (key.getKey() == key.ENTER) {
                         this.grid.filters.clearFilters();
 
-                        this.store.baseparams = {};
-                        this.store.setBaseParam("condition", field.getValue());
+                        var proxy = this.store.getProxy();
+                        proxy.extraParams = {};
+                        proxy.setExtraParam("condition", field.getValue());
 
                         this.pagingtoolbar.moveFirst();
                     }
@@ -455,8 +460,9 @@ pimcore.object.helpers.gridTabAbstract = Class.create({
                 this.sqlEditor.setValue("");
 
                 // reset base params, because of the condition
-                this.store.baseparams = {};
-                this.store.setBaseParam("condition", null);
+                var proxy = this.store.getProxy();
+                proxy.extraParams = {};
+                proxy.setExtraParam("condition", null);
                 this.pagingtoolbar.moveFirst();
 
                 if(button.pressed) {

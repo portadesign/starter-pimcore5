@@ -53,7 +53,6 @@ pimcore.document.tags.image = Class.create(pimcore.document.tag, {
             el.getEl().on("contextmenu", this.onContextMenu.bind(this));
 
             // register at global DnD manager
-            //TODO ExtJS 5
             if (typeof dndManager != 'undefined') {
                 dndManager.addDropTarget(el.getEl(), this.onNodeOver.bind(this), this.onNodeDrop.bind(this));
             }
@@ -279,7 +278,7 @@ pimcore.document.tags.image = Class.create(pimcore.document.tag, {
         this.resetData();
 
         this.updateImage();
-        this.getBody().addClass("pimcore_tag_image_empty");
+        this.getBody().addCls("pimcore_tag_image_empty");
         this.altBar.setStyle({
             display: "none"
         });
@@ -438,7 +437,7 @@ pimcore.document.tags.image = Class.create(pimcore.document.tag, {
             this.datax["hotspots"] = data["hotspots"];
             this.datax["marker"] = data["marker"];
         }.bind(this));
-        editor.open(true);
+        editor.open(false);
     },
 
     getValue: function () {

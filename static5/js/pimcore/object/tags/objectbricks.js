@@ -80,7 +80,7 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
 
         panelConf = {
             autoHeight: true,
-            cls: "object_field",
+            componentCls: "object_field",
             items: [this.tabpanel]
         };
 
@@ -193,7 +193,7 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
 
                 this.tabpanel.remove(blockElement);
                 this.addedTypes[blockElement.fieldtype] = false;
-                this.component.remove(this.component.get(0));
+                this.component.remove(this.component.getComponent(0));
                 this.component.insert(0, this.getControls());
                 this.component.doLayout();
 
@@ -223,7 +223,6 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
         var blockElement = new Ext.Panel({
             //bodyStyle: "padding:10px;",
             style: "margin: 0 0 10px 0;",
-            //layout: "pimcoreform",
             autoHeight: true,
             border: false,
             title: ts(type),
@@ -231,7 +230,7 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
         });
 
 
-        this.component.remove(this.component.items[0]);
+        this.component.remove(this.component.getComponent(0));
 
         this.addedTypes[type] = true;
 
@@ -243,9 +242,7 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
         blockElement.key = type;
         blockElement.fieldtype = type;
         this.tabpanel.add(blockElement);
-//        console.log(this.getControls());
         this.component.insert(0, this.getControls());
-
 
         this.tabpanel.doLayout();
         this.component.doLayout();
@@ -309,7 +306,6 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
                         }
                     }
                 }
-
 
                 data.push({
                     type: element.type,

@@ -47,7 +47,7 @@ pimcore.document.pages.settings = Class.create({
                     id = "";
                 }
 
-                var count = this.urlAliasPanel.findByType("textfield").length+1;
+                var count = this.urlAliasPanelInner.query("textfield").length+1;
 
                 var compositeField = new Ext.Container({
                     hideLabel: true,
@@ -92,21 +92,27 @@ pimcore.document.pages.settings = Class.create({
                 }]);
 
 
-                this.urlAliasPanel.add(compositeField);
+                this.urlAliasPanelInner.add(compositeField);
 
-                this.urlAliasPanel.doLayout();
+                this.urlAliasPanelInner.doLayout();
             }.bind(this);
 
             var user = pimcore.globalmanager.get("user");
 
-            this.urlAliasPanel = new Ext.form.FieldSet({
+            this.urlAliasPanelInner = new Ext.form.FieldSet({
                 title: t("path_aliases") + " (" + t("redirects") + ")",
                 collapsible: false,
-                autoHeight:true,
-                width: 700,
+                autoHeight: true,
                 style: "margin-top: 20px;",
                 disabled: !user.isAllowed("redirects"),
-                items: [],
+                items: []
+            });
+
+            this.urlAliasPanel = new Ext.panel.Panel({
+                border: false,
+                layout: 'fit',
+                width: 700,
+                items: [this.urlAliasPanelInner],
                 buttons: [{
                     text: t("add"),
                     iconCls: "pimcore_icon_add",
@@ -117,8 +123,6 @@ pimcore.document.pages.settings = Class.create({
             for(var r=0; r<this.page.data.redirects.length; r++) {
                 addUrlAlias(this.page.data.redirects[r].source, this.page.data.redirects[r]["id"]);
             }
-
-
 
             // meta-data
             var addMetaData = function (idName, idValue, contentName, contentValue) {
@@ -147,7 +151,8 @@ pimcore.document.pages.settings = Class.create({
                     }
                 };
 
-                var compositeField = new Ext.Container({
+                var compositeField = new Ext.form.FieldContainer({
+                    layout: 'hbox',
                     hideLabel: true,
                     style: "padding-bottom:5px;",
                     items: [{
@@ -267,8 +272,6 @@ pimcore.document.pages.settings = Class.create({
             // create layout
             this.layout = new Ext.FormPanel({
                 title: t('settings'),
-                bodyStyle:'padding:20px 5px 20px 5px;',
-                layout: "pimcoreform",
                 border: false,
                 autoScroll: true,
                 iconCls: "pimcore_icon_tab_settings",
@@ -294,7 +297,7 @@ pimcore.document.pages.settings = Class.create({
                                 enableKeyEvents: true,
                                 listeners: {
                                     "keyup": function (el) {
-                                        el.label.update(t("title") + " (" + el.getValue().length + "):");
+                                        el.labelEl.update(t("title") + " (" + el.getValue().length + "):");
                                     }
                                 }
                             },
@@ -308,7 +311,7 @@ pimcore.document.pages.settings = Class.create({
                                 enableKeyEvents: true,
                                 listeners: {
                                     "keyup": function (el) {
-                                        el.label.update(t("description") + " (" + el.getValue().length + "):");
+                                        el.labelEl.update(t("description") + " (" + el.getValue().length + "):");
                                     }
                                 }
                             },
@@ -322,7 +325,7 @@ pimcore.document.pages.settings = Class.create({
                                 enableKeyEvents: true,
                                 listeners: {
                                     "keyup": function (el) {
-                                        el.label.update(t("keywords") + " (" + el.getValue().length + "):");
+                                        el.labelEl.update(t("keywords") + " (" + el.getValue().length + "):");
                                     }
                                 }
                             },
@@ -573,8 +576,9 @@ pimcore.document.pages.settings = Class.create({
                                             },
 
                                             onNodeDrop : function (target, dd, e, data) {
-                                                if (data.node.attributes.elementType == "document") {
-                                                    this.setValue(data.node.attributes.path);
+                                                data = data.records[0].data;
+                                                if (data.elementType == "document") {
+                                                    this.setValue(data.path);
                                                     return true;
                                                 }
                                                 return false;

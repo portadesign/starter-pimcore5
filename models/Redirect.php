@@ -225,7 +225,8 @@ class Redirect extends AbstractModel {
     }
 
     /**
-     * @param int $expiry
+     * @param $expiry
+     * @return $this
      */
     public function setExpiry($expiry)
     {
@@ -253,7 +254,6 @@ class Redirect extends AbstractModel {
         $list->load();
 
         foreach ($list->getRedirects() as $redirect) {
-            echo $redirect->getSource() . "\n";
             $redirect->delete();
         }
     }

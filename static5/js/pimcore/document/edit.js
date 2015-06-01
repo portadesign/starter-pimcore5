@@ -67,12 +67,15 @@ pimcore.document.edit = Class.create({
                     var editables = this.frame.Ext.getBody().query(".pimcore_editable");
                     var ed;
                     for(var i=0; i<editables.length; i++) {
-                        ed = Ext.get(editables[i]);
-                        if(!ed.hasClass("pimcore_tag_inc") && !ed.hasClass("pimcore_tag_areablock")
-                            && !ed.hasClass("pimcore_tag_block") && !ed.hasClass("pimcore_tag_area")) {
+                        var ed = this.frame.Ext.get(editables[i]);
+
+                        if(!ed.hasCls("pimcore_tag_inc") && !ed.hasCls("pimcore_tag_areablock")
+                            && !ed.hasCls("pimcore_tag_block") && !ed.hasCls("pimcore_tag_area")) {
                             if(el.pressed) {
                                 var mask = ed.mask();
                                 mask.setStyle("background-color","#f5d833");
+                                mask.setStyle("opacity","0.5");
+                                mask.setStyle("pointer-events","none");
                             } else {
                                 ed.unmask();
                             }
@@ -93,7 +96,10 @@ pimcore.document.edit = Class.create({
                     valueField: "id",
                     store: {
                         xtype: "jsonstore",
-                        url: "/admin/reports/targeting/persona-list/?add-default=true",
+                        proxy: {
+                            type: 'ajax',
+                            url: "/admin/reports/targeting/persona-list/?add-default=true"
+                        },
                         fields: ["id", "text"]
                     },
                     editable: false,
@@ -153,19 +159,17 @@ pimcore.document.edit = Class.create({
                     // this is to hide the mask if edit/startup.js isn't executed (eg. in case an error is shown)
                     // otherwise edit/startup.js will disable the loading mask
                     if(!this["frame"]) {
-                        //this.loadMask.hide();
+                        this.loadMask.hide();
                     }
                 }.bind(this));
 
-                //this.loadMask = new Ext.LoadMask(
-                //    {
-                //        target: this.layout.body,
-                //        msg: t("please_wait"),
-                //        hidden: true
-                //    });
-                //this.loadMask.enable();
-                //TODO EXTJS5
-                //this.loadMask.show();
+                this.loadMask = new Ext.LoadMask(
+                    {
+                        target: this.layout,
+                        msg: t("please_wait")
+                    });
+
+                this.loadMask.show();
             }.bind(this));
         }
 
@@ -303,8 +307,8 @@ pimcore.document.edit = Class.create({
     getValues: function () {
 
         var values = {};
-        
-        if (!this.frame || !this.frame.editables) {
+
+        if (!this.frame || !this.frame.editablesReady) {
             throw "edit not available";
         }
 

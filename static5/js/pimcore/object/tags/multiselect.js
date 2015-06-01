@@ -27,7 +27,7 @@ pimcore.object.tags.multiselect = Class.create(pimcore.object.tags.abstract, {
         return {header: ts(field.label), width: 150, sortable: false, dataIndex: field.key,
             renderer: function (key, value, metaData, record) {
                 if(record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                    metaData.css += " grid_value_inherited";
+                    metaData.tdCls += " grid_value_inherited";
                 }
 
                 if (value && value.length > 0) {
@@ -88,7 +88,10 @@ pimcore.object.tags.multiselect = Class.create(pimcore.object.tags.abstract, {
             editable: false,
             fieldLabel: this.fieldConfig.title,
             store: store,
-            itemCls: "object_field"
+            componentCls: "object_field",
+            height: 100,
+            valueField: 'id',
+            labelWidth: this.fieldConfig.labelWidth ? this.fieldConfig.labelWidth : 100
         };
 
         if (this.fieldConfig.width) {
@@ -96,6 +99,9 @@ pimcore.object.tags.multiselect = Class.create(pimcore.object.tags.abstract, {
         } else {
             options.width = 100;
         }
+
+        options.width += options.labelWidth;
+
         if (this.fieldConfig.height) {
             options.height = this.fieldConfig.height;
         }

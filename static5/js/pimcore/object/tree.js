@@ -64,6 +64,7 @@ pimcore.object.tree = Class.create({
         var itemsPerPage = 30;
 
         rootNodeConfig.text = t("home");
+        rootNodeConfig.id = "" +  rootNodeConfig.id;
         rootNodeConfig.draggable = true;
         rootNodeConfig.iconCls = "pimcore_icon_home";
         rootNodeConfig.expanded = true;
@@ -111,13 +112,6 @@ pimcore.object.tree = Class.create({
             //rootVisible: this.config.rootVisible,
             rootVisible: true,
             border: true,
-            //dockedItems: [{
-            //    xtype: 'pagingtoolbar',
-            //    store: store,   // same store GridPanel is using
-            //    //dock: 'bottom',
-            //    displayInfo: true,
-            //    pageSize: itemsPerPage
-            //}],
             listeners: this.getTreeNodeListeners(),
             viewConfig: {
                 plugins: {
@@ -127,35 +121,7 @@ pimcore.object.tree = Class.create({
                 },
                 xtype: 'pimcoretreeview'
             },
-
-            //tools: [
-            //    {
-            //        //id: "right",
-            //        handler: pimcore.layout.treepanelmanager.toRight.bind(this)
-            //    },
-            //    {
-            //        //id: "left",
-            //        handler: pimcore.layout.treepanelmanager.toLeft.bind(this),
-            //        hidden: true
-            //    }
-            //],
             root: rootNodeConfig
-            //,
-            ////TODO removed
-            //// plugins: new Ext.ux.tree.TreeNodeMouseoverPlugin(),
-            //loader: new Ext.ux.tree.PagingTreeLoader({
-            //    dataUrl: this.treeDataUrl,
-            //    pageSize: 30,
-            //    enableTextPaging: false,
-            //    pagingModel: 'remote',
-            //    requestMethod: "GET",
-            //    baseAttrs: {
-            //        listeners: this.getTreeNodeListeners(),
-            //        reference: this,
-            //        nodeType: "async"
-            //    },
-            //    baseParams: this.config.loaderBaseParams
-            //})
         });
 
         //this.tree.on("render", function () {
@@ -171,7 +137,6 @@ pimcore.object.tree = Class.create({
                     target: Ext.getCmp(this.config.treeId),
                     msg:t("please_wait")
                 });
-            //this.tree.loadMask.enable();
         }.bind(this));
 
         this.config.parentPanel.insert(this.config.index, this.tree);
@@ -226,8 +191,6 @@ pimcore.object.tree = Class.create({
     },
 
     onTreeNodeOver: function (targetNode, position, dragData, e, eOpts ) {
-        console.log("onTreeNodeOver");
-
         var node = dragData.records[0];
         // check for permission
         try {
@@ -534,7 +497,7 @@ pimcore.object.tree = Class.create({
                 menu.add(new Ext.menu.Item({
                     text: t("add_variant"),
                     iconCls: "pimcore_icon_tree_variant",
-                    handler: this.createVariant.bind(this)
+                    handler: this.createVariant.bind(this, tree, record)
                 }));
             }
 
@@ -776,28 +739,16 @@ pimcore.object.tree = Class.create({
     createVariant: function (tree, record) {
         Ext.MessageBox.prompt(t('add_variant'), t('please_enter_the_name_of_the_new_variant'),
             this.addVariantCreate.bind(this, tree, record));
-//        this.reload();
     },
 
     addVariantCreate: function (tree, record, button, value, object) {
 
         // check for identical filename in current level
-        if (this.isExistingKeyInLevel(this, value)) {
+        if (this.isExistingKeyInLevel(record, value)) {
             return;
         }
 
         if (button == "ok") {
-//            Ext.Ajax.request({
-//                url: "/admin/object/add",
-//                params: {
-//                    className: className,
-//                    classId: classId,
-//                    parentId: this.id,
-//                    key: pimcore.helpers.getValidFilename(value)
-//                },
-//                success: this.attributes.reference.addObjectComplete.bind(this)
-//            });
-
             Ext.Ajax.request({
                 url: "/admin/object/add",
                 params: {
@@ -814,7 +765,7 @@ pimcore.object.tree = Class.create({
         }
     },
 
-    addVariantComplete: function (response) {
+    addVariantComplete: function (tree, record, response) {
         try {
             var rdata = Ext.decode(response.responseText);
             if (rdata && rdata.success) {
@@ -930,7 +881,9 @@ pimcore.object.tree = Class.create({
                         record.pasteProgressBar = null;
 
                         pimcore.helpers.showNotification(t("error"), t("error_pasting_object"), "error", t(message));
-                        this.parentNode.reload();
+
+                        this.refresh(record.parentNode);
+
                     }.bind(this),
                     jobs: res.pastejobs
                 });
@@ -958,7 +911,7 @@ pimcore.object.tree = Class.create({
     },
 
     importObjects: function (classId, className, tree, record) {
-        new pimcore.object.importer(record.parentNode, classId, className);
+        new pimcore.object.importer(tree, record.parentNode, classId, className);
     },
 
     addObject: function (classId, className, tree, record) {
@@ -1082,12 +1035,8 @@ pimcore.object.tree = Class.create({
                 try {
                     var rdata = Ext.decode(response.responseText);
                     if (rdata && rdata.success) {
-                        if (pimcore.globalmanager.exists("object_" + this.id)) {
-                            var tabPanel = Ext.getCmp("pimcore_panel_tabs");
-                            var tabId = "object_" + record.data.id;
-                            tabPanel.remove(tabId);
-                            pimcore.globalmanager.remove("object_" + record.data.id);
-
+                        if (pimcore.globalmanager.exists("object_" + record.id)) {
+                            pimcore.helpers.closeObject(record.data.id);
                             pimcore.helpers.openObject(record.data.id, record.data.type);
                         }
                     }

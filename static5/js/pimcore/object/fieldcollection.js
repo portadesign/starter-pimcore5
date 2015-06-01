@@ -108,7 +108,15 @@ pimcore.object.fieldcollection = Class.create({
     getEditPanel: function () {
         if (!this.editPanel) {
             this.editPanel = Ext.create('Ext.tab.Panel', {
-                region: "center"
+                region: "center",
+                plugins:
+                    [
+                        Ext.create('Ext.ux.TabCloseMenu', {
+                            showCloseAll: true,
+                            showCloseOthers: true
+                        }),
+                        Ext.create('Ext.ux.TabReorderer', {})
+                    ]
             });
         }
 
@@ -216,14 +224,14 @@ pimcore.object.fieldcollection = Class.create({
         Ext.getCmp("pimcore_panel_tabs").setActiveItem("pimcore_fieldcollections");
     },
 
-    deleteField: function () {
+    deleteField: function (tree, record) {
 
         Ext.Msg.confirm(t('delete'), t('delete_message'), function(btn){
             if (btn == 'yes'){
                 Ext.Ajax.request({
                     url: "/admin/class/fieldcollection-delete",
                     params: {
-                        id: this.id
+                        id: record.data.id
                     }
                 });
 

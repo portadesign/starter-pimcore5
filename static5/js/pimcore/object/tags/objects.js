@@ -52,7 +52,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                 this.applyPermissionStyle(key, value, metaData, record);
 
                 if(record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                    metaData.css += " grid_value_inherited";
+                    metaData.tdCls += " grid_value_inherited";
                 }
 
                 if (value && value.length > 0) {
@@ -94,22 +94,18 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
             layout: "fit"
         });
 
-        this.nameField = new Ext.form.Field({
-            xtype: 'field',
+        this.nameField = new Ext.form.TextField({
             fieldLabel: t('name'),
-            width: 200
+            width: 300
 
         });
 
-        this.parentIdField = new Ext.form.Hidden({
-            xtype: 'parentld'
+        this.parentIdField = new Ext.form.Hidden({});
 
-        });
-
-        this.parentField = new Ext.form.Field({
+        this.parentField = new Ext.form.TextField({
             name: 'parent',
             fieldLabel: t('parent_element'),
-            width: 200,
+            width: 300,
             disabled:true
         });
 
@@ -121,12 +117,11 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
 
 
         var panel = new Ext.Panel({
-            layout: "pimcoreform",
             bodyStyle: "padding: 10px;",
             items: [
                 this.nameField,
-                new Ext.form.CompositeField({
-                    width: 300,
+                new Ext.form.FieldContainer({
+                    layout: 'hbox',
                     items: [
                         this.parentField,
                         this.parentChooseButton
@@ -183,11 +178,11 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                 success: function(response) {
                     var data = Ext.decode(response.responseText);
                     if (data.success) {
-                        this.store.add(new this.store.recordType({
+                        this.store.add({
                             id: data.id,
                             path: parent + "/" + pimcore.helpers.getValidFilename(name),
                             type: className
-                        }));
+                        });
                         pimcore.helpers.openElement(data.id, "object", "object");
                         this.window.close();
                     } else {
@@ -357,7 +352,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                     }
                 ],
 
-            cls: cls,
+            componentCls: cls,
             autoExpandColumn: 'path',
             width: this.fieldConfig.width,
             height: this.fieldConfig.height,
@@ -516,7 +511,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
     }
     ,
 
-    onRowContextmenu: function (grid, rowIndex, event) {
+    onRowContextmenu: function (grid, record, tr, rowIndex, e, eOpts ) {
 
         //Ext.get(grid.getView().getRow(rowIndex)).frame();
         //grid.getSelectionModel().selectRow(rowIndex);
@@ -548,8 +543,8 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
             }.bind(this.reference)
         }));
 
-        event.stopEvent();
-        menu.showAt(event.getXY());
+        e.stopEvent();
+        menu.showAt(e.getXY());
     }
     ,
 
@@ -604,11 +599,11 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
         if (items.length > 0) {
             for (var i = 0; i < items.length; i++) {
                 if (!this.objectAlreadyExists(items[i].id)) {
-                    this.store.add(new this.store.recordType({
+                    this.store.add({
                         id: items[i].id,
                         path: items[i].fullpath,
                         type: items[i].classname
-                    }));
+                    });
                 }
             }
         }

@@ -41,7 +41,7 @@ pimcore.object.tags.datetime = Class.create(pimcore.object.tags.abstract, {
 
                                 if (record.data.inheritedFields[key]
                                                         && record.data.inheritedFields[key].inherited == true) {
-                                    metaData.css += " grid_value_inherited";
+                                    metaData.tdCls += " grid_value_inherited";
                                 }
 
                                 if (value) {
@@ -60,7 +60,6 @@ pimcore.object.tags.datetime = Class.create(pimcore.object.tags.abstract, {
     getLayoutEdit:function () {
 
         var date = {
-            itemCls:"object_field",
             width:100
         };
 
@@ -79,12 +78,15 @@ pimcore.object.tags.datetime = Class.create(pimcore.object.tags.abstract, {
         this.datefield = Ext.create('Ext.form.field.Date', date);
         this.timefield = Ext.create('Ext.form.field.Time', time);
 
-        this.component = Ext.create('Ext.form.FieldSet', {
+        this.component = Ext.create('Ext.form.FieldContainer', {
             layout: 'hbox',
             fieldLabel:this.fieldConfig.title,
             combineErrors:false,
             items:[this.datefield, this.timefield],
-            itemCls:"object_field"
+            componentCls:"object_field",
+            isDirty: function() {
+                return this.datefield.isDirty() || this.timefield.isDirty()
+            }.bind(this)
         });
 
         return this.component;

@@ -70,7 +70,7 @@ pimcore.object.tags.structuredTable = Class.create(pimcore.object.tags.abstract,
                         this.applyPermissionStyle(key, value, metaData, record);
 
                         if(record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                            metaData.css += " grid_value_inherited";
+                            metaData.tdCls += " grid_value_inherited";
                         }
                         var rows = Object.keys(value);
                         if (rows && rows.length > 0) {
@@ -115,7 +115,7 @@ pimcore.object.tags.structuredTable = Class.create(pimcore.object.tags.abstract,
         var columns = [
             {header: this.fieldConfig.labelFirstCell, width: this.fieldConfig.labelWidth, sortable: false,
                                 dataIndex: '__row_label', editor: null, renderer: function(value, metaData) {
-                    metaData.css = 'x-grid-hd-row';
+                    metaData.tdCls = 'x-grid-hd-row';
                     return ts(value);
                }
             }
@@ -136,9 +136,12 @@ pimcore.object.tags.structuredTable = Class.create(pimcore.object.tags.abstract,
             } else if(this.fieldConfig.cols[i].type == "bool") {
                 editor = new Ext.form.Checkbox();
                 renderer = function (value, metaData, record, rowIndex, colIndex, store) {
-                    metaData.css += ' x-grid3-check-col-td';
-                    return String.format('<div class="x-grid3-check-col{0}" style="background-position:10px center;">&#160;</div>',
-                                                                                    value ? '-on' : '');
+                    if (value) {
+                        return '<div style="text-align: center"><img class="x-grid-checkcolumn x-grid-checkcolumn-checked" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+
+                    } else {
+                        return '<div style="text-align: center"><img class="x-grid-checkcolumn" src="data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></div>';
+                    }
                 };
                 listeners = {
                     "mousedown": function (col, grid, rowIndex, event) {
@@ -169,7 +172,7 @@ pimcore.object.tags.structuredTable = Class.create(pimcore.object.tags.abstract,
             store: this.store,
             enableColumnMove: false,
             columns: columns,
-            cls: 'object_field',
+            componentCls: 'object_field',
             width: this.fieldConfig.width,
             height: this.fieldConfig.height,
             selModel: Ext.create('Ext.selection.CellModel'),
@@ -212,7 +215,7 @@ pimcore.object.tags.structuredTable = Class.create(pimcore.object.tags.abstract,
         var columns = [
             {header: "", width: 80, sortable: false, dataIndex: '__row_label', editor: null,
                 renderer: function(value, metaData) {
-                                metaData.css = 'x-grid3-hd-row';
+                                metaData.tdCls = 'x-grid3-hd-row';
                                 return ts(value);
                            }
             }
@@ -230,7 +233,7 @@ pimcore.object.tags.structuredTable = Class.create(pimcore.object.tags.abstract,
         this.component = Ext.create('Ext.grid.Panel', {
             store: this.store,
             columns: columns,
-            cls: cls,
+            componentCls: cls,
             width: this.fieldConfig.width,
             height: this.fieldConfig.height,
             tbar: [
@@ -251,7 +254,7 @@ pimcore.object.tags.structuredTable = Class.create(pimcore.object.tags.abstract,
                 }
             ],
             autoHeight: autoHeight,
-            bodyCssClass: "pimcore_object_tag_objects"
+            bodyCls: "pimcore_object_tag_objects"
         });
 
         return this.component;

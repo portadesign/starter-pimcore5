@@ -46,7 +46,7 @@ pimcore.object.tags.numeric = Class.create(pimcore.object.tags.abstract, {
         // NUMERIC
         if (field.type == "numeric") {
             editorConfig.decimalPrecision = 20;
-            return new Ext.ux.form.SpinnerField(editorConfig);
+            return new Ext.form.field.Spinner(editorConfig);
         }
     },
 
@@ -59,7 +59,7 @@ pimcore.object.tags.numeric = Class.create(pimcore.object.tags.abstract, {
         var input = {
             fieldLabel:this.fieldConfig.title,
             name:this.fieldConfig.name,
-            itemCls:"object_field"
+            componentCls:"object_field"
         };
 
         if (!isNaN(this.data)) {
@@ -90,7 +90,7 @@ pimcore.object.tags.numeric = Class.create(pimcore.object.tags.abstract, {
             input.decimalPrecision = 20;
         }
 
-        this.component = new Ext.ux.form.SpinnerField(input);
+        this.component = new Ext.form.field.Spinner(input);
         return this.component;
     },
 

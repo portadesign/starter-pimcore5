@@ -191,12 +191,18 @@ class Service
                 "limit" => $limit,
                 "groupBy" => $groupBy
             ));
+            $list->setUnpublished(1);
 
             $items = array();
+            /** @var  $doc Document */
             foreach ($list as $doc) {
                 $item = new Webservice\Data\Document\Listing\Item();
                 $item->id = $doc->getId();
                 $item->type = $doc->getType();
+                if (method_exists($doc, "getPublished")) {
+                    $item->published = $doc->getPublished();
+                }
+
 
                 $items[] = $item;
             }
@@ -828,12 +834,16 @@ class Service
             }
 
             $list = $listClassName::getList($params);
+            $list->setUnpublished(1);
 
             $items = array();
             foreach ($list as $object) {
                 $item = new Webservice\Data\Object\Listing\Item();
                 $item->id = $object->getId();
                 $item->type = $object->getType();
+                if (method_exists($object, "getPublished")) {
+                    $item->published = $object->getPublished();
+                }
 
                 $items[] = $item;
             }

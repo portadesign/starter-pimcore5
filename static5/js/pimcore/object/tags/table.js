@@ -63,7 +63,7 @@ pimcore.object.tags.table = Class.create(pimcore.object.tags.abstract, {
                             this.applyPermissionStyle(key, value, metaData, record);
 
                             if(record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
-                                metaData.css += " grid_value_inherited";
+                                metaData.tdCls += " grid_value_inherited";
                             }
 
                             if (value && value.length > 0) {
@@ -89,7 +89,7 @@ pimcore.object.tags.table = Class.create(pimcore.object.tags.abstract, {
         options.frame = true;
         options.layout = "fit";
         options.title = this.fieldConfig.title;
-        options.cls = "object_field";
+        options.componentCls = "object_field";
 
         if (!this.component) {
             this.component = new Ext.Panel(options);
@@ -138,13 +138,12 @@ pimcore.object.tags.table = Class.create(pimcore.object.tags.abstract, {
 
         this.grid = Ext.create('Ext.grid.Panel', {
             store: this.store,
-            width: 700,
-            height: 300,
             columns:columns,
             stripeRows: true,
             columnLines: true,
             autoHeight: true,
             selModel: Ext.create('Ext.selection.CellModel'),
+            hideHeaders: true,
             plugins: [
                 this.cellEditing
             ],
@@ -217,11 +216,13 @@ pimcore.object.tags.table = Class.create(pimcore.object.tags.abstract, {
     addRow: function  () {
         var initData = {};
 
-        for (var o = 0; o < this.grid.getColumnModel().config.length; o++) {
+        var columnnManager = this.grid.getColumnManager();
+        var columns = columnnManager.getColumns();
+        for (var o = 0; o < columns.length; o++) {
             initData["col_" + o] = "";
         }
 
-        this.store.add(new this.store.recordType(initData, this.store.getCount() + 1));
+        this.store.add(initData);
         this.dirty = true;
     },
 

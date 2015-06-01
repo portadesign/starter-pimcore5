@@ -95,8 +95,6 @@ pimcore.settings.recyclebin = Class.create({
             pageSize: itemsPerPage,
             remoteSort: true,
             listeners: {
-                write : function(store, action, result, response, rs) {
-                },
                 load: function () {
                     if(this.store.getCount() > 0) {
                         Ext.getCmp("pimcore_recyclebin_button_flush").enable();
@@ -117,7 +115,7 @@ pimcore.settings.recyclebin = Class.create({
                     if (key.getKey() == key.ENTER) {
                         var input = field;
                         var proxy = this.store.getProxy();
-                        proxy.extraParams.filter = input.getValue();
+                        proxy.extraParams.filterFullText = input.getValue();
                         this.store.load();
                     }
                 }.bind(this)
@@ -151,8 +149,7 @@ pimcore.settings.recyclebin = Class.create({
             value: 20,
             triggerAction: "all",
             listeners: {
-                select: function (box, records, index) {
-                    rec = records[0];
+                select: function (box, rec, index) {
                     var store = this.pagingtoolbar.getStore();
                     store.setPageSize(intval(rec.data.field1));
                     this.pagingtoolbar.moveFirst();
@@ -166,13 +163,17 @@ pimcore.settings.recyclebin = Class.create({
             {header: t("type"), flex: 50, sortable: true, dataIndex: 'subtype', renderer: function(d) {
                 return '<img src="/pimcore/static/img/icon/' + d + '.png" />';
             }},
-            {header: t("path"), flex: 200, sortable: true, dataIndex: 'path'},
+            {header: t("path"), flex: 200, sortable: true, dataIndex: 'path', filter: 'string'},
             {header: t("amount"), flex: 60, sortable: true, dataIndex: 'amount'},
-            {header: t("deletedby"), flex:80,sortable: true, dataIndex: 'deletedby'},
-            {header: t("date"), flex: 140, sortable: true, dataIndex: 'date', renderer: function(d) {
-                var date = new Date(d * 1000);
-                return Ext.Date.format(date, "Y-m-d H:i:s");
-            }},
+            {header: t("deletedby"), flex:80,sortable: true, dataIndex: 'deletedby', filter: 'string'},
+            {header: t("date"), flex: 140, sortable: true, dataIndex: 'date',
+                renderer: function(d) {
+                    var date = new Date(d * 1000);
+                    return Ext.Date.format(date, "Y-m-d H:i:s");
+                },
+                filter: 'date'
+
+            },
             {
                 xtype: 'actioncolumn',
                 width: 30,
@@ -186,7 +187,6 @@ pimcore.settings.recyclebin = Class.create({
             }
         ];
 
-        this.gridfilters = this.getGridFilters();
 
         this.grid = new Ext.grid.GridPanel({
             frame: false,
@@ -195,10 +195,9 @@ pimcore.settings.recyclebin = Class.create({
             columnLines: true,
             bbar: this.pagingtoolbar,
             stripeRows: true,
-            //plugins: [this.gridfilters],                  // TODO grid filters
-            sm: Ext.create('Ext.selection.RowModel', {}),
+            selModel: Ext.create('Ext.selection.RowModel', {}),
+            plugins: ['gridfilters'],
             columns : typesColumns,
-            autoExpandColumn: "recyclebin_path_col",
             tbar: [
                 {
                     text: t('restore'),
@@ -258,10 +257,12 @@ pimcore.settings.recyclebin = Class.create({
     },
 
     onDelete: function () {
-        var rec = this.grid.getSelectionModel().getSelected();
-        if (!rec) {
+        var selections = this.grid.getSelectionModel().getSelected();
+        if (!selections || selections.getCount() == 0 ) {
             return false;
         }
+        var rec = selections.getAt(0);
+
         this.grid.store.remove(rec);
 
         Ext.getCmp("pimcore_recyclebin_button_restore").disable();
@@ -271,11 +272,12 @@ pimcore.settings.recyclebin = Class.create({
     onRestore: function () {
         
         pimcore.helpers.loadingShow();
-        
-        var rec = this.grid.getSelectionModel().getSelected();
-        if (!rec) {
+
+        var selections = this.grid.getSelectionModel().getSelected();
+        if (!selections || selections.getCount() == 0 ) {
             return false;
         }
+        var rec = selections.getAt(0);
 
         Ext.Ajax.request({
             url: "/admin/recyclebin/restore",
@@ -308,30 +310,5 @@ pimcore.settings.recyclebin = Class.create({
 
         Ext.getCmp("pimcore_recyclebin_button_restore").disable();
         Ext.getCmp("pimcore_recyclebin_button_delete").disable();
-    },
-
-
-    getGridFilters: function() {
-        var configuredFilters = [{
-            type: "string",
-            dataIndex: "path"
-        },{
-            type: "string",
-            dataIndex: "deletedby"
-        },
-            {
-            type: "date",
-            dataIndex: "date"
-        }];
-
-        // filters
-        //var gridfilters = new Ext.ux.grid.GridFilters({
-        //    encode: true,
-        //    local: false,
-        //    filters: configuredFilters
-        //});
-        var gridfilters = null;
-
-        return gridfilters;
     }
 });

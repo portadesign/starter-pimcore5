@@ -55,7 +55,7 @@ pimcore.object.tags.multihref = Class.create(pimcore.object.tags.abstract, {
 
                                 if(record.data.inheritedFields[key]
                                                         && record.data.inheritedFields[key].inherited == true) {
-                                    metaData.css += " grid_value_inherited";
+                                    metaData.tdCls += " grid_value_inherited";
                                 }
 
                                 if (value && value.length > 0) {
@@ -203,7 +203,7 @@ pimcore.object.tags.multihref = Class.create(pimcore.object.tags.abstract, {
                     }
                 ]
             },
-            cls: cls,
+            componentCls: cls,
             //autoExpandColumn: 'path',
             tbar: {
                 items: toolbarItems,
@@ -353,12 +353,12 @@ pimcore.object.tags.multihref = Class.create(pimcore.object.tags.abstract, {
             try {
                 var data = Ext.decode(res.response.responseText);
                 if(data["id"]) {
-                    this.store.add(new this.store.recordType({
+                    this.store.add({
                         id: data["id"],
                         path: data["fullpath"],
                         type: "asset",
                         subtype: data["type"]
-                    }));
+                    });
                 }
             } catch (e) {
                 console.log(e);
@@ -366,10 +366,10 @@ pimcore.object.tags.multihref = Class.create(pimcore.object.tags.abstract, {
         }.bind(this));
     },
 
-    onRowContextmenu: function (grid, rowIndex, event) {
+    onRowContextmenu: function (grid, record, tr, rowIndex, e, eOpts ) {
 
         var menu = new Ext.menu.Menu();
-        var data = grid.getStore().getAt(rowIndex);
+        var data = record;
 
         menu.add(new Ext.menu.Item({
             text: t('remove'),
@@ -401,8 +401,8 @@ pimcore.object.tags.multihref = Class.create(pimcore.object.tags.abstract, {
             }.bind(this.reference)
         }));
 
-        event.stopEvent();
-        menu.showAt(event.getXY());
+        e.stopEvent();
+        menu.showAt(e.getXY());
     },
 
     openSearchEditor: function () {

@@ -138,8 +138,7 @@ pimcore.element.notes = Class.create({
                 value: 20,
                 triggerAction: "all",
                 listeners: {
-                    select: function (box, records, index) {
-                        rec = records[0];
+                    select: function (box, rec, index) {
                         var store = this.pagingtoolbar.getStore();
                         store.setPageSize(intval(rec.data.field1));
                         this.pagingtoolbar.moveFirst();
@@ -252,9 +251,15 @@ pimcore.element.notes = Class.create({
         var rec = this.store.getAt(rowIndex);
 
         var keyValueStore = new Ext.data.Store({
+            proxy: {
+                type: 'memory',
+                reader: {
+                    type: 'json',
+                    rootProperty: 'data'
+                }
+            },
             autoDestroy: true,
             data: rec.data,
-            rootProperty: 'data',
             fields: ['data', 'name', 'type']
         });
 
@@ -335,17 +340,17 @@ pimcore.element.notes = Class.create({
                 editable: true,
                 mode: "local",
                 triggerAction: "all",
-                width: 150
+                width: 250
             },{
                 xtype: "textfield",
                 fieldLabel: t("title"),
                 name: "title",
-                width: 350
+                width: 450
             }, {
                 xtype: "textarea",
                 fieldLabel: t("description"),
                 name: "description",
-                width: 350
+                width: 450
             },{
                 xtype: "hidden",
                 name: "cid",
@@ -367,7 +372,6 @@ pimcore.element.notes = Class.create({
                 text: t("save"),
                 iconCls: "pimcore_icon_accept",
                 handler: function () {
-
                     var values = formPanel.getForm().getFieldValues();
 
                     Ext.Ajax.request({

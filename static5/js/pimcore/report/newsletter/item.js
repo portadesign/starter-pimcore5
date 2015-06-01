@@ -67,15 +67,21 @@ pimcore.report.newsletter.item = Class.create({
         var store;
 
         if(pimcore.settings.google_analytics_enabled) {
-            store = new Ext.data.JsonStore({
+            store = new Ext.data.Store({
+                proxy: {
+                    type: 'ajax',
+                    url: '/admin/reports/analytics/chartmetricdata',
+                    extraParams: {
+                        "metric[]": "visits",
+                        filters: "ga:campaign==" + this.data.name + ";ga:medium==Email;ga:source==Newsletter"
+                    },
+                    reader: {
+                        type: 'json',
+                        rootProperty: 'data'
+                    }
+                },
                 autoDestroy: true,
                 autoLoad: true,
-                url: '/admin/reports/analytics/chartmetricdata',
-                baseParams: {
-                    "metric[]": "visits",
-                    filters: "ga:campaign==" + this.data.name + ";ga:medium==Email;ga:source==Newsletter"
-                },
-                root: 'data',
                 fields: ['timestamp','datetext','visits']
             });
         } else {
@@ -87,25 +93,56 @@ pimcore.report.newsletter.item = Class.create({
             });
         }
 
-        this.analytics = new Ext.form.FieldSet({
-            hidden: !this.getAnalyticsVisiblity(),
-            title: t("google_analytics"),
+        this.analytics = new Ext.panel.Panel(
+            {
+            border: false,
+            layout: 'fit',
             items: [{
-                xtype: 'linechart',
-                store: store,
-                xField: 'datetext',
-                height: 240,
-                series: [
+                xtype: 'fieldset',
+                hidden: !this.getAnalyticsVisiblity(),
+                title: t("google_analytics"),
+                items: [
                     {
-                        type:'line',
-                        displayName: t("visits"),
-                        yField: 'visits',
-                        style: {
-                            color: 0x15428B
-                        }
+                    xtype: 'cartesian',
+                    store: store,
+                    height: 240,
+                    axes: [{
+                        type: 'numeric',
+                        fields: ['visits' ],
+                        position: 'left',
+                        grid: true,
+                        minimum: 0
                     }
-                ]
-            }],
+                        , {
+                            type: 'category',
+                            fields: 'datetext',
+                            position: 'bottom',
+                            grid: true,
+                            label: {
+                                rotate: {
+                                    degrees: -45
+                                }
+                            }
+                        }
+                    ],
+                    series: [
+                        {
+                            type:'line',
+                            displayName: t("visits"),
+                            xField: 'datetext',
+                            yField: 'visits',
+                            style: {
+                                lineWidth: 2,
+                                stroke: '#15428B',
+                                fill: '#15428B'
+                            },
+                            marker: {
+                                radius: 4
+                            }
+                        }
+                    ]
+                }
+            ]}],
             buttons: [{
                 text: t("show_in_google_anaytics"),
                 iconCls: "pimcore_icon_analytics",
@@ -152,7 +189,6 @@ pimcore.report.newsletter.item = Class.create({
         });
 
         this.form = new Ext.form.FormPanel({
-            layout: "pimcoreform",
             region: "center",
             bodyStyle: "padding:10px",
             labelWidth: 150,
@@ -167,21 +203,21 @@ pimcore.report.newsletter.item = Class.create({
                     name: "name",
                     value: this.data.name,
                     fieldLabel: t("name"),
-                    width: 300,
+                    width: 450,
                     disabled: true
                 },{
                     xtype: "textarea",
                     name: "description",
                     value: this.data.description,
                     fieldLabel: t("description"),
-                    width: 300,
+                    width: 450,
                     height: 50
                 },{
                     xtype: "textfield",
                     name: "document",
                     value: this.data.document,
                     fieldLabel: t("document"),
-                    width: 300,
+                    width: 450,
                     cls: "input_drop_target",
                     enableKeyEvents: true,
                     listeners: {
@@ -198,8 +234,9 @@ pimcore.report.newsletter.item = Class.create({
                                 },
 
                                 onNodeDrop : function (el, target, dd, e, data) {
-                                    if (data.node.attributes.elementType == "document") {
-                                        el.setValue(data.node.attributes.path);
+                                    var record = data.records[0];
+                                    if (record.data.elementType == "document") {
+                                        el.setValue(record.data.path);
                                         return true;
                                     }
                                     return false;
@@ -215,14 +252,14 @@ pimcore.report.newsletter.item = Class.create({
                     triggerAction: 'all',
                     editable: false,
                     store: this.data.availableClasses,
-                    width: 180
+                    width: 280
 
                 },{
                     xtype: "textfield",
                     name: "objectFilterSQL",
                     value: this.data.objectFilterSQL,
                     fieldLabel: t("object_filter") + " (SQL)",
-                    width: 300,
+                    width: 450,
                     itemId: "objectFilterSQL",
                     enableKeyEvents: true,
                     listeners: {
@@ -267,14 +304,14 @@ pimcore.report.newsletter.item = Class.create({
                     displayField: "text",
                     valueField: "id",
                     name: 'personas',
-                    width: 200,
+                    width: 300,
                     value: this.data["personas"]
                 }, {
                     xtype: "textfield",
                     name: "testEmailAddress",
                     value: this.data.testEmailAddress,
                     fieldLabel: t("test_email_address"),
-                    width: 300
+                    width: 450
                 },{
                     xtype: "checkbox",
                     name: "googleAnalytics",
@@ -314,7 +351,7 @@ pimcore.report.newsletter.item = Class.create({
         });
 
         this.parentPanel.getEditPanel().add(this.panel);
-        this.parentPanel.getEditPanel().activate(this.panel);
+        this.parentPanel.getEditPanel().setActiveItem(this.panel);
 
         pimcore.layout.refresh();
 
@@ -369,7 +406,10 @@ pimcore.report.newsletter.item = Class.create({
     },
 
     saveOnComplete: function () {
-        this.parentPanel.tree.getRootNode().reload();
+        var tree = this.parentPanel.tree;
+        tree.getStore().load({
+            node: tree.getRootNode()
+        });
         pimcore.helpers.showNotification(t("success"), t("saved_successfully"), "success");
     },
 

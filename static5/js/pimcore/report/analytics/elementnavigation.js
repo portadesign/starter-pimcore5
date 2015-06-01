@@ -42,7 +42,9 @@ pimcore.report.analytics.elementnavigation = Class.create(pimcore.report.abstrac
         });
         
         panel.on("afterrender", function (panel) {
-            this.loadMask = new Ext.LoadMask(panel.getEl(), {msg: t("please_wait")});
+            this.loadMask = new Ext.LoadMask({
+                target: panel,
+                msg: t("please_wait")});
             this.loadMask.enable();
             
         }.bind(this));
@@ -119,9 +121,11 @@ pimcore.report.analytics.elementnavigation = Class.create(pimcore.report.abstrac
 
             this.filterPanel = new Ext.FormPanel({
                 region: 'north',
-                labelWidth: 40,
+                defaults: {
+                    labelWidth: 40
+                },
                 height: 40,
-                layout: 'form',
+                layout: 'hbox',
                 bodyStyle: 'padding:7px 0 0 5px',
                 items: [{
                         xtype: "datefield",
