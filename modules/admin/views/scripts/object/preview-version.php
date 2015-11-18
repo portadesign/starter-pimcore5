@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
-    <link rel="stylesheet" type="text/css" href="/pimcore/static/css/object_versions.css"/>
+    <link rel="stylesheet" type="text/css" href="/pimcore/static6/css/object_versions.css"/>
 
 </head>
 
@@ -27,17 +27,17 @@
     <tr class="system">
         <td>Date</td>
         <td>o_modificationDate</td>
-        <td><?php echo date('Y-m-d H:i:s', $this->object->getModificationDate()); ?></td>
+        <td><?= date('Y-m-d H:i:s', $this->object->getModificationDate()); ?></td>
     </tr>
     <tr class="system">
         <td>Path</td>
         <td>o_path</td>
-        <td><?php echo $this->object->getFullpath(); ?></td>
+        <td><?= $this->object->getFullpath(); ?></td>
     </tr>
     <tr class="system">
         <td>Published</td>
         <td>o_published</td>
-        <td><?php echo \Zend_Json::encode($this->object->getPublished()); ?></td>
+        <td><?= \Zend_Json::encode($this->object->getPublished()); ?></td>
     </tr>
 
     <tr class="">
@@ -50,8 +50,8 @@
         <?php foreach(\Pimcore\Tool::getValidLanguages() as $language) { ?>
             <?php foreach ($definition->getFieldDefinitions() as $lfd) { ?>
                 <tr<?php if ($c % 2) { ?> class="odd"<?php } ?>>
-                    <td><?php echo $lfd->getTitle() ?> (<?php echo $language; ?>)</td>
-                    <td><?php echo $lfd->getName() ?></td>
+                    <td><?= $lfd->getTitle() ?> (<?= $language; ?>)</td>
+                    <td><?= $lfd->getName() ?></td>
                     <td>
                         <?php
                             if($this->object->getValueForFieldName($fieldName)) {
@@ -84,19 +84,74 @@
                     }
                     ?>
                      <tr<?php if ($c % 2) { ?> class="odd"<?php } ?>>
-                        <td><?php echo ucfirst($asAllowedType) . " - " . $lfd->getTitle() ?> (<?php echo $language; ?>)</td>
-                        <td><?php echo $lfd->getName() ?></td>
-                        <td><?php echo $value ?></td>
+                        <td><?= ucfirst($asAllowedType) . " - " . $lfd->getTitle() ?> (<?= $language; ?>)</td>
+                        <td><?= $lfd->getName() ?></td>
+                        <td><?= $value ?></td>
                     </tr>
                     <?php
                     $c++;
                 } ?>
             <?php } ?>
+    <?php } else if($definition instanceof Object\ClassDefinition\Data\Classificationstore){
+        /** @var $storedata Object\Classificationstore */
+        $storedata = $definition->getVersionPreview($this->object->getValueForFieldName($fieldName));
+
+        if (!$storedata) {
+            continue;
+        }
+        $activeGroups = $storedata->getActiveGroups();
+        if (!$activeGroups) {
+            continue;
+        }
+
+        $languages = array("default");
+
+        if ($definition->isLocalized()) {
+            $languages = array_merge($languages, \Pimcore\Tool::getValidLanguages());
+        }
+
+        foreach ($activeGroups as $activeGroupId => $enabled) {
+            if  (!$enabled) {
+                continue;
+            }
+            /** @var $groupDefinition Object\Classificationstore\GroupConfig */
+            $groupDefinition = Pimcore\Model\Object\Classificationstore\GroupConfig::getById($activeGroupId);
+            if (!$groupDefinition) {
+                continue;
+            }
+
+            /** @var $keyGroupRelation Object\Classificationstore\KeyGroupRelation */
+            $keyGroupRelations = $groupDefinition->getRelations();
+
+            foreach ($keyGroupRelations as $keyGroupRelation) {
+
+                $keyDef = Object\Classificationstore\Service::getFieldDefinitionFromJson(json_decode($keyGroupRelation->getDefinition()), $keyGroupRelation->getType());
+                if (!$keyDef) {
+                    continue;
+                }
+
+                foreach ($languages as $language) {
+
+                    $keyData = $storedata->getLocalizedKeyValue($activeGroupId, $keyGroupRelation->getKeyId(), $language, true, true);
+                    $preview = $keyDef->getVersionPreview($keyData);
+                    ?>
+
+                    <tr<?php if ($c % 2) { ?> class="odd"<?php } ?>>
+                        <td><?= $definition->getTitle() ?></td>
+                        <td><?= $groupDefinition->getName() ?> - <?= $keyGroupRelation->getName()?> / <?= $definition->isLocalized() ? $language : "" ?></td>
+                        <td><?= $preview ?></td>
+                    </tr>
+                    <?php
+                    $c++;
+                }
+            }
+        }
+        ?>
     <?php } else { ?>
         <tr<?php if ($c % 2) { ?> class="odd"<?php } ?>>
-            <td><?php echo $definition->getTitle() ?></td>
-            <td><?php echo $definition->getName() ?></td>
-            <td><?php echo $definition->getVersionPreview($this->object->getValueForFieldName($fieldName)) ?></td>
+            <td><?= $definition->getTitle() ?></td>
+            <td><?= $definition->getName() ?></td>
+            <td><?= $definition->getVersionPreview($this->object->getValueForFieldName($fieldName)) ?></td>
         </tr>
     <?php } ?>
 <?php $c++;

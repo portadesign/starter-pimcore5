@@ -2,20 +2,17 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore;
 
-use Pimcore\Resource; 
+use Pimcore\Db;
 
 class Backup {
 
@@ -190,7 +187,7 @@ class Backup {
         $steps = array();
 
         // get available tables
-        $db = Resource::get();
+        $db = Db::get();
         $tables = $this->getTables();
 
 
@@ -357,7 +354,7 @@ class Backup {
      * @return array
      */
     protected function getTables(){
-        $db = Resource::get();
+        $db = Db::get();
 
         if($mysqlTables = $this->options['mysql-tables']){
             $specificTables = explode(',',$mysqlTables);
@@ -376,7 +373,7 @@ class Backup {
      * @return array
      */
     public function mysqlTables ($exclude = []) {
-        $db = Resource::get();
+        $db = Db::get();
 
         $tables = $this->getTables();
 
@@ -424,7 +421,7 @@ class Backup {
      * @return array
      */
     public function mysqlData ($name, $type) {
-        $db = Resource::reset();
+        $db = Db::reset();
 
         $dumpData = "\n\n";
 
@@ -497,9 +494,15 @@ class Backup {
      * @throws \Exception
      */
     public function complete () {
+
         $this->getArchive()->addFromString(PIMCORE_FRONTEND_MODULE . "/var/cache/.dummy", "dummy");
         $this->getArchive()->addFromString(PIMCORE_FRONTEND_MODULE . "/var/tmp/.dummy", "dummy");
+        $this->getArchive()->addFromString(PIMCORE_FRONTEND_MODULE . "/var/backup/.dummy", "dummy");
+        $this->getArchive()->addFromString(PIMCORE_FRONTEND_MODULE . "/var/log/.dummy", "dummy");
+        $this->getArchive()->addFromString(PIMCORE_FRONTEND_MODULE . "/var/system/.dummy", "dummy");
+        $this->getArchive()->addFromString(PIMCORE_FRONTEND_MODULE . "/var/webdav/.dummy", "dummy");
         $this->getArchive()->addFromString(PIMCORE_FRONTEND_MODULE . "/var/log/debug.log", "dummy");
+
         $this->getArchive()->addFile(PIMCORE_DOCUMENT_ROOT . "/index.php", "index.php");
         $this->getArchive()->addFile(PIMCORE_DOCUMENT_ROOT . "/.htaccess", ".htaccess");
 

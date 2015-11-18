@@ -1,15 +1,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 pimcore.registerNS("pimcore.layout.toolbar");
@@ -273,6 +270,14 @@ pimcore.layout.toolbar = Class.create({
             });
         }
 
+        if (user.isAllowed("application_logging")) {
+            extrasItems.push({
+                text: t("log_applicationlog"),
+                iconCls: "pimcore_icon_log_admin",
+                handler: this.logAdmin
+            });
+        }
+
         if (extrasItems.length > 0) {
             extrasItems.push("-");
         }
@@ -319,14 +324,6 @@ pimcore.layout.toolbar = Class.create({
                 iconCls: "pimcore_icon_update",
                 handler: function () {
                     var update = new pimcore.settings.update();
-                }
-            });
-
-            extrasItems.push({
-                text: t("language_download"),
-                iconCls: "pimcore_icon_languages",
-                handler: function () {
-                    var update = new pimcore.settings.languages();
                 }
             });
 
@@ -609,6 +606,13 @@ pimcore.layout.toolbar = Class.create({
                     iconCls: "pimcore_icon_key",
                     handler: this.keyValueSettings
                 });
+
+                objectMenu.menu.items.push({
+                    text: t("classificationstore_menu_config"),
+                    iconCls: "pimcore_icon_classificationstore",
+                    handler: this.editClassificationStoreConfig
+                });
+
 
                 objectMenu.menu.items.push({
                     text: t("custom_views"),
@@ -1327,6 +1331,15 @@ pimcore.layout.toolbar = Class.create({
         }
     },
 
+    editClassificationStoreConfig: function () {
+        try {
+            pimcore.globalmanager.get("classifcationstore_config").activate();
+        }
+        catch (e) {
+            pimcore.globalmanager.add("classifcationstore_config", new pimcore.object.classificationstore.configPanel());
+        }
+    },
+
     editClasses: function () {
         try {
             pimcore.globalmanager.get("classes").activate();
@@ -1439,6 +1452,15 @@ pimcore.layout.toolbar = Class.create({
         }
         catch (e) {
             pimcore.globalmanager.add("extensionmanager_admin", new pimcore.extensionmanager.admin());
+        }
+    },
+
+    logAdmin: function () {
+        try {
+            pimcore.globalmanager.get("pimcore_applicationlog_admin").activate();
+        }
+        catch (e) {
+            pimcore.globalmanager.add("pimcore_applicationlog_admin", new pimcore.log.admin());
         }
     },
 

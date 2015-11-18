@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\Model\Element;
@@ -94,9 +91,10 @@ class Admin_ElementController extends \Pimcore\Controller\Action\Admin {
         $list->setLimit($this->getParam("limit"));
         $list->setOffset($this->getParam("start"));
 
-        if($this->getParam("sort")) {
-            $list->setOrderKey(array($this->getParam("sort"), "id"));
-            $list->setOrder(array($this->getParam("dir"), $this->getParam("dir")));
+        $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
+        if($sortingSettings['orderKey'] && $sortingSettings['order']) {
+            $list->setOrderKey($sortingSettings['orderKey']);
+            $list->setOrder($sortingSettings['order']);
         } else {
             $list->setOrderKey(array("date", "id"));
             $list->setOrder(array("DESC", "DESC"));

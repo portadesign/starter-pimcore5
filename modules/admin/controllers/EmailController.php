@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\Mail;
@@ -118,8 +115,8 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
      */
     public function emailLogsAction()
     {
-        if(!$this->getUser()->isAllowed("sent_emails")) {
-            throw new \Exception("Permission denied, user needs 'sent_emails' permission.");
+        if(!$this->getUser()->isAllowed("emails")) {
+            throw new \Exception("Permission denied, user needs 'emails' permission.");
         }
 
         $list = new Tool\Email\Log\Listing();
@@ -175,8 +172,8 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
      */
     public function showEmailLogAction()
     {
-        if(!$this->getUser()->isAllowed("sent_emails")) {
-            throw new \Exception("Permission denied, user needs 'sent_emails' permission.");
+        if(!$this->getUser()->isAllowed("emails")) {
+            throw new \Exception("Permission denied, user needs 'emails' permission.");
         }
 
         $type = $this->getParam('type');
@@ -285,8 +282,8 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
      */
     public function deleteEmailLogAction()
     {
-        if(!$this->getUser()->isAllowed("sent_emails")) {
-            throw new \Exception("Permission denied, user needs 'sent_emails' permission.");
+        if(!$this->getUser()->isAllowed("emails")) {
+            throw new \Exception("Permission denied, user needs 'emails' permission.");
         }
 
         $success = false;
@@ -305,8 +302,8 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
      */
     public function resendEmailAction(){
 
-        if(!$this->getUser()->isAllowed("sent_emails")) {
-            throw new \Exception("Permission denied, user needs 'sent_emails' permission.");
+        if(!$this->getUser()->isAllowed("emails")) {
+            throw new \Exception("Permission denied, user needs 'emails' permission.");
         }
 
         $success = false;
@@ -353,12 +350,13 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
     public function sendTestEmailAction() {
 
         if(!$this->getUser()->isAllowed("emails")) {
-            throw new \Exception("Permission denied, user needs 'sent_emails' permission.");
+            throw new \Exception("Permission denied, user needs 'emails' permission.");
         }
 
         $mail = new Mail();
         $mail->addTo($this->getParam("to"));
         $mail->setSubject($this->getParam("subject"));
+        $mail->setIgnoreDebugMode(true);
 
         if($this->getParam("type") == "text") {
             $mail->setBodyText($this->getParam("content"));
@@ -377,7 +375,7 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
     public function blacklistAction() {
 
         if(!$this->getUser()->isAllowed("emails")) {
-            throw new \Exception("Permission denied, user needs 'sent_emails' permission.");
+            throw new \Exception("Permission denied, user needs 'emails' permission.");
         }
 
         if ($this->getParam("data")) {
@@ -422,10 +420,14 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
             $list->setLimit($this->getParam("limit"));
             $list->setOffset($this->getParam("start"));
 
-            if($this->getParam("sort")) {
-                $list->setOrderKey($this->getParam("sort"));
-                $list->setOrder($this->getParam("dir"));
+            $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
+            if($sortingSettings['orderKey']) {
+                $orderKey = $sortingSettings['orderKey'];
             }
+            if($sortingSettings['order']) {
+                $order  = $sortingSettings['order'];
+            }
+
 
             if($this->getParam("filter")) {
                 $list->setCondition("`address` LIKE " . $list->quote("%".$this->getParam("filter")."%"));

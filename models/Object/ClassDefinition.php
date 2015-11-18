@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object;
@@ -147,7 +144,7 @@ class ClassDefinition extends Model\AbstractModel {
 
             try {
                 $class = new self();
-                $class->getResource()->getById($id);
+                $class->getDao()->getById($id);
                 \Zend_Registry::set($cacheKey, $class);
             } catch (\Exception $e) {
                 \Logger::error($e);
@@ -166,7 +163,7 @@ class ClassDefinition extends Model\AbstractModel {
         $class = new self();
 
         try {
-            $class->getResource()->getByName($name);
+            $class->getDao()->getByName($name);
         } catch (\Exception $e) {
             \Logger::error($e);
             return null;
@@ -218,7 +215,7 @@ class ClassDefinition extends Model\AbstractModel {
 
         $this->setModificationDate(time());
 
-        $this->getResource()->save();
+        $this->getDao()->save();
 
         // create class for object
         $extendClass = "Concrete";
@@ -288,7 +285,7 @@ class ClassDefinition extends Model\AbstractModel {
 
         if (is_array($this->getFieldDefinitions()) && count($this->getFieldDefinitions())) {
             foreach ($this->getFieldDefinitions() as $key => $def) {
-                if (!(method_exists($def,"isRemoteOwner") and $def->isRemoteOwner())) {
+                if (!(method_exists($def,"isRemoteOwner") && $def->isRemoteOwner()) && !$def instanceof Object\ClassDefinition\Data\CalculatedValue) {
                     $cd .= "public $" . $key . ";\n";
                 }
             }
@@ -388,6 +385,12 @@ class ClassDefinition extends Model\AbstractModel {
         }
         catch (\Exception $e) {
         }
+
+        if ($isUpdate) {
+            \Pimcore::getEventManager()->trigger("object.class.postUpdate", $this);
+        } else {
+            \Pimcore::getEventManager()->trigger("object.class.postAdd", $this);
+        }
     }
 
     /**
@@ -426,7 +429,7 @@ class ClassDefinition extends Model\AbstractModel {
             $customLayout->delete();
         }
 
-        $this->getResource()->delete();
+        $this->getDao()->delete();
     }
 
     /**

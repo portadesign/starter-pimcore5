@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\File;
@@ -172,15 +169,6 @@ class Admin_PageController extends \Pimcore\Controller\Action\Admin\Document {
         $this->_helper->json(false);
     }
 
-    public function mobilePreviewAction() {
-
-        $page = Document::getById($this->getParam("id"));
-
-        if($page instanceof Document\Page) {
-            $this->view->previewUrl = $page->getFullPath() . "?pimcore_preview=true&time=" . time();
-        }
-    }
-
     public function getListAction() {
         $list = new Document\Listing();
         $list->setCondition("type = ?", array("page"));
@@ -215,7 +203,7 @@ class Admin_PageController extends \Pimcore\Controller\Action\Admin\Document {
         if($this->getParam("id")) {
 
             $doc = Document::getById($this->getParam("id"));
-            $url = Tool::getHostUrl() . $doc->getRealFullPath() . "?pimcore_preview=true";
+            $url = Tool::getHostUrl() . $doc->getRealFullPath();
 
             $config = \Pimcore\Config::getSystemConfig();
             if ($config->general->http_auth) {

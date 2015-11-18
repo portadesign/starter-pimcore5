@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\Tool;
@@ -72,7 +69,7 @@ class   Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin {
             foreach ($configFiles as $configFile) {
                 if (is_file($configFile)) {
                     $gridConfig = Tool\Serialize::unserialize(file_get_contents($configFile));
-                    if(array_key_exists("classId", $gridConfig)) {
+                    if(is_array($gridConfig) && array_key_exists("classId", $gridConfig)) {
                         if($gridConfig["classId"] == $class->getId()) {
                             break;
                         } else {
@@ -302,6 +299,7 @@ class   Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin {
         }
 
         if(!$field->getInvisible() && ($force || $visible)) {
+            Object\Service::enrichLayoutDefinition($field);
             return array(
                 "key" => $key,
                 "type" => $field->getFieldType(),
@@ -687,16 +685,54 @@ class   Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin {
             }
         }
 
+
+        $fields = array();
+        $bricks = array();
+        if ($this->getParam("fields")) {
+            $fields = $this->getParam("fields");
+
+            foreach ($fields as $f) {
+                $parts = explode("~", $f);
+                if (substr($f, 0, 1) == "~") {
+                    // key value, ignore for now
+                } else if (count($parts) > 1) {
+                    $bricks[$parts[0]] = $parts[0];
+                }
+            }
+        }
+        if (!empty($bricks)) {
+            foreach ($bricks as $b) {
+                $list->addObjectbrick($b);
+            }
+        }
+
         $list->load();
 
         $objects = array();
         \Logger::debug("objects in list:" . count($list->getObjects()));
         foreach ($list->getObjects() as $object) {
 
-            if ($object instanceof Object\Concrete) {
-                $o = $this->csvObjectData($object);
-                $objects[] = $o;
+            if($fields) {
+
+                $objectData = [];
+                foreach($fields as $field) {
+                    $fieldData = $this->getCsvFieldData($field, $object);
+                    if($fieldData) {
+                        $objectData[$field] = $fieldData;
+                    }
+                }
+                $objects[] = $objectData;
+
+            } else {
+                /**
+                 * @extjs - TODO remove this, when old ext support is removed
+                 */
+                if ($object instanceof Object\Concrete) {
+                    $o = $this->csvObjectData($object);
+                    $objects[] = $o;
+                }
             }
+
         }
         //create csv
         if(!empty($objects)) {
@@ -729,6 +765,70 @@ class   Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin {
     }
 
 
+    protected function getCsvFieldData($field, $object) {
+
+        //check if field is systemfield
+        $systemFieldMap = [
+            'id' => "getId",
+            'fullpath' => "getFullPath",
+            'published' => "getPublished",
+            'creationDate' => "getCreationDate",
+            'modificationDate' => "getModificationDate",
+            'filename' => "getKey",
+            'classname' => "getClassname"
+        ];
+        if(in_array($field, array_keys($systemFieldMap) )) {
+            return $object->{$systemFieldMap[$field]}();
+        } else {
+            //check if field is standard object field
+            $fieldDefinition = $object->getClass()->getFieldDefinition($field);
+            if($fieldDefinition) {
+                return $fieldDefinition->getForCsvExport($object);
+            } else {
+
+                $fieldParts = explode("~", $field);
+
+                // check for objects bricks and localized fields
+                if (substr($field, 0, 1) == "~") {
+                    //key value store - ignore for now
+                } else if(count($fieldParts) > 1) {
+                    // brick
+                    $brickType = $fieldParts[0];
+                    $brickKey = $fieldParts[1];
+                    $key = Object\Service::getFieldForBrickType($object->getClass(), $brickType);
+
+                    $brickClass = Pimcore\Model\Object\Objectbrick\Definition::getByKey($brickType);
+                    $fieldDefinition = $brickClass->getFieldDefinition($brickKey);
+
+                    if($fieldDefinition) {
+                        $brickContainer = $object->{"get".ucfirst($key)}();
+                        if($brickContainer && !empty($brickKey)) {
+                            $brick = $brickContainer->{"get".ucfirst($brickType)}();
+                            if($brick) {
+                                return $fieldDefinition->getForCsvExport($brick);
+                            }
+
+                        }
+                    }
+
+                } else if($locFields = $object->getClass()->getFieldDefinition("localizedfields")) {
+
+                    // if the definition is not set try to get the definition from localized fields
+                    $fieldDefinition = $locFields->getFieldDefinition($field);
+                    if ($fieldDefinition) {
+                        $needLocalizedPermissions = true;
+                        return $fieldDefinition->getForCsvExport($object->getLocalizedFields(), ["language" => $this->getParam("language")]);
+                    }
+                }
+
+            }
+
+        }
+    }
+
+    /**
+     * @extjs - TODO remove this, when old ext support is removed
+     */
     /**
      * Flattens object data to an array with key=>value where
      * value is simply a string representation of the value (for objects, hrefs and assets the full path is used)

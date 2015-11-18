@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\Config;
@@ -18,7 +15,7 @@ use Pimcore\Model\Cache;
 use Pimcore\Controller;
 use Pimcore\Tool;
 use Pimcore\File;
-use Pimcore\Resource;
+use Pimcore\Db;
 use Pimcore\ExtensionManager;
 use Pimcore\Model\User;
 use Pimcore\Model;
@@ -287,6 +284,7 @@ class Pimcore {
                 if(!headers_sent()) {
                     header("HTTP/1.0 404 Not Found");
                 }
+                \Logger::err($e);
                 throw new \Zend_Controller_Router_Exception("No route, document, custom route or redirect is matching the request: " . $_SERVER["REQUEST_URI"] . " | \n" . "Specific ERROR: " . $e->getMessage());
             } catch (\Exception $e) {
                 if(!headers_sent()) {
@@ -469,6 +467,12 @@ class Pimcore {
         // this is for simple_dom_html
         ini_set('pcre.recursion-limit', 100000);
 
+        // zlib.output_compression conflicts with while (@ob_end_flush()) ;
+        // see also: https://github.com/pimcore/pimcore/issues/291
+        if (ini_get('zlib.output_compression')) {
+            @ini_set('zlib.output_compression', 'Off');
+        }
+
         // set dummy timezone if no tz is specified / required for example by the logger, ...
         $defaultTimezone = @date_default_timezone_get();
         if(!$defaultTimezone) {
@@ -476,8 +480,8 @@ class Pimcore {
         }
 
         // check some system variables
-        if (version_compare(PHP_VERSION, '5.4', "<")) {
-            $m = "pimcore requires at least PHP version 5.4.0 your PHP version is: " . PHP_VERSION;
+        if (version_compare(PHP_VERSION, '5.5', "<")) {
+            $m = "pimcore requires at least PHP version 5.5.0 your PHP version is: " . PHP_VERSION;
             Tool::exitWithError($m);
         }
     }
@@ -556,16 +560,16 @@ class Pimcore {
                     }
 
                     $jsPaths = array();
-                    $isExtJs5 = \Pimcore\Tool\Admin::isExtJS5();
+                    $isExtJs6 = \Pimcore\Tool\Admin::isExtJS6();
 
-                    if ($isExtJs5 && is_array($p['plugin']['pluginJsPaths-extjs5'])
-                        && isset($p['plugin']['pluginJsPaths-extjs5']['path'])
-                        && is_array($p['plugin']['pluginJsPaths-extjs5']['path'])) {
-                        $jsPaths = $p['plugin']['pluginJsPaths-extjs5']['path'];
+                    if ($isExtJs6 && is_array($p['plugin']['pluginJsPaths-extjs6'])
+                        && isset($p['plugin']['pluginJsPaths-extjs6']['path'])
+                        && is_array($p['plugin']['pluginJsPaths-extjs6']['path'])) {
+                        $jsPaths = $p['plugin']['pluginJsPaths-extjs6']['path'];
                     }
-                    else if ($isExtJs5 && is_array($p['plugin']['pluginJsPaths-extjs5'])
-                        && $p['plugin']['pluginJsPaths-extjs5']['path'] != null) {
-                        $jsPaths[0] = $p['plugin']['pluginJsPaths-extjs5']['path'];
+                    else if ($isExtJs6 && is_array($p['plugin']['pluginJsPaths-extjs6'])
+                        && $p['plugin']['pluginJsPaths-extjs6']['path'] != null) {
+                        $jsPaths[0] = $p['plugin']['pluginJsPaths-extjs6']['path'];
                     } else  if (is_array($p['plugin']['pluginJsPaths'])
                         && isset($p['plugin']['pluginJsPaths']['path'])
                         && is_array($p['plugin']['pluginJsPaths']['path'])) {
@@ -585,14 +589,14 @@ class Pimcore {
                     }
 
                     $cssPaths = array();
-                    if ($isExtJs5 && is_array($p['plugin']['pluginCssPaths-extjs5'])
-                        && isset($p['plugin']['pluginCssPaths-extjs5']['path'])
-                        && is_array($p['plugin']['pluginCssPaths-extjs5']['path'])) {
-                        $cssPaths = $p['plugin']['pluginCssPaths-extjs5']['path'];
+                    if ($isExtJs6 && is_array($p['plugin']['pluginCssPaths-extjs6'])
+                        && isset($p['plugin']['pluginCssPaths-extjs6']['path'])
+                        && is_array($p['plugin']['pluginCssPaths-extjs6']['path'])) {
+                        $cssPaths = $p['plugin']['pluginCssPaths-extjs6']['path'];
                     }
-                    else if ($isExtJs5 && is_array($p['plugin']['pluginCssPaths-extjs5'])
-                        && $p['plugin']['pluginCssPaths-extjs5']['path'] != null) {
-                        $cssPaths[0] = $p['plugin']['pluginCssPaths-extjs5']['path'];
+                    else if ($isExtJs6 && is_array($p['plugin']['pluginCssPaths-extjs6'])
+                        && $p['plugin']['pluginCssPaths-extjs6']['path'] != null) {
+                        $cssPaths[0] = $p['plugin']['pluginCssPaths-extjs6']['path'];
                     } else  if (is_array($p['plugin']['pluginCssPaths'])
                         && isset($p['plugin']['pluginCssPaths']['path'])
                         && is_array($p['plugin']['pluginCssPaths']['path'])) {
@@ -686,7 +690,7 @@ class Pimcore {
 
         // init configuration
         try {
-            $conf = Config::getSystemConfig();
+            $conf = Config::getSystemConfig(true);
 
             // set timezone
             if ($conf instanceof \Zend_Config) {
@@ -699,13 +703,6 @@ class Pimcore {
 
             if (!defined("PIMCORE_DEBUG")) define("PIMCORE_DEBUG", $debug);
             if (!defined("PIMCORE_DEVMODE")) define("PIMCORE_DEVMODE", (bool) $conf->general->devmode);
-
-            // check for output-cache settings
-            // if a lifetime for the output cache is specified then the cache tag "output" will be ignored on clear
-            $cacheLifetime = (int) $conf->cache->lifetime;
-            if (!empty($cacheLifetime) && $conf->cache->enabled) {
-                Cache::addIgnoredTagOnClear("output");
-            }
 
             return true;
         }
@@ -850,7 +847,7 @@ class Pimcore {
     public static function collectGarbage ($keepItems = array()) {
 
         // close mysql-connection
-        Resource::close();
+        Db::close();
 
         $protectedItems = array(
             "Zend_Locale",
@@ -867,7 +864,7 @@ class Pimcore {
             "pimcore_editmode",
             "pimcore_error_document",
             "pimcore_site",
-            "Pimcore_Resource_Mysql"
+            "Pimcore_Db"
         );
 
         if(is_array($keepItems) && count($keepItems) > 0) {
@@ -892,7 +889,7 @@ class Pimcore {
             \Zend_Registry::set($key, $value);
         }
 
-        Resource::reset();
+        Db::reset();
 
         // force PHP garbage collector
         gc_enable();

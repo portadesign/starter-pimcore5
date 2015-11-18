@@ -7,8 +7,10 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <meta name="robots" content="noindex, follow" />
 
-    <link rel="stylesheet" href="/pimcore/static/css/login.css" type="text/css" />
-    <script type="text/javascript" src="/pimcore/static/js/lib/jquery.min.js"></script>
+    <link rel="icon" type="image/png" href="/pimcore/static6/img/favicon/favicon-32x32.png" />
+
+    <link rel="stylesheet" href="/pimcore/static6/css/login.css" type="text/css" />
+    <script type="text/javascript" src="/pimcore/static6/js/lib/jquery.min.js"></script>
 
     <?php
     // load plugin scripts
@@ -23,7 +25,7 @@
                             $cssPath = trim($cssPath);
                             if (!empty($cssPath)) {
                                 ?>
-                                <link rel="stylesheet" type="text/css" href="<?php echo $cssPath ?>?_dc=<?php echo time() ?>"/>
+                                <link rel="stylesheet" type="text/css" href="<?= $cssPath ?>?_dc=<?= time() ?>"/>
                             <?php
 
                             }
@@ -47,19 +49,19 @@ $browser = new \Pimcore\Browser();
 $browserVersion = (int) $browser->getVersion();
 $platform = $browser->getPlatform();
 
-if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_FIREFOX && $browserVersion >= 4) {
+if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_FIREFOX && $browserVersion >= 39) {
     $supported = true;
 }
-if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_IE && $browserVersion >= 9) {
+if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_IE && $browserVersion >= 11) {
     $supported = true;
 }
-if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_CHROME && $browserVersion >= 6) {
+if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_CHROME && $browserVersion >= 40) {
     $supported = true;
 }
-if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_SAFARI && $browserVersion >= 5) {
+if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_SAFARI && $browserVersion >= 7) {
     $supported = true;
 }
-if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_OPERA && $browserVersion >= 15) {
+if ($browser->getBrowser() == \Pimcore\Browser::BROWSER_OPERA && $browserVersion >= 30) {
     $supported = true;
 }
 
@@ -70,7 +72,7 @@ $config = \Pimcore\Config::getSystemConfig();
 <?php if ($config->general->loginscreencustomimage) { ?>
     <style type="text/css">
         body {
-            background: url(<?php echo $config->general->loginscreencustomimage; ?>) no-repeat center center fixed;
+            background: url(<?= $config->general->loginscreencustomimage; ?>) no-repeat center center fixed;
             -webkit-background-size: cover;
             -moz-background-size: cover;
             -o-background-size: cover;
@@ -89,13 +91,10 @@ $config = \Pimcore\Config::getSystemConfig();
     </style>
 <?php } ?>
 
-<div id="vcenter" class="<?php echo ($config->general->loginscreencustomimage ? "customimage" : ""); ?>">
+<div id="vcenter" class="<?= ($config->general->loginscreencustomimage ? "customimage" : ""); ?>">
     <div id="hcenter">
         <div id="header">
-            <img src="/pimcore/static/img/login/logo.png">
-            <p>
-                Your Open Source Multichannel PLatform
-            </p>
+            <img src="/pimcore/static6/img/logo-white.svg">
         </div>
         <div id="content">
             <div id="loginform">
@@ -113,30 +112,30 @@ $config = \Pimcore\Config::getSystemConfig();
                     </div>
 
                     <div class="body">
-                        <button type="submit"><?php echo $this->translate("Login"); ?></button>
+                        <button type="submit"><?= $this->translate("Login"); ?></button>
                     </div>
                 </form>
 
                 <div class="body lostpassword">
-                    <a href="/admin/login/lostpassword" class="lostpassword"><?php echo $this->translate("Forgot your password"); ?>?</a>
+                    <a href="/admin/login/lostpassword" class="lostpassword"><?= $this->translate("Forgot your password"); ?>?</a>
                 </div>
             </div>
 
             <?php if (!$supported) { ?>
                 <div id="browserinfo">
                     <div class="error">
-                        <?php echo $this->translate("Your browser is not supported. Please install the latest version of one of the following browsers."); ?>
+                        <?= $this->translate("Your browser is not supported. Please install the latest version of one of the following browsers."); ?>
                     </div>
 
                     <div class="body">
                         <div class="links">
-                            <a href="http://www.google.com/chrome/" target="_blank"><img src="/pimcore/static/img/login/chrome.png"/></a>
-                            <a href="http://www.mozilla.com/" target="_blank"><img src="/pimcore/static/img/login/firefox.png"/></a>
-                            <a href="http://www.apple.com/safari/" target="_blank"><img src="/pimcore/static/img/login/safari.png"/></a>
-                            <a href="http://www.microsoft.com/" target="_blank"><img src="/pimcore/static/img/login/ie.png"/></a>
+                            <a href="http://www.google.com/chrome/" target="_blank"><img src="/pimcore/static6/img/login/chrome.png"/></a>
+                            <a href="http://www.mozilla.com/" target="_blank"><img src="/pimcore/static6/img/login/firefox.png"/></a>
+                            <a href="http://www.apple.com/safari/" target="_blank"><img src="/pimcore/static6/img/login/safari.png"/></a>
+                            <a href="http://www.microsoft.com/" target="_blank"><img src="/pimcore/static6/img/login/ie.png"/></a>
                         </div>
                         <br>
-                        <a href="#" onclick="showLogin();"><?php echo $this->translate("Click here to proceed"); ?></a>
+                        <a href="#" onclick="showLogin();"><?= $this->translate("Click here to proceed"); ?></a>
                     </div>
 
                     <script type="text/javascript">
@@ -157,9 +156,7 @@ $config = \Pimcore\Config::getSystemConfig();
     </div>
 </div>
 <div id="footer">
-    <a href="http://www.pimcore.org/">pimcore. Open Source Multichannel Experience and Engagement Platform</a>
-    <br />
-    &copy; 2009-<?php echo date("Y") ?> <a href="http://www.pimcore.org/">pimcore GmbH</a>, a proud member of the <a href="http://www.elements.at/">elements group</a>
+    &copy; 2009-<?= date("Y") ?> <a href="http://www.pimcore.org/">pimcore GmbH</a>, a proud member of the <a href="http://www.elements.at/">elements group</a>
 </div>
 
 

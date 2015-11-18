@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Controller\Action;
@@ -23,6 +20,7 @@ use Pimcore\Tool\Session;
 use Pimcore\Model\Document;
 use Pimcore\Model\Object;
 use Pimcore\Model;
+use Pimcore\Translate;
 
 abstract class Frontend extends Action {
 
@@ -163,6 +161,9 @@ abstract class Frontend extends Action {
             // logged in users only
             if ($user) {
 
+                // set the user to registry so that it is available via \Pimcore\Tool\Admin::getCurrentUser();
+                \Zend_Registry::set("pimcore_admin_user", $user);
+
                 // document editmode
                 if ($this->getParam("pimcore_editmode")) {
                     \Zend_Registry::set("pimcore_editmode", true);
@@ -302,7 +303,9 @@ abstract class Frontend extends Action {
 
             if(\Zend_Registry::isRegistered("Zend_Translate")) {
                 $translator = \Zend_Registry::get("Zend_Translate");
-                $translator->setLocale($locale);
+                if($translator instanceof Translate) {
+                    $translator->setLocale($locale);
+                }
             }
         }
     }

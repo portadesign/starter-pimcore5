@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code. dsf sdaf asdf asdf
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license dsf sdaf asdf asdf
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\File;
@@ -212,7 +209,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
 
             // check if the path is outside of the asset directory
             $newRealPath = PIMCORE_ASSET_DIRECTORY . $newPath;
-            $newRealPath= realpath($newRealPath);
+            $newRealPath = resolvePath($newRealPath);
             if (strpos($newRealPath, PIMCORE_ASSET_DIRECTORY) !== 0) {
                 throw new \Exception("not allowed");
             }
@@ -1590,7 +1587,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
                 //TODO probably not needed
             }
         } else {
-            $db = \Pimcore\Resource::get();
+            $db = \Pimcore\Db::get();
                 // get list of objects
             $folder = Asset::getById($this->getParam("folderId"));
 

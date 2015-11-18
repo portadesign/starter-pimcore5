@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Asset
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model;
@@ -220,7 +217,7 @@ class Asset extends Element\AbstractElement {
             $asset = new Asset();
 
             if (Tool::isValidPath($path)) {
-                $asset->getResource()->getByPath($path);
+                $asset->getDao()->getByPath($path);
                 return self::getById($asset->getId());
             }
         }
@@ -257,7 +254,7 @@ class Asset extends Element\AbstractElement {
             try {
                 if (!$asset = Cache::load($cacheKey)) {
                     $asset = new Asset();
-                    $asset->getResource()->getById($id);
+                    $asset->getDao()->getById($id);
 
                     $mappingClass = "\\Pimcore\\Model\\Asset\\" . ucfirst($asset->getType());
                     $typeClass = Tool::getModelClassMapping($mappingClass);
@@ -265,7 +262,7 @@ class Asset extends Element\AbstractElement {
                     if (Tool::classExists($typeClass)) {
                         $asset = new $typeClass();
                         \Zend_Registry::set($cacheKey, $asset);
-                        $asset->getResource()->getById($id);
+                        $asset->getDao()->getById($id);
 
                         Cache::save($asset, $cacheKey);
                     }
@@ -480,13 +477,13 @@ class Asset extends Element\AbstractElement {
                 $this->correctPath();
 
                 if (!$isUpdate) {
-                    $this->getResource()->create();
+                    $this->getDao()->create();
                 }
 
                 // get the old path from the database before the update is done
                 $oldPath = null;
                 if ($isUpdate) {
-                    $oldPath = $this->getResource()->getCurrentFullPath();
+                    $oldPath = $this->getDao()->getCurrentFullPath();
                 }
 
                 $this->update();
@@ -499,8 +496,8 @@ class Asset extends Element\AbstractElement {
                         if(!@rename(PIMCORE_ASSET_DIRECTORY . $oldPath, $this->getFileSystemPath())) {
                             throw new \Exception("Unable to rename asset " . $this->getId() . " on the filesystem: " . $oldFullPath);
                         }
-                        $this->getResource()->updateWorkspaces();
-                        $updatedChildren = $this->getResource()->updateChildsPaths($oldPath);
+                        $this->getDao()->updateWorkspaces();
+                        $updatedChildren = $this->getDao()->updateChildsPaths($oldPath);
                     }
                 }
 
@@ -568,13 +565,16 @@ class Asset extends Element\AbstractElement {
                 // that is currently in the parent object (in memory), because this might have changed but wasn't not saved
                 $this->setPath(str_replace("//", "/", $parent->getCurrentFullPath() . "/"));
             } else {
-                // parent document doesn't exist anymore, so delete this document
-                //$this->delete();
-
                 // parent document doesn't exist anymore, set the parent to to root
                 $this->setParentId(1);
                 $this->setPath("/");
             }
+
+            if (strlen($this->getFilename()) < 1) {
+                $this->setFilename("---no-valid-filename---" . $this->getId());
+                throw new \Exception("Asset requires filename, generated filename automatically");
+            }
+
         } else if($this->getId() == 1) {
             // some data in root node should always be the same
             $this->setParentId(0);
@@ -604,11 +604,6 @@ class Asset extends Element\AbstractElement {
      * @throws \Exception
      */
     protected function update() {
-
-        if (!$this->getFilename() && $this->getId() != 1) {
-            $this->setFilename("---no-valid-filename---" . $this->getId());
-            throw new \Exception("Asset requires filename, generated filename automatically");
-        }
 
         // set date
         $this->setModificationDate(time());
@@ -673,11 +668,11 @@ class Asset extends Element\AbstractElement {
 
         // save properties
         $this->getProperties();
-        $this->getResource()->deleteAllProperties();
+        $this->getDao()->deleteAllProperties();
         if (is_array($this->getProperties()) and count($this->getProperties()) > 0) {
             foreach ($this->getProperties() as $property) {
                 if (!$property->getInherited()) {
-                    $property->setResource(null);
+                    $property->setDao(null);
                     $property->setCid($this->getId());
                     $property->setCtype("asset");
                     $property->setCpath($this->getPath() . $this->getKey());
@@ -701,7 +696,7 @@ class Asset extends Element\AbstractElement {
         }
         $d->save();
 
-        $this->getResource()->update();
+        $this->getDao()->update();
 
         //set object to registry
         \Zend_Registry::set("asset_" . $this->getId(), $this);
@@ -808,12 +803,12 @@ class Asset extends Element\AbstractElement {
         if ($this->getType() == "folder") {
             if (is_bool($this->hasChilds)) {
                 if (($this->hasChilds and empty($this->childs)) or (!$this->hasChilds and !empty($this->childs))) {
-                    return $this->getResource()->hasChilds();
+                    return $this->getDao()->hasChilds();
                 } else {
                     return $this->hasChilds;
                 }
             }
-            return $this->getResource()->hasChilds();
+            return $this->getDao()->hasChilds();
         }
         return false;
     }
@@ -844,12 +839,12 @@ class Asset extends Element\AbstractElement {
 	public function hasSiblings() {
 		if(is_bool($this->hasSiblings)){
 			if(($this->hasSiblings and empty($this->siblings)) or (!$this->hasSiblings and !empty($this->siblings))){
-				return $this->getResource()->hasSiblings();
+				return $this->getDao()->hasSiblings();
 			} else {
 				return $this->hasSiblings;
 			}
 		}
-		return $this->getResource()->hasSiblings();
+		return $this->getDao()->hasSiblings();
 	}
 
     /**
@@ -910,24 +905,24 @@ class Asset extends Element\AbstractElement {
 
 
         // remove permissions
-        $this->getResource()->deleteAllPermissions();
+        $this->getDao()->deleteAllPermissions();
 
         // remove all properties
-        $this->getResource()->deleteAllProperties();
+        $this->getDao()->deleteAllProperties();
 
         // remove all metadata
-        $this->getResource()->deleteAllMetadata();
+        $this->getDao()->deleteAllMetadata();
 
 
         // remove all tasks
-        $this->getResource()->deleteAllTasks();
+        $this->getDao()->deleteAllTasks();
 
         // remove dependencies
         $d = $this->getDependencies();
         $d->cleanAllForElement($this);
 
         // remove from resource
-        $this->getResource()->delete();
+        $this->getDao()->delete();
 
         // empty object cache
         $this->clearDependentCache();
@@ -1065,7 +1060,7 @@ class Asset extends Element\AbstractElement {
      */
     public function setParentId($parentId) {
         $this->parentId = (int) $parentId;
-        $this->parent = Asset::getById($parentId);
+        $this->parent = null;
         return $this;
     }
 
@@ -1211,7 +1206,7 @@ class Asset extends Element\AbstractElement {
             $cacheKey = "asset_properties_" . $this->getId();
             $properties = Cache::load($cacheKey);
             if (!is_array($properties)) {
-                $properties = $this->getResource()->getProperties();
+                $properties = $this->getDao()->getProperties();
                 $elementCacheTag = $this->getCacheTag();
                 $cacheTags = array("asset_properties" => "asset_properties", $elementCacheTag => $elementCacheTag);
                 Cache::save($properties, $cacheKey, $cacheTags);
@@ -1293,7 +1288,7 @@ class Asset extends Element\AbstractElement {
      */
     public function getVersions() {
         if ($this->versions === null) {
-            $this->setVersions($this->getResource()->getVersions());
+            $this->setVersions($this->getDao()->getVersions());
         }
         return $this->versions;
     }
@@ -1536,12 +1531,12 @@ class Asset extends Element\AbstractElement {
      */
     public function saveScheduledTasks() {
         $this->getScheduledTasks();
-        $this->getResource()->deleteAllTasks();
+        $this->getDao()->deleteAllTasks();
 
         if (is_array($this->getScheduledTasks()) && count($this->getScheduledTasks()) > 0) {
             foreach ($this->getScheduledTasks() as $task) {
                 $task->setId(null);
-                $task->setResource(null);
+                $task->setDao(null);
                 $task->setCid($this->getId());
                 $task->setCtype("asset");
                 $task->save();
@@ -1710,14 +1705,14 @@ class Asset extends Element\AbstractElement {
     public function renewInheritedProperties () {
         $this->removeInheritedProperties();
 
-        // add to registry to avoid infinite regresses in the following $this->getResource()->getProperties()
+        // add to registry to avoid infinite regresses in the following $this->getDao()->getProperties()
         $cacheKey = "asset_" . $this->getId();
         if(!\Zend_Registry::isRegistered($cacheKey)) {
             \Zend_Registry::set($cacheKey, $this);
         }
 
         $myProperties = $this->getProperties();
-        $inheritedProperties = $this->getResource()->getProperties(true);
+        $inheritedProperties = $this->getDao()->getProperties(true);
         $this->setProperties(array_merge($inheritedProperties, $myProperties));
     }
 

@@ -1,9 +1,13 @@
 <?php
 /**
- * Created by PhpStorm.
- * User: ckogler
- * Date: 17.03.2015
- * Time: 10:05
+ * Pimcore
+ *
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
+ *
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\FIle\Transfer\Adapter;
@@ -47,6 +51,11 @@ class Ftp extends \Zend_File_Transfer_Adapter_Abstract
      * @var int
      */
     protected $transferMode = FTP_ASCII;
+
+    /**
+     * @var bool
+     */
+    protected $passive = false;
 
     /**
      * @return boolean
@@ -103,6 +112,22 @@ class Ftp extends \Zend_File_Transfer_Adapter_Abstract
     }
 
     /**
+     * @return boolean
+     */
+    public function isPassive()
+    {
+        return $this->passive;
+    }
+
+    /**
+     * @param boolean $passive
+     */
+    public function setPassive($passive)
+    {
+        $this->passive = $passive;
+    }
+
+    /**
      * Connects to the FTP-Host
      *
      * @return $this
@@ -127,6 +152,9 @@ class Ftp extends \Zend_File_Transfer_Adapter_Abstract
             $this->connect();
         }
         $this->setLoggedIn(ftp_login($this->getConnection(), $this->getUsername(), $this->getPassword()));
+
+        ftp_pasv($this->getConnection(), $this->isPassive());
+
         return $this;
     }
 

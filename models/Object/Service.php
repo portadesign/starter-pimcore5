@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object;
@@ -112,7 +109,7 @@ class Service extends Model\Element\Service {
         $new->setParentId($target->getId());
         $new->setUserOwner($this->_user->getId());
         $new->setUserModification($this->_user->getId());
-        $new->setResource(null);
+        $new->setDao(null);
         $new->setLocked(false);
         $new->setCreationDate(time());
         $new->save();
@@ -151,7 +148,7 @@ class Service extends Model\Element\Service {
         $new->setParentId($target->getId());
         $new->setUserOwner($this->_user->getId());
         $new->setUserModification($this->_user->getId());
-        $new->setResource(null);
+        $new->setDao(null);
         $new->setLocked(false);
         $new->setCreationDate(time());
         $new->save();
@@ -553,28 +550,38 @@ class Service extends Model\Element\Service {
         $conditionPartsFilters = array();
 
         if ($filterJson) {
-            $db = \Pimcore\Resource::get();
+            $db = \Pimcore\Db::get();
             $filters = \Zend_Json::decode($filterJson);
             foreach ($filters as $filter) {
 
                 $operator = "=";
 
+                /**
+                 * @extjs
+                 */
+                $filterField = $filter["field"];
+                $filterOperator = $filter["comparison"];
+                if(\Pimcore\Tool\Admin::isExtJS6()) {
+                    $filterField = $filter["property"];
+                    $filterOperator = $filter["operator"];
+                }
+
                 if($filter["type"] == "string") {
                     $operator = "LIKE";
                 } else if ($filter["type"] == "numeric") {
-                    if($filter["comparison"] == "lt") {
+                    if($filterOperator == "lt") {
                         $operator = "<";
-                    } else if($filter["comparison"] == "gt") {
+                    } else if($filterOperator == "gt") {
                         $operator = ">";
-                    } else if($filter["comparison"] == "eq") {
+                    } else if($filterOperator == "eq") {
                         $operator = "=";
                     }
                 } else if ($filter["type"] == "date") {
-                    if($filter["comparison"] == "lt") {
+                    if($filterOperator == "lt") {
                         $operator = "<";
-                    } else if($filter["comparison"] == "gt") {
+                    } else if($filterOperator == "gt") {
                         $operator = ">";
-                    } else if($filter["comparison"] == "eq") {
+                    } else if($filterOperator == "eq") {
                         $operator = "=";
                     }
                     $filter["value"] = strtotime($filter["value"]);
@@ -585,7 +592,7 @@ class Service extends Model\Element\Service {
                     $filter["value"] = (int) $filter["value"];
                 }
 
-                $field = $class->getFieldDefinition($filter["field"]);
+                $field = $class->getFieldDefinition($filterField);
                 $brickField = null;
                 $brickType = null;
                 if(!$field) {
@@ -593,14 +600,14 @@ class Service extends Model\Element\Service {
                     // if the definition doesn't exist check for a localized field
                     $localized = $class->getFieldDefinition("localizedfields");
                     if($localized instanceof ClassDefinition\Data\Localizedfields) {
-                        $field = $localized->getFieldDefinition($filter["field"]);
+                        $field = $localized->getFieldDefinition($filterField);
                     }
 
 
                     //if the definition doesn't exist check for object brick
-                    $keyParts = explode("~", $filter["field"]);
+                    $keyParts = explode("~", $filterField);
 
-                    if (substr($filter["field"], 0, 1) == "~") {
+                    if (substr($filterField, 0, 1) == "~") {
                         // not needed for now
 //                            $type = $keyParts[1];
 //                            $field = $keyParts[2];
@@ -619,7 +626,7 @@ class Service extends Model\Element\Service {
                 }
                 if($field instanceof ClassDefinition\Data\Objectbricks) {
                     // custom field
-                    $db = \Pimcore\Resource::get();
+                    $db = \Pimcore\Db::get();
                     if(is_array($filter["value"])) {
                         $fieldConditions = array();
                         foreach ($filter["value"] as $filterValue) {
@@ -641,12 +648,12 @@ class Service extends Model\Element\Service {
                         $conditionPartsFilters[] = $field->getFilterCondition($filter["value"], $operator);
                     }
 
-                } else if (in_array("o_".$filter["field"], $systemFields)) {
+                } else if (in_array("o_".$filterField, $systemFields)) {
                     // system field
-                    if ($filter["field"] == "fullpath") {
+                    if ($filterField == "fullpath") {
                         $conditionPartsFilters[] = "concat(o_path, o_key) " . $operator . " " . $db->quote("%" . $filter["value"] . "%");
                     } else {
-                        $conditionPartsFilters[] = "`o_" . $filter["field"] . "` " . $operator . " " . $db->quote($filter["value"]);
+                        $conditionPartsFilters[] = "`o_" . $filterField . "` " . $operator . " " . $db->quote($filter["value"]);
                     }
                 }
             }
@@ -718,7 +725,7 @@ class Service extends Model\Element\Service {
             $object = new AbstractObject();
 
             if (\Pimcore\Tool::isValidPath($path)) {
-                $object->getResource()->getByPath($path);
+                $object->getDao()->getByPath($path);
                 return true;
             }
         }
@@ -1170,18 +1177,111 @@ class Service extends Model\Element\Service {
     /** Enriches the layout definition before it is returned to the admin interface.
      * @param $layout
      */
-    public static function enrichLayoutDefinition(&$layout) {
+    public static function enrichLayoutDefinition(&$layout, $object = null) {
         if (method_exists($layout, "enrichLayoutDefinition")) {
-            $layout->enrichLayoutDefinition();
+            $layout->enrichLayoutDefinition($object);
         }
 
         if (method_exists($layout, "getChilds")) {
             $children = $layout->getChilds();
             if (is_array($children)) {
                 foreach ($children as $child) {
-                    self::enrichLayoutDefinition($child);
+                    self::enrichLayoutDefinition($child, $object);
                 }
             }
         }
+    }
+
+    /**
+     * @param $object
+     * @param $data Model\Object\Data\CalculatedValue
+     * @return mixed|null
+     */
+    public static function getCalculatedFieldValueForEditMode($object, $data) {
+        if (!$data) {
+            return;
+        }
+        $fieldname = $data->getFieldname();
+        $ownerType = $data->getOwnerType();
+        /** @var $fd Model\Object\ClassDefinition\Data\CalculatedValue */
+        if ($ownerType == "object") {
+            $fd = $object->getClass()->getFieldDefinition($fieldname);
+        } else if ($ownerType == "localizedfield") {
+            $fd = $object->getClass()->getFieldDefinition("localizedfields")->getFieldDefinition($fieldname);
+        } else if ($ownerType == "classificationstore") {
+            $fd = $data->getKeyDefinition();
+        } else if ($ownerType == "fieldcollection" || $ownerType == "objectbrick") {
+            $fd = $data->getKeyDefinition();
+        }
+
+        if (!$fd) {
+            return $data;
+        }
+        $className = $fd->getCalculatorClass();
+        if (!$className || !\Pimcore\Tool::classExists($className)) {
+            \Logger::error("Class does not exist: " . $className);
+            return null;
+        }
+
+        $inheritanceEnabled = Model\Object\Concrete::getGetInheritedValues();
+        Model\Object\Concrete::setGetInheritedValues(true);
+
+        if (method_exists($className, 'getCalculatedValueForEditMode')) {
+            $result = call_user_func($className . '::getCalculatedValueForEditMode', $object, $data);
+
+        } else {
+            $result = self::getCalculatedFieldValue($object, $data);
+
+        }
+        Model\Object\Concrete::setGetInheritedValues($inheritanceEnabled);
+        return $result;
+
+    }
+
+
+    /**
+     * @param $object
+     * @param $data Model\Object\Data\CalculatedValue
+     * @return mixed|null
+     */
+    public static function getCalculatedFieldValue($object, $data) {
+        if (!$data) {
+            return null;
+        }
+        $fieldname = $data->getFieldname();
+        $ownerType = $data->getOwnerType();
+        /** @var $fd Model\Object\ClassDefinition\Data\CalculatedValue */
+        if ($ownerType == "object") {
+            $fd = $object->getClass()->getFieldDefinition($fieldname);
+        } else if ($ownerType == "localizedfield") {
+            $fd = $object->getClass()->getFieldDefinition("localizedfields")->getFieldDefinition($fieldname);
+        } else if ($ownerType == "classificationstore") {
+            $fd = $data->getKeyDefinition();
+        } else if ($ownerType == "fieldcollection" || $ownerType == "objectbrick") {
+            $fd = $data->getKeyDefinition();
+        }
+
+        if (!$fd) {
+            return null;
+        }
+        $className = $fd->getCalculatorClass();
+        if (!$className || !\Pimcore\Tool::classExists($className)) {
+            \Logger::error("Class does not exsist: " . $className);
+            return null;
+        }
+
+        if (method_exists($className, 'compute')) {
+            $inheritanceEnabled = Model\Object\Concrete::getGetInheritedValues();
+            Model\Object\Concrete::setGetInheritedValues(true);
+
+            $result = call_user_func($className . '::compute', $object, $data);
+            Model\Object\Concrete::setGetInheritedValues($inheritanceEnabled);
+            return $result;
+        }
+
+        return null;
+
+
+
     }
 }

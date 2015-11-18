@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\View\Helper;
@@ -18,6 +15,7 @@ namespace Pimcore\View\Helper;
 use Pimcore\Config; 
 use Pimcore\Model\Site;
 use Pimcore\Model\Staticroute;
+use Pimcore\Tool;
 
 class Url extends \Zend_View_Helper_Url {
 
@@ -35,7 +33,10 @@ class Url extends \Zend_View_Helper_Url {
             $urlOptions = array();
         }
 
-        if(!$name) {
+        // when using $name = false we don't use the default route (happens when $name = null / ZF default behavior)
+        // but just the query string generation using the given parameters
+        // eg. $this->url(["foo" => "bar"], false) => /?foo=bar
+        if($name === null) {
             if(Staticroute::getCurrentRoute() instanceof Staticroute) {
                 $name = Staticroute::getCurrentRoute()->getName();
             }
@@ -102,6 +103,12 @@ class Url extends \Zend_View_Helper_Url {
         try {
             return parent::url($urlOptions, $name, $reset, $encode);
         } catch (\Exception $e) {
+            if(Tool::isFrontentRequestByAdmin()) {
+                // routes can be site specific, so in editmode it's possible that we don't get
+                // the right route (sites are not registered in editmode), so we cannot throw exceptions there
+                return "ERROR_IN_YOUR_URL_CONFIGURATION:~ROUTE--" . $name . "--DOES_NOT_EXIST";
+            }
+
             throw new \Exception("Route '".$name."' for building the URL not found");
         }
     }    

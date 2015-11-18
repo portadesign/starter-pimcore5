@@ -1,15 +1,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 pimcore.registerNS("pimcore.document.tags.image");
@@ -313,11 +310,13 @@ pimcore.document.tags.image = Class.create(pimcore.document.tag, {
             if (typeof this.options.thumbnail == "string") {
                 path = "/admin/asset/get-image-thumbnail/id/" + this.datax.id + "/thumbnail/" + this.options.thumbnail
                     + "?" + Ext.urlEncode(this.datax);
-            }
-            else if (this.options.thumbnail.width || this.options.thumbnail.height) {
+            } else if (this.options.thumbnail.width || this.options.thumbnail.height) {
                 path = "/admin/asset/get-image-thumbnail/id/" + this.datax.id + "/width/"
                     + this.options.thumbnail.width + "/height/" + this.options.thumbnail.height + "?"
                     + Ext.urlEncode(this.datax);
+            } else {
+                path = "/admin/asset/get-image-thumbnail/id/" + this.datax.id + "/?config="
+                    + encodeURIComponent(Ext.encode(this.options.thumbnail));
             }
         }
 
@@ -434,7 +433,7 @@ pimcore.document.tags.image = Class.create(pimcore.document.tag, {
             this.datax["hotspots"] = data["hotspots"];
             this.datax["marker"] = data["marker"];
         }.bind(this));
-        editor.open(true);
+        editor.open(false);
     },
 
     getValue: function () {

@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code. dsf sdaf asdf asdf
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license dsf sdaf asdf asdf
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\Image\HtmlToImage;
@@ -47,7 +44,7 @@ class Admin_AdminButtonController extends \Pimcore\Controller\Action\Admin {
 
             echo "\n\n\n";
 
-            echo file_get_contents(PIMCORE_PATH . "/static/js/frontend/admin/admin.js");
+            echo file_get_contents(PIMCORE_PATH . "/static6/js/frontend/admin/admin.js");
         }
 
         exit;
@@ -105,7 +102,7 @@ class Admin_AdminButtonController extends \Pimcore\Controller\Action\Admin {
 
                 list($width, $height) = getimagesize($screenFile);
                 $im = imagecreatefromjpeg($screenFile);
-                $font = PIMCORE_DOCUMENT_ROOT . "/pimcore/static/font/vera.ttf";
+                $font = PIMCORE_DOCUMENT_ROOT . "/pimcore/static6/font/vera.ttf";
                 $fontSize = 10;
 
                 if($markers && count($markers) > 0) {

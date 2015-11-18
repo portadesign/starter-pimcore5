@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Tool;
@@ -712,7 +709,8 @@ class RestClient
                     if ($assetType == "image" && strlen($thumbnail) > 0) {
                         // try to retrieve thumbnail first
                         // http://example.com/website/var/tmp/thumb_9__fancybox_thumb
-                        $uri = $protocol . $this->getHost() . "/website/var/tmp/thumb_" . $asset->getId() . "__" . $thumbnail;
+                        $tmpPath = preg_replace("@^" . preg_quote(PIMCORE_DOCUMENT_ROOT, "@") . "@", "", PIMCORE_TEMPORARY_DIRECTORY);
+                        $uri = $protocol . $this->getHost() . $tmpPath . "/thumb_" . $asset->getId() . "__" . $thumbnail;
                         $client->setUri($uri);
 
                         if ($this->getLoggingEnabled()) {

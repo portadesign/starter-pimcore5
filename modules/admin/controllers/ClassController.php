@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\Model;
@@ -62,13 +59,15 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin {
         $classes = $classesList->load();
 
         // filter classes
-        $tmpClasses = array();
-        foreach($classes as $class) {
-            if($this->getUser()->isAllowed($class->getId(), "class")) {
-                $tmpClasses[] = $class;
+        if($this->getParam("createAllowed")) {
+            $tmpClasses = array();
+            foreach($classes as $class) {
+                if($this->getUser()->isAllowed($class->getId(), "class")) {
+                    $tmpClasses[] = $class;
+                }
             }
+            $classes = $tmpClasses;
         }
-        $classes = $tmpClasses;
 
         $classItems = array();
 
@@ -78,7 +77,7 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin {
                 $classItems[] = array(
                     "id" => $classItem->getId(),
                     "text" => $classItem->getName(),
-                    "icon" => $classItem->getIcon() ? $classItem->getIcon() : '/pimcore/static/img/icon/database_gear.png',
+                    "icon" => $classItem->getIcon() ? $classItem->getIcon() : '/pimcore/static6/img/icon/database_gear.png',
                     "propertyVisibility" => $classItem->getPropertyVisibility(),
                     "qtipCfg" => array(
                         "title" => "ID: " . $classItem->getId()
@@ -174,7 +173,7 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin {
                         // no group
                         $class['id'] = $classes[0]->getId();
                         $class['text'] = $classes[0]->getName();
-                        $class['icon'] = $classes[0]->getIcon() ? $classes[0]->getIcon() : '/pimcore/static/img/icon/database_gear.png';
+                        $class['icon'] = $classes[0]->getIcon() ? $classes[0]->getIcon() : '/pimcore/static6/img/icon/database_gear.png';
                         $class['propertyVisibility'] = $classes[0]->getPropertyVisibility();
                         $class['qtipCfg']['title'] = "ID: " . $classes[0]->getId();
                     }
@@ -192,7 +191,7 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin {
                                 "id" => $classItem->getId(),
                                 "text" => $classItem->getName(),
                                 "leaf" => true,
-                                "icon" => $classItem->getIcon() ? $classItem->getIcon() : '/pimcore/static/img/icon/database_gear.png',
+                                "icon" => $classItem->getIcon() ? $classItem->getIcon() : '/pimcore/static6/img/icon/database_gear.png',
                                 "propertyVisibility" => $classItem->getPropertyVisibility(),
                                 "qtipCfg" => array(
                                     "title" => "ID: " . $classItem->getId()
@@ -550,8 +549,22 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin {
     public function fieldcollectionUpdateAction() {
 
         try {
+            $key = $this->getParam("key");
+
+            if($this->getParam("task") == "add") {
+                // check for existing fieldcollection with same name with different lower/upper cases
+                $list = new Object\Fieldcollection\Definition\Listing();
+                $list = $list->load();
+
+                foreach ($list as $item) {
+                    if (strtolower($key) === strtolower($item->getKey())) {
+                        throw new \Exception("FieldCollection with the same name already exists (lower/upper cases may be different)");
+                    }
+                }
+            }
+
             $fc = new Object\Fieldcollection\Definition();
-            $fc->setKey($this->getParam("key"));
+            $fc->setKey($key);
 
             if ($this->getParam("values")) {
                 $values = \Zend_Json::decode($this->getParam("values"));
@@ -648,6 +661,9 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin {
             foreach ($list as $type) {
                 if (in_array($type->getKey(), $allowedTypes)) {
                     $filteredList[] = $type;
+
+                    // mainly for objects-meta data-type
+                    Object\Service::enrichLayoutDefinition($type->getLayoutDefinitions(), null);
                 }
             }
 
@@ -727,8 +743,23 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin {
     public function objectbrickUpdateAction() {
 
         try {
+            $key = $this->getParam("key");
+
+            if($this->getParam("task") == "add") {
+                // check for existing brick with same name with different lower/upper cases
+                $list = new Object\Objectbrick\Definition\Listing();
+                $list = $list->load();
+
+                foreach ($list as $item) {
+                    if (strtolower($key) === strtolower($item->getKey())) {
+                        throw new \Exception("Brick with the same name already exists (lower/upper cases may be different)");
+                    }
+                }
+            }
+
+            // now we create a new definition
             $fc = new Object\Objectbrick\Definition();
-            $fc->setKey($this->getParam("key"));
+            $fc->setKey($key);
 
             if ($this->getParam("values")) {
                 $values = \Zend_Json::decode($this->getParam("values"));
@@ -972,7 +1003,7 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin {
 
 
                     $layoutList = new Object\ClassDefinition\CustomLayout\Listing();
-                    $db = \Pimcore\Resource::get();
+                    $db = \Pimcore\Db::get();
                     $layoutList->setCondition("name = " . $db->quote($layoutName) . " AND classId = " . $classId);
                     $layoutList = $layoutList->load();
 

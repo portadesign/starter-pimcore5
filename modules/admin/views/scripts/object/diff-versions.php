@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
-    <link rel="stylesheet" type="text/css" href="/pimcore/static/css/object_versions.css"/>
+    <link rel="stylesheet" type="text/css" href="/pimcore/static6/css/object_versions.css"/>
 
 </head>
 
@@ -27,20 +27,20 @@ $fields = $this->object1->getClass()->getFieldDefinitions();
     <tr class="system">
         <td>Date</td>
         <td>o_modificationDate</td>
-        <td><?php echo date('Y-m-d H:i:s', $this->object1->getModificationDate()); ?></td>
-        <td><?php echo date('Y-m-d H:i:s', $this->object2->getModificationDate()); ?></td>
+        <td><?= date('Y-m-d H:i:s', $this->object1->getModificationDate()); ?></td>
+        <td><?= date('Y-m-d H:i:s', $this->object2->getModificationDate()); ?></td>
     </tr>
     <tr class="system">
         <td>Path</td>
         <td>o_path</td>
-        <td><?php echo $this->object1->getFullpath(); ?></td>
-        <td><?php echo $this->object2->getFullpath(); ?></td>
+        <td><?= $this->object1->getFullpath(); ?></td>
+        <td><?= $this->object2->getFullpath(); ?></td>
     </tr>
     <tr class="system">
         <td>Published</td>
         <td>o_published</td>
-        <td><?php echo \Zend_Json::encode($this->object1->getPublished()); ?></td>
-        <td><?php echo \Zend_Json::encode($this->object2->getPublished()); ?></td>
+        <td><?= \Zend_Json::encode($this->object1->getPublished()); ?></td>
+        <td><?= \Zend_Json::encode($this->object2->getPublished()); ?></td>
     </tr>
 
     <tr class="">
@@ -59,17 +59,97 @@ $fields = $this->object1->getClass()->getFieldDefinitions();
                     $v2 = $lfd->getVersionPreview($this->object2->getValueForFieldName($fieldName)->getLocalizedValue($lfd->getName(), $language));
                 ?>
                 <tr<?php if ($c % 2) { ?> class="odd"<?php } ?>>
-                    <td><?php echo $lfd->getTitle() ?> (<?php echo $language; ?>)</td>
-                    <td><?php echo $lfd->getName() ?></td>
-                    <td><?php echo $v1 ?></td>
-                    <td<?php if ($v1 != $v2) { ?> class="modified"<?php } ?>><?php echo $v2 ?></td>
+                    <td><?= $lfd->getTitle() ?> (<?= $language; ?>)</td>
+                    <td><?= $lfd->getName() ?></td>
+                    <td><?= $v1 ?></td>
+                    <td<?php if ($v1 != $v2) { ?> class="modified"<?php } ?>><?= $v2 ?></td>
                 </tr>
                 <?php
                 $c++;
             } ?>
         <?php } ?>
-    <?php } else
-            if($definition instanceof Object\ClassDefinition\Data\ObjectBricks) {
+        <?php } else if($definition instanceof Object\ClassDefinition\Data\Classificationstore){
+
+
+
+            /** @var $storedata Object\Classificationstore */
+            $storedata1 = $definition->getVersionPreview($this->object1->getValueForFieldName($fieldName));
+            $storedata2 = $definition->getVersionPreview($this->object2->getValueForFieldName($fieldName));
+
+            $existingGroups = array();
+
+
+            if ($storedata1) {
+                $activeGroups1 = $storedata1->getActiveGroups();
+            } else {
+                $activeGroups1 = array();
+            }
+
+            if ($storedata2) {
+                $activeGroups2 = $storedata2->getActiveGroups();
+            } else {
+                $activeGroups2 = array();
+            }
+
+            foreach ($activeGroups1 as $activeGroupId => $enabled) {
+                $existingGroups[$activeGroupId] = $activeGroupId;
+            }
+
+            foreach ($activeGroups2 as $activeGroupId => $enabled) {
+                $existingGroups[$activeGroupId] = $enabled;
+            }
+
+            if (!$existingGroups) {
+                continue;
+            }
+
+            $languages = array("default");
+
+            if ($definition->isLocalized()) {
+                $languages = array_merge($languages, \Pimcore\Tool::getValidLanguages());
+            }
+
+            foreach ($existingGroups as $activeGroupId => $enabled) {
+                if  (!$activeGroups1[$activeGroupId] && !$activeGroups2[$activeGroupId]) {
+                    continue;
+                }
+                /** @var $groupDefinition Object\Classificationstore\GroupConfig */
+                $groupDefinition = Pimcore\Model\Object\Classificationstore\GroupConfig::getById($activeGroupId);
+                if (!$groupDefinition) {
+                    continue;
+                }
+
+                /** @var $keyGroupRelation Object\Classificationstore\KeyGroupRelation */
+                $keyGroupRelations = $groupDefinition->getRelations();
+
+                foreach ($keyGroupRelations as $keyGroupRelation) {
+
+                    $keyDef = Object\Classificationstore\Service::getFieldDefinitionFromJson(json_decode($keyGroupRelation->getDefinition()), $keyGroupRelation->getType());
+                    if (!$keyDef) {
+                        continue;
+                    }
+
+                    foreach ($languages as $language) {
+                        $keyData1 = $storedata1 ? $storedata1->getLocalizedKeyValue($activeGroupId, $keyGroupRelation->getKeyId(), $language, true, true) : null;
+                        $preview1 = $keyDef->getVersionPreview($keyData1);
+
+                        $keyData2 = $storedata2 ? $storedata2->getLocalizedKeyValue($activeGroupId, $keyGroupRelation->getKeyId(), $language, true, true) : null;
+                        $preview2 = $keyDef->getVersionPreview($keyData2);
+                        ?>
+
+                        <tr class = "<?php if ($c % 2) { ?> odd<?php  } ?>">
+                            <td><?= $definition->getTitle() ?></td>
+                            <td><?= $groupDefinition->getName() ?> - <?= $keyGroupRelation->getName()?> <?= $definition->isLocalized() ? "/ " . $language : "" ?></td>
+                            <td><?= $preview1 ?></td>
+                            <td><?= $preview2 ?></td>
+                        </tr>
+                        <?php
+                        $c++;
+                    }
+                }
+            }
+            ?>
+    <?php } else if($definition instanceof Object\ClassDefinition\Data\ObjectBricks) {
                 ?>
                 <?php foreach($definition->getAllowedTypes() as $asAllowedType) { ?>
                     <?php
@@ -100,10 +180,10 @@ $fields = $this->object1->getClass()->getFieldDefinitions();
 
                         ?>
                         <tr<?php if ($c % 2) { ?> class="odd"<?php } ?>>
-                            <td><?php echo ucfirst($asAllowedType) . " - " . $lfd->getTitle() ?></td>
-                            <td><?php echo $lfd->getName() ?></td>
-                            <td><?php echo $v1 ?></td>
-                            <td<?php if ($v1 != $v2) { ?> class="modified"<?php } ?>><?php echo $v2 ?></td>
+                            <td><?= ucfirst($asAllowedType) . " - " . $lfd->getTitle() ?></td>
+                            <td><?= $lfd->getName() ?></td>
+                            <td><?= $v1 ?></td>
+                            <td<?php if ($v1 != $v2) { ?> class="modified"<?php } ?>><?= $v2 ?></td>
                         </tr>
                         <?php
                         $c++;
@@ -116,11 +196,12 @@ $fields = $this->object1->getClass()->getFieldDefinitions();
             $v2 = $definition->getVersionPreview($this->object2->getValueForFieldName($fieldName));
         ?>
         <tr<?php if ($c % 2) { ?> class="odd"<?php } ?>>
-            <td><?php echo $definition->getTitle() ?></td>
-            <td><?php echo $definition->getName() ?></td>
-            <td><?php echo $v1 ?></td>
-            <td<?php if ($v1 != $v2) { ?> class="modified"<?php } ?>><?php echo $v2 ?></td>
+            <td><?= $definition->getTitle() ?></td>
+            <td><?= $definition->getName() ?></td>
+            <td><?= $v1 ?></td>
+            <td<?php if ($v1 != $v2) { ?> class="modified"<?php } ?>><?= $v2 ?></td>
         </tr>
+
     <?php } ?>
     <?php $c++;
 } ?>

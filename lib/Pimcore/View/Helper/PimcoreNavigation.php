@@ -3,15 +3,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\View\Helper;
@@ -19,6 +16,7 @@ namespace Pimcore\View\Helper;
 use Pimcore\Model\Document;
 use Pimcore\Model\Cache as CacheManager;
 use Pimcore\Model\Site;
+use Pimcore\Navigation\Page\Uri;
 
 class PimcoreNavigation extends \Zend_View_Helper_Navigation
 {
@@ -127,19 +125,24 @@ class PimcoreNavigationController
             $navigationRootDocument = Document::getById(1);
         }
 
-        $siteSuffix = "";
+        $cacheKeys = [];
+
         if(Site::isSiteRequest()) {
             $site = Site::getCurrentSite();
-            $siteSuffix = "__site_" . $site->getId();
+            $cacheKeys[] = "site__" . $site->getId();
         }
 
 
-        $cacheId = $navigationRootDocument->getId();
+        $cacheKeys[] = "root_id__" . $navigationRootDocument->getId();
         if(is_string($cache)) {
-            $cacheId .= "_" . $cache;
+            $cacheKeys[] = "custom__" . $cache;
         }
 
-        $cacheKey = "navigation_" . $cacheId . $siteSuffix;
+        if($pageCallback instanceof \Closure) {
+            $cacheKeys[] = "pageCallback_" . closureHash($pageCallback);
+        }
+
+        $cacheKey = "nav_" . md5(serialize($cacheKeys));
         $navigation = CacheManager::load($cacheKey);
 
         if(!$navigation || !$cacheEnabled) {
@@ -158,10 +161,25 @@ class PimcoreNavigationController
         }
 
         // set active path
-        $activePage = $navigation->findOneBy("realFullPath", $activeDocument->getRealFullPath());
+        $front = \Zend_Controller_Front::getInstance();
+        $request = $front->getRequest();
+
+        // try to find a page matching exactly the request uri
+        $activePage = $navigation->findOneBy("uri", $request->getRequestUri());
+
+        if(!$activePage) {
+            // try to find a page matching the path info
+            $activePage = $navigation->findOneBy("uri", $request->getPathInfo());
+        }
+
+        if(!$activePage) {
+            // use the provided pimcore document
+            $activePage = $navigation->findOneBy("realFullPath", $activeDocument->getRealFullPath());
+        }
+
         if(!$activePage) {
             // find by link target
-            $activePage = $navigation->findOneBy("uri", $activeDocument->getRealFullPath());
+            $activePage = $navigation->findOneBy("uri", $activeDocument->getFullPath());
         }
 
         if($activePage) {
@@ -174,13 +192,15 @@ class PimcoreNavigationController
             foreach($allPages as $page) {
                 $activeTrail = false;
 
-                if (strpos($activeDocument->getRealFullPath(), $page->getRealFullPath() . "/") === 0) {
+                if (strpos($activeDocument->getRealFullPath(), $page->getUri() . "/") === 0) {
                     $activeTrail = true;
                 }
 
-                if($page->getDocumentType() == "link") {
-                    if (strpos($activeDocument->getFullPath(), $page->getUri() . "/") === 0) {
-                        $activeTrail = true;
+                if($page instanceof Uri) {
+                    if ($page->getDocumentType() == "link") {
+                        if (strpos($activeDocument->getFullPath(), $page->getUri() . "/") === 0) {
+                            $activeTrail = true;
+                        }
                     }
                 }
 
@@ -236,7 +256,7 @@ class PimcoreNavigationController
 
     /**
      * Returns the name of the pageclass
-     * 
+     *
      * @return String
      */
     public function getPageClass()
@@ -278,7 +298,7 @@ class PimcoreNavigationController
                     if ($child instanceof Document\Link) {
                         $path = $child->getHref();
                     }
-                    
+
                     $page = new $this->_pageClass();
                     $page->setUri($path . $child->getProperty("navigation_parameters") . $child->getProperty("navigation_anchor"));
                     $page->setLabel($child->getProperty("navigation_name"));
@@ -302,20 +322,20 @@ class PimcoreNavigationController
 
                     $page->setClass($page->getClass() . $classes);
 
-                    if($pageCallback) {
-                        $pageCallback($page, $child);
+                    if ($child->hasChilds()) {
+                        $childPages = $this->buildNextLevel($child, false, $pageCallback);
+                        $page->setPages($childPages);
                     }
 
-                    if ($child->hasChilds()) {
-                        $childPages = $this->buildNextLevel($child, false);
-                        $page->setPages($childPages);
+                    if($pageCallback instanceof \Closure) {
+                        $pageCallback($page, $child);
                     }
 
                     $pages[] = $page;
                 }
             }
         }
-        
+
         return $pages;
     }
 

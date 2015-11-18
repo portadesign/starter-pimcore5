@@ -1,18 +1,15 @@
-<?php 
+<?php
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object\ClassDefinition\Data;
@@ -35,17 +32,17 @@ class Multiselect extends Model\Object\ClassDefinition\Data {
      * @var array
      */
     public $options;
-    
+
     /**
      * @var integer
      */
-    public $width;    
-    
+    public $width;
+
     /**
      * @var integer
      */
-    public $height; 
-    
+    public $height;
+
     /**
      * Type for the column to query
      *
@@ -82,7 +79,7 @@ class Multiselect extends Model\Object\ClassDefinition\Data {
         $this->options = $options;
         return $this;
     }
-    
+
     /**
      * @return integer
      */
@@ -98,7 +95,7 @@ class Multiselect extends Model\Object\ClassDefinition\Data {
         $this->width = $this->getAsIntegerCast($width);
         return $this;
     }
-    
+
     /**
      * @return integer
      */
@@ -133,7 +130,7 @@ class Multiselect extends Model\Object\ClassDefinition\Data {
      * @return string
      */
     public function getDataFromResource($data) {
-        if($data) {
+        if(strlen($data)) {
             return explode(",",$data);
         } else {
             return null;
@@ -162,7 +159,7 @@ class Multiselect extends Model\Object\ClassDefinition\Data {
      */
     public function getDataForEditmode($data, $object = null) {
         if(is_array($data)) {
-           return implode(",",$data); 
+           return implode(",",$data);
         }
     }
 
@@ -173,15 +170,12 @@ class Multiselect extends Model\Object\ClassDefinition\Data {
      * @return string
      */
     public function getDataFromEditmode($data, $object = null) {
-        if($data) {
-            if (\Pimcore\Tool\Admin::isExtJS5()) {
-                return $data;
-            } else {
-                return explode(",", $data);
-            }
-        } else {
-            return null;
+        if (\Pimcore\Tool\Admin::isExtJS6()) {
+            return $data;
+        } else if (strlen($data)) {
+            return explode(",", $data);
         }
+        return null;
     }
 
     /**

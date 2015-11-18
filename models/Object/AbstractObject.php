@@ -2,30 +2,29 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object;
 
 use Pimcore\Model;
-use Pimcore\Model\Cache; 
-use Pimcore\Tool; 
+use Pimcore\Model\Cache;
+use Pimcore\Tool;
 
 class AbstractObject extends Model\Element\AbstractElement {
 
     const OBJECT_TYPE_FOLDER = "folder";
     const OBJECT_TYPE_OBJECT = "object";
     const OBJECT_TYPE_VARIANT = "variant";
+
+    static $doNotRestoreKeyAndPath = false;
 
     /**
      * possible types of a document
@@ -238,7 +237,7 @@ class AbstractObject extends Model\Element\AbstractElement {
                 if (!$object = Cache::load($cacheKey)) {
 
                     $object = new Model\Object();
-                    $typeInfo = $object->getResource()->getTypeById($id);
+                    $typeInfo = $object->getDao()->getTypeById($id);
 
                     if ($typeInfo["o_type"] == "object" || $typeInfo["o_type"] == "variant" || $typeInfo["o_type"] == "folder") {
 
@@ -254,7 +253,7 @@ class AbstractObject extends Model\Element\AbstractElement {
 
                         $object = new $concreteClassName();
                         \Zend_Registry::set($cacheKey, $object);
-                        $object->getResource()->getById($id);
+                        $object->getDao()->getById($id);
 
                         Cache::save($object, $cacheKey);
                     } else {
@@ -298,7 +297,7 @@ class AbstractObject extends Model\Element\AbstractElement {
             $object = new self();
 
             if (Tool::isValidPath($path)) {
-                $object->getResource()->getByPath($path);
+                $object->getDao()->getByPath($path);
                 return self::getById($object->getId());
             }
         }
@@ -416,12 +415,12 @@ class AbstractObject extends Model\Element\AbstractElement {
     public function hasChilds($objectTypes = array(self::OBJECT_TYPE_OBJECT, self::OBJECT_TYPE_FOLDER)) {
         if(is_bool($this->o_hasChilds)){
             if(($this->o_hasChilds and empty($this->o_childs)) or (!$this->o_hasChilds and !empty($this->o_childs))){
-                return $this->getResource()->hasChilds($objectTypes);
+                return $this->getDao()->hasChilds($objectTypes);
             } else {
                 return $this->o_hasChilds;
             }
         }
-        return $this->getResource()->hasChilds($objectTypes);
+        return $this->getDao()->hasChilds($objectTypes);
     }
 
 
@@ -458,12 +457,12 @@ class AbstractObject extends Model\Element\AbstractElement {
 	public function hasSiblings($objectTypes = array(self::OBJECT_TYPE_OBJECT, self::OBJECT_TYPE_FOLDER)) {
 		if(is_bool($this->o_hasSiblings)){
 			if(($this->o_hasSiblings and empty($this->o_siblings)) or (!$this->o_hasSiblings and !empty($this->o_siblings))){
-				return $this->getResource()->hasSiblings($objectTypes);
+				return $this->getDao()->hasSiblings($objectTypes);
 			} else {
 				return $this->o_hasSiblings;
 			}
 		}
-		return $this->getResource()->hasSiblings($objectTypes);
+		return $this->getDao()->hasSiblings($objectTypes);
 	}
 
 
@@ -507,12 +506,12 @@ class AbstractObject extends Model\Element\AbstractElement {
         $d->cleanAllForElement($this);
 
         // remove all properties
-        $this->getResource()->deleteAllProperties();
+        $this->getDao()->deleteAllProperties();
 
         // remove all permissions
-        $this->getResource()->deleteAllPermissions();
+        $this->getDao()->deleteAllPermissions();
 
-        $this->getResource()->delete();
+        $this->getDao()->delete();
 
         // empty object cache
         $this->clearDependentCache();
@@ -544,13 +543,13 @@ class AbstractObject extends Model\Element\AbstractElement {
         $maxRetries = 5;
         for($retries=0; $retries<$maxRetries; $retries++) {
 
+            // be sure that unpublished objects in relations are saved also in frontend mode, eg. in importers, ...
+            $hideUnpublishedBackup = self::getHideUnpublished();
+            self::setHideUnpublished(false);
+
             $this->beginTransaction();
 
             try {
-                // be sure that unpublished objects in relations are saved also in frontend mode, eg. in importers, ...
-                $hideUnpublishedBackup = self::getHideUnpublished();
-                self::setHideUnpublished(false);
-
                 if(!Tool::isValidKey($this->getKey()) && $this->getId() != 1){
                     throw new \Exception("invalid key for object with id [ ".$this->getId()." ] key is: [" . $this->getKey() . "]");
                 }
@@ -561,23 +560,25 @@ class AbstractObject extends Model\Element\AbstractElement {
                 $this->correctPath();
 
                 if (!$isUpdate) {
-                    $this->getResource()->create();
+                    $this->getDao()->create();
                 }
 
                 // get the old path from the database before the update is done
                 $oldPath = null;
                 if ($isUpdate) {
-                    $oldPath = $this->getResource()->getCurrentFullPath();
+                    $oldPath = $this->getDao()->getCurrentFullPath();
+                }
+
+                // if the old path is different from the new path, update all children
+                // we need to do the update of the children's path before $this->update() because the
+                // inheritance helper needs the correct paths of the children in InheritanceHelper::buildTree()
+                $updatedChildren = array();
+                if($oldPath && $oldPath != $this->getFullPath()) {
+                    $this->getDao()->updateWorkspaces();
+                    $updatedChildren = $this->getDao()->updateChildsPaths($oldPath);
                 }
 
                 $this->update();
-
-                // if the old path is different from the new path, update all children
-                $updatedChildren = array();
-                if($oldPath && $oldPath != $this->getFullPath()) {
-                    $this->getResource()->updateWorkspaces();
-                    $updatedChildren = $this->getResource()->updateChildsPaths($oldPath);
-                }
 
                 self::setHideUnpublished($hideUnpublishedBackup);
 
@@ -591,6 +592,9 @@ class AbstractObject extends Model\Element\AbstractElement {
                     // PDO adapter throws exceptions if rollback fails
                     \Logger::info($er);
                 }
+
+                // set "HideUnpublished" back to the value it was originally
+                self::setHideUnpublished($hideUnpublishedBackup);
 
                 // we try to start the transaction $maxRetries times again (deadlocks, ...)
                 if($retries < ($maxRetries-1)) {
@@ -644,12 +648,14 @@ class AbstractObject extends Model\Element\AbstractElement {
                 // that is currently in the parent object (in memory), because this might have changed but wasn't not saved
                 $this->setPath(str_replace("//","/",$parent->getCurrentFullPath()."/"));
             } else {
-                // parent document doesn't exist anymore, so delete this document
-                //$this->delete();
-
                 // parent document doesn't exist anymore, set the parent to to root
                 $this->setParentId(1);
                 $this->setPath("/");
+            }
+
+            if (strlen($this->getKey()) < 1) {
+                $this->setKey("---no-valid-key---" . $this->getId());
+                throw new \Exception("Document requires key, generated key automatically");
             }
         } else if($this->getId() == 1) {
             // some data in root node should always be the same
@@ -676,11 +682,6 @@ class AbstractObject extends Model\Element\AbstractElement {
      */
     protected function update() {
 
-        if(is_null($this->getKey()) && $this->getId() != 1) {
-            $this->delete();
-            throw new \Exception("Object requires key, object with id " . $this->getId() . " deleted");
-        }
-
         // set mod date
         $this->setModificationDate(time());
 
@@ -690,12 +691,12 @@ class AbstractObject extends Model\Element\AbstractElement {
 
         // save properties
         $this->getProperties();
-        $this->getResource()->deleteAllProperties();
+        $this->getDao()->deleteAllProperties();
 
         if (is_array($this->getProperties()) and count(is_array($this->getProperties())) > 0) {
             foreach ($this->getProperties() as $property) {
                 if (!$property->getInherited()) {
-                    $property->setResource(null);
+                    $property->setDao(null);
                     $property->setCid($this->getId());
                     $property->setCtype("object");
                     $property->setCpath($this->getPath() . $this->getKey());
@@ -845,7 +846,7 @@ class AbstractObject extends Model\Element\AbstractElement {
      */
     public function setParentId($o_parentId) {
         $this->o_parentId = (int) $o_parentId;
-        $this->o_parent = AbstractObject::getById($o_parentId);
+        $this->o_parent = null;
         return $this;
     }
 
@@ -968,7 +969,7 @@ class AbstractObject extends Model\Element\AbstractElement {
             $cacheKey = "object_properties_" . $this->getId();
             $properties = Cache::load($cacheKey);
             if (!is_array($properties)) {
-                $properties = $this->getResource()->getProperties();
+                $properties = $this->getDao()->getProperties();
                 $elementCacheTag = $this->getCacheTag();
                 $cacheTags = array("object_properties" => "object_properties", $elementCacheTag => $elementCacheTag);
                 Cache::save($properties, $cacheKey, $cacheTags);
@@ -1055,7 +1056,7 @@ class AbstractObject extends Model\Element\AbstractElement {
      *
      */
     public function __wakeup() {
-        if(isset($this->_fulldump)) {
+        if(isset($this->_fulldump) && !self::$doNotRestoreKeyAndPath) {
             // set current key and path this is necessary because the serialized data can have a different path than the original element ( element was renamed or moved )
             $originalElement = AbstractObject::getById($this->getId());
             if($originalElement) {
@@ -1097,14 +1098,14 @@ class AbstractObject extends Model\Element\AbstractElement {
     public function renewInheritedProperties () {
         $this->removeInheritedProperties();
 
-        // add to registry to avoid infinite regresses in the following $this->getResource()->getProperties()
+        // add to registry to avoid infinite regresses in the following $this->getDao()->getProperties()
         $cacheKey = "object_" . $this->getId();
         if(!\Zend_Registry::isRegistered($cacheKey)) {
             \Zend_Registry::set($cacheKey, $this);
         }
 
         $myProperties = $this->getProperties();
-        $inheritedProperties = $this->getResource()->getProperties(true);
+        $inheritedProperties = $this->getDao()->getProperties(true);
         $this->setProperties(array_merge($inheritedProperties, $myProperties));
     }
 
@@ -1127,4 +1128,22 @@ class AbstractObject extends Model\Element\AbstractElement {
 
         return parent::__call($method, $args);
     }
+
+    /**
+     * @return boolean
+     */
+    public static function doNotRestoreKeyAndPath()
+    {
+        return self::$doNotRestoreKeyAndPath;
+    }
+
+    /**
+     * @param boolean $doNotRestoreKeyAndPath
+     */
+    public static function setDoNotRestoreKeyAndPath($doNotRestoreKeyAndPath)
+    {
+        self::$doNotRestoreKeyAndPath = $doNotRestoreKeyAndPath;
+    }
+
+
 }

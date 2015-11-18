@@ -1,18 +1,15 @@
-<?php 
+<?php
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object\ClassDefinition\Data;
@@ -116,27 +113,6 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image {
                 "crop" => $data->getCrop()
             );
 
-            $rewritePath = function ($data) {
-
-                if(!is_array($data)) {
-                    return array();
-                }
-
-                foreach ($data as &$element) {
-                    if(array_key_exists("data",$element) && is_array($element["data"]) && count($element["data"]) > 0) {
-                        foreach($element["data"] as &$metaData) {
-                            if($metaData["value"] instanceof Element\ElementInterface) {
-                                $metaData["value"] = $metaData["value"]->getId();
-                            }
-                        }
-                    }
-                }
-                return $data;
-            };
-
-            $metaData["hotspots"] = $rewritePath($metaData["hotspots"]);
-            $metaData["marker"] = $rewritePath($metaData["marker"]);
-
             $metaData = Serialize::serialize($metaData);
 
             return array(
@@ -156,7 +132,9 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image {
      * @return Asset
      */
     public function getDataFromResource($data) {
-        if($data[$this->getName() . "__image"] || $data[$this->getName() . "__hotspots"]) {
+        $imageId = $data[$this->getName() . "__image"];
+        $image = Asset::getById($imageId);
+        if($image) {
 
             $metaData = $data[$this->getName() . "__hotspots"];
 
@@ -183,9 +161,9 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image {
                 foreach ($data as &$element) {
                     if(array_key_exists("data",$element) && is_array($element["data"]) && count($element["data"]) > 0) {
                         foreach($element["data"] as &$metaData) {
-                            if(in_array($metaData["type"], array("object","asset","document"))) {
-                                $el = Element\Service::getElementById($metaData["type"], $metaData["value"]);
-                                $metaData["value"] = $el;
+                            // this is for backward compatibility (Array vs. MarkerHotspotItem)
+                            if(is_array($metaData)) {
+                                $metaData = new Element\Data\MarkerHotspotItem($metaData);
                             }
                         }
                     }
@@ -196,7 +174,8 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image {
             $hotspots = $rewritePath($hotspots);
             $marker = $rewritePath($marker);
 
-            return new Object\Data\Hotspotimage($data[$this->getName() . "__image"], $hotspots, $marker, $crop);
+            $value = new Object\Data\Hotspotimage($imageId, $hotspots, $marker, $crop);
+            return $value;
         }
         return null;
 
@@ -246,6 +225,9 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image {
             $marker = $rewritePath($data->getMarker());
             $hotspots = $rewritePath($data->getHotspots());
 
+            $marker = object2array($marker);
+            $hotspots = object2array($hotspots);
+
             return array(
                 "image" => $imageId,
                 "hotspots" => $hotspots,
@@ -273,8 +255,9 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image {
             foreach ($data as &$element) {
                 if(array_key_exists("data",$element) && is_array($element["data"]) && count($element["data"]) > 0) {
                     foreach($element["data"] as &$metaData) {
+                        $metaData = new Element\Data\MarkerHotspotItem($metaData);
                         if(in_array($metaData["type"], array("object","asset","document"))) {
-                            $el = Element\Service::getElementByPath($metaData["type"], $metaData["value"]);
+                            $el = Element\Service::getElementByPath($metaData["type"], $metaData->getValue());
                             $metaData["value"] = $el;
                         }
                     }
@@ -423,7 +406,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image {
     }
 
 
-        /**
+    /**
      * converts data to be exposed via webservices
      * @param string $object
      * @return mixed

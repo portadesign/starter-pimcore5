@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore;
@@ -25,12 +22,27 @@ class Tool {
     protected static $notFoundClassNames = [];
 
     /**
+     * @var array
+     */
+    protected static $validLanguages = [];
+
+    /**
      * @static
      * @param string $key
      * @return bool
      */
     public static function isValidKey($key){
         return (bool) preg_match("/^[a-z0-9_~\.\-]+$/", $key);
+    }
+
+    /**
+     * returns a valid cache key/tag string
+     *
+     * @param string $key
+     * @return string
+     */
+    public static function getValidCacheKey($key){
+        return preg_replace("/[^a-zA-Z0-9]/", "_", $key);
     }
 
     /**
@@ -69,21 +81,25 @@ class Tool {
      */
     public static function getValidLanguages() {
 
-        $config = Config::getSystemConfig();
-        $validLanguages = strval($config->general->validLanguages);
+        if(empty(self::$validLanguages)) {
+            $config = Config::getSystemConfig();
+            $validLanguages = strval($config->general->validLanguages);
 
-        if (empty($validLanguages)) {
-            return array();
+            if (empty($validLanguages)) {
+                return array();
+            }
+
+            $validLanguages = str_replace(" ", "", $validLanguages);
+            $languages = explode(",", $validLanguages);
+
+            if (!is_array($languages)) {
+                $languages = array();
+            }
+
+            self::$validLanguages = $languages;
         }
 
-        $validLanguages = str_replace(" ", "", $validLanguages);
-        $languages = explode(",", $validLanguages);
-
-        if (!is_array($languages)) {
-            $languages = array();
-        }
-
-        return $languages;
+        return self::$validLanguages;
     }
 
     /**
@@ -108,7 +124,7 @@ class Tool {
     }
 
     /**
-     * @return null
+     * @return null|string
      */
     public static function getDefaultLanguage() {
         $config = Config::getSystemConfig();
@@ -126,7 +142,8 @@ class Tool {
     }
 
     /**
-     * @static
+     * @return array|mixed
+     * @throws \Zend_Locale_Exception
      */
     public static function getSupportedLocales() {
 
@@ -320,40 +337,44 @@ class Tool {
     /**
      * Returns the host URL
      *
-     * @static
+     * @param string $useProtocol use a specific protocol
+     *
      * @return string
      */
-    public static function getHostUrl()
-        {
-            $protocol = "http";
-            $port = '';
+    public static function getHostUrl($useProtocol = null) {
+        $protocol = "http";
+        $port = '';
 
-            if(isset($_SERVER["SERVER_PROTOCOL"])) {
-                $protocol = strtolower($_SERVER["SERVER_PROTOCOL"]);
-                $protocol = substr($protocol, 0, strpos($protocol, "/"));
-                $protocol .= (isset($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] == "on") ? "s" : "";
-            }
-
-            if(isset($_SERVER["SERVER_PORT"])) {
-                if(!in_array((int) $_SERVER["SERVER_PORT"],array(443,80))){
-                    $port = ":" . $_SERVER["SERVER_PORT"];
-                }
-            }
-
-            $hostname = self::getHostname();
-
-            //get it from System settings
-            if (!$hostname) {
-                $systemConfig = Config::getSystemConfig()->toArray();
-                $hostname = $systemConfig['general']['domain'];
-                if (!$hostname) {
-                    \Logger::warn('Couldn\'t determine HTTP Host. No Domain set in "Settings" -> "System" -> "Website" -> "Domain"');
-                    return "";
-                }
-            }
-
-            return $protocol . "://" . $hostname . $port;
+        if(isset($_SERVER["SERVER_PROTOCOL"])) {
+            $protocol = strtolower($_SERVER["SERVER_PROTOCOL"]);
+            $protocol = substr($protocol, 0, strpos($protocol, "/"));
+            $protocol .= (isset($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] == "on") ? "s" : "";
         }
+
+        if(isset($_SERVER["SERVER_PORT"])) {
+            if(!in_array((int) $_SERVER["SERVER_PORT"],array(443,80))){
+                $port = ":" . $_SERVER["SERVER_PORT"];
+            }
+        }
+
+        $hostname = self::getHostname();
+
+        //get it from System settings
+        if (!$hostname) {
+            $systemConfig = Config::getSystemConfig()->toArray();
+            $hostname = $systemConfig['general']['domain'];
+            if (!$hostname) {
+                \Logger::warn('Couldn\'t determine HTTP Host. No Domain set in "Settings" -> "System" -> "Website" -> "Domain"');
+                return "";
+            }
+        }
+
+        if($useProtocol){
+            $protocol = $useProtocol;
+        }
+
+        return $protocol . "://" . $hostname . $port;
+    }
 
 
     /**
@@ -439,7 +460,7 @@ class Tool {
     /**
      * @param string $type
      * @param array $options
-     * @return mixed
+     * @return \Zend_Http_Client
      * @throws \Exception
      * @throws \Zend_Http_Client_Exception
      */

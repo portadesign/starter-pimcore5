@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Staticroute
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model;
@@ -142,7 +139,7 @@ class Staticroute extends AbstractModel {
                 $route = new self();
                 \Zend_Registry::set($cacheKey, $route);
                 $route->setId(intval($id));
-                $route->getResource()->getById();
+                $route->getDao()->getById();
 
             } catch (\Exception $e) {
                 \Logger::error($e);
@@ -170,7 +167,7 @@ class Staticroute extends AbstractModel {
         $route = new self();
 
         try {
-            $route->getResource()->getByName($name, $siteId);
+            $route->getDao()->getByName($name, $siteId);
         } catch (\Exception $e) {
             \Logger::warn($e);
             return null;
@@ -515,6 +512,10 @@ class Staticroute extends AbstractModel {
                 }
             }
 
+            // we need to unset this 3 params here, because otherwise the defaults wouldn't have an effect if used
+            // in combination with dynamic action/controller/module configurations
+            unset($params["controller"], $params["action"], $params["module"]);
+
             $params = array_merge($this->getDefaultsArray(), $params);
 
             $variables = explode(",", $this->getVariables());
@@ -571,7 +572,7 @@ class Staticroute extends AbstractModel {
      */
     public function clearDependentCache() {
         
-        // this is mostly called in Staticroute\Resource not here
+        // this is mostly called in Staticroute\Dao not here
         try {
             \Pimcore\Model\Cache::clearTag("staticroute");
         }

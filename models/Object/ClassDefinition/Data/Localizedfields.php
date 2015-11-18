@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object\ClassDefinition\Data;
@@ -117,7 +114,29 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         // replace the real data with the data for the editmode
         foreach($result["data"] as $language => &$data) {
             foreach($data as $key => &$value) {
-                $value = $this->getFielddefinition($key)->getDataForEditmode($value, $object);
+                $fieldDefinition = $this->getFielddefinition($key);
+                if (!$fieldDefinition instanceof CalculatedValue) {
+                    $value = $fieldDefinition->getDataForEditmode($value, $object);
+                }
+            }
+        }
+
+        if ($this->hasChilds()) {
+            $childs = $this->getChilds();
+
+            $validLanguages = Tool::getValidLanguages();
+
+            foreach ($childs as $childDef) {
+                if ($childDef instanceof CalculatedValue) {
+
+
+                    foreach ($validLanguages as $language) {
+                        $childData = new Object\Data\CalculatedValue($childDef->getName());
+                        $childData->setContextualData("localizedfield", $this->getName(), null, $language);
+                        $childData = $childDef->getDataForEditmode($childData, $object);
+                        $result["data"][$language][$childDef->getName()] = $childData;
+                    }
+                }
             }
         }
 

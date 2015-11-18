@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Metadata
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Metadata\Predefined;
@@ -64,7 +61,7 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing {
 
         if (is_array($subTypes)) {
             $types = array();
-            $db = \Pimcore\Resource::get();
+            $db = \Pimcore\Db::get();
             foreach ($subTypes as $item) {
                 $types[] = $db->quote($item);
             }
@@ -81,9 +78,9 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing {
      * @param $language
      * @return \Pimcore\Model\Metadata\Predefined
      */
-    public static function getByKeyAndLanguage($key, $language) {
+    public static function getByKeyAndLanguage($key, $language, $targetSubtype = null) {
 
-        $db = \Pimcore\Resource::get();
+        $db = \Pimcore\Db::get();
         $list = new self();
         $condition = "name = " . $db->quote($key);
         if ($language) {
@@ -91,6 +88,11 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing {
         } else {
             $condition .= " AND (language = '' OR LANGUAGE IS NULL)";
         }
+
+        if($targetSubtype) {
+            $condition .= " AND targetSubtype = " . $db->quote($targetSubtype);
+        }
+
         $list->setCondition($condition);
         $list = $list->load();
         if ($list) {

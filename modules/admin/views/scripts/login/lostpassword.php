@@ -7,7 +7,9 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <meta name="robots" content="noindex, follow" />
 
-    <link rel="stylesheet" href="/pimcore/static/css/login.css" type="text/css" />
+    <link rel="icon" type="image/png" href="/pimcore/static6/img/favicon/favicon-32x32.png" />
+
+    <link rel="stylesheet" href="/pimcore/static6/css/login.css" type="text/css" />
 
     <?php
     // load plugin scripts
@@ -22,7 +24,7 @@
                             $cssPath = trim($cssPath);
                             if (!empty($cssPath)) {
                                 ?>
-                                <link rel="stylesheet" type="text/css" href="<?php echo $cssPath ?>?_dc=<?php echo time() ?>"/>
+                                <link rel="stylesheet" type="text/css" href="<?= $cssPath ?>?_dc=<?= time() ?>"/>
                             <?php
 
                             }
@@ -44,18 +46,18 @@
 
             <?php if($this->success) { ?>
                 <div class="body info">
-                    <?php echo $this->translate("A temporary login link has been sent to your email address."); ?>
+                    <?= $this->translate("A temporary login link has been sent to your email address."); ?>
                     <br />
-                    <?php echo $this->translate("Please check your mailbox."); ?>
+                    <?= $this->translate("Please check your mailbox."); ?>
 
                     <br />
                     <br />
 
-                    <a href="/admin/login/"><?php echo $this->translate("Back to login"); ?></a>
+                    <a href="/admin/login/"><?= $this->translate("Back to login"); ?></a>
                 </div>
             <?php } else { ?>
                 <div class="body info">
-                    <?php echo $this->translate("Enter your username and pimcore will send a login link to your email address"); ?>
+                    <?= $this->translate("Enter your username and pimcore will send a login link to your email address"); ?>
                 </div>
 
                 <div id="loginform">
@@ -73,16 +75,14 @@
             <?php } ?>
 
             <div class="body lostpassword" style="padding-top: 30px;">
-                <a href="/admin/login/"><?php echo $this->translate("Back to login"); ?></a>
+                <a href="/admin/login/"><?= $this->translate("Back to login"); ?></a>
             </div>
         </div>
     </div>
 </div>
 
 <div id="footer">
-    <a href="http://www.pimcore.org/">pimcore. Open Source Multichannel Experience and Engagement Platform</a>
-    <br />
-    &copy; 2009-<?php echo date("Y") ?> <a href="http://www.pimcore.org/">pimcore GmbH</a>, a proud member of the <a href="http://www.elements.at/">elements group</a>
+    &copy; 2009-<?= date("Y") ?> <a href="http://www.pimcore.org/">pimcore GmbH</a>, a proud member of the <a href="http://www.elements.at/">elements group</a>
 </div>
 
 </body>

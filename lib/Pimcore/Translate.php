@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore;
@@ -127,6 +124,7 @@ class Translate extends \Zend_Translate_Adapter {
 
         $messageIdOriginal = $messageId;
         $messageId = mb_strtolower($messageId);
+        $messageId = trim($messageId);
 
         // the maximum length of message-id's is 255
         if(strlen($messageId) > 255) {
@@ -135,6 +133,15 @@ class Translate extends \Zend_Translate_Adapter {
 
         if ($locale === null) {
             $locale = $this->_options['locale'];
+        }
+
+        // check if the given locale is available, if not try again just the language without the region
+        if(!Tool::isValidLanguage($locale)) {
+            $originalLocale = new \Zend_Locale((string) $locale);
+            if(Tool::isValidLanguage($originalLocale->getLanguage())) {
+                $locale = $originalLocale->getLanguage();
+                $this->setLocale($locale);
+            }
         }
 
         // list isn't cacheable, just get a single item
@@ -219,6 +226,7 @@ class Translate extends \Zend_Translate_Adapter {
 
         $messageIdOriginal = $messageId;
         $messageId = mb_strtolower($messageId);
+        $messageId = trim($messageId);
 
         // don't create translation if it's just empty
         if(array_key_exists($messageId, $this->_translate[$locale])) {

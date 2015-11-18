@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object\ClassDefinition\Data\Relations;
@@ -20,7 +17,7 @@ namespace Pimcore\Model\Object\ClassDefinition\Data\Relations;
 use Pimcore\Model;
 use Pimcore\Model\Object;
 use Pimcore\Model\Element;
-use Pimcore\Resource;
+use Pimcore\Db;
 
 abstract class AbstractRelations extends Model\Object\ClassDefinition\Data {
 
@@ -67,15 +64,23 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data {
     protected function correctClasses ($classes) {
 
         // this is the new method with Ext.form.MultiSelect
-        if((is_string($classes) && !empty($classes)) || (\Pimcore\Tool\Admin::isExtJS5() && is_array($classes))) {
-            if (!\Pimcore\Tool\Admin::isExtJS5()) {
+        /**
+         * @extjs6
+         * @todo this need to be refactored when extjs3 support is removed
+         */
+        if((is_string($classes) && !empty($classes)) || (\Pimcore\Tool\Admin::isExtJS6() && is_array($classes))) {
+            if (!\Pimcore\Tool\Admin::isExtJS6()) {
                 $classParts = explode(",", $classes);
             } else {
                 $classParts = $classes;
             }
             $classes = array();
             foreach ($classParts as $class) {
-                $classes[] = array("classes" => $class);
+                if(is_array($class)) {
+                    $classes[] = $class;
+                } else if($class) {
+                    $classes[] = array("classes" => $class);
+                }
             }
         }
 
@@ -269,7 +274,7 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data {
      */
     public function save ($object, $params = array()) {
 
-        $db = Resource::get();
+        $db = Db::get();
 
         $data = $this->getDataFromObjectParam($object, $params);
         $relations = $this->getDataForResource($data, $object);
@@ -302,7 +307,7 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data {
      * @return null
      */
     public function load($object, $params = array()) {
-        $db = Resource::get();
+        $db = Db::get();
         $data = null;
 
         if($object instanceof Object\Concrete) {

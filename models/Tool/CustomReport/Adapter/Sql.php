@@ -2,23 +2,20 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Pimcore
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Tool\CustomReport\Adapter;
 
 use Pimcore\Model;
-use Pimcore\Resource; 
+use Pimcore\Db;
 
 class Sql extends AbstractAdapter {
 
@@ -33,7 +30,7 @@ class Sql extends AbstractAdapter {
      * @return array
      */
     public function getData($filters, $sort, $dir, $offset, $limit, $fields = null, $drillDownFilters = null) {
-        $db = Resource::get();
+        $db = Db::get();
 
         $baseQuery = $this->getBaseQuery($filters, $fields, false, $drillDownFilters);
 
@@ -73,7 +70,7 @@ class Sql extends AbstractAdapter {
 
         if(!preg_match("/(ALTER|CREATE|DROP|RENAME|TRUNCATE|UPDATE|DELETE) /i", $sql, $matches)) {
             $sql .= " LIMIT 0,1";
-            $db = Resource::get();
+            $db = Db::get();
             $res = $db->fetchRow($sql);
             $columns = array_keys($res);
         } else {
@@ -98,7 +95,7 @@ class Sql extends AbstractAdapter {
             }
             $sql .= str_replace("\n", " ", $config->sql);
         } else if($selectField) {
-            $db = Resource::get();
+            $db = Db::get();
             $sql .= "SELECT " . $db->quoteIdentifier($selectField);
         } else {
             $sql .= "SELECT *";
@@ -116,7 +113,7 @@ class Sql extends AbstractAdapter {
             }
 
             if($drillDownFilters) {
-                $db = Resource::get();
+                $db = Db::get();
                 foreach($drillDownFilters as $field => $value) {
                     if($value !== "" && $value !== null) {
                         $whereParts[] = "`$field` = " . $db->quote($value);
@@ -151,7 +148,7 @@ class Sql extends AbstractAdapter {
      * @return array
      */
     protected function getBaseQuery($filters, $fields, $ignoreSelectAndGroupBy = false, $drillDownFilters = null, $selectField = null) {
-        $db = Resource::get();
+        $db = Db::get();
         $condition = array("1 = 1");
 
         $sql = $this->buildQueryString($this->config, $ignoreSelectAndGroupBy, $drillDownFilters, $selectField);
@@ -161,20 +158,46 @@ class Sql extends AbstractAdapter {
         if($filters) {
             if(is_array($filters)) {
                 foreach ($filters as $filter) {
-                    if($filter["type"] == "string") {
-                        $condition[] = $db->quoteIdentifier($filter["field"]) . " LIKE " . $db->quote("%" . $filter["value"] . "%");
-                    } else if($filter["type"] == "numeric") {
-                        $compMapping = array(
-                            "lt" => "<",
-                            "gt" => ">",
-                            "eq" => "="
-                        );
-                        if($compMapping[$filter["comparison"]]) {
-                            $condition[] = $db->quoteIdentifier($filter["field"]) . " " . $compMapping[$filter["comparison"]] . " " . $db->quote($filter["value"]);
+                    if (\Pimcore\Tool\Admin::isExtJS6()) {
+                        $operator = $filter['operator'];
+                        switch ($operator) {
+                            case 'like':
+                                $condition[] = $db->quoteIdentifier($filter["property"]) . " LIKE " . $db->quote("%" . $filter["value"] . "%");
+                                break;
+                            case "lt":
+                            case "gt":
+                            case "eq":
+
+                                $compMapping = array(
+                                    "lt" => "<",
+                                    "gt" => ">",
+                                    "eq" => "="
+                                );
+
+                                $condition[] = $db->quoteIdentifier($filter["property"]) . " " . $compMapping[$operator] . " " . $db->quote($filter["value"]);
+                                break;
+                            case "=":
+                                $condition[] = $db->quoteIdentifier($filter["property"]) . " = " . $db->quote((int)$filter["value"]);
+                                break;
                         }
-                    } else if ($filter["type"] == "boolean") {
-                        $condition[] = $db->quoteIdentifier($filter["field"]) . " = " . $db->quote((int)$filter["value"]);
-                    } else if ($filter["type"] == "date") {
+
+                    } else {
+                        if($filter["type"] == "string") {
+                            $condition[] = $db->quoteIdentifier($filter["field"]) . " LIKE " . $db->quote("%" . $filter["value"] . "%");
+                        } else if($filter["type"] == "numeric") {
+                            $compMapping = array(
+                                "lt" => "<",
+                                "gt" => ">",
+                                "eq" => "="
+                            );
+                            if($compMapping[$filter["comparison"]]) {
+                                $condition[] = $db->quoteIdentifier($filter["field"]) . " " . $compMapping[$filter["comparison"]] . " " . $db->quote($filter["value"]);
+                            }
+                        } else if ($filter["type"] == "boolean") {
+                            $condition[] = $db->quoteIdentifier($filter["field"]) . " = " . $db->quote((int)$filter["value"]);
+                        } else if ($filter["type"] == "date") {
+
+                        }
 
                     }
                 }
@@ -211,7 +234,7 @@ class Sql extends AbstractAdapter {
      * @return array|mixed
      */
     public function getAvailableOptions($filters, $field, $drillDownFilters) {
-        $db = Resource::get();
+        $db = Db::get();
         $baseQuery = $this->getBaseQuery($filters, array($field), true, $drillDownFilters, $field);
         $data = array();
         if($baseQuery) {

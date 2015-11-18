@@ -2,24 +2,23 @@
 <html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <title><?php echo htmlentities($this->getRequest()->getHttpHost(), ENT_QUOTES, 'UTF-8') ?> :: Pimcore</title>
+    <title><?= htmlentities($this->getRequest()->getHttpHost(), ENT_QUOTES, 'UTF-8') ?> :: Pimcore</title>
 
-
-    <!-- libraries and stylesheets -->
-    <link rel="stylesheet" type="text/css" href="/pimcore/static/js/lib/ext/resources/css/ext-all.css"/>
-    <link rel="stylesheet" type="text/css" href="/pimcore/static/js/lib/ext/resources/css/xtheme-gray.css"/>
+    <link rel="stylesheet" type="text/css" href="/pimcore/static6/js/lib/ext/classic/theme-triton/resources/theme-triton-all.css"/>
+    <link rel="stylesheet" type="text/css" href="/pimcore/static6/css/admin.css"/>
 
     <style type="text/css">
         body {
-            background: #222;
+            min-height: 600px;
         }
     </style>
+    
 </head>
 
 <body>
 
 <script type="text/javascript">
-    var pimcore_version = "<?php echo \Pimcore\Version::getVersion() ?>";
+    var pimcore_version = "<?= \Pimcore\Version::getVersion() ?>";
 </script>
 
 <?php
@@ -28,54 +27,52 @@ $scripts = array(
     // library
     "lib/prototype-light.js",
     "lib/jquery.min.js",
-    "lib/ext/adapter/jquery/ext-jquery-adapter.js",
-    "lib/ext/ext-all-debug.js"
+    "lib/ext/ext-all.js",
+    "lib/ext/classic/theme-triton/theme-triton.js",
 );
 
 ?>
 
 <?php foreach ($scripts as $scriptUrl) { ?>
-<script type="text/javascript" src="/pimcore/static/js/<?php echo $scriptUrl ?>"></script>
+<script type="text/javascript" src="/pimcore/static6/js/<?= $scriptUrl ?>"></script>
 <?php } ?>
 
 
 <script type="text/javascript">
 
-    var errorMessages = '<?php echo implode("<br />", $this->errors) ?>';
+    var errorMessages = '<b>ERROR:</b><br /><?= implode("<br />", $this->errors) ?>';
     var installdisabled = false;
 
     <?php if (!empty($this->errors)) { ?>
-            installdisabled = true;
-        <?php } ?>
+        installdisabled = true;
+    <?php } ?>
 
     Ext.onReady(function() {
 
-        Ext.Ajax.timeout = 900000;
-
-        var pimcoreViewport = new Ext.Viewport({
-            id: "pimcore_viewport"
-        });
+        Ext.Ajax.setDisableCaching(true);
+        Ext.Ajax.setTimeout(900000);
 
         var win = new Ext.Window({
-            width: 300,
+            width: 450,
             closable: false,
-            title: "PIMCORE Installer",
             closeable: false,
-            y: 50,
+            y: 20,
             items: [
                 {
                     xtype: "panel",
                     id: "logo",
                     border: false,
-                    bodyStyle: "padding: 10px",
-                    html: '<div align="center"><img width="200" src="/pimcore/static/img/logo-gray.png" align="center" /></div>'
+                    manageHeight: false,
+                    bodyStyle: "padding: 20px 10px 5px 10px",
+                    html: '<div align="center"><img width="200" src="/pimcore/static6/img/logo.svg" align="center" /></div>'
                 },
                 {
                     xtype: "panel",
                     id: "install_errors",
                     border: false,
                     bodyStyle: "color: red; padding: 10px",
-                    html: errorMessages
+                    html: errorMessages,
+                    hidden: !installdisabled
                 },
                 {
                     xtype: "form",
@@ -87,7 +84,7 @@ $scripts = array(
                             title: "MySQL Settings",
                             xtype: "fieldset",
                             defaults: {
-                                width: 130
+                                width: 380
                             },
                             items: [{
                                     xtype: "combo",
@@ -98,8 +95,7 @@ $scripts = array(
                                         ["Pdo_Mysql", "Pdo_Mysql"]
                                     ],
                                     mode: "local",
-                                    value: "Mysqli",
-                                    width: 120,
+                                    value: "Pdo_Mysql",
                                     triggerAction: "all"
                                 },
                                 {
@@ -135,7 +131,7 @@ $scripts = array(
                             title: "Admin User",
                             xtype: "fieldset",
                             defaults: {
-                                width: 130
+                                width: 380
                             },
                             items: [
                                 {
@@ -155,20 +151,24 @@ $scripts = array(
                 }
             ],
             bbar: [{
+                    id: "check_button",
                     text: "Check Requirements",
-                    icon: "/pimcore/static/img/icon/laptop_magnify.png",
+                    icon: "/pimcore/static6/img/icon/laptop_magnify.png",
                     handler: function () {
                         window.open("/install/check/?" + Ext.urlEncode(Ext.getCmp("install_form").getForm().getFieldValues()));
                     }
                 },"->",
                 {
                     text: "<b>Install Now!</b>",
-                    icon: "/pimcore/static/img/icon/accept.png",
+                    icon: "/pimcore/static6/img/icon/accept.png",
                     disabled: installdisabled,
                     handler: function (btn) {
 
                         btn.disable();
+                        Ext.getCmp("install_form").hide();
+                        Ext.getCmp("check_button").hide();
 
+                        Ext.getCmp("install_errors").show();
                         Ext.getCmp("install_errors").update("Installing ...");
 
                         Ext.Ajax.request({
@@ -184,20 +184,30 @@ $scripts = array(
                                 }
                                 catch (e) {
                                     Ext.getCmp("install_errors").update(transport.responseText);
+                                    Ext.getCmp("install_form").show();
+                                    Ext.getCmp("check_button").show();
                                     btn.enable();
                                 }
                             },
                             failure: function (transport) {
                                 Ext.getCmp("install_errors").update("Failed: " + transport.responseText);
+                                Ext.getCmp("install_form").show();
+                                Ext.getCmp("check_button").show();
                                 btn.enable();
                             }
                         });
                     }
                 }
-            ]
+            ],
+            listeners: {
+                afterrender: function () {
+                    // no idea why this is necessary to layout the window correctly
+                    window.setTimeout(function () {
+                        win.updateLayout();
+                    }, 1000);
+                }
+            }
         });
-
-        pimcoreViewport.add(win);
 
         win.show();
     });

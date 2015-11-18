@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Loader;
@@ -21,7 +18,30 @@ class ClassMapAutoloader extends \Zend_Loader_ClassMapAutoloader {
 
     public function autoload($class) {
 
+        // manual aliasing
+        $classAliases = [
+            "Pimcore\\Resource" => "Pimcore\\Db",
+            "Pimcore_Resource" => "Pimcore\\Db",
+            "Pimcore\\Resource\\Mysql" => "Pimcore\\Db",
+            "Pimcore_Resource_Mysql" => "Pimcore\\Db",
+        ];
+
+        if(array_key_exists($class, $classAliases)) {
+            class_alias($classAliases[$class], $class);
+            return;
+        }
+
         parent::autoload($class);
+
+        // compatibility from Resource => Dao
+        if(strpos($class, "Resource") && !class_exists($class, false) && !interface_exists($class, false)) {
+            $daoClass = str_replace("Resource","Dao",$class);
+            if(Tool::classExists($daoClass) || Tool::interfaceExists($daoClass)) {
+                if(!class_exists($class, false) && !interface_exists($class, false)) {
+                    class_alias($daoClass, $class);
+                }
+            }
+        }
 
         // reverse compatibility from namespaced to prefixed class names e.g. Pimcore\Model\Document => Document
         if(strpos($class, "Pimcore\\") === 0) {
@@ -37,7 +57,7 @@ class ClassMapAutoloader extends \Zend_Loader_ClassMapAutoloader {
             if(class_exists($class, false) || interface_exists($class, false)) {
                 // create an alias
                 $alias = str_replace("\\", "_", $class);
-                $alias = preg_replace("/_Abstract(.*)/", "_Abstract", $alias);
+                $alias = preg_replace("/_Abstract([^_]+)/", "_Abstract", $alias);
                 $alias = preg_replace("/_[^_]+Interface/", "_Interface", $alias);
                 $alias = str_replace("_Listing_", "_List_", $alias);
                 $alias = preg_replace("/_Listing$/", "_List", $alias);

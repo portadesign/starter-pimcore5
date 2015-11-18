@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Document
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Document;
@@ -82,12 +79,12 @@ abstract class PageSnippet extends Model\Document {
 
         // update elements
         $this->getElements();
-        $this->getResource()->deleteAllElements();
+        $this->getDao()->deleteAllElements();
 
         if (is_array($this->getElements()) and count($this->getElements()) > 0) {
             foreach ($this->getElements() as $name => $element) {
                 if(!$element->getInherited()) {
-                    $element->setResource(null);
+                    $element->setDao(null);
                     $element->setDocumentId($this->getId());
                     $element->save();
                 }
@@ -167,7 +164,7 @@ abstract class PageSnippet extends Model\Document {
         }
 
         // remove all tasks
-        $this->getResource()->deleteAllTasks();
+        $this->getDao()->deleteAllTasks();
 
         parent::delete();
     }
@@ -444,7 +441,7 @@ abstract class PageSnippet extends Model\Document {
      */
     public function getElements() {
         if ($this->elements === null) {
-            $this->setElements($this->getResource()->getElements());
+            $this->setElements($this->getDao()->getElements());
         }
         return $this->elements;
     }
@@ -463,7 +460,7 @@ abstract class PageSnippet extends Model\Document {
      */
     public function getVersions() {
         if ($this->versions === null) {
-            $this->setVersions($this->getResource()->getVersions());
+            $this->setVersions($this->getDao()->getVersions());
         }
         return $this->versions;
     }
@@ -511,12 +508,12 @@ abstract class PageSnippet extends Model\Document {
      */
     public function saveScheduledTasks() {
         $scheduled_tasks = $this->getScheduledTasks();
-        $this->getResource()->deleteAllTasks();
+        $this->getDao()->deleteAllTasks();
 
         if (is_array($scheduled_tasks) && count($scheduled_tasks) > 0) {
             foreach ($scheduled_tasks as $task) {
                 $task->setId(null);
-                $task->setResource(null);
+                $task->setDao(null);
                 $task->setCid($this->getId());
                 $task->setCtype("document");
                 $task->save();

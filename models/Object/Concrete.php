@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object;
@@ -153,18 +150,7 @@ class Concrete extends AbstractObject {
                 AbstractObject::setGetInheritedValues($inheritedValues);
 
                 $value = $this->$getter();
-
                 $omitMandatoryCheck = $this->getOmitMandatoryCheck();
-
-                /*$timeSinceCreation = (time()-$this->getCreationDate());
-                if($timeSinceCreation <= 5){
-                    // legacy hack: in previous version there was no check for mandatory fields,
-                    // and everybody uses the save method for new object creation - so now let's evict the mandatory check
-                    // if the object was created within the last 5 seconds
-                    $omitMandatoryCheck=true;
-                    \Logger::debug("executing mandatory fields check for object [ ".$this->getId()." ]");
-                }
-                */
                 
                 //check throws Exception
                 try {
@@ -196,20 +182,20 @@ class Concrete extends AbstractObject {
 
         parent::update();
 
-        $this->getResource()->update();
+        $this->getDao()->update();
 
         // scheduled tasks are saved in $this->saveVersion();
 
         $this->saveVersion(false, false);
-        $this->saveChilds();
+        $this->saveChildData();
     }
 
     /**
      * @return void
      */
-    public function saveChilds () {
+    protected function saveChildData () {
         if($this->getClass()->getAllowInherit()) {
-            $this->getResource()->saveChilds();
+            $this->getDao()->saveChildData();
         }
     }
 
@@ -219,12 +205,12 @@ class Concrete extends AbstractObject {
     public function saveScheduledTasks () {
         // update scheduled tasks
         $this->getScheduledTasks();
-        $this->getResource()->deleteAllTasks();
+        $this->getDao()->deleteAllTasks();
 
         if (is_array($this->getScheduledTasks()) && count($this->getScheduledTasks()) > 0) {
             foreach ($this->getScheduledTasks() as $task) {
                 $task->setId(null);
-                $task->setResource(null);
+                $task->setDao(null);
                 $task->setCid($this->getId());
                 $task->setCtype("object");
                 $task->save();
@@ -242,7 +228,7 @@ class Concrete extends AbstractObject {
             $v->delete();
         }
 
-        $this->getResource()->deleteAllTasks();
+        $this->getDao()->deleteAllTasks();
 
         parent::delete();
     }
@@ -300,7 +286,7 @@ class Concrete extends AbstractObject {
      */
     public function getVersions() {
         if ($this->o_versions === null) {
-            $this->setVersions($this->getResource()->getVersions());
+            $this->setVersions($this->getDao()->getVersions());
         }
         return $this->o_versions;
     }
@@ -319,8 +305,12 @@ class Concrete extends AbstractObject {
      * @return mixed
      */
     public function getValueForFieldName($key) {
-        if ($this->$key) {
+        if (isset($this->$key)) {
             return $this->$key;
+        } else if ($this->getClass()->getFieldDefinition($key) instanceof Model\Object\ClassDefinition\Data\CalculatedValue) {
+            $value = new Model\Object\Data\CalculatedValue($key);
+            $value = Service::getCalculatedFieldValue($this, $value);
+            return $value;
         }
         return false;
     }
@@ -475,6 +465,26 @@ class Concrete extends AbstractObject {
      * @return mixed
      */
     public function getValueFromParent($key, $params = null) {
+
+        $parent = $this->getNextParentForInheritance();
+        if ($parent) {
+            $method = "get" . $key;
+            if (method_exists($parent, $method)) {
+                if (method_exists($parent, $method)) {
+                    return call_user_func(array($parent, $method), $params);
+                }
+            }
+        }
+
+        return;
+    }
+
+
+    /**
+     * @return AbstractObject|void
+     * @return AbstractObject|void
+     */
+    public function getNextParentForInheritance() {
         if ($this->getParent() instanceof AbstractObject) {
 
             $parent = $this->getParent();
@@ -484,19 +494,13 @@ class Concrete extends AbstractObject {
 
             if ($parent && ($parent->getType() == "object" || $parent->getType() == "variant")) {
                 if ($parent->getClassId() == $this->getClassId()) {
-                    $method = "get" . $key;
-                    if (method_exists($parent, $method)) {
-                        if (method_exists($parent, $method)) {
-                            return call_user_func(array($parent, $method), $params);
-                        }
-                    }
+                    return $parent;
                 }
             }
         }
+
         return;
     }
-
-
 
     /**
      * Dummy which can be overwritten by a parent class, this is a hook executed in every getter of the properties in the object
@@ -514,7 +518,7 @@ class Concrete extends AbstractObject {
      * @return array
      */
     public function getRelationData($fieldName,$forOwner,$remoteClassId){
-        $relationData = $this->getResource()->getRelationData($fieldName,$forOwner,$remoteClassId);
+        $relationData = $this->getDao()->getRelationData($fieldName,$forOwner,$remoteClassId);
         return $relationData;
     }
 
@@ -550,7 +554,7 @@ class Concrete extends AbstractObject {
             $arguments = array_pad($arguments, 3, 0);
             list($value, $limit, $offset) = $arguments;
 
-            $defaultCondition = $propertyName . " = " . \Pimcore\Resource::get()->quote($value) . " ";
+            $defaultCondition = $propertyName . " = " . \Pimcore\Db::get()->quote($value) . " ";
             $listConfig = array(
                 "condition" => $defaultCondition
             );
@@ -571,7 +575,7 @@ class Concrete extends AbstractObject {
 
             if(isset($listConfig['limit']) && $listConfig['limit'] == 1) {
                 $elements = $list->getObjects();
-                return $elements[0];
+                return isset($elements[0]) ? $elements[0] : null;
             }
 
             return $list;
@@ -620,5 +624,17 @@ class Concrete extends AbstractObject {
         if(property_exists($this, "localizedfields") && $this->localizedfields instanceof Localizedfield) {
             $this->localizedfields->setObject($this);
         }
+    }
+
+
+    /**
+     * load lazy loaded fields before cloning
+     * @return void
+     */
+    public function __clone()
+    {
+        parent::__clone();
+
+        Service::loadAllObjectFields($this);
     }
 }

@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Document
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Document\Tag;
@@ -540,6 +537,12 @@ class Video extends Model\Document\Tag
         // get vimeo id
         if(preg_match("@vimeo.*/([\d]+)@i", $this->id, $matches)) {
             $vimeoId = intval($matches[1]);
+        } else {
+            // for object-videos
+            $vimeoId = $this->id;
+        }
+
+        if (ctype_digit($vimeoId)){
 
             $width = "100%";
             if(array_key_exists("width", $options)) {
@@ -551,8 +554,41 @@ class Video extends Model\Document\Tag
                 $height = $options["height"];
             }
 
+                        $valid_vimeo_prams=array(
+                "autoplay",
+                "loop");
+
+            $additional_params="";
+
+            $clipConfig = array();
+            if(is_array($options["config"]["clip"])) {
+                $clipConfig = $options["config"]["clip"];
+            }
+
+            // this is to be backward compatible to <= v 1.4.7
+            $configurations = $clipConfig;
+            if(is_array($options["vimeo"])){
+                $configurations = array_merge($clipConfig, $options["vimeo"]);
+            }
+
+            if(!empty($configurations)){
+                foreach($configurations as $key=>$value){
+                    if(in_array($key, $valid_vimeo_prams)){
+                        if(is_bool($value)){
+                            if($value){
+                                $additional_params.="&".$key."=1";
+                            }else{
+                                $additional_params.="&".$key."=0";
+                            }
+                        }else{
+                            $additional_params.="&".$key."=".$value;
+                        }
+                    }
+                }
+            }
+
             $code .= '<div id="pimcore_video_' . $this->getName() . '" class="pimcore_tag_video">
-                <iframe src="//player.vimeo.com/video/' . $vimeoId . '?title=0&amp;byline=0&amp;portrait=0" width="' . $width . '" height="' . $height . '" frameborder="0" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
+                <iframe src="//player.vimeo.com/video/' . $vimeoId . '?title=0&amp;byline=0&amp;portrait=0'. $additional_params .'" width="' . $width . '" height="' . $height . '" frameborder="0" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
             </div>';
 
             return $code;
@@ -610,6 +646,12 @@ class Video extends Model\Document\Tag
 
             if(array_key_exists("attributes", $this->getOptions())) {
                 $attributes = array_merge($attributes, $this->getOptions()["attributes"]);
+            }
+
+            if(isset($this->getOptions()["removeAttributes"]) && is_array($this->getOptions()["removeAttributes"])) {
+                foreach($this->getOptions()["removeAttributes"] as $attribute) {
+                    unset($attributes[$attribute]);
+                }
             }
 
             foreach($attributes as $key => $value) {

@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Document
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Tool\Email;
@@ -213,7 +210,7 @@ class Log extends Model\AbstractModel
         }
 
         $emailLog = new Model\Tool\Email\Log();
-        $emailLog->getResource()->getById($id);
+        $emailLog->getDao()->getById($id);
         $emailLog->setEmailLogExistsHtml();
         $emailLog->setEmailLogExistsText();
         return $emailLog;
@@ -364,7 +361,7 @@ class Log extends Model\AbstractModel
     {
         @unlink(PIMCORE_LOG_MAIL_PERMANENT . '/email-' . $this->getId() . '-html.log');
         @unlink(PIMCORE_LOG_MAIL_PERMANENT . '/email-' . $this->getId() . '-text.log');
-        $this->getResource()->delete();
+        $this->getDao()->delete();
     }
 
 
@@ -397,7 +394,7 @@ class Log extends Model\AbstractModel
     {
         // set date
         if (!(int)$this->getId()) {
-            $this->getResource()->create();
+            $this->getDao()->create();
         }
         $this->update();
     }
@@ -407,7 +404,7 @@ class Log extends Model\AbstractModel
      */
     protected function update()
     {
-        $this->getResource()->update();
+        $this->getDao()->update();
         if (!is_dir(PIMCORE_LOG_MAIL_PERMANENT)) {
             File::mkdir(PIMCORE_LOG_MAIL_PERMANENT);
         }

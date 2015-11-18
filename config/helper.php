@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 
@@ -395,3 +392,48 @@ function isAssocArray(array $arr)
 {
     return array_keys($arr) !== range(0, count($arr) - 1);
 }
+
+/**
+ * this is an alternative for realpath() which isn't able to handle symlinks correctly
+ * @param $filename
+ * @return string
+ */
+function resolvePath($filename)
+{
+    $filename = str_replace('//', '/', $filename);
+    $parts = explode('/', $filename);
+    $out = array();
+    foreach ($parts as $part){
+        if ($part == '.') continue;
+        if ($part == '..') {
+            array_pop($out);
+            continue;
+        }
+        $out[] = $part;
+    }
+    return implode('/', $out);
+}
+
+/**
+ * @param Closure $closure
+ * @return string
+ */
+function closureHash (Closure $closure)
+{
+    $ref  = new ReflectionFunction($closure);
+    $file = new SplFileObject($ref->getFileName());
+    $file->seek($ref->getStartLine()-1);
+    $content = '';
+    while ($file->key() < $ref->getEndLine()) {
+        $content .= $file->current();
+        $file->next();
+    }
+
+    $hash = md5(json_encode(array(
+        $content,
+        $ref->getStaticVariables()
+    )));
+
+    return $hash;
+}
+

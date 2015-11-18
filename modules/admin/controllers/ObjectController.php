@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\Tool;
@@ -171,7 +168,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
         $tmpObject["allowChildren"] = true;
 
-        if (\Pimcore\Tool\Admin::isExtJS5()) {
+        if (\Pimcore\Tool\Admin::isExtJS6()) {
             $tmpObject["leaf"] = !$hasChildren;
         } else {
             $tmpObject["leaf"] = false;
@@ -223,6 +220,15 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         if ($child->getLocked()) {
             $tmpObject["cls"] .= "pimcore_treenode_lockOwner ";
         }
+
+        if (\Pimcore\Tool\Admin::isExtJS6()) {
+            if ($tmpObject["leaf"]) {
+                $tmpObject["expandable"] = false;
+                $tmpObject["expanded"] = true;
+                $tmpObject["leaf"] = false;
+            }
+        }
+
 
         return $tmpObject;
     }
@@ -298,10 +304,6 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
             $objectData["idPath"] = Element\Service::getIdPath($object);
             $objectData["previewUrl"] = $object->getClass()->getPreviewUrl();
-            $objectData["layout"] = $object->getClass()->getLayoutDefinitions();
-            $this->getDataForObject($object, $objectFromVersion);
-            $objectData["data"] = $this->objectData;
-            $objectData["metaData"] = $this->metaData;
 
             $objectData["general"] = array();
             $allowedKeys = array("o_published", "o_key", "o_id", "o_modificationDate", "o_creationDate", "o_classId", "o_className", "o_locked", "o_type", "o_parentId", "o_userOwner", "o_userModification");
@@ -313,6 +315,15 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             }
 
             $objectData["general"]["o_locked"] = $object->isLocked();
+
+            $this->getDataForObject($object, $objectFromVersion);
+            $objectData["data"] = $this->objectData;
+
+
+
+            $objectData["metaData"] = $this->metaData;
+
+            $objectData["layout"] = $object->getClass()->getLayoutDefinitions();
 
             $objectData["properties"] = Element\Service::minimizePropertiesForEditmode($object->getProperties());
             $objectData["userPermissions"] = $object->getUserPermissions();
@@ -335,10 +346,10 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             }
 
             $objectData["childdata"]["id"] = $object->getId();
-            $objectData["childdata"]["data"]["classes"] = $object->getResource()->getClasses();
+            $objectData["childdata"]["data"]["classes"] = $object->getDao()->getClasses();
 
-            $currentLayoutId = $this->getParam("layoutId");
-
+            $currentLayoutId = $this->getParam("layoutId", null);
+            
             $validLayouts = Object\Service::getValidLayouts($object);
 
             //master layout has id 0 so we check for is_null()
@@ -380,7 +391,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             }
 
             $objectData = $this->filterLocalizedFields($object, $objectData);
-            Object\Service::enrichLayoutDefinition($objectData["layout"]);
+            Object\Service::enrichLayoutDefinition($objectData["layout"], $object);
 
 
             //Hook for modifying return value - e.g. for changing permissions based on object data
@@ -429,7 +440,9 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             (!$objectFromVersion
                 && $fielddefinition instanceof Object\ClassDefinition\Data\Relations\AbstractRelations
                 && $fielddefinition->getLazyLoading()
-                && !$fielddefinition instanceof Object\ClassDefinition\Data\ObjectsMetadata)
+                && !$fielddefinition instanceof Object\ClassDefinition\Data\ObjectsMetadata
+                && !$fielddefinition instanceof Object\ClassDefinition\Data\MultihrefMetadata
+            )
             || $fielddefinition instanceof Object\ClassDefinition\Data\Nonownerobjects
         ) {
 
@@ -468,10 +481,17 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         } else {
             $fieldData = $object->$getter();
             $isInheritedValue = false;
-            $value = $fielddefinition->getDataForEditmode($fieldData, $object, $objectFromVersion);
+
+            if ($fielddefinition instanceof Object\ClassDefinition\Data\CalculatedValue) {
+                $fieldData = new Object\Data\CalculatedValue($fielddefinition->getName());
+                $fieldData->setContextualData("object", null, null, null);
+                $value = $fielddefinition->getDataForEditmode($fieldData, $object, $objectFromVersion);
+            } else {
+                $value = $fielddefinition->getDataForEditmode($fieldData, $object, $objectFromVersion);
+            }
 
             // following some exceptions for special data types (localizedfields, objectbricks)
-            if ($value && ($fieldData instanceof Object\Localizedfield)) {
+            if ($value && ($fieldData instanceof Object\Localizedfield || $fieldData instanceof Object\Classificationstore)) {
                 // make sure that the localized field participates in the inheritance detection process
                 $isInheritedValue = $value["inherited"];
             }
@@ -621,7 +641,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
             $objectData["properties"] = Element\Service::minimizePropertiesForEditmode($object->getProperties());
             $objectData["userPermissions"] = $object->getUserPermissions();
-            $objectData["classes"] = $object->getResource()->getClasses();
+            $objectData["classes"] = $object->getDao()->getClasses();
 
             // grid-config
             $configFile = PIMCORE_CONFIGURATION_DIRECTORY . "/object/grid/" . $object->getId() . "-user_" . $this->getUser()->getId() . ".psf";
@@ -1195,9 +1215,13 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
     public function previewVersionAction()
     {
+        Pimcore\Model\Object\AbstractObject::setDoNotRestoreKeyAndPath(true);
+
         $id = intval($this->getParam("id"));
         $version = Model\Version::getById($id);
         $object = $version->loadData();
+
+        Pimcore\Model\Object\AbstractObject::setDoNotRestoreKeyAndPath(false);
 
         if($object) {
             if ($object->isAllowed("versions")) {
@@ -1213,6 +1237,8 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
     public function diffVersionsAction()
     {
 
+        Pimcore\Model\Object\AbstractObject::setDoNotRestoreKeyAndPath(true);
+
         $id1 = intval($this->getParam("from"));
         $id2 = intval($this->getParam("to"));
 
@@ -1221,6 +1247,8 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
         $version2 = Model\Version::getById($id2);
         $object2 = $version2->loadData();
+
+        Pimcore\Model\Object\AbstractObject::setDoNotRestoreKeyAndPath(false);
 
         if($object1 && $object2) {
             if ($object1->isAllowed("versions") && $object2->isAllowed("versions")) {
@@ -1378,36 +1406,18 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                 $start = $this->getParam("start");
             }
 
-            $sortParam = $this->getParam("sort");
-            if (\Pimcore\Tool\Admin::isExtJS5()) {
-                if ($sortParam) {
-                    $sortParam = json_decode($sortParam, true);
-                    $sortParam = $sortParam[0];
-                    $orderKey = $sortParam["property"];
-                    $order = $sortParam["direction"];
 
-                    if (!(substr($orderKey, 0, 1) == "~")) {
-                        if (array_key_exists($orderKey, $colMappings)) {
-                            $orderKey = $colMappings[$orderKey];
-                        }
+            $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
+
+            if($sortingSettings['order']) {
+                $order = $sortingSettings['order'];
+            }
+            if (strlen($sortingSettings['orderKey']) > 0) {
+                $orderKey = $sortingSettings['orderKey'];
+                if (!(substr($orderKey, 0, 1) == "~")) {
+                    if (array_key_exists($orderKey, $colMappings)) {
+                        $orderKey = $colMappings[$orderKey];
                     }
-                }
-
-            } else {
-                if (strlen($sortParam) > 0) {
-                    if (!(substr($sortParam, 0, 1) == "~")) {
-                        if ($this->getParam("sort")) {
-                            if (array_key_exists($this->getParam("sort"), $colMappings)) {
-                                $orderKey = $colMappings[$this->getParam("sort")];
-                            } else {
-                                $orderKey = $this->getParam("sort");
-                            }
-                        }
-                    }
-                }
-
-                if ($this->getParam("dir")) {
-                    $order = $this->getParam("dir");
                 }
             }
 

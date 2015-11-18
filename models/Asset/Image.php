@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Asset
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Asset;
@@ -207,5 +204,79 @@ class Image extends Model\Asset {
     public function getHeight() {
         $dimensions = $this->getDimensions();
         return $dimensions["height"];
+    }
+
+    /**
+     * Checks if this file represents an animated image (png or gif)
+     *
+     * @return bool
+     */
+    public function isAnimated()
+    {
+        $isAnimated = false;
+
+        switch ($this->getMimetype()) {
+            case 'image/gif':
+                $isAnimated = $this->isAnimatedGif();
+                break;
+            case 'image/png':
+                $isAnimated = $this->isAnimatedPng();
+                break;
+            default:
+                break;
+        }
+
+        return $isAnimated;
+    }
+
+    /**
+     * Checks if this object represents an animated gif file
+     *
+     * @return bool
+     */
+    private function isAnimatedGif()
+    {
+        $isAnimated = false;
+
+        if ($this->getMimetype() == 'image/gif') {
+            $fileContent = $this->getData();
+
+            /**
+             * An animated gif contains multiple "frames", with each frame having a header made up of:
+             *  - a static 4-byte sequence (\x00\x21\xF9\x04)
+             *  - 4 variable bytes
+             *  - a static 2-byte sequence (\x00\x2C) (some variants may use \x00\x21 ?)
+             *
+             * @see http://it.php.net/manual/en/function.imagecreatefromgif.php#104473
+             */
+            $numberOfFrames = preg_match_all('#\x00\x21\xF9\x04.{4}\x00(\x2C|\x21)#s', $fileContent, $matches);
+
+            $isAnimated = $numberOfFrames > 1;
+        }
+
+        return $isAnimated;
+    }
+
+    /**
+     * Checks if this object represents an animated png file
+     *
+     * @return bool
+     */
+    private function isAnimatedPng()
+    {
+        $isAnimated = false;
+
+        if ($this->getMimetype() == 'image/png') {
+            $fileContent = $this->getData();
+
+            /**
+             * Valid APNGs have an "acTL" chunk somewhere before their first "IDAT" chunk.
+             * 
+             * @see http://foone.org/apng/
+             */
+            $isAnimated = strpos(substr($fileContent, 0, strpos($fileContent, 'IDAT')), 'acTL') !== false;
+        }
+
+        return $isAnimated;
     }
 }

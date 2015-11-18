@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object\ClassDefinition\Data;
@@ -100,10 +97,12 @@ class Fieldcollections extends Model\Object\ClassDefinition\Data
     {
 
         $editmodeData = array();
+        $idx = -1;
 
         if ($data instanceof Object\Fieldcollection) {
             foreach ($data as $item) {
-
+                $idx++;
+                
                 if (!$item instanceof Object\Fieldcollection\Data\AbstractData) {
                     continue;
                 }
@@ -117,7 +116,15 @@ class Fieldcollections extends Model\Object\ClassDefinition\Data
                 $collectionData = array();
 
                 foreach ($collectionDef->getFieldDefinitions() as $fd) {
-                    $collectionData[$fd->getName()] = $fd->getDataForEditmode($item->{$fd->getName()}, $object); 
+
+                    if ($fd instanceof CalculatedValue) {
+                        $data = new Object\Data\CalculatedValue($fd->getName());
+                        $data->setContextualData("fieldcollection", $this->getName(), $idx, null,  null, null, $fd);
+                        $data = $fd->getDataForEditmode($data, $object);
+                        $collectionData[$fd->getName()] = $data;
+                    } else {
+                        $collectionData[$fd->getName()] = $fd->getDataForEditmode($item->{$fd->getName()}, $object);
+                    }
                 }
 
                 $editmodeData[] = array(

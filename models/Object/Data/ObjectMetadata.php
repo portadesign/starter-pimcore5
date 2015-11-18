@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object\Data;
@@ -89,7 +86,7 @@ class ObjectMetadata extends Model\AbstractModel {
      * @param $position
      */
     public function save($object, $ownertype = "object", $ownername, $position) {
-        $this->getResource()->save($object, $ownertype, $ownername, $position);
+        $this->getDao()->save($object, $ownertype, $ownername, $position);
     }
 
     /**
@@ -102,7 +99,7 @@ class ObjectMetadata extends Model\AbstractModel {
      * @return mixed
      */
     public function load(Object\Concrete $source, $destination, $fieldname, $ownertype, $ownername, $position) {
-        return $this->getResource()->load($source, $destination, $fieldname, $ownertype, $ownername, $position);
+        return $this->getDao()->load($source, $destination, $fieldname, $ownertype, $ownername, $position);
     }
 
     /**
@@ -135,6 +132,21 @@ class ObjectMetadata extends Model\AbstractModel {
      */
     public function getObject() {
         return $this->object;
+    }
+
+    /**
+     * @param $object
+     * @return $this
+     */
+    public function setElement($element) {
+        return $this->setObject($element);
+    }
+
+    /**
+     * @return Object\Concrete
+     */
+    public function getElement() {
+        return $this->getObject();
     }
 
     /**

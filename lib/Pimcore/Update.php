@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code. 
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license 
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore;
@@ -167,10 +164,6 @@ class Update {
                 $jobs["procedural"][] = $updateScripts[$revision]["postupdate"];
             }
         }
-        
-        $jobs["procedural"][] = array(
-            "type" => "languages"
-        );
  
         $jobs["procedural"][] = array(
             "type" => "clearcache"
@@ -190,7 +183,7 @@ class Update {
      */
     public static function downloadData ($revision, $url) {
         
-        $db = Resource::get();
+        $db = Db::get();
         
         $db->query("CREATE TABLE IF NOT EXISTS `" . self::$tmpTable . "` (
           `id` int(11) NULL DEFAULT NULL,
@@ -250,7 +243,7 @@ class Update {
      */
     public static function installData ($revision) {
         
-        $db = Resource::get();
+        $db = Db::get();
         $files = $db->fetchAll("SELECT * FROM `" . self::$tmpTable . "` WHERE revision = ?", $revision);
         
         foreach ($files as $file) { 
@@ -331,91 +324,12 @@ class Update {
     public static function cleanup () {
         
         // remove database tmp table
-        $db = Resource::get();
+        $db = Db::get();
         $db->query("DROP TABLE IF EXISTS `" . self::$tmpTable . "`");
         
         //delete tmp data
         recursiveDelete(PIMCORE_SYSTEM_TEMP_DIRECTORY . "/update", true);
     }
-    
- 
- 
- 
- 
- 
- 
- 
- 
- 
-    /**
-     * download language files for all existing system languages for pimcore core and plugins
-     * @static
-     * @return bool
-     */
-    public static function downloadLanguages() {
-        return self::downloadLanguage();
-    }
-
-
-    /**
-     * Download language files for a specific language for pimcore core and all plugins or
-     * download language files for all existing system languages for pimcore core and plugins if parameter is null
-     * @static
-     * @param  $language
-     * @return bool
-     */
-    public static function downloadLanguage($lang = null) {
-
-        $languages = Tool\Admin::getLanguages();
-        if (!empty($lang)) {
-            $languages = array($lang);
-        } else {
-            //omit core language
-            $additonalLanguages = array();
-            foreach($languages as $lang){
-                if($lang != "en"){
-                    $additonalLanguages[]=$lang;
-                }
-            }
-            $languages=$additonalLanguages;
-        }
-
-        //directory for additional languages
-        $langDir = PIMCORE_CONFIGURATION_DIRECTORY . "/texts";
-        if (!is_dir($langDir)) {
-            File::mkdir($langDir);
-        }
-
-        $success = is_dir($langDir);
-        if ($success) {
-            if(is_array($languages)) {
-                foreach ($languages as $language) {
-                    //TODO: remove hard coded
-                    $src = "http://www.pimcore.org/?controller=translation&action=download&language=" . $language;
-                    $data = Tool::getHttpData($src);
-    
-                    if (!empty($language) and !empty($data)) {
-                        try {
-                            $languageFile = $langDir . "/" . $language . ".csv";
-                            $fh = fopen($languageFile, 'w');
-                            fwrite($fh, $data);
-                            fclose($fh);
-    
-                        } catch (\Exception $e) {
-                            \Logger::error("could not download language file");
-                            \Logger::error($e);
-                            $success = false;
-                        }
-                    }
-                }
-            }
-        } else {
-            \Logger::warning("Pimcore_Update: Could not create language dir [  $langDir ]");
-        }
-        return $success;
-
-    }
-
 
     public static function updateMaxmindDb () {
 

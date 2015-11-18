@@ -1,15 +1,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
  
  /* THIS FILE IS GENERATED DYNAMICALLY BECAUSE OF DYNAMIC CSS CLASSES IN THE ADMIN */
@@ -21,8 +18,8 @@
     <?php foreach ($this->customviews as $cv) { ?>
     
     <?php if ($cv["icon"]) { ?>
-    .pimcore_object_customviews_icon_<?php echo $cv["id"]; ?> {
-        background: url(<?php echo $cv["icon"]; ?>) left center no-repeat !important;
+    .pimcore_object_customviews_icon_<?= $cv["id"]; ?> {
+        background: url(<?= $cv["icon"]; ?>) left center no-repeat !important;
     }
     <?php } ?> 
     
@@ -40,27 +37,25 @@
         $iconFile = \Pimcore\Tool::getLanguageFlagFile($language);
         $iconFile = preg_replace("@^" . preg_quote(PIMCORE_DOCUMENT_ROOT, "@") . "@", "", $iconFile);
     ?>
+
+
     /* tab icon for localized fields [ <?= $language ?> ] */
     .pimcore_icon_language_<?= strtolower($language) ?> {
         background: url(<?= $iconFile ?>) left center no-repeat;
     }
 
-
-    <?php if (!\Pimcore\Tool\Admin::isExtJS5()) { ?>
-    /* grid column header icon in translations [ <?= $language ?> ] */
-    .x-grid3-hd-translation_column_<?= strtolower($language) ?> {
-        background: url(<?= $iconFile ?>) no-repeat 3px 3px ! important;
-        padding-left:22px !important;
-    }
+    <?php if (!\Pimcore\Tool\Admin::isExtJS6()) { ?>
+        /* grid column header icon in translations [ <?= $language ?> ] */
+        .x-grid3-hd-translation_column_<?= strtolower($language) ?> {
+            background: url(<?= $iconFile ?>) no-repeat 3px 3px !important;
+            padding-left:22px !important;
+        }
     <?php } else { ?>
         /* grid column header icon in translations [ <?= $language ?> ] */
         .x-column-header_<?= strtolower($language) ?> {
-        background: url(<?= $iconFile ?>) no-repeat 3px 3px ! important;
-        padding-left:22px !important;
+            background: url(<?= $iconFile ?>) no-repeat 3px center !important;
+            padding-left:22px !important;
         }
     <?php } ?>
-
-
-
 
 <?php } ?>

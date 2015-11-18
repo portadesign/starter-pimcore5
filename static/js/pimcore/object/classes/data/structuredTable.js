@@ -1,15 +1,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 pimcore.registerNS("pimcore.object.classes.data.structuredTable");
@@ -99,6 +96,7 @@ pimcore.object.classes.data.structuredTable = Class.create(pimcore.object.classe
         
         if(hasType) {
             fields.push('type');
+            fields.push('length');
             fields.push('width');
         }
         
@@ -180,7 +178,10 @@ pimcore.object.classes.data.structuredTable = Class.create(pimcore.object.classe
                 return types[value];
             }});
 
-            typesColumns.push({header: t("width"), width: 10, sortable: true, dataIndex: 'width',
+            typesColumns.push({header: t("length"), width: 15, sortable: true, dataIndex: 'length',
+                                        editor: new Ext.form.NumberField({})});
+
+            typesColumns.push({header: t("width"), width: 15, sortable: true, dataIndex: 'width',
                                         editor: new Ext.form.NumberField({})});
 
         }

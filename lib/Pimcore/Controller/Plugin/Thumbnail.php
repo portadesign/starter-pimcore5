@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Controller\Plugin;
@@ -52,9 +49,9 @@ class Thumbnail extends \Zend_Controller_Plugin_Abstract {
                         }
                     } else {
                         //get thumbnail for e.g. pdf page thumb__document_pdfPage-5
-                        if(preg_match("|document_(.*)\-(\d+)$|",$thumbnailName,$matches)){
-                            $thumbnailName = $matches[1];
-                            $page = (int)$matches[2];
+                        if(preg_match("|document_(.*)\-(\d+)$|",$thumbnailName,$matchesThumbs)){
+                            $thumbnailName = $matchesThumbs[1];
+                            $page = (int)$matchesThumbs[2];
                         }
                         // just check if the thumbnail exists -> throws exception otherwise
                         $thumbnailConfig = Asset\Image\Thumbnail\Config::getByName($thumbnailName);

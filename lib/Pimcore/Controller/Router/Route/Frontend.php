@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Controller\Router\Route;
@@ -83,6 +80,9 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract {
      * @return array|bool
      */
     public function match($path, $partial = false) {
+
+        // this allows the usage of UTF8 URLs and within static routes
+        $path = urldecode($path); 
 
         $front = \Zend_Controller_Front::getInstance();
         $matchFound = false;
@@ -170,7 +170,7 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract {
                 header("Location: " . $url, true, 301);
 
                 // log all redirects to the redirect log
-                \Pimcore\Log\Simple::log("redirect", Tool::getAnonymizedClientIp() . " \t Source: " . $_SERVER["REQUEST_URI"] . " -> " . $url);
+                \Pimcore\Log\Simple::log("redirect", Tool::getAnonymizedClientIp() . " \t Host-Redirect Source: " . $_SERVER["REQUEST_URI"] . " -> " . $url);
                 exit;
             }
         } catch (\Exception $e) {
@@ -559,7 +559,7 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract {
                         header("Location: " . $url, true, $redirect->getStatusCode());
 
                         // log all redirects to the redirect log
-                        \Pimcore\Log\Simple::log("redirect", Tool::getAnonymizedClientIp() . " \t Source: " . $_SERVER["REQUEST_URI"] . " -> " . $url);
+                        \Pimcore\Log\Simple::log("redirect", Tool::getAnonymizedClientIp() . " \t Custom-Redirect ID: " . $redirect->getId() . " , Source: " . $_SERVER["REQUEST_URI"] . " -> " . $url);
                         exit;
                     }
                 }

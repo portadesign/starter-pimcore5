@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Asset
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Asset\Image;
@@ -197,9 +194,10 @@ class Thumbnail {
     * Width and Height attribute can be overridden. SRC-attribute not.
     * Values of attributes are escaped.
     * @param array $attributes Listof key-value pairs of HTML attributes.
+    * @param array $removeAttributes Listof key-value pairs of HTML attributes that should be removed
     * @return string IMG-element with at least the attributes src, width, height, alt.
     */
-    public function getHTML($attributes = array()) {
+    public function getHTML($attributes = array(), $removeAttributes = []) {
 
         $image = $this->getAsset();
         $attr = array();
@@ -255,6 +253,12 @@ class Thumbnail {
         }
 
         foreach($attributes as $key => $value) {
+
+            // ignored attributes
+            if(in_array($key, ["disableWidthHeightAttributes"])) {
+                continue;
+            }
+
             //only include attributes with characters a-z and dashes in their name.
             if(preg_match("/^[a-z-]+$/i", $key)) {
                 $attr[$key] = $key . '="' . htmlspecialchars($value) . '"';
@@ -286,6 +290,11 @@ class Thumbnail {
                 $srcSetValues[] = $srcsetEntry;
             }
             $attr['srcset'] = 'srcset="'. implode(", ", $srcSetValues) .'"';
+        }
+
+        foreach($removeAttributes as $attribute) {
+            unset($attr[$attribute]);
+            unset($pictureAttribs[$attribute]);
         }
 
         // build html tag

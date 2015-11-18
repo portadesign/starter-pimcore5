@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Controller\Plugin;
@@ -27,7 +24,7 @@ class EuCookieLawNotice extends \Zend_Controller_Plugin_Abstract {
 
         $config = \Pimcore\Config::getSystemConfig();
 
-        if(!$config->general->show_cookie_notice || !Tool::isHtmlResponse($this->getResponse())) {
+        if(!$config->general->show_cookie_notice || !Tool::useFrontendOutputFilters($this->getRequest()) || !Tool::isHtmlResponse($this->getResponse())) {
             return;
         }
 
@@ -62,7 +59,7 @@ class EuCookieLawNotice extends \Zend_Controller_Plugin_Abstract {
                         var ci = window.setInterval(function () {
                             if(document.body) {
                                 clearInterval(ci);
-                                document.body.insertAdjacentHTML("afterbegin", code);
+                                document.body.insertAdjacentHTML("beforeend", code);
 
                                 document.getElementById("pc-button").onclick = function () {
                                     document.getElementById("pc-cookie-notice").style.display = "none";

@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Document
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Document;
@@ -301,8 +298,7 @@ class Link extends Model\Document
     {
         if ($this->object instanceof Document || $this->object instanceof Asset) {
             return $this->object;
-        }
-        else {
+        } else {
             if ($this->setObjectFromId()) {
                 return $this->object;
             }
@@ -320,16 +316,18 @@ class Link extends Model\Document
     }
 
     /**
-     * @return void
+     * @return Asset|Document
      */
     public function setObjectFromId()
     {
-        if ($this->internalType == "document") {
-            $this->object = Document::getById($this->internal);
+        if($this->internal) {
+            if ($this->internalType == "document") {
+                $this->object = Document::getById($this->internal);
+            } else if ($this->internalType == "asset") {
+                $this->object = Asset::getById($this->internal);
+            }
         }
-        else if ($this->internalType == "asset") {
-            $this->object = Asset::getById($this->internal);
-        }
+
         return $this->object;
     }
 
@@ -472,5 +470,24 @@ class Link extends Model\Document
         }
 
         return '<a href="' . $this->getLink() . '" ' . implode(" ", $attribs) . '>' . htmlspecialchars($this->getProperty("navigation_name")) . '</a>';
+    }
+
+    /**
+     *
+     */
+    public function __sleep() {
+
+        $finalVars = array();
+        $parentVars = parent::__sleep();
+
+        $blockedVars = ["object"];
+
+        foreach ($parentVars as $key) {
+            if (!in_array($key, $blockedVars)) {
+                $finalVars[] = $key;
+            }
+        }
+
+        return $finalVars;
     }
 }

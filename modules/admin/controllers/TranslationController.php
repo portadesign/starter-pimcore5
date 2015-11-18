@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code. dsf sdaf asdf asdf
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license dsf sdaf asdf asdf
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 use Pimcore\Tool;
@@ -222,7 +219,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
 
             if ($this->getParam("xaction") == "destroy") {
                 $data = \Zend_Json::decode($this->getParam("data"));
-                if (\Pimcore\Tool\Admin::isExtJS5()) {
+                if (\Pimcore\Tool\Admin::isExtJS6()) {
                     $t = $class::getByKey($data["key"]);
                 } else {
                     $t = $class::getByKey($data);
@@ -293,27 +290,12 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
             $list->setOrder("asc");
             $list->setOrderKey("key");
 
-            if (\Pimcore\Tool\Admin::isExtJS5()) {
-                $sortParam = $this->getParam("sort");
-                if ($sortParam) {
-                    $sortParam = json_decode($sortParam, true);
-                    $sortParam = $sortParam[0];
-                    $orderKey = $sortParam["property"];
-                    $order = $sortParam["direction"];
-
-                    $list->setOrderKey($orderKey);
-                    $list->setOrder($order);
-
-                }
-            } else {
-
-                if($this->getParam("dir")) {
-                    $list->setOrder($this->getParam("dir"));
-                }
-
-                if($this->getParam("sort")) {
-                    $list->setOrderKey($this->getParam("sort"));
-                }
+            $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
+            if($sortingSettings['orderKey']) {
+                $list->setOrderKey($sortingSettings['orderKey']);
+            }
+            if($sortingSettings['order']) {
+                $list->setOrder($sortingSettings['order']);
             }
 
             $list->setLimit($this->getParam("limit"));
@@ -339,11 +321,19 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
 
     protected function getGridFilterCondition() {
 
-        $db = \Pimcore\Resource::get();
+        $db = \Pimcore\Db::get();
         $conditionFilters = [];
 
         $filterJson = $this->getParam("filter");
         if ($filterJson) {
+            $isExtJs6 = \Pimcore\Tool\Admin::isExtJS6();
+            if ($isExtJs6) {
+                $propertyField = "property";
+                $operatorField = "operator";
+            } else {
+                $propertyField = "field";
+                $operatorField = "comparison";
+            }
 
             $filters = \Zend_Json::decode($filterJson);
             foreach ($filters as $filter) {
@@ -352,16 +342,20 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
                 $field = null;
                 $value = null;
 
-                if ($filter["type"] == "date") {
-                    if($filter["comparison"] == "lt") {
+                $fieldname = $filter[$propertyField];
+
+                if ($filter["type"] == "date" ||
+                    ($isExtJs6 && in_array($fieldname, array("modificationDate", "creationdate"))))
+                {
+                    if($filter[$operatorField] == "lt") {
                         $operator = "<";
-                    } else if($filter["comparison"] == "gt") {
+                    } else if($filter[$operatorField] == "gt") {
                         $operator = ">";
-                    } else if($filter["comparison"] == "eq") {
+                    } else if($filter[$operatorField] == "eq") {
                         $operator = "=";
                     }
                     $filter["value"] = strtotime($filter["value"]);
-                    $field = "`" . $filter["field"] . "` ";
+                    $field = "`" . $fieldname . "` ";
                     $value = $filter["value"];
                 }
 
@@ -873,7 +867,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
                 </head>
                 <body>
             ');*/
-            File::put($exportFile, '<style type="text/css">' . file_get_contents(PIMCORE_PATH . "/static/css/word-export.css") . '</style>');
+            File::put($exportFile, '<style type="text/css">' . file_get_contents(PIMCORE_PATH . "/static6/css/word-export.css") . '</style>');
         }
 
         foreach ($data as $el) {

@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Controller\Plugin;
@@ -70,45 +67,9 @@ class Less extends \Zend_Controller_Plugin_Abstract {
 
             include_once("simple_html_dom.php");
 
-            if($this->getRequest()->getParam("pimcore_editmode")) {
-                $this->editmode();
-            } else {
-                $this->frontend();
-            }
-        }
-    }
-
-    /**
-     *
-     */
-    protected function frontend () {
-
-        $body = $this->getResponse()->getBody();
-
-        $body = \Pimcore\Tool\Less::processHtml($body);
-
-        $this->getResponse()->setBody($body);
-    }
-
-    /**
-     *
-     */
-    protected function editmode () {
-        $body = $this->getResponse()->getBody();
-
-        $html = str_get_html($body);
-
-        if($html) {
-            $head = $html->find("head",0);
-            if($head) {
-                $head->innertext = $head->innertext . "\n" . '<script type="text/javascript">var less = {"env": "development"};</script><script type="text/javascript" src="/pimcore/static/js/lib/less.js"></script>'."\n";
-
-                $body = $html->save();
-                $this->getResponse()->setBody($body);
-            }
-
-            $html->clear();
-            unset($html);
+            $body = $this->getResponse()->getBody();
+            $body = \Pimcore\Tool\Less::processHtml($body);
+            $this->getResponse()->setBody($body);
         }
     }
 }

@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Document
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Document\Hardlink;
@@ -35,14 +32,14 @@ class Service {
                 $destDoc = self::upperCastDocument($sourceDoc);
                 $destDoc->setKey($doc->getKey());
                 $destDoc->setPath($doc->getRealPath());
-                $destDoc->initResource(get_class($sourceDoc));
+                $destDoc->initDao(get_class($sourceDoc));
                 $destDoc->setHardLinkSource($doc);
                 return $destDoc;
             }
         } else {
             $sourceClass = get_class($doc);
             $doc = self::upperCastDocument($doc);
-            $doc->initResource($sourceClass);
+            $doc->initDao($sourceClass);
             return $doc;
         }
 
@@ -134,7 +131,7 @@ class Service {
                     $_path = str_replace("\\", "/", $_path); // windows patch
                     $_path .= $_path != "/" ? "/" : "";
 
-                    $_path = preg_replace("@^" . preg_quote($hardlink->getSourceDocument()->getRealFullPath()) . "@", $hardlink->getRealFullPath(), $_path);
+                    $_path = preg_replace("@^" . preg_quote($hardlink->getSourceDocument()->getRealPath()) . "@", $hardlink->getRealPath(), $_path);
 
                     $hardLinkedDocument->setPath($_path);
                     return $hardLinkedDocument;

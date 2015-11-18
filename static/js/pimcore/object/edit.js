@@ -8,8 +8,8 @@
  * It is also available through the world-wide-web at this URL:
  * http://www.pimcore.org/license
  *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 pimcore.registerNS("pimcore.object.edit");
@@ -51,11 +51,13 @@ pimcore.object.edit = Class.create({
         return this.layout;
     },
 
-    getDataForField: function (name) {
+    getDataForField: function (fieldConfig) {
+        var name = fieldConfig.name;
         return this.object.data.data[name];
     },
 
-    getMetaDataForField: function (name) {
+    getMetaDataForField: function (fieldConfig) {
+        var name = fieldConfig.name;
         return this.object.data.metaData[name];
     },
 

@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Translation
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Translation;
@@ -178,7 +175,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
         }
 
         try {
-            $translation->getResource()->getByKey(self::getValidTranslationKey($id));
+            $translation->getDao()->getByKey(self::getValidTranslationKey($id));
         } catch (\Exception $e) {
             if (!$create) {
                 throw new \Exception($e->getMessage());
@@ -248,7 +245,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
             $this->setModificationDate(time());
         }
 
-        $this->getResource()->save();
+        $this->getDao()->save();
     }
 
     /**
@@ -370,7 +367,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
      */
     public function getForWebserviceExport(){
         $data = get_object_vars($this);
-        unset($data['resource']);
+        unset($data['dao']);
         return $data;
     }
 }

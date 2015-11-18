@@ -1,15 +1,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 pimcore.registerNS("pimcore.document.pages.settings");
@@ -389,9 +386,28 @@ pimcore.document.pages.settings = Class.create({
                                 }
                             },
                             {
+                                xtype:'combo',
                                 fieldLabel: t('module_optional'),
+                                displayField: 'name',
+                                valueField: 'name',
                                 name: 'module',
-                                value: this.page.data.module
+                                disableKeyFilter: true,
+                                store: new Ext.data.JsonStore({
+                                    autoDestroy: true,
+                                    url: "/admin/misc/get-available-modules",
+                                    root: "data",
+                                    fields: ["name"]
+                                }),
+                                triggerAction: "all",
+                                mode: "local",
+                                id: "pimcore_document_settings_module_" + this.page.id,
+                                value: this.page.data.module,
+                                width: 250,
+                                listeners: {
+                                    afterrender: function (el) {
+                                        el.getStore().load();
+                                    }
+                                }
                             },
                             {
                                 xtype:'combo',
@@ -412,9 +428,14 @@ pimcore.document.pages.settings = Class.create({
                                 value: this.page.data.controller,
                                 width: 250,
                                 listeners: {
-                                    afterrender: function (el) {
-                                        el.getStore().load();
-                                    }
+                                    "focus": function (el) {
+                                        el.getStore().reload({
+                                            params: {
+                                                moduleName: Ext.getCmp("pimcore_document_settings_module_"
+                                                    + this.page.id).getValue()
+                                            }
+                                        });
+                                    }.bind(this)
                                 }
                             },
                             {
@@ -439,7 +460,9 @@ pimcore.document.pages.settings = Class.create({
                                         el.getStore().reload({
                                             params: {
                                                 controllerName: Ext.getCmp("pimcore_document_settings_controller_"
-                                                                                    + this.page.id).getValue()
+                                                                                    + this.page.id).getValue(),
+                                                moduleName: Ext.getCmp("pimcore_document_settings_module_"
+                                                    + this.page.id).getValue()
                                             }
                                         });
                                     }.bind(this)

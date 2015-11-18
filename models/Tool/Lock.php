@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Tool
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Tool;
@@ -58,7 +55,7 @@ class Lock extends Model\AbstractModel {
     public static function acquire ($key, $expire = 120, $refreshInterval = 1) {
 
         $instance = self::getInstance();
-        $instance->getResource()->acquire($key, $expire, $refreshInterval);
+        $instance->getDao()->acquire($key, $expire, $refreshInterval);
 
         self::$acquiredLocks[$key] = $key;
     }
@@ -69,7 +66,7 @@ class Lock extends Model\AbstractModel {
     public static function release ($key) {
 
         $instance = self::getInstance();
-        $instance->getResource()->release($key);
+        $instance->getDao()->release($key);
 
         unset(self::$acquiredLocks[$key]);
     }
@@ -81,7 +78,7 @@ class Lock extends Model\AbstractModel {
     public static function lock ($key) {
 
         $instance = self::getInstance();
-        return $instance->getResource()->lock($key);
+        return $instance->getDao()->lock($key);
     }
 
     /**
@@ -91,7 +88,7 @@ class Lock extends Model\AbstractModel {
      */
     public static function isLocked ($key, $expire = 120) {
         $instance = self::getInstance();
-        return $instance->getResource()->isLocked($key, $expire);
+        return $instance->getDao()->isLocked($key, $expire);
     }
 
     /**

@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Tool
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Tool;
@@ -85,7 +82,7 @@ class TmpStore extends Model\AbstractModel {
             return true;
         }
 
-        return $instance->getResource()->add($id, $data, $tag, $lifetime);
+        return $instance->getDao()->add($id, $data, $tag, $lifetime);
     }
 
     /**
@@ -94,7 +91,7 @@ class TmpStore extends Model\AbstractModel {
      */
     public static function delete($id) {
         $instance = self::getInstance();
-        return $instance->getResource()->delete($id);
+        return $instance->getDao()->delete($id);
     }
 
     /**
@@ -118,7 +115,7 @@ class TmpStore extends Model\AbstractModel {
      */
     public static function cleanup() {
         $instance = self::getInstance();
-        $instance->getResource()->cleanup();
+        $instance->getDao()->cleanup();
     }
 
     /**
@@ -127,7 +124,7 @@ class TmpStore extends Model\AbstractModel {
      */
     public static function getIdsByTag($tag) {
         $instance = self::getInstance();
-        $items = $instance->getResource()->getIdsByTag($tag);
+        $items = $instance->getDao()->getIdsByTag($tag);
         return $items;
     }
 

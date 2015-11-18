@@ -2,17 +2,14 @@
 /**
  * Pimcore
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Model\Object\ClassDefinition;
@@ -204,11 +201,12 @@ abstract class Data
      * converts object data to a simple string value or CSV Export
      * @abstract
      * @param Object\AbstractObject $object
+     * @param array $params
      * @return string
      */
-    public function getForCsvExport($object)
+    public function getForCsvExport($object, $params = array())
     {
-        return $this->getDataFromObjectParam($object);
+        return $this->getDataFromObjectParam($object, $params);
     }
 
     /**
@@ -603,6 +601,9 @@ abstract class Data
      */
     public function getFilterCondition($value, $operator)
     {
+        $db = \Pimcore\Db::get();
+        $key = $db->quoteIdentifier($this->name);
+
         if ($value === "NULL") {
             if ($operator == '=') {
                 $operator = "IS";
@@ -611,14 +612,15 @@ abstract class Data
             }
         } else if (!is_array($value) && !is_object($value)) {
             if ($operator == "LIKE") {
-                $value = "'%" . $value . "%'";
+                $value = $db->quote("%" . $value . "%");
             } else {
-                $value = "'" . $value . "'";
+                $value = $db->quote($value);
             }
         }
 
         if (in_array($operator, Object\ClassDefinition\Data::$validFilterOperators)) {
-            return "`" . $this->name . "` " . $operator . " " . $value . " ";
+
+            return $key . " " . $operator . " " . $value . " ";
         } else return "";
     }
 
@@ -763,7 +765,6 @@ abstract class Data
     public function getGetterCodeFieldcollection($fieldcollectionDefinition)
     {
         $key = $this->getName();
-        $code = "";
 
         $code = "";
         $code .= '/**' . "\n";
@@ -832,7 +833,11 @@ abstract class Data
 
         // adds a hook preGetValue which can be defined in an extended class
         $code .= "\t" . '$preValue = $this->preGetValue("' . $key . '");' . " \n";
-        $code .= "\t" . 'if($preValue !== null && !\Pimcore::inAdmin()) { return $preValue;}' . "\n";
+        $code .= "\t" . 'if($preValue !== null && !\Pimcore::inAdmin()) { ' . "\n";
+        $code .= "\t\t" . 'return $preValue;' . "\n";
+        $code .= "\t" . '}' . "\n";
+
+        // we don't need to consider preGetData, because this is already managed directly by the localized fields within getLocalizedValue()
 
         $code .= "\t return " . '$data' . ";\n";
         $code .= "}\n\n";
@@ -1021,4 +1026,23 @@ abstract class Data
             }
         }
     }
+
+    /** Encode value for packing it into a single column.
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @return mixed
+     */
+    public function marshal($value, $object = null) {
+        return $value;
+    }
+
+    /** See marshal
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @return mixed
+     */
+    public function unmarshal($value, $object = null) {
+        return $value;
+    }
+
 }

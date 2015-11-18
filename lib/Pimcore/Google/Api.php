@@ -2,15 +2,12 @@
 /**
  * Pimcore
  *
- * LICENSE
+ * This source file is subject to the GNU General Public License version 3 (GPLv3)
+ * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
+ * files that are distributed with this source code.
  *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://www.pimcore.org/license
- *
- * @copyright  Copyright (c) 2009-2014 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     New BSD License
+ * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Google;
@@ -88,16 +85,22 @@ class Api {
     }
 
     /**
-     * @return \Google_Client
+     * @param null $scope
+     * @return bool|\Google_Client
      * @throws \Zend_Json_Exception
      */
-    public static function getServiceClient () {
+    public static function getServiceClient ($scope = null) {
 
         if(!self::isServiceConfigured()) {
             return false;
         }
 
         $config = self::getConfig();
+
+        if(!$scope) {
+            // default scope
+            $scope = ['https://www.googleapis.com/auth/analytics.readonly'];
+        }
 
         $clientConfig = new \Google_Config();
         $clientConfig->setClassConfig("Google_Cache_File", "directory", PIMCORE_CACHE_DIRECTORY);
@@ -108,14 +111,15 @@ class Api {
         $key = file_get_contents(self::getPrivateKeyPath());
         $client->setAssertionCredentials(new \Google_Auth_AssertionCredentials(
             $config->email,
-            array('https://www.googleapis.com/auth/analytics.readonly',"https://www.google.com/webmasters/tools/feeds/"),
+            $scope,
             $key)
         );
 
         $client->setClientId($config->client_id);
 
         // token cache
-        $tokenId =  "google-api.token";
+        $hash = crc32(serialize([$scope]));
+        $tokenId =  "google-api.token." . $hash;
         if($tokenData = TmpStore::get($tokenId)) {
             $tokenInfo = \Zend_Json::decode($tokenData->getData());
             if( ($tokenInfo["created"] + $tokenInfo["expires_in"]) > (time()-900) )  {
