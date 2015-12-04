@@ -414,7 +414,7 @@ class Asset extends Element\AbstractElement {
 
         $mappings = array(
             "image" => array("/image/", "/\.eps$/", "/\.ai$/", "/\.svgz$/", "/\.pcx$/", "/\.iff$/", "/\.pct$/", "/\.wmf$/"),
-            "text" => array("/text/"),
+            "text" => array("/text/","/xml/"),
             "audio" => array("/audio/"),
             "video" => array("/video/"),
             "document" => array("/msword/","/pdf/","/powerpoint/","/office/","/excel/","/opendocument/"),
@@ -461,6 +461,8 @@ class Asset extends Element\AbstractElement {
             \Pimcore::getEventManager()->trigger("asset.preAdd", $this);
         }
 
+        $this->correctPath();
+
         // we wrap the save actions in a loop here, so that we can restart the database transactions in the case it fails
         // if a transaction fails it gets restarted $maxRetries times, then the exception is thrown out
         // this is especially useful to avoid problems with deadlocks in multi-threaded environments (forked workers, ...)
@@ -470,12 +472,6 @@ class Asset extends Element\AbstractElement {
             $this->beginTransaction();
 
             try {
-                if (!Tool::isValidKey($this->getKey()) && $this->getId() != 1) {
-                    throw new \Exception("invalid filename '".$this->getKey()."' for asset with id [ " . $this->getId() . " ]");
-                }
-
-                $this->correctPath();
-
                 if (!$isUpdate) {
                     $this->getDao()->create();
                 }
@@ -559,6 +555,14 @@ class Asset extends Element\AbstractElement {
                 throw new \Exception("ParentID and ID is identical, an element can't be the parent of itself.");
             }
 
+            if ($this->getFilename()  === '..' || $this->getFilename() === '.') {
+                throw new \Exception('Cannot create asset called ".." or "."');
+            }
+
+            if (!Tool::isValidKey($this->getKey())) {
+                throw new \Exception("invalid filename '".$this->getKey()."' for asset with id [ " . $this->getId() . " ]");
+            }
+
             $parent = Asset::getById($this->getParentId());
             if($parent) {
                 // use the parent's path from the database here (getCurrentFullPath), to ensure the path really exists and does not rely on the path
@@ -569,12 +573,6 @@ class Asset extends Element\AbstractElement {
                 $this->setParentId(1);
                 $this->setPath("/");
             }
-
-            if (strlen($this->getFilename()) < 1) {
-                $this->setFilename("---no-valid-filename---" . $this->getId());
-                throw new \Exception("Asset requires filename, generated filename automatically");
-            }
-
         } else if($this->getId() == 1) {
             // some data in root node should always be the same
             $this->setParentId(0);
@@ -865,6 +863,24 @@ class Asset extends Element\AbstractElement {
     }
 
     /**
+     * Deletes file from filesystem
+     */
+    protected function deletePhysicalFile()
+    {
+        $fsPath = PIMCORE_ASSET_DIRECTORY . $this->getPath() . $this->getFilename();
+
+        if ($this->getType() != "folder") {
+            if (is_file($fsPath) && is_writable($fsPath)) {
+                unlink($fsPath);
+            }
+        } else {
+            if (is_dir($fsPath) && is_writable($fsPath)) {
+                recursiveDelete($fsPath, true);
+            }
+        }
+    }
+
+    /**
      * @throws \Exception
      */
     public function delete() {
@@ -885,17 +901,9 @@ class Asset extends Element\AbstractElement {
         }
 
         // remove file on filesystem
-        $fsPath = PIMCORE_ASSET_DIRECTORY . $this->getPath() . $this->getFilename();
-
-        if ($this->getType() != "folder") {
-            if (is_file($fsPath) && is_writable($fsPath)) {
-                unlink($fsPath);
-            }
-        }
-        else {
-            if (is_dir($fsPath) && is_writable($fsPath)) {
-                recursiveDelete($fsPath, true);
-            }
+        $fullPath = $this->getFullPath();
+        if ($fullPath != "/.." && !strpos($fullPath, '/../') && $this->getKey() !== "." && $this->getKey() !== "..") {
+            $this->deletePhysicalFile();
         }
 
         $versions = $this->getVersions();

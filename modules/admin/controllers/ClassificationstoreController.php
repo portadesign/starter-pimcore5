@@ -232,7 +232,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
                 foreach($filters as $f) {
                     if ($count > 0) {
-                        $condition .= " OR ";
+                        $condition .= " AND ";
                     }
                     $count++;
 
@@ -242,7 +242,6 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
                         $condition .= $db->getQuoteIdentifierSymbol() . $f->field . $db->getQuoteIdentifierSymbol() . " LIKE " . $db->quote("%" . $f->value . "%");
                     }
                 }
-
             }
 
             if ($allowedCollectionIds) {
@@ -359,7 +358,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
                 foreach($filters as $f) {
                     if ($count > 0) {
-                        $condition .= " OR ";
+                        $condition .= " AND ";
                     }
                     $count++;
 
@@ -491,7 +490,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
                 foreach($filters as $f) {
                     if ($count > 0) {
-                        $condition .= " OR ";
+                        $condition .= " AND ";
                     }
                     $count++;
                     $fieldname = $mapping[$f->field];
@@ -565,11 +564,10 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
                 $order = $this->_getParam("dir");
             }
 
-            if ($this->_getParam("sort")) {
-                $orderKey = $this->_getParam("sort");
-                $orderKey = $mapping[$orderKey];
-            } else {
-                $orderKey = "sorter";
+            $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
+            if($sortingSettings['orderKey'] && $sortingSettings['order']) {
+                $orderKey = $sortingSettings['orderKey'];
+                $order = $sortingSettings['order'];
             }
 
             if ($this->_getParam("overrideSort") == "true") {
@@ -603,7 +601,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
                 foreach($filters as $f) {
                     if ($count > 0) {
-                        $condition .= " OR ";
+                        $condition .= " AND ";
                     }
                     $count++;
                     $fieldname = $mapping[$f->field];
@@ -851,7 +849,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
                 foreach($filters as $f) {
                     if ($count > 0) {
-                        $condition .= " OR ";
+                        $condition .= " AND ";
                     }
                     $count++;
 
@@ -951,6 +949,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             );
             $config = new Classificationstore\KeyConfig();
             $config->setName($name);
+            $config->setTitle($name);
             $config->setType("input");
             $config->setEnabled(1);
             $config->setDefinition(json_encode($definition));

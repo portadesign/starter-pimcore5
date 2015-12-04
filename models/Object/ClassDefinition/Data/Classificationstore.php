@@ -805,7 +805,7 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
      */
     public function setLabelWidth($labelWidth)
     {
-        $this->labelWidth = $labelWidth;
+        $this->labelWidth = (int) $labelWidth;
     }
 
     /**
@@ -923,7 +923,7 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
             $relation = new Object\Classificationstore\KeyGroupRelation\Listing();
             $relation->setCondition("groupId = " . $relation->quote($group->getId()));
             $relation->setOrderKey(array("sorter", "id"));
-            $relation->setOrder(array("DESC", "ASC"));
+            $relation->setOrder(array("ASC", "ASC"));
             $relation = $relation->load();
             foreach ($relation as $key) {
                 $definition = \Pimcore\Model\Object\Classificationstore\Service::getFieldDefinitionFromKeyConfig($key);
