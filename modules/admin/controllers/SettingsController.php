@@ -10,7 +10,7 @@
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
-use Pimcore\Model\Cache; 
+use Pimcore\Cache;
 use Pimcore\Tool;
 use Pimcore\Config;
 use Pimcore\Model\Metadata;
@@ -364,7 +364,6 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin {
                 "fallbackLanguages" => $fallbackLanguages,
                 "defaultLanguage" => $values["general.defaultLanguage"],
                 "theme" => $values["general.theme"],
-                "contactemail" => $values["general.contactemail"],
                 "extjs6" => $values["general.extjs6"],
                 "loginscreencustomimage" => $values["general.loginscreencustomimage"],
                 "disableusagestatistics" => $values["general.disableusagestatistics"],

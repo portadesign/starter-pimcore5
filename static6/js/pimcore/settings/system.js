@@ -29,7 +29,12 @@ pimcore.settings.system = Class.create({
                     this.adminUsersStore = new Ext.data.JsonStore({
                         autoDestroy: true,
                         data: this.data,
-                        root: 'adminUsers',
+                        proxy: {
+                            type: 'memory',
+                            reader: {
+                                rootProperty: 'adminUsers'
+                            }
+                        },
                         fields: ['id', 'username']
                     });
                 } catch (e) {
@@ -180,12 +185,6 @@ pimcore.settings.system = Class.create({
                                 forceSelection: true,
                                 triggerAction: 'all',
                                 name: 'general.language'
-                            }, {
-                                fieldLabel: t("contact_email"),
-                                xtype: "textfield",
-                                name: "general.contactemail",
-                                value: this.getValue("general.contactemail"),
-                                width: 450
                             },
                             {
                                 fieldLabel: t("url_to_custom_image_on_login_screen"),
@@ -430,12 +429,12 @@ pimcore.settings.system = Class.create({
                                     ["error", "ERROR"]
                                 ],
                                 mode: "local",
-                                triggerAction: "all"
+                                triggerAction: "all",
+                                forceSelection: true
                             },
                             {
                                 fieldLabel: t('log_messages_user_mail_recipient'),
-                                //xtype: "combo",     // If typeAhead is enabled the combo must be editable: true -- please change one of those settings.
-                                editable: false,
+                                xtype: "combo",
                                 triggerAction: 'all',
                                 store: this.adminUsersStore,
                                 value: this.getValue("general.logrecipient"),
@@ -443,7 +442,6 @@ pimcore.settings.system = Class.create({
                                 displayField: 'username',
                                 valueField: 'id',
                                 name: 'general.logrecipient',
-                                typeAhead: true,
                                 mode: 'local',
                                 forceSelection: true
                             },

@@ -36,8 +36,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function deleteCollectionRelationAction() {
-        $colId = $this->_getParam("colId");
-        $groupId = $this->_getParam("groupId");
+        $colId = $this->getParam("colId");
+        $groupId = $this->getParam("groupId");
 
         $config = new Classificationstore\CollectionGroupRelation();
         $config->setColId($colId);
@@ -49,8 +49,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
 
     public function deleteRelationAction() {
-        $keyId = $this->_getParam("keyId");
-        $groupId = $this->_getParam("groupId");
+        $keyId = $this->getParam("keyId");
+        $groupId = $this->getParam("groupId");
 
         $config = new Classificationstore\KeyGroupRelation();
         $config->setKeyId($keyId);
@@ -62,7 +62,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
 
     public function deletegroupAction() {
-        $id = $this->_getParam("id");
+        $id = $this->getParam("id");
 
         $config = Classificationstore\GroupConfig::getById($id);
         $config->delete();
@@ -71,7 +71,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function createGroupAction() {
-        $name = $this->_getParam("name");
+        $name = $this->getParam("name");
         $alreadyExist = false;
         $config = Classificationstore\GroupConfig::getByName($name);
 
@@ -86,7 +86,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function createCollectionAction() {
-        $name = $this->_getParam("name");
+        $name = $this->getParam("name");
         $alreadyExist = false;
         $config = Classificationstore\CollectionConfig::getByName($name);
 
@@ -133,7 +133,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function getgroupAction() {
-        $id = $this->_getParam("id");
+        $id = $this->getParam("id");
         $config = Classificationstore\GroupConfig::getByName($id);
 
         $data = array(
@@ -147,8 +147,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function collectionsAction() {
-        if ($this->_getParam("data")) {
-            $dataParam = $this->_getParam("data");
+        if ($this->getParam("data")) {
+            $dataParam = $this->getParam("data");
             $data = \Zend_Json::decode($dataParam);
 
             $id = $data["id"];
@@ -171,15 +171,15 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $orderKey = "name";
             $order = "ASC";
 
-            if ($this->_getParam("dir")) {
-                $order = $this->_getParam("dir");
+            if ($this->getParam("dir")) {
+                $order = $this->getParam("dir");
             }
 
-            if ($this->_getParam("limit")) {
-                $limit = $this->_getParam("limit");
+            if ($this->getParam("limit")) {
+                $limit = $this->getParam("limit");
             }
-            if ($this->_getParam("start")) {
-                $start = $this->_getParam("start");
+            if ($this->getParam("start")) {
+                $start = $this->getParam("start");
             }
 
             $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
@@ -188,7 +188,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
                 $order = $sortingSettings['order'];
             }
 
-            if ($this->_getParam("overrideSort") == "true") {
+            if ($this->getParam("overrideSort") == "true") {
                 $orderKey = "id";
                 $order = "DESC";
             }
@@ -222,12 +222,17 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $list->setOrderKey($orderKey);
 
             $condition = "";
+            $db = Db::get();
 
-            if($this->_getParam("filter")) {
-                $filterString = $this->_getParam("filter");
+            $searchfilter = $this->getParam("searchfilter");
+            if ($searchfilter) {
+                $condition = "(name LIKE " . $db->quote("%" . $searchfilter . "%") . " OR description LIKE " . $db->quote("%". $searchfilter . "%") . ")";
+            }
+
+            if($this->getParam("filter")) {
+                $filterString = $this->getParam("filter");
                 $filters = json_decode($filterString);
 
-                $db = Db::get();
                 $count = 0;
 
                 foreach($filters as $f) {
@@ -290,8 +295,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
 
     public function groupsAction() {
-        if ($this->_getParam("data")) {
-            $dataParam = $this->_getParam("data");
+        if ($this->getParam("data")) {
+            $dataParam = $this->getParam("data");
             $data = \Zend_Json::decode($dataParam);
 
             $id = $data["id"];
@@ -314,19 +319,19 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $orderKey = "name";
             $order = "ASC";
 
-            if ($this->_getParam("dir")) {
-                $order = $this->_getParam("dir");
+            if ($this->getParam("dir")) {
+                $order = $this->getParam("dir");
             }
 
-            if ($this->_getParam("sort")) {
-                $orderKey = $this->_getParam("sort");
+            if ($this->getParam("sort")) {
+                $orderKey = $this->getParam("sort");
             }
 
-            if ($this->_getParam("limit")) {
-                $limit = $this->_getParam("limit");
+            if ($this->getParam("limit")) {
+                $limit = $this->getParam("limit");
             }
-            if ($this->_getParam("start")) {
-                $start = $this->_getParam("start");
+            if ($this->getParam("start")) {
+                $start = $this->getParam("start");
             }
 
             $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
@@ -335,7 +340,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
                 $order = $sortingSettings['order'];
             }
 
-            if ($this->_getParam("overrideSort") == "true") {
+            if ($this->getParam("overrideSort") == "true") {
                 $orderKey = "id";
                 $order = "DESC";
             }
@@ -348,12 +353,17 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $list->setOrderKey($orderKey);
 
             $condition = "";
+            $db = Db::get();
 
-            if($this->_getParam("filter")) {
-                $filterString = $this->_getParam("filter");
+            $searchfilter = $this->getParam("searchfilter");
+            if ($searchfilter) {
+                $condition = "(name LIKE " . $db->quote("%" . $searchfilter . "%") . " OR description LIKE " . $db->quote("%". $searchfilter . "%") . ")";
+            }
+
+            if($this->getParam("filter")) {
+                $filterString = $this->getParam("filter");
                 $filters = json_decode($filterString);
 
-                $db = Db::get();
                 $count = 0;
 
                 foreach($filters as $f) {
@@ -424,8 +434,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function collectionRelationsAction() {
-        if ($this->_getParam("data")) {
-            $dataParam = $this->_getParam("data");
+        if ($this->getParam("data")) {
+            $dataParam = $this->getParam("data");
             $data = \Zend_Json::decode($dataParam);
 
             $colId = $data["colId"];
@@ -449,8 +459,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $orderKey = "sorter";
             $order = "ASC";
 
-            if ($this->_getParam("dir")) {
-                $order = $this->_getParam("dir");
+            if ($this->getParam("dir")) {
+                $order = $this->getParam("dir");
             }
 
             $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
@@ -459,16 +469,16 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
                 $order = $sortingSettings['order'];
             }
 
-            if ($this->_getParam("overrideSort") == "true") {
+            if ($this->getParam("overrideSort") == "true") {
                 $orderKey = "id";
                 $order = "DESC";
             }
 
-            if ($this->_getParam("limit")) {
-                $limit = $this->_getParam("limit");
+            if ($this->getParam("limit")) {
+                $limit = $this->getParam("limit");
             }
-            if ($this->_getParam("start")) {
-                $start = $this->_getParam("start");
+            if ($this->getParam("start")) {
+                $start = $this->getParam("start");
             }
 
             $list = new Classificationstore\CollectionGroupRelation\Listing();
@@ -480,10 +490,10 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $list->setOrder($order);
             $list->setOrderKey($orderKey);
 
-            if($this->_getParam("filter")) {
+            if($this->getParam("filter")) {
                 $db = Db::get();
                 $condition = "";
-                $filterString = $this->_getParam("filter");
+                $filterString = $this->getParam("filter");
                 $filters = json_decode($filterString);
 
                 $count = 0;
@@ -535,8 +545,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
 
     public function relationsAction() {
-        if ($this->_getParam("data")) {
-            $dataParam = $this->_getParam("data");
+        if ($this->getParam("data")) {
+            $dataParam = $this->getParam("data");
             $data = \Zend_Json::decode($dataParam);
 
             $keyId = $data["keyId"];
@@ -560,8 +570,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $orderKey = "name";
             $order = "ASC";
 
-            if ($this->_getParam("dir")) {
-                $order = $this->_getParam("dir");
+            if ($this->getParam("dir")) {
+                $order = $this->getParam("dir");
             }
 
             $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
@@ -570,16 +580,16 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
                 $order = $sortingSettings['order'];
             }
 
-            if ($this->_getParam("overrideSort") == "true") {
+            if ($this->getParam("overrideSort") == "true") {
                 $orderKey = "id";
                 $order = "DESC";
             }
 
-            if ($this->_getParam("limit")) {
-                $limit = $this->_getParam("limit");
+            if ($this->getParam("limit")) {
+                $limit = $this->getParam("limit");
             }
-            if ($this->_getParam("start")) {
-                $start = $this->_getParam("start");
+            if ($this->getParam("start")) {
+                $start = $this->getParam("start");
             }
 
             $list = new Classificationstore\KeyGroupRelation\Listing();
@@ -591,10 +601,10 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $list->setOrder($order);
             $list->setOrderKey($orderKey);
 
-            if($this->_getParam("filter")) {
+            if($this->getParam("filter")) {
                 $db = Db::get();
                 $condition = "";
-                $filterString = $this->_getParam("filter");
+                $filterString = $this->getParam("filter");
                 $filters = json_decode($filterString);
 
                 $count = 0;
@@ -643,7 +653,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function addCollectionsAction() {
-        $ids = \Zend_Json::decode($this->_getParam("collectionIds"));
+        $ids = \Zend_Json::decode($this->getParam("collectionIds"));
 
         if ($ids) {
 
@@ -723,7 +733,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
 
 
     public function addGroupsAction() {
-        $ids = \Zend_Json::decode($this->_getParam("groupIds"));
+        $ids = \Zend_Json::decode($this->getParam("groupIds"));
 
         $keyCondition = "groupId in (" . implode(",", $ids) . ")";
 
@@ -781,8 +791,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function propertiesAction() {
-        if ($this->_getParam("data")) {
-            $dataParam = $this->_getParam("data");
+        if ($this->getParam("data")) {
+            $dataParam = $this->getParam("data");
             $data = \Zend_Json::decode($dataParam);
 
             $id = $data["id"];
@@ -808,8 +818,8 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $orderKey = "name";
             $order = "ASC";
 
-            if ($this->_getParam("dir")) {
-                $order = $this->_getParam("dir");
+            if ($this->getParam("dir")) {
+                $order = $this->getParam("dir");
             }
 
             $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
@@ -818,16 +828,16 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
                 $order = $sortingSettings['order'];
             }
 
-            if ($this->_getParam("overrideSort") == "true") {
+            if ($this->getParam("overrideSort") == "true") {
                 $orderKey = "id";
                 $order = "DESC";
             }
 
-            if ($this->_getParam("limit")) {
-                $limit = $this->_getParam("limit");
+            if ($this->getParam("limit")) {
+                $limit = $this->getParam("limit");
             }
-            if ($this->_getParam("start")) {
-                $start = $this->_getParam("start");
+            if ($this->getParam("start")) {
+                $start = $this->getParam("start");
             }
 
             $list = new Classificationstore\KeyConfig\Listing();
@@ -839,10 +849,16 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $list->setOrder($order);
             $list->setOrderKey($orderKey);
 
-            if($this->_getParam("filter")) {
-                $db = Db::get();
-                $condition = "";
-                $filterString = $this->_getParam("filter");
+            $condition = "";
+            $db = \Pimcore\Db::get();
+
+            $searchfilter = $this->getParam("searchfilter");
+            if ($searchfilter) {
+                $condition = "(name LIKE " . $db->quote("%" . $searchfilter . "%") . " OR description LIKE " . $db->quote("%". $searchfilter . "%") . ")";
+            }
+
+            if($this->getParam("filter")) {
+                $filterString = $this->getParam("filter");
                 $filters = json_decode($filterString);
 
                 $count = 0;
@@ -859,19 +875,18 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
                         $condition .= $db->getQuoteIdentifierSymbol() . $f->field . $db->getQuoteIdentifierSymbol() . " LIKE " . $db->quote("%" . $f->value . "%");
                     }
                 }
-
-
-                $list->setCondition($condition);
             }
 
-            if ($this->_getParam("groupIds") || $this->_getParam("keyIds")) {
+            $list->setCondition($condition);
+
+            if ($this->getParam("groupIds") || $this->getParam("keyIds")) {
                 $db = Db::get();
 
-                if ($this->_getParam("groupIds")) {
-                    $ids = \Zend_Json::decode($this->_getParam("groupIds"));
+                if ($this->getParam("groupIds")) {
+                    $ids = \Zend_Json::decode($this->getParam("groupIds"));
                     $col = "group";
                 } else {
-                    $ids = \Zend_Json::decode($this->_getParam("keyIds"));
+                    $ids = \Zend_Json::decode($this->getParam("keyIds"));
                     $col = "id";
                 }
 
@@ -937,7 +952,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function addPropertyAction() {
-        $name = $this->_getParam("name");
+        $name = $this->getParam("name");
         $alreadyExist = false;
 
         if(!$alreadyExist) {
@@ -960,7 +975,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     }
 
     public function deletePropertyAction() {
-        $id = $this->_getParam("id");
+        $id = $this->getParam("id");
 
         $config = Classificationstore\KeyConfig::getById($id);
 //        $config->delete();
