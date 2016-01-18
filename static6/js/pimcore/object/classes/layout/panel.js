@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -33,6 +33,14 @@ pimcore.object.classes.layout.panel = Class.create(pimcore.object.classes.layout
     getLayout: function ($super) {
         $super();
 
+        var layouts = Ext.create('Ext.data.Store', {
+            fields: ['abbr', 'name'],
+            data : [
+                {"abbr":"", "name":"Default"},
+                {"abbr":"fit", "name":"Fit"}
+            ]
+        });
+
         this.layout.add({
             xtype: "form",
             bodyStyle: "padding: 10px;",
@@ -43,11 +51,13 @@ pimcore.object.classes.layout.panel = Class.create(pimcore.object.classes.layout
                     fieldLabel: t("layout"),
                     name: "layout",
                     value: this.datax.layout,
-                    store: ["","fit"],
+                    store: layouts,
                     triggerAction: 'all',
-                    editable: false
+                    editable: false,
+                    displayField: 'name',
+                    valueField: 'abbr',
                 },{
-                    xtype: "spinnerfield",
+                    xtype: "numberfield",
                     name: "labelWidth",
                     fieldLabel: t("label_width"),
                     value: this.datax.labelWidth

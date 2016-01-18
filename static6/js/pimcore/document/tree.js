@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -108,7 +108,7 @@ pimcore.document.tree = Class.create({
             iconCls: this.config.treeIconCls,
             autoScroll:true,
             autoLoad: false,
-            animate:true,
+            animate: false,
             containerScroll: true,
             rootVisible: this.config.rootVisible,
             bufferedRenderer: false,
@@ -692,7 +692,7 @@ pimcore.document.tree = Class.create({
             }));
         }
 
-        menu.showAt(e.pageX, e.pageY);
+        menu.showAt(e.pageX+1, e.pageY+1);
     },
 
     copy: function (tree, record) {
@@ -775,7 +775,7 @@ pimcore.document.tree = Class.create({
                     closable:false,
                     plain: true,
                     modal: true,
-                    items: [this.pasteProgressBar]
+                    items: [record.pasteProgressBar]
                 });
 
                 record.pasteWindow.show();
@@ -793,7 +793,7 @@ pimcore.document.tree = Class.create({
                         }
                     }.bind(this),
                     update: function (currentStep, steps, percent) {
-                        if(this.pasteProgressBar) {
+                        if(record.pasteProgressBar) {
                             var status = currentStep / steps;
                             record.pasteProgressBar.updateProgress(status, percent + "%");
                         }
@@ -973,10 +973,10 @@ pimcore.document.tree = Class.create({
                 bodyStyle: "padding: 10px;",
                 items: [{
                     xtype: "textfield",
+                    width: "100%",
                     fieldLabel: t('key'),
                     itemId: "key",
                     name: 'key',
-                    width: 300,
                     enableKeyEvents: true,
                     listeners: {
                         afterrender: function () {
@@ -993,13 +993,13 @@ pimcore.document.tree = Class.create({
                     itemId: "name",
                     fieldLabel: t('navigation'),
                     name: 'name',
-                    width: 300
+                    width: "100%"
                 },{
                     xtype: "textfield",
                     itemId: "title",
                     fieldLabel: t('title'),
                     name: 'title',
-                    width: 300
+                    width: "100%"
                 }]
             });
 
@@ -1019,6 +1019,7 @@ pimcore.document.tree = Class.create({
             var messageBox = new Ext.Window({
                 modal: true,
                 width: 400,
+                title: t(textKeyTitle),
                 items: pageForm,
                 buttons: [{
                     text: t('OK'),

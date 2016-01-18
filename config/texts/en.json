@@ -3724,10 +3724,6 @@
         "definition": "CHMOD Files"
     },
     {
-        "term": "hostname_for_webdav",
-        "definition": "Hostname for WebDAV"
-    },
-    {
         "term": "api_key",
         "definition": "API Key"
     },
@@ -5161,7 +5157,7 @@
     },
     {
         "term": "webservice",
-        "definition": "Web Service API (Beta Feature)"
+        "definition": "Web Service API"
     },
     {
         "term": "webservice_enabled",
@@ -5281,7 +5277,7 @@
     },
     {
         "term": "csv_object_export_warning",
-        "definition": "Please note that the CSV export does not support all data types. Consequently, re-importing an export CSV to pimcore might lead to data loss. Press OK to continue with export."
+        "definition": "Please note that the CSV export does not support all data types. Consequently, re-importing an exported CSV to pimcore might lead to data loss. Press OK to continue with the export."
     },
     {
         "term": "Initializing",
@@ -6232,6 +6228,10 @@
         "definition": "Logentry"
     },
     {
+        "term": "log_pid",
+        "definition": "PID"
+    },
+    {
         "term": "log_filelink",
         "definition": "Filelink"
     },
@@ -6590,5 +6590,115 @@
     {
         "term": "click_to_edit",
         "definition": "Click to edit"
+    },
+    {
+        "term": "preview_width",
+        "definition": "Preview Width"
+    },
+    {
+        "term": "preview_height",
+        "definition": "Preview Height"
+    },
+    {
+        "term": "url_width",
+        "definition": "URL Width"
+    },
+    {
+        "term": "externalImage",
+        "definition": "External Image"
+    },
+    {
+        "term": "loading_texts",
+        "definition": "Loading Texts"
+    },
+    {
+        "term": "element_tag_configuration",
+        "definition": "Tag Configuration"
+    },
+    {
+        "term": "element_tag_all_tags",
+        "definition": "All Tags"
+    },
+    {
+        "term": "rename_tag",
+        "definition": "Rename Tag"
+    },
+    {
+        "term": "enter_new_name_of_the_tag",
+        "definition": "Enter new name of the Tag"
+    },
+    {
+        "term": "assigned_tags",
+        "definition": "Assigned Tags"
+    },
+    {
+        "term": "element_tag_tree",
+        "definition": "Tag Tree"
+    },
+    {
+        "term": "filter_tags",
+        "definition": "Filter for Tags"
+    },
+    {
+        "term": "consider_child_tags",
+        "definition": "Consider child tags too"
+    },
+    {
+        "term": "tags_assignment",
+        "definition": "Tags Assignment"
+    },
+    {
+        "term": "tags_configuration",
+        "definition": "Tags Configuration"
+    },
+    {
+        "term": "tags_search",
+        "definition": "Tags Search"
+    },
+    {
+        "term": "apply_tags",
+        "definition": "apply Tags to Children"
+    },
+    {
+        "term": "remove_and_apply_tags",
+        "definition": "remove and apply Tags to Children"
+    },
+    {
+        "term": "batch_assignment",
+        "definition": "Tag batch assignment"
+    },
+    {
+        "term": "batch_assignment_error",
+        "definition": "Tag batch assignment error"
+    },
+    {
+        "term": "no_children_found",
+        "definition": "No Children found."
+    },
+    {
+        "term": "apply_all",
+        "definition": "Apply all"
+    },
+    {
+        "term": "revert_all",
+        "definition": "Revert all"
+    },
+    {
+        "term": "batch_applied",
+        "definition": "Batch applied"
+    },
+    {
+        "term": "asset_search",
+        "definition": "Search Assets"
+    },
+    {
+        "term": "document_search",
+        "definition": "Search Documents"
+    },
+    {
+        "term": "object_search",
+        "definition": "Search Objects"
     }
+
+
 ]

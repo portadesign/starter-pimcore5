@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -175,17 +175,12 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
         $tmpObject["cls"] = "";
 
-        if ($child->getType() == "folder") {
-            $tmpObject["qtipCfg"] = array(
-                "title" => "ID: " . $child->getId()
-            );
-        } else {
+        $tmpObject["qtipCfg"] = $child->getElementAdminStyle()->getElementQtipConfig();
+
+        if ($child->getType() != "folder") {
             $tmpObject["published"] = $child->isPublished();
             $tmpObject["className"] = $child->getClass()->getName();
-            $tmpObject["qtipCfg"] = array(
-                "title" => "ID: " . $child->getId(),
-                "text" => 'Type: ' . $child->getClass()->getName()
-            );
+
 
             if (!$child->isPublished()) {
                 $tmpObject["cls"] .= "pimcore_unpublished ";
@@ -226,6 +221,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                 $tmpObject["expandable"] = false;
                 $tmpObject["expanded"] = true;
                 $tmpObject["leaf"] = false;
+                $tmpObject["loaded"] = true;
             }
         }
 
@@ -1076,12 +1072,14 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             $object->setOmitMandatoryCheck(true);
         }
 
-
         if (($this->getParam("task") == "publish" && $object->isAllowed("publish")) or ($this->getParam("task") == "unpublish" && $object->isAllowed("unpublish"))) {
 
             try {
                 $object->save();
-                $this->_helper->json(array("success" => true));
+                $treeData = array();
+                $treeData["qtipCfg"] = $object->getElementAdminStyle()->getElementQtipConfig();
+
+                $this->_helper->json(array("success" => true, "treeData" => $treeData));
             } catch (\Exception $e) {
                 \Logger::log($e);
                 $this->_helper->json(array("success" => false, "message" => $e->getMessage()));
@@ -1101,6 +1099,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             if ($object->isAllowed("save")) {
                 try {
                     $object->saveVersion();
+
                     $this->_helper->json(array("success" => true));
                 } catch (\Exception $e) {
                     \Logger::log($e);
@@ -1204,7 +1203,9 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             $object->setUserModification($this->getUser()->getId());
             try {
                 $object->save();
-                $this->_helper->json(array("success" => true));
+                $treeData = array();
+                $treeData["qtipCfg"] = $object->getElementAdminStyle()->getElementQtipConfig();
+                $this->_helper->json(array("success" => true, "treeData" => $treeData));
             } catch (\Exception $e) {
                 $this->_helper->json(array("success" => false, "message" => $e->getMessage()));
             }

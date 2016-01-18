@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -240,6 +240,11 @@ abstract class AbstractModel {
      * @throws \Exception
      */
     public function __call($method, $args) {
+
+        // protected / private methods shouldn't be delegated to the dao -> this can have dangerous effects
+        if(!is_callable([$this, $method])) {
+            throw new \Exception("Unable to call private/protected method '" . $method . "' on object " . get_class($this));
+        }
 
         // check if the method is defined in ´dao
         if (method_exists($this->getDao(), $method)) {

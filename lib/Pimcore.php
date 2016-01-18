@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -235,20 +235,6 @@ class Pimcore {
             }
         }
 
-        // check if webdav is configured and add router
-        if ($conf instanceof \Zend_Config) {
-            if ($conf->assets->webdav->hostname) {
-                $routeWebdav = new \Zend_Controller_Router_Route_Hostname(
-                    $conf->assets->webdav->hostname,
-                    array(
-                        "module" => "admin",
-                        'controller' => 'asset',
-                        'action' => 'webdav'
-                    )
-                );
-                $router->addRoute('webdav', $routeWebdav);
-            }
-        }
 
         $front->setRouter($router);
 
@@ -630,14 +616,10 @@ class Pimcore {
 
         $autoloader->registerNamespace('Logger');
         $autoloader->registerNamespace('Pimcore');
-        $autoloader->registerNamespace('Sabre');
         $autoloader->registerNamespace('Net_');
         $autoloader->registerNamespace('Website');
         $autoloader->registerNamespace('Csv');
         $autoloader->registerNamespace('Search');
-        $autoloader->registerNamespace('Whoops');
-        $autoloader->registerNamespace('Google');
-        $autoloader->registerNamespace('Symfony');
 
         // these are necessary to be backward compatible
         // so if e.g. plugins use the namespace Object but do not include them in their own autoloader definition (plugin.xml)

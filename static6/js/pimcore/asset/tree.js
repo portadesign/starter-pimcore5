@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -91,7 +91,7 @@ pimcore.asset.tree = Class.create({
             title: this.config.treeTitle,
             iconCls: this.config.treeIconCls,
             autoScroll:true,
-            animate:true,
+            animate:false,
             containerScroll: true,
             ddAppendOnly: true,
             rootVisible: this.config.rootVisible,
@@ -628,7 +628,7 @@ pimcore.asset.tree = Class.create({
             }));
         }
 
-        menu.showAt(e.pageX, e.pageY);
+        menu.showAt(e.pageX+1, e.pageY+1);
     },
 
 
@@ -723,14 +723,14 @@ pimcore.asset.tree = Class.create({
                         }
                     }.bind(this),
                     update: function (currentStep, steps, percent) {
-                        if(this.pasteProgressBar) {
+                        if(record.pasteProgressBar) {
                             var status = currentStep / steps;
-                            this.pasteProgressBar.updateProgress(status, percent + "%");
+                            record.pasteProgressBar.updateProgress(status, percent + "%");
                         }
                     }.bind(this),
                     failure: function (message) {
                         this.pasteWindow.close();
-                        this.pasteProgressBar = null;
+                        record.pasteProgressBar = null;
 
                         pimcore.helpers.showNotification(t("error"), t("error_pasting_asset"), "error", t(message));
                         this.refresh(record.parentNode);
@@ -945,11 +945,9 @@ pimcore.asset.tree = Class.create({
 
         this.treePanel = new Ext.tree.TreePanel({
             region: "west",
-            id: "pimcore_asset_server_explorer",
             width: 300,
             rootVisible: true,
             enableDD: false,
-            useArrows: true,
             autoScroll: true,
             store: store,
             root: {
@@ -970,7 +968,7 @@ pimcore.asset.tree = Class.create({
         this.uploadWindow = new Ext.Window({
             layout: 'fit',
             title: t('add_assets'),
-            closeAction: 'close',
+            closeAction: 'destroy',
             width:400,
             height:400,
             modal: true,

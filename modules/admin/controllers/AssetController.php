@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code. dsf sdaf asdf asdf
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -682,10 +682,15 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
             $publicDir = new Asset\WebDAV\Folder($homeDir);
             $objectTree = new Asset\WebDAV\Tree($publicDir);
             $server = new \Sabre\DAV\Server($objectTree);
+            $server->setBaseUri("/admin/asset/webdav/");
 
+            // lock plugin
             $lockBackend = new \Sabre\DAV\Locks\Backend\File(PIMCORE_WEBDAV_TEMP . '/locks.dat');
             $lockPlugin = new \Sabre\DAV\Locks\Plugin($lockBackend);
             $server->addPlugin($lockPlugin);
+
+            // sync plugin
+            $server->addPlugin(new \Sabre\DAV\Sync\Plugin());
 
             $server->exec();
         } catch (\Exception $e) {

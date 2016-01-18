@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -176,7 +176,7 @@ pimcore.settings.system = Class.create({
                                 fieldLabel: t('language_admin'),
                                 typeAhead: true,
                                 value: this.getValue("general.language"),
-                                mode: 'local',
+                                queryMode: 'local',
                                 listWidth: 100,
                                 //editable: true,     // If typeAhead is enabled the combo must be editable: true -- please change one of those settings.
                                 store: pimcore.globalmanager.get("pimcorelanguages"),
@@ -265,7 +265,7 @@ pimcore.settings.system = Class.create({
                                     id: "system_settings_general_languageSelection",
                                     triggerAction: 'all',
                                     //resizable: true,
-                                    mode: 'local',
+                                    queryMode: 'local',
                                     store: this.languagesStore,
                                     displayField: 'display',
                                     valueField: 'language',
@@ -334,7 +334,6 @@ pimcore.settings.system = Class.create({
                                 triggerAction: "all",
                                 listeners: {
                                     "select": function (el) {
-                                        console.log(el);
                                         if (el.getValue() == "production") {
                                             var ipField = Ext.getCmp("system_settings_general_debug_ip");
                                             if (empty(ipField.getValue())) {
@@ -355,7 +354,6 @@ pimcore.settings.system = Class.create({
                                 checked: this.getValue("general.debug"),
                                 listeners: {
                                     change: function (el, checked) {
-                                        console.log("check");
                                         // set the current client ip to the debug ip field
                                         var ipField = Ext.getCmp("system_settings_general_debug_ip");
                                         if (checked && empty(ipField.getValue())) {
@@ -1011,11 +1009,6 @@ pimcore.settings.system = Class.create({
                         defaultType: 'textfield',
                         defaults: {width: 600},
                         items: [
-                            {
-                                fieldLabel: t('hostname_for_webdav'),
-                                name: 'assets.webdav.hostname',
-                                value: this.getValue("assets.webdav.hostname"),
-                            },
                             {
                                 fieldLabel: t('store_version_history_in_days'),
                                 name: 'assets.versions.days',

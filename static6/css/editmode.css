@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -342,6 +342,20 @@
 
 .pimcore_tag_select, .pimcore_tag_checkbox {
     display: inline-block;
+}
+
+/* support for placeholders as in EXTJS3,4 */
+.pimcore_tag_input[contenteditable=true]:empty:before,
+.pimcore_tag_textarea[contenteditable=true]:empty:before,
+.pimcore_wysiwyg.empty[contenteditable=true]:before {
+    cursor: text; /* For chrome */
+    content: attr(data-placeholder);
+    display: block; /* For firefox */
+    color:#BABABA;
+}
+
+.pimcore_wysiwyg.empty[contenteditable=true]:before {
+    height: 0; /* For firefox and Edge */
 }
 
 /* text fields: hover, focus, ... states */

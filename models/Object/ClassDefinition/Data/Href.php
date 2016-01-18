@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -21,6 +21,8 @@ use Pimcore\Model\Document;
 use Pimcore\Model\Element;
 
 class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations {
+
+    use Model\Object\ClassDefinition\Data\Extension\Relation;
 
     /**
      * Static type of this element
@@ -611,5 +613,14 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
     public function synchronizeWithMasterDefinition(Object\ClassDefinition\Data $masterDefinition) {
         $this->assetUploadPath = $masterDefinition->assetUploadPath;
         $this->relationType = $masterDefinition->relationType;
+    }
+
+
+    /**
+     * @return string
+     */
+    public function getPhpdocType()
+    {
+        return implode(' | ', $this->getPhpDocClassString( false ));
     }
 }

@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -376,9 +376,10 @@ pimcore.report.newsletter.item = Class.create({
                         var start = new Date(res["data"]["start"] * 1000);
 
                         this.statusPanel.getComponent("progress").setValue(res["data"]["current"] + " / " + res["data"]["total"]);
-                        this.statusPanel.getComponent("start").setValue(start.format("Y-m-d H:i:s"));
-                        this.statusPanel.getComponent("lastUpdate").setValue(lastUpdate.format("Y-m-d H:i:s"));
+                        this.statusPanel.getComponent("start").setValue(Ext.Date.format(start, "Y-m-d H:i:s"));
+                        this.statusPanel.getComponent("lastUpdate").setValue(Ext.Date.format(lastUpdate, "Y-m-d H:i:s"));
                     } catch (e) {
+                        console.log(e);
                         clearInterval(this.updateStatusInterval);
                     }
                 } else {

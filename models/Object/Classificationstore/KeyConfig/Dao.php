@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Object
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -34,7 +34,11 @@ class Dao extends Model\Dao\AbstractDao {
 
         $data = $this->db->fetchRow("SELECT * FROM " . self::TABLE_NAME_KEYS . " WHERE id = ?", $this->model->getId());
 
-        $this->assignVariablesToModel($data);
+        if ($data) {
+            $this->assignVariablesToModel($data);
+        } else {
+            throw new \Exception("KeyConfig with id: " . $this->model->getId() . " does not exist");
+        }
     }
 
     /**

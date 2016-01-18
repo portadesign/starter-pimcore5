@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -230,7 +230,7 @@ Ext.onReady(function () {
     });
     Ext.Ajax.on("beforerequest", function () {
         if (xhrActive < 1) {
-            Ext.get("pimcore_logo").dom.innerHTML = '<img class="activity" src="/pimcore/static6/img/loading.gif"/>';
+            Ext.get("pimcore_logo").dom.innerHTML = '<div class="spinner"><div class="bounce1"></div><div class="bounce2"></div><div class="bounce3"></div></div>';
         }
         xhrActive++;
     });
@@ -519,10 +519,10 @@ Ext.onReady(function () {
                                 region: 'west',
                                 id:'pimcore_panel_tree_left',
                                 split:true,
-                                width:250,
-                                height: 300,
+                                width:300,
                                 minSize:175,
                                 collapsible:true,
+                                collapseMode: 'header',
                                 animCollapse:false,
                                 layout:'accordion',
                                 layoutConfig:{
@@ -558,9 +558,10 @@ Ext.onReady(function () {
                             id:'pimcore_panel_tree_right',
                             cls: "pimcore_panel_tree",
                             split:true,
-                            width:250,
+                            width:300,
                             minSize:175,
                             collapsible:true,
+                            collapseMode: 'header',
                             collapsed:false,
                             animCollapse:false,
                             layout:'accordion',

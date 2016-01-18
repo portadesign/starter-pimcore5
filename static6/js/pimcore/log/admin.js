@@ -5,14 +5,14 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 pimcore.registerNS("pimcore.log.admin");
 pimcore.log.admin = Class.create({
 
-    searchParams: {start: 0, limit: 25},
+    searchParams: {},
 
 	initialize: function () {
 		this.getTabPanel();
@@ -46,7 +46,7 @@ pimcore.log.admin = Class.create({
             this.store = pimcore.helpers.grid.buildDefaultStore(
                 '/admin/log/show?',
                 [
-                    'id', 'message', 'priority', 'timestamp', 'fileobject', 'filename', 'component', 'relatedobject', 'source'
+                    'id', 'pid', 'message', 'priority', 'timestamp', 'fileobject', 'filename', 'component', 'relatedobject', 'source'
                 ],
                 itemsPerPage
             );
@@ -69,8 +69,13 @@ pimcore.log.admin = Class.create({
                         dataIndex: 'timestamp',
                         width: 150,
                         align: 'left',
-                        /*hidden: true,*/
                         sortable: true
+                    },{
+                        header: t("log_pid"),
+                        dataIndex: 'pid',
+                        flex: 40,
+                        sortable: true,
+                        hidden: true
                     },{
                         id: 'p_message',
                         header: t("log_message"),
@@ -264,7 +269,6 @@ pimcore.log.admin = Class.create({
 
             this.panel.add(this.layout);
             this.store.load();
-            //this.store.load({params:this.searchParams});
             pimcore.layout.refresh();
 		}
 		return this.panel;
@@ -304,8 +308,6 @@ pimcore.log.admin = Class.create({
         //this.store.baseParams = this.searchParams;
 
         this.pagingToolbar.moveFirst();
-
-        //this.store.reload();
     }
 
 

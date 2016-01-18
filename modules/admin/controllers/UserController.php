@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -71,6 +71,9 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin {
         else {
             $tmpUser["leaf"] = true;
             $tmpUser["iconCls"] = "pimcore_icon_user";
+            if (!$user->getActive()) {
+                $tmpUser["cls"] = " pimcore_unpublished";
+            }
             $tmpUser["allowChildren"] = false;
             $tmpUser["admin"] = $user->isAdmin();
 
@@ -467,6 +470,8 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin {
 
         // unset confidential informations
         $userData = object2array($user);
+        $contentLanguages = Tool\Admin::reorderWebsiteLanguages($user, Tool::getValidLanguages());
+        $userData["contentLanguages"] = $contentLanguages;
         unset($userData["password"]);
 
         echo "pimcore.currentuser = " . \Zend_Json::encode($userData);

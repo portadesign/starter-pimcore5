@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -53,6 +53,7 @@ class ApplicationLoggerDb extends AbstractProcessingHandler {
         $db = Database::get();
 
         $data = [
+            'pid' => getmypid(),
             'priority' => strtolower($record["level_name"]),
             'message' => $record["message"],
             'timestamp' => $record["datetime"]->format("Y-m-d H:i:s"),

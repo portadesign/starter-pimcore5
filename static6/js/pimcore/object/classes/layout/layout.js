@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -89,13 +89,13 @@ pimcore.object.classes.layout.layout = Class.create({
                             value: this.datax.title
                         },
                         {
-                            xtype: "spinnerfield",
+                            xtype: "numberfield",
                             fieldLabel: t("width"),
                             name: "width",
                             value: this.datax.width
                         },
                         {
-                            xtype: "spinnerfield",
+                            xtype: "numberfield",
                             fieldLabel: t("height"),
                             name: "height",
                             value: this.datax.height

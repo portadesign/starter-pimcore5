@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -54,7 +54,7 @@ pimcore.object.classes.data.data = Class.create({
     },
 
     getGroup: function () {
-        return "other";   
+        return "other";
     },
 
     getType: function () {
@@ -69,7 +69,10 @@ pimcore.object.classes.data.data = Class.create({
             title: t("specific_settings") + " (" + niceName + ")",
             bodyStyle: "padding: 10px;",
             style: "margin: 10px 0 10px 0",
-            items: []
+            items: [],
+            defaults: {
+                labelWidth: 140
+            }
         });
 
 
@@ -308,7 +311,5 @@ pimcore.object.classes.data.data = Class.create({
     applySpecialData: function(source) {
 
     }
-
-
 
 });

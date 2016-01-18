@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -35,7 +35,7 @@ pimcore.object.tags.geopoint = Class.create(pimcore.object.tags.geo.abstract, {
                     var mapUrl = 'https://maps.google.com/staticmap?center=' + value.latitude + ','
                             + value.longitude + '&zoom=' + mapZoom + '&size=' + width + 'x80&markers='
                             + value.latitude + ',' + value.longitude
-                            + ',red&sensor=false';
+                            + ',red';
 
                     if (pimcore.settings.google_maps_api_key) {
                         mapUrl += '&key=' + pimcore.settings.google_maps_api_key;
@@ -143,12 +143,12 @@ pimcore.object.tags.geopoint = Class.create(pimcore.object.tags.geo.abstract, {
                 + lat + "," + lng + "&zoom=" + mapZoom +
                 '&size=' + px + 'x' + py
                 + '&markers=color:red|' + lat + ',' + lng
-                + '&sensor=false&maptype=' + this.fieldConfig.mapType;
+                + '&maptype=' + this.fieldConfig.mapType;
         } else {
             mapUrl = 'https://maps.googleapis.com/maps/api/staticmap?center='
                 + lat + "," + lng + "&zoom=" + mapZoom +
                 '&size=' + px + 'x' + py
-                + '&sensor=false&maptype=' + this.fieldConfig.mapType;
+                + '&maptype=' + this.fieldConfig.mapType;
         }
 
         if (pimcore.settings.google_maps_api_key) {

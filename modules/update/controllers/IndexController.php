@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -18,20 +18,7 @@ class Update_IndexController extends \Pimcore\Controller\Action\Admin {
     public function init() {
         parent::init();
 
-        // clear the opcache (as of PHP 5.5)
-        if(function_exists("opcache_reset")) {
-            opcache_reset();
-        }
-
-        // clear the APC opcode cache (<= PHP 5.4)
-        if(function_exists("apc_clear_cache")) {
-            apc_clear_cache();
-        }
-
-        // clear the Zend Optimizer cache (Zend Server <= PHP 5.4)
-        if (function_exists('accelerator_reset')) {
-            return accelerator_reset();
-        }
+        Update::clearOPCaches();
 
         $this->checkPermission("update");
     }

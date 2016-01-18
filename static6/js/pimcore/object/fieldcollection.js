@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -71,9 +71,8 @@ pimcore.object.fieldcollection = Class.create({
                 id: "pimcore_panel_fieldcollections_tree",
                 store: this.store,
                 region: "west",
-                useArrows:true,
                 autoScroll:true,
-                animate:true,
+                animate:false,
                 containerScroll: true,
                 width: 200,
                 split: true,

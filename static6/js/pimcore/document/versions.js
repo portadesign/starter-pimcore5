@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -57,16 +57,8 @@ pimcore.document.versions = Class.create({
                     reader: {
                         type: 'json',
                         rootProperty: 'versions'
-
-                        //totalProperty:'total',            // default
-                        //successProperty:'success'         // default
                     }
-                    //,                                     // default
-                    //writer: {
-                    //    type: 'json'
-                    //}
                 }
-
             });
 
             this.store.on("update", this.dataUpdate.bind(this));
@@ -94,7 +86,7 @@ pimcore.document.versions = Class.create({
                 columns: [
                     checkShow,
                     {header: "ID", sortable: true, dataIndex: 'id', editable: false, width: 40},
-                    {header: t("date"), width:130, sortable: true, dataIndex: 'date', renderer: function(d) {
+                    {header: t("date"), width:150, sortable: true, dataIndex: 'date', renderer: function(d) {
                         var date = new Date(d * 1000);
                         return Ext.Date.format(date, "Y-m-d H:i:s");
                     }, editable: false},
@@ -113,9 +105,10 @@ pimcore.document.versions = Class.create({
                 columnLines: true,
                 trackMouseOver: true,
                 stripeRows: true,
-                width:600,
+                width:620,
                 title: t('available_versions'),
                 region: "west",
+                split: true,
                 viewConfig: {
                     getRowClass: function(record, rowIndex, rp, ds) {
                         if (record.data.date == this.document.data.modificationDate) {
@@ -136,7 +129,7 @@ pimcore.document.versions = Class.create({
             var preview = new Ext.Panel({
                 title: t("preview"),
                 region: "center",
-                bodyStyle: "-webkit-overflow-scrolling:touch;",
+                bodyCls: "pimcore_overflow_scrolling",
                 html: '<iframe src="about:blank" frameborder="0" id="document_version_iframe_'
                     + this.document.id + '"></iframe>'
             });
@@ -284,7 +277,7 @@ pimcore.document.versions = Class.create({
 
         if (operation == "edit") {
             Ext.Ajax.request({
-                url: "/admin/document/version-update",
+                url: "/admin/element/version-update",
                 params: {
                     data: Ext.encode(record.data)
                 }

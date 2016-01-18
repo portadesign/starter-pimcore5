@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -51,15 +51,15 @@ pimcore.report.panel = Class.create({
             this.tree = Ext.create('Ext.tree.Panel', {
                 region: "west",
                 title: t("select_a_report"),
-                width: 200,
+                width: 250,
                 enableDD: false,
+                split: true,
                 autoScroll: true,
                 collapsible: true,
                 rootVisible: false,
                 root: {
                     id: 0
                 },
-                bodyStyle: "padding: 5px;",
                 listeners: {
                     //"click": function () {
                     //    this.expand();

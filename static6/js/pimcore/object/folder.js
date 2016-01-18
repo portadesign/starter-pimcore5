@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -35,6 +35,7 @@ pimcore.object.folder = Class.create(pimcore.object.abstract, {
         }
 
         this.dependencies = new pimcore.element.dependencies(this, "object");
+        this.tagAssignment = new pimcore.element.tag.assignment(this, "object");
     },
 
 
@@ -208,7 +209,8 @@ pimcore.object.folder = Class.create(pimcore.object.abstract, {
                 region: "north",
                 border: false,
                 cls: "main-toolbar",
-                items: buttons
+                items: buttons,
+                overflowHandler: 'menu'
             });
         }
 
@@ -230,6 +232,11 @@ pimcore.object.folder = Class.create(pimcore.object.abstract, {
 
         if (this.isAllowed("settings")) {
             items.push(this.notes.getLayout());
+        }
+
+        var user = pimcore.globalmanager.get("user");
+        if (user.isAllowed("tags_assignment")) {
+            items.push(this.tagAssignment.getLayout());
         }
 
         this.tabbar = new Ext.TabPanel({

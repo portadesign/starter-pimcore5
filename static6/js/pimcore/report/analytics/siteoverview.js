@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -89,7 +89,7 @@ pimcore.report.analytics.overview = Class.create(pimcore.report.abstract, {
                 listeners: {
                     "resize": this.framePanelResize.bind(this)
                 },
-                bodyStyle: "-webkit-overflow-scrolling:touch;",
+                bodyCls: "pimcore_overflow_scrolling",
                 html: '<iframe src="about:blank" frameborder="0" id="' + this.iframeId + '" width="100%"></iframe>',
                 region: "center"
             });
@@ -126,19 +126,19 @@ pimcore.report.analytics.overview = Class.create(pimcore.report.abstract, {
                         fieldLabel: t('from'),
                         name: 'datefrom',
                         value: fromDate,
-                        itemCls: "pimcore_analytics_filter_form_item"
+                        cls: "pimcore_analytics_filter_form_item"
                     },
                     {
                         xtype: "datefield",
                         fieldLabel: t('to'),
                         name: 'dateto',
                         value: today,
-                        itemCls: "pimcore_analytics_filter_form_item"
+                        cls: "pimcore_analytics_filter_form_item"
                     },
                     {
                         xtype: "button",
                         text: "apply",
-                        itemCls: "pimcore_analytics_filter_form_item",
+                        cls: "pimcore_analytics_filter_form_item",
                         handler: this.setFrameUrl.bind(this)
                     }
                 ]

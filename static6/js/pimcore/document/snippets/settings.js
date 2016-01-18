@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -125,7 +125,7 @@ pimcore.document.snippets.settings = Class.create({
                                     fields: ["name"]
                                 }),
                                 triggerAction: "all",
-                                mode: "local",
+                                queryMode: "local",
                                 value: this.snippet.data.action,
                                 listeners: {
                                     "focus": function (el) {
@@ -133,6 +133,9 @@ pimcore.document.snippets.settings = Class.create({
                                             params: {
                                                 controllerName: Ext.getCmp("pimcore_document_settings_controller_"
                                                                         + this.snippet.id).getValue()
+                                            },
+                                            callback: function() {
+                                                el.expand();
                                             }
                                         });
                                     }.bind(this)

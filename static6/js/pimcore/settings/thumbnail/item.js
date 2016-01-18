@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -1170,7 +1170,7 @@ pimcore.settings.thumbnail.items = {
             bodyStyle: "padding: 10px;",
             tbar: this.getTopBar(niceName, myId, panel),
             items: [{
-                xtype: 'spinnerfield',
+                xtype: 'numberfield',
                 name: 'radius',
                 fieldLabel: t('radius'),
                 width: 210,
@@ -1180,7 +1180,7 @@ pimcore.settings.thumbnail.items = {
                 incrementValue: 0.1,
                 value: data.radius || 0
             },{
-                xtype: 'spinnerfield',
+                xtype: 'numberfield',
                 name: 'sigma',
                 width: 210,
                 fieldLabel: t('sigma'),
@@ -1218,7 +1218,7 @@ pimcore.settings.thumbnail.items = {
             bodyStyle: "padding: 10px;",
             tbar: this.getTopBar(niceName, myId, panel),
             items: [{
-                xtype: 'spinnerfield',
+                xtype: 'numberfield',
                 name: 'brightness',
                 fieldLabel: t('brightness'),
                 width: 210,
@@ -1226,7 +1226,7 @@ pimcore.settings.thumbnail.items = {
                 incrementValue: 1,
                 value: data.brightness || 100
             },{
-                xtype: 'spinnerfield',
+                xtype: 'numberfield',
                 name: 'saturation',
                 fieldLabel: t('saturation'),
                 width: 210,
@@ -1234,7 +1234,7 @@ pimcore.settings.thumbnail.items = {
                 incrementValue: 1,
                 value: data.saturation || 100
             },{
-                xtype: 'spinnerfield',
+                xtype: 'numberfield',
                 name: 'hue',
                 fieldLabel: t('hue'),
                 width: 210,

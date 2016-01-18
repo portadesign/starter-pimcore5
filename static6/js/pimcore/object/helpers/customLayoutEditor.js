@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -274,7 +274,6 @@ pimcore.object.helpers.customLayoutEditor = Class.create({
             this.selectionPanel = Ext.create('Ext.tree.Panel', {
                 rootVisible: true,
                 region:'center',
-                useArrows: true,
                 title: t('custom_layout'),
                 layout:'fit',
                 width: 428,
@@ -513,7 +512,6 @@ pimcore.object.helpers.customLayoutEditor = Class.create({
             title: t('class_definitions'),
             region: "west",
             autoScroll: true,
-            useArrows: true,
             split: true,
             disabled: true,
             root: {

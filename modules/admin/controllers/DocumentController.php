@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -534,19 +534,6 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
         die($document->getPath() . $document->getKey());
     }
 
-    public function versionUpdateAction()
-    {
-
-        $data = \Zend_Json::decode($this->getParam("data"));
-
-        $version = Version::getById($data["id"]);
-        $version->setPublic($data["public"]);
-        $version->setNote($data["note"]);
-        $version->save();
-
-        $this->_helper->json(array("success" => true));
-    }
-
     public function versionToSessionAction()
     {
 
@@ -644,7 +631,8 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
                     "type" => "child",
                     "enableInheritance" => $this->getParam("enableInheritance"),
                     "transactionId" => $transactionId,
-                    "saveParentId" => true
+                    "saveParentId" => true,
+                    "resetIndex" => true
                 )
             ));
 
@@ -698,7 +686,8 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
                     "targetId" => $this->getParam("targetId"),
                     "type" => $this->getParam("type"),
                     "enableInheritance" => $this->getParam("enableInheritance"),
-                    "transactionId" => $transactionId
+                    "transactionId" => $transactionId,
+                    "resetIndex" => ($this->getParam("type") == "child")
                 )
             ));
         }
@@ -778,7 +767,9 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
                 if ($source != null) {
                     if ($this->getParam("type") == "child") {
                         $enableInheritance = ($this->getParam("enableInheritance") == "true") ? true : false;
-                        $newDocument = $this->_documentService->copyAsChild($target, $source, $enableInheritance);
+                        $resetIndex = ($this->getParam("resetIndex") == "true") ? true : false;
+
+                        $newDocument = $this->_documentService->copyAsChild($target, $source, $enableInheritance, $resetIndex);
                         $session->{$this->getParam("transactionId")}["idMapping"][(int)$source->getId()] = (int)$newDocument->getId();
 
                         // this is because the key can get the prefix "_copy" if the target does already exists
@@ -888,6 +879,7 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
         $tmpDocument["iconCls"] = "pimcore_icon_" . $childDocument->getType();
         if (\Pimcore\Tool\Admin::isExtJS6()) {
             $tmpDocument["expandable"] = $childDocument->hasChilds();
+            $tmpDocument["loaded"] = !$childDocument->hasChilds();
         }
 
         // set type specific settings

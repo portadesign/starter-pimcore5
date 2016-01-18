@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -200,7 +200,7 @@ pimcore.element.notes = Class.create({
             });
 
             this.layout = new Ext.Panel({
-                title: t('notes') + " & " + t("events"),
+                title: t('notes_events'),
                 border: true,
                 iconCls: "pimcore_icon_tab_notes",
                 items: [this.grid, this.detailView],

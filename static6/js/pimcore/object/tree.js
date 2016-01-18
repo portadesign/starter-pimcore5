@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -99,7 +99,7 @@ pimcore.object.tree = Class.create({
             id: this.config.treeId,
             title: this.config.treeTitle,
             autoScroll: true,
-            animate: true,
+            animate: false,
             rootVisible: true,
             bufferedRenderer: false,
             border: false,
@@ -711,7 +711,7 @@ pimcore.object.tree = Class.create({
         }));
 
 
-        menu.showAt(e.pageX, e.pageY);
+        menu.showAt(e.pageX+1, e.pageY+1);
     },
 
     reloadNode: function(tree, record) {
@@ -832,7 +832,7 @@ pimcore.object.tree = Class.create({
 
             if (res.pastejobs) {
 
-                this.pasteProgressBar = new Ext.ProgressBar({
+                record.pasteProgressBar = new Ext.ProgressBar({
                     text: t('initializing')
                 });
 
@@ -844,7 +844,7 @@ pimcore.object.tree = Class.create({
                     closable: false,
                     plain: true,
                     modal: true,
-                    items: [this.pasteProgressBar]
+                    items: [record.pasteProgressBar]
                 });
 
                 record.pasteWindow.show();
@@ -862,9 +862,9 @@ pimcore.object.tree = Class.create({
                         }
                     }.bind(this),
                     update: function (currentStep, steps, percent) {
-                        if (this.pasteProgressBar) {
+                        if (record.pasteProgressBar) {
                             var status = currentStep / steps;
-                            this.pasteProgressBar.updateProgress(status, percent + "%");
+                            record.pasteProgressBar.updateProgress(status, percent + "%");
                         }
                     }.bind(this),
                     failure: function (message) {
@@ -1059,18 +1059,26 @@ pimcore.object.tree = Class.create({
                     var view = ownerTree.getView();
                     var nodeEl = Ext.fly(view.getNodeByRecord(record));
 
+                    if (nodeEl) {
+                        var nodeElInner = nodeEl.down(".x-grid-td");
+                    }
+
                     var rdata = Ext.decode(response.responseText);
                     if (rdata && rdata.success) {
 
                         if (task == 'unpublish') {
-                            nodeEl.addCls('pimcore_unpublished');
+                            if (nodeElInner) {
+                                nodeElInner.addCls('pimcore_unpublished');
+                            }
                             record.data.published = false;
                             if (pimcore.globalmanager.exists("object_" + record.data.id)) {
                                 pimcore.globalmanager.get("object_" + record.data.id).toolbarButtons.unpublish.hide();
                             }
 
                         } else {
-                            nodeEl.removeCls('pimcore_unpublished');
+                            if (nodeElInner) {
+                                nodeElInner.removeCls('pimcore_unpublished');
+                            }
 
                             record.data.published = true;
                             if (pimcore.globalmanager.exists("object_" + record.data.id)) {

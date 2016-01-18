@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -42,11 +42,9 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
         }
     },
 
-    selectInTree: function () {
+    selectInTree: function (button) {
         try {
-            Ext.getCmp("pimcore_panel_tree_assets").expand();
-            var tree = pimcore.globalmanager.get("layout_asset_tree");
-            pimcore.helpers.selectPathInTree(tree.tree, this.data.idPath);
+            pimcore.treenodelocator.showInTree(this, "asset", button)
         } catch (e) {
             console.log(e);
         }
@@ -236,7 +234,8 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
                 region: "north",
                 border: false,
                 cls: "main-toolbar",
-                items: buttons
+                items: buttons,
+                overflowHandler: 'menu'
             });
         }
 
@@ -293,7 +292,6 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
         catch (e3) {
             //console.log(e);
         }
-
 
         return parameters;
     },

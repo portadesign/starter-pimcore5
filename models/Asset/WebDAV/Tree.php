@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Asset
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -18,7 +18,7 @@ use Pimcore\File;
 use Sabre\DAV;
 use Pimcore\Model\Asset;
 
-class Tree extends DAV\ObjectTree {
+class Tree extends DAV\Tree {
 
     /**
      * Moves a file/directory

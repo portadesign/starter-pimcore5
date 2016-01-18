@@ -6,13 +6,14 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 namespace Pimcore\Tool;
 
 use Pimcore\Model\User;
+use Pimcore\Tool;
 
 class Authentication {
 
@@ -67,18 +68,24 @@ class Authentication {
      */
     public static function authenticateHttpBasic () {
 
-        $auth = new \Sabre\HTTP\BasicAuth();
-        $auth->setRealm("pimcore");
-        $result = $auth->getUserPass();
+        // we're using Sabre\HTTP for basic auth
+        $request = \Sabre\HTTP\Sapi::getRequest();
+        $response = new \Sabre\HTTP\Response();
+        $auth = new \Sabre\HTTP\Auth\Basic(Tool::getHostname(), $request, $response);
+        $result = $auth->getCredentials();
 
         if(is_array($result)) {
             list($username, $password) = $result;
-            return self::authenticatePlaintext($username, $password);
+            $user = self::authenticatePlaintext($username, $password);
+            if($user) {
+                return $user;
+            }
         }
 
         $auth->requireLogin();
+        $response->setBody("Authentication required");
         \Logger::error("Authentication Basic (WebDAV) required");
-        echo "Authentication required\n";
+        \Sabre\HTTP\Sapi::sendResponse($response);
         die();
     }
 

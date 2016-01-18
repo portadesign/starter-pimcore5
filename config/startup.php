@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -63,7 +63,8 @@ $includePaths = array(
     PIMCORE_PATH . "/models",
     PIMCORE_WEBSITE_PATH . "/lib",
     PIMCORE_WEBSITE_PATH . "/models",
-    PIMCORE_CLASS_DIRECTORY
+    PIMCORE_CLASS_DIRECTORY,
+    get_include_path()
 );
 set_include_path(implode(PATH_SEPARATOR, $includePaths) . PATH_SEPARATOR);
 
@@ -107,5 +108,5 @@ register_shutdown_function(function () {
     \Pimcore::getEventManager()->trigger("system.shutdown");
 });
 
-// attach global shutdown event
-Pimcore::getEventManager()->attach("system.shutdown", array("Pimcore", "shutdown"), 9999);
+include_once("event-listeners.php");
+

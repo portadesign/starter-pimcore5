@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -192,6 +192,20 @@ pimcore.helpers.closeObject = function (id) {
         console.log(e);
     }
 };
+
+pimcore.helpers.updateObjectQTip = function (id, treeData) {
+    if (treeData) {
+        var tree = pimcore.globalmanager.get("layout_object_tree").tree;
+        var store = tree.getStore();
+        var record = store.getById(id);
+        if (record) {
+            record.set("qtitle", treeData.qtipCfg.title);
+            record.set("qtip", treeData.qtipCfg.text);
+        }
+    }
+};
+
+
 
 pimcore.helpers.getHistory = function() {
     var history = localStorage.getItem("pimcore_element_history");

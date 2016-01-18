@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -140,7 +140,8 @@ pimcore.document.pages.preview = Class.create({
                 border: false,
                 region: "center",
                 scrollable: false,
-                bodyStyle: "-webkit-overflow-scrolling:touch; background:#323232;",
+                bodyStyle: "background:#323232;",
+                bodyCls: "pimcore_overflow_scrolling",
                 html: '<iframe src="about:blank" width="100%" onload="' + iframeOnLoad + '" frameborder="0" id="'
                     + this.iframeName + '" name="' + this.iframeName + '"' +
                     'style="background: #fff;"></iframe>'

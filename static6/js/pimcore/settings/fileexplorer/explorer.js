@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -60,9 +60,9 @@ pimcore.settings.fileexplorer.explorer = Class.create({
                 width: 300,
                 rootVisible: true,
                 enableDD: false,
-                useArrows: true,
-                autoScroll: true,
+                scrollable: true,
                 folderSort:true,
+                split: true,
                 root: {
                     iconCls: "pimcore_icon_home",
                     type: "folder",

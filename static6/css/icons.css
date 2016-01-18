@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -614,6 +614,11 @@
 .pimcore_icon_image {
     background: url(/pimcore/static6/img/icon/picture.png) center center no-repeat !important;
 }
+
+.pimcore_icon_externalImage {
+    background: url(/pimcore/static6/img/icon/picture_link.png) center center no-repeat !important;
+}
+
 
 .pimcore_icon_hotspotimage {
     background: url(/pimcore/static6/img/icon/pictures_thumbs.png) center center no-repeat !important;
@@ -1437,4 +1442,8 @@
 
 .pimcore_icon_calculatedValue {
     background: url("/pimcore/static6/img/icon/calculator.png") center center no-repeat !important;
+}
+
+.pimcore_icon_element_tags {
+    background: url("/pimcore/static6/img/icon/tag_yellow.png") center center no-repeat !important;
 }

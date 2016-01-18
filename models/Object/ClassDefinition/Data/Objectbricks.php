@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -183,7 +183,10 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
                 $editmodeValue = $fielddefinition->getDataForEditmode($fieldValue, $baseObject);
             }
             if($fielddefinition->isEmpty($fieldValue) && !empty($parent)) {
+                $backup = Object\AbstractObject::getGetInheritedValues();
+                Object\AbstractObject::setGetInheritedValues(true);
                 $parentItem = $parent->{"get" . ucfirst($this->getName())}()->$getter();
+                Object\AbstractObject::setGetInheritedValues($backup);
                 if(!empty($parentItem)) {
                     return $this->getDataForField($parentItem, $key, $fielddefinition, $level + 1, $parent, $getter, $objectFromVersion);
                 }
@@ -880,7 +883,12 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
     {
         if (is_array($this->allowedTypes)) {
             foreach ($this->allowedTypes as $allowedType) {
-                $definition = Object\Objectbrick\Definition::getByKey($allowedType);
+                try {
+                    $definition = Object\Objectbrick\Definition::getByKey($allowedType);
+                } catch (\Exception $e) {
+                    \Logger::info("Unknown allowed type [ $allowedType ] ignored.");
+                }
+
                 if ($definition) {
                     $fieldDefinition = $definition->getFieldDefinitions();
 

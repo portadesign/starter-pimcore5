@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -130,6 +130,8 @@ pimcore.settings.translations = Class.create({
 
         this.modelName = 'pimcore.model.translations.' + this.translationType;
 
+        var itemsPerPage = 20;
+
         if (!Ext.ClassManager.get(this.modelName)) {
 
             var url = this.dataUrl;
@@ -159,7 +161,6 @@ pimcore.settings.translations = Class.create({
                         destroy: 'POST'
                     },
                     extraParams: {
-                        limit: itemsPerPage,
                         searchString: this.preconfiguredFilter
                     },
 
@@ -189,13 +190,13 @@ pimcore.settings.translations = Class.create({
         }
 
 
-        var itemsPerPage = 20;
         this.store = new Ext.data.Store({
             id: 'translation_store',
             model: this.modelName,
             remoteSort: true,
             remoteFilter: true,
-            autoSync: true
+            autoSync: true,
+            pageSize: itemsPerPage
         });
 
         this.pagingtoolbar = Ext.create('Ext.toolbar.Paging', {
@@ -263,12 +264,12 @@ pimcore.settings.translations = Class.create({
                     handler: this.doMerge.bind(this),
                     iconCls: "pimcore_icon_merge"
                 },
-                "-",
-                {
-                    text: t('import_csv'),
-                    handler: this.doImport.bind(this),
-                    iconCls: "pimcore_icon_import"
-                },
+                //"-",
+                //{
+                //    text: t('import_csv'),
+                //    handler: this.doImport.bind(this),
+                //    iconCls: "pimcore_icon_import"
+                //},
                 '-',
                 {
                     text: t('export_csv'),

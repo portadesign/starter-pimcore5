@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Object
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -318,7 +318,7 @@ class KeyConfig extends Model\AbstractModel {
             \Pimcore::getEventManager()->trigger("object.keyValue.keyConfig.preAdd", $this);
         }
 
-        $model = parent::save();
+        $model = $this->getDao()->save();
 
         if ($isUpdate) {
             \Pimcore::getEventManager()->trigger("object.keyValue.keyConfig.postUpdate", $this);
@@ -369,7 +369,7 @@ class KeyConfig extends Model\AbstractModel {
      */
     public function setMandatory($mandatory)
     {
-        $this->mandatory = $mandatory;
+        $this->mandatory = (bool)$mandatory;
     }
 
     /**

@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 /*global google */
@@ -93,13 +93,13 @@ pimcore.object.tags.geobounds = Class.create(pimcore.object.tags.geo.abstract, {
                     + data.ne.lng();
                 mapUrl = 'https://maps.googleapis.com/maps/api/staticmap?center=' + center.y + ','
                     + center.x + '&zoom=' + mapZoom + '&size=' + px + 'x' + py
-                    + '&path=' + path + '&sensor=false&maptype=' + fieldConfig.mapType;
+                    + '&path=' + path + '&maptype=' + fieldConfig.mapType;
             }
             else {
                 mapUrl = 'https://maps.googleapis.com/maps/api/staticmap?center='
                     + fieldConfig.lat + ',' + fieldConfig.lng
                     + '&zoom=' + mapZoom + '&size='
-                    + px + 'x' + py + '&sensor=false&maptype=' + fieldConfig.mapType;
+                    + px + 'x' + py + '&maptype=' + fieldConfig.mapType;
             }
 
             if (pimcore.settings.google_maps_api_key) {

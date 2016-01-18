@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -123,7 +123,7 @@ Ext.onReady(function () {
 
         xhrActive--;
         if (xhrActive < 1) {
-            Ext.get("pimcore_logo").dom.innerHTML = '<img class="logo" src="/pimcore/static/img/logo.png"/>';
+            Ext.get("pimcore_logo").dom.innerHTML = '<img class="logo" src="/pimcore/static6/img/logo-white.svg"/>';
         }
     });
     Ext.Ajax.on("beforerequest", function () {
@@ -135,7 +135,7 @@ Ext.onReady(function () {
     Ext.Ajax.on("requestcomplete", function (conn, response, options) {
         xhrActive--;
         if (xhrActive < 1) {
-            Ext.get("pimcore_logo").dom.innerHTML = '<img class="logo" src="/pimcore/static/img/logo.png"/>';
+            Ext.get("pimcore_logo").dom.innerHTML = '<img class="logo" src="/pimcore/static6/img/logo-white.svg"/>';
         }
 
         // redirect to login-page if session is expired

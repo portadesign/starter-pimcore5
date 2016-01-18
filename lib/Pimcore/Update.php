@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code. 
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -51,13 +51,16 @@ class Update {
     }
 
     /**
+     * @param null $currentRev
      * @return array
      * @throws \Exception
      */
-    public static function getAvailableUpdates() {
+    public static function getAvailableUpdates($currentRev = null) {
 
-        $currentRev = Version::$revision;
-                
+        if(!$currentRev) {
+            $currentRev = Version::$revision;
+        }
+
         self::cleanup();
  
         if(PIMCORE_DEVMODE){
@@ -105,11 +108,14 @@ class Update {
 
     /**
      * @param $toRevision
+     * @param null $currentRev
      * @return array
      */
-    public static function getJobs ($toRevision) {
-        
-        $currentRev = Version::$revision;
+    public static function getJobs ($toRevision, $currentRev = null) {
+
+        if(!$currentRev) {
+            $currentRev = Version::$revision;
+        }
         
         $xmlRaw = Tool::getHttpData("http://" . self::$updateHost . "/v2/getDownloads.php?from=" . $currentRev . "&to=" . $toRevision);
         $xml = simplexml_load_string($xmlRaw, null, LIBXML_NOCDATA);
@@ -284,6 +290,8 @@ class Update {
                 }
             }
         }
+
+        self::clearOPCaches();
     }
 
     /**
@@ -313,11 +321,22 @@ class Update {
             }
             $outputMessage = ob_get_clean();
         }
- 
+
+        self::clearOPCaches();
+
         return array(
             "message" => $outputMessage,
             "success" => true
         );
+    }
+
+    /**
+     *
+     */
+    public static function clearOPCaches() {
+        if(function_exists("opcache_reset")) {
+            opcache_reset();
+        }
     }
 
     /**

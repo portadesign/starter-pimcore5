@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -53,21 +53,22 @@ pimcore.object.versions = Class.create({
                     reader: {
                         type: 'json',
                         rootProperty: 'versions'
-
-                        //totalProperty:'total',            // default
-                        //successProperty:'success'         // default
                     }
-                    //,                                     // default
-                    //writer: {
-                    //    type: 'json'
-                    //}
+
                 }
+            });
+
+            this.store.on("update", this.dataUpdate.bind(this));
+
+            this.cellEditing = Ext.create('Ext.grid.plugin.CellEditing', {
+                clicksToEdit: 2
             });
 
             var grid = Ext.create('Ext.grid.Panel', {
                 store: this.store,
+                plugins: [this.cellEditing],
                 columns: [
-                    {header: t("date"), width:130, sortable: true, dataIndex: 'date', renderer: function(d) {
+                    {header: t("date"), width:150, sortable: true, dataIndex: 'date', renderer: function(d) {
                         var date = new Date(d * 1000);
                         return Ext.Date.format(date, "Y-m-d H:i:s");
                     }},
@@ -77,13 +78,14 @@ pimcore.object.versions = Class.create({
                         	var date = new Date(d * 1000);
                             return Ext.Date.format(date, "Y-m-d H:i:s");
                     	}
-                    }, editable: false}
-                    //Not used: {header: t("note"), sortable: true, dataIndex: 'note'}
+                    }, editable: false},
+                    {header: t("note"), sortable: true, dataIndex: 'note', editor: new Ext.form.TextField()}
                 ],
                 stripeRows: true,
-                width:360,
+                width: 450,
                 title: t('available_versions'),
                 region: "west",
+                split: true,
                 viewConfig: {
                     getRowClass: function(record, rowIndex, rp, ds) {
                         if (record.data.date == this.object.data.general.o_modificationDate) {
@@ -108,7 +110,7 @@ pimcore.object.versions = Class.create({
             var preview = new Ext.Panel({
                 title: t("preview"),
                 region: "center",
-                bodyStyle: "-webkit-overflow-scrolling:touch;",
+                bodyCls: "pimcore_overflow_scrolling",
                 html: '<iframe src="about:blank" frameborder="0" id="object_version_iframe_' + this.object.id
                                                                 + '"></iframe>'
             });
@@ -222,12 +224,35 @@ pimcore.object.versions = Class.create({
         Ext.Ajax.request({
             url: "/admin/object/publish-version",
             params: {id: versionId},
-            success: this.object.reload.bind(this.object)
+            success: function(response) {
+                this.object.reload.bind(this.object);
+
+                var rdata = Ext.decode(response.responseText);
+                if (rdata && rdata.success) {
+                    pimcore.helpers.updateObjectQTip(this.object.id, rdata.treeData);
+                }
+
+            }.bind(this)
         });
     },
 
     reload: function () {
         this.store.reload();
+    },
+
+    dataUpdate: function (store, record, operation) {
+
+        if (operation == "edit") {
+            Ext.Ajax.request({
+                url: "/admin/element/version-update",
+                params: {
+                    data: Ext.encode(record.data)
+                }
+            });
+        }
+
+        store.commitChanges();
     }
-    
+
+
 });

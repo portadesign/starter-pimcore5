@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Asset
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -275,7 +275,7 @@ class Processor {
      */
     public function convert() {
         $this->save();
-        $cmd = Console::getPhpCli() . " " . realpath(PIMCORE_PATH . DIRECTORY_SEPARATOR . "cli" . DIRECTORY_SEPARATOR . "video-converter.php"). " " . $this->getProcessId();
+        $cmd = Console::getPhpCli() . " " . realpath(PIMCORE_PATH . DIRECTORY_SEPARATOR . "cli" . DIRECTORY_SEPARATOR . "console.php"). " internal:video-converter " . $this->getProcessId();
         Console::execInBackground($cmd);
     }
 

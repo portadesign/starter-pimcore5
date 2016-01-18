@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code. dsf sdaf asdf asdf
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -462,8 +462,17 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
 
         $elements = array_values($elements);
 
-        // one job = 10 elements
-        $elements = array_chunk($elements, 10);
+        $elementsPerJob = 10;
+        if($type == "word") {
+            // the word export can only handle one document per request
+            // the problem is Document\Service::render(), ... in the action can be a $this->redirect() or exit;
+            // nobody knows what's happening in an action ;-) So we need to isolate them in isolated processes
+            // so that the export doesn't stop completely after a "redirect" or any other unexpected behavior of an action
+            $elementsPerJob = 1;
+        }
+
+        // one job = X elements
+        $elements = array_chunk($elements, $elementsPerJob);
         foreach($elements as $chunk) {
             $jobs[] = array(array(
                 "url" => "/admin/translation/" . $type . "-export",
@@ -869,12 +878,6 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
 
         $exportFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/" . $id . ".html";
         if(!is_file($exportFile)) {
-            /*file_put_contents($exportFile, '<!DOCTYPE html>' . "\n" . '<html>
-                <head>
-                    <style type="text/css">' . file_get_contents(PIMCORE_PATH . "/static/css/word-export.css") . '</style>
-                </head>
-                <body>
-            ');*/
             File::put($exportFile, '<style type="text/css">' . file_get_contents(PIMCORE_PATH . "/static6/css/word-export.css") . '</style>');
         }
 
@@ -1137,18 +1140,20 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin {
     public function mergeItemAction() {
 
         $translationType = $this->getParam("translationType");
-        $success = true;
 
-        $data = json_decode($this->getParam("data"), true);
+        $dataList = json_decode($this->getParam("data"), true);
 
         $classname = "\\Pimcore\\Model\\Translation\\" . ucfirst($translationType);
-        $t = $classname::getByKey($data["key"],true);
-        $t->addTranslation($data["lg"], $data["current"]);
-        $t->setModificationDate(time());$t->save();
+        foreach ($dataList as $data) {
+            $t = $classname::getByKey($data["key"], true);
+            $t->addTranslation($data["lg"], $data["current"]);
+            $t->setModificationDate(time());
+            $t->save();
+        }
 
 
         $this->_helper->json(array(
-            "success" => $success
+            "success" => true
         ));
     }
 }

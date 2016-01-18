@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -30,7 +30,7 @@ pimcore.object.preview = Class.create({
                 autoScroll: true,
                 closable: false,
                 iconCls: "pimcore_icon_tab_preview",
-                bodyStyle: "-webkit-overflow-scrolling:touch;",
+                bodyCls: "pimcore_overflow_scrolling",
                 html: '<iframe src="about:blank" width="100%" onload="' + iframeOnLoad
                     + '" frameborder="0" id="object_preview_iframe_' + this.object.data.general.o_id + '"></iframe>'
             });

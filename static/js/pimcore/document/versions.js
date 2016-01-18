@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -252,7 +252,7 @@ pimcore.document.versions = Class.create({
 
         if (operation == "edit") {
             Ext.Ajax.request({
-                url: "/admin/document/version-update",
+                url: "/admin/element/version-update",
                 params: {
                     data: Ext.encode(record.data)
                 }

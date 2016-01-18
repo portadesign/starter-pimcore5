@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -30,6 +30,7 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
         this.notes = new pimcore.element.notes(this, "object");
         this.reports = new pimcore.report.panel("object_concrete", this);
         this.variants = new pimcore.object.variantsTab(this);
+        this.tagAssignment = new pimcore.element.tag.assignment(this, "object");
         this.getData();
     },
 
@@ -72,9 +73,9 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
     inheritedFields: {},
     setupInheritanceDetector: function() {
         this.tab.on("deactivate", this.stopInheritanceDetector.bind(this));
-        this.tab.on("activate", this.startInheritanceDetector.bind(this));
-        this.tab.on("destroy", this.stopInheritanceDetector.bind(this));
-        this.startInheritanceDetector();
+          this.tab.on("activate", this.startInheritanceDetector.bind(this));
+          this.tab.on("destroy", this.stopInheritanceDetector.bind(this));
+          this.startInheritanceDetector();
     },
 
     startInheritanceDetector: function () {
@@ -146,6 +147,7 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
             layout: "border",
             items: [this.getLayoutToolbar(),this.getTabPanel()],
             object: this,
+            cls: "pimcore_class_" + this.data.general.o_className,
             iconCls: iconClass
         });
 
@@ -257,6 +259,11 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
                 }
             }
         }
+
+        if (user.isAllowed("tags_assignment")) {
+            items.push(this.tagAssignment.getLayout());
+        }
+
 
         //
         if(this.data.childdata.data.classes.length > 0) {
@@ -430,7 +437,7 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
             this.newerVersionNotification = new Ext.Toolbar.TextItem({
                 xtype: 'tbtext',
                 text: '&nbsp;&nbsp;<img src="/pimcore/static6/img/icon/error.png" align="absbottom" />&nbsp;&nbsp;'
-                + t("this_is_a_newer_not_published_version"),
+                    + t("this_is_a_newer_not_published_version"),
                 scale: "small",
                 hidden: true
             });
@@ -449,7 +456,8 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
                 region: "north",
                 border: false,
                 cls: "main-toolbar",
-                items: buttons
+                items: buttons,
+                overflowHandler: 'menu'
             });
 
             this.toolbar.on("afterrender", function () {
@@ -651,40 +659,42 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
                 method: "post",
                 params: saveData,
                 success: function (response) {
-                    if (task != "session") {
-                        try {
-                            var rdata = Ext.decode(response.responseText);
-                            if (rdata && rdata.success) {
-                                pimcore.helpers.showNotification(t("success"), t("your_object_has_been_saved"),
-                                    "success");
-                                this.resetChanges();
+                        if (task != "session") {
+                            try {
+                                var rdata = Ext.decode(response.responseText);
+                                if (rdata && rdata.success) {
+                                    pimcore.helpers.showNotification(t("success"), t("your_object_has_been_saved"),
+                                        "success");
+                                    this.resetChanges();
+
+                                    pimcore.helpers.updateObjectQTip(this.id, rdata.treeData);
+                                }
+                                else {
+                                    pimcore.helpers.showNotification(t("error"), t("error_saving_object"),
+                                        "error", t(rdata.message));
+                                }
+                            } catch (e) {
+                                pimcore.helpers.showNotification(t("error"), t("error_saving_object"), "error");
                             }
-                            else {
-                                pimcore.helpers.showNotification(t("error"), t("error_saving_object"),
-                                    "error", t(rdata.message));
-                            }
-                        } catch (e) {
-                            pimcore.helpers.showNotification(t("error"), t("error_saving_object"), "error");
-                        }
-                        // reload versions
-                        if (this.isAllowed("versions")) {
-                            if (typeof this.versions.reload == "function") {
-                                try {
-                                    //TODO remove this as soon as it works
-                                    this.versions.reload();
-                                } catch (e) {
-                                    console.log(e);
+                            // reload versions
+                            if (this.isAllowed("versions")) {
+                                if (typeof this.versions.reload == "function") {
+                                    try {
+                                        //TODO remove this as soon as it works
+                                        this.versions.reload();
+                                    } catch (e) {
+                                        console.log(e);
+                                    }
                                 }
                             }
                         }
-                    }
 
 
                     this.tab.unmask();
 
-                    if (typeof callback == "function") {
-                        callback();
-                    }
+                        if (typeof callback == "function") {
+                            callback();
+                        }
 
                 }.bind(this),
                 failure: function (response) {

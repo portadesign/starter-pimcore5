@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Object|Class
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -306,7 +306,7 @@ class Numeric extends Model\Object\ClassDefinition\Data {
         }
 
         if(!$this->isEmpty($data) and !is_numeric($data)){
-            throw new \Exception("invalid numeric data");
+            throw new \Exception("invalid numeric data [" . $data . "]");
         }
 
         if(!$omitMandatoryCheck ) {

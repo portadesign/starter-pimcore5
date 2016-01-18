@@ -5,21 +5,18 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code. 
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
 pimcore.registerNS("pimcore.object.abstract");
 pimcore.object.abstract = Class.create(pimcore.element.abstract, {
 
-    selectInTree: function (type) {
+    selectInTree: function (type, button) {
 
         if(type != "variant" || this.data.general.showVariants) {
             try {
-                var cmp = Ext.getCmp("pimcore_panel_tree_objects");
-                cmp.expand();
-                var tree = pimcore.globalmanager.get("layout_object_tree");
-                pimcore.helpers.selectPathInTree(tree.tree, this.data.idPath);
+                pimcore.treenodelocator.showInTree(this, "object", button)
             } catch (e) {
                 console.log(e);
             }

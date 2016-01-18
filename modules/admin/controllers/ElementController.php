@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -297,4 +297,92 @@ class Admin_ElementController extends \Pimcore\Controller\Action\Admin {
             "success" => $success
         ));
     }
+
+    public function typePathAction()
+    {
+        $id = $this->getParam("id");
+        $type = $this->getParam("type");
+
+        if ($type == "asset") {
+            $asset = Asset::getById($id);
+            $typePath = self::getAssetTypePath($asset);
+            $data = array(
+                "success" => true,
+                "idPath" => Element_Service::getIdPath($asset),
+                "typePath" => $typePath
+            );
+            $this->_helper->json($data);
+        } else {
+            $object = Object_Abstract::getById($id);
+            $typePath = self::getTypePath($object);
+            $data = array(
+                "success" => true,
+                "idPath" => Element_Service::getIdPath($object),
+                "typePath" => $typePath
+            );
+            $this->_helper->json($data);
+
+        }
+
+    }
+
+    public static function getAssetTypePath($element) {
+
+        $path = "";
+
+        if ($element) {
+            $parentId = $element->getParentId();
+            if ($parentId) {
+                $ne = Asset::getById($element->getParentId());
+            }
+        }
+
+        if ($ne) {
+            $path = self::getAssetTypePath($ne, $path);
+        }
+
+        if ($element) {
+            $path = $path . "/" . $element->getType();
+        }
+
+        return $path;
+    }
+
+
+
+    public static function getTypePath($element) {
+        $path = "";
+
+        if ($element) {
+            $parentId = $element->getParentId();
+            if ($parentId) {
+                $ne = Object_Abstract::getById($element->getParentId());
+            }
+        }
+
+        if ($ne) {
+            $path = self::getTypePath($ne, $path);
+        }
+
+        if ($element) {
+            $path = $path . "/" . $element->getType();
+        }
+
+        return $path;
+    }
+
+    public function versionUpdateAction()
+    {
+
+        $data = \Zend_Json::decode($this->getParam("data"));
+
+        $version = Version::getById($data["id"]);
+        $version->setPublic($data["public"]);
+        $version->setNote($data["note"]);
+        $version->save();
+
+        $this->_helper->json(array("success" => true));
+    }
+
+
 }

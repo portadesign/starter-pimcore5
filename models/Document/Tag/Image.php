@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Document
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -243,16 +243,18 @@ class Image extends Model\Document\Tag {
                 }
             }
 
-            // get copyright from asset
-            if($this->getImage()->getMetadata("copyright")) {
-                if(!empty($altText)) {
-                    $altText .= " | ";
+            // get copyright from asset (except for thumbnails as for them we do it later in getHTML)
+            if(!$imagePath instanceof Asset\Image\Thumbnail) {
+                if ($this->getImage()->getMetadata("copyright")) {
+                    if (!empty($altText)) {
+                        $altText .= " | ";
+                    }
+                    if (!empty($titleText)) {
+                        $titleText .= " | ";
+                    }
+                    $altText .= ("© " . $this->getImage()->getMetadata("copyright"));
+                    $titleText .= ("© " . $this->getImage()->getMetadata("copyright"));
                 }
-                if(!empty($titleText)) {
-                    $titleText .= " | ";
-                }
-                $altText .= ("© " . $this->getImage()->getMetadata("copyright"));
-                $titleText .= ("© " . $this->getImage()->getMetadata("copyright"));
             }
 
             $defaultAttributes = array(
@@ -458,6 +460,11 @@ class Image extends Model\Document\Tag {
     public function setImage($image)
     {
         $this->image = $image;
+
+        if($image instanceof Asset) {
+            $this->setId($image->getId());
+        }
+
         return $this;
     }
 

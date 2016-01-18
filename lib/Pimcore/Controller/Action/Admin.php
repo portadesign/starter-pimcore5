@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -103,7 +103,7 @@ abstract class Admin extends Action {
                     $this->setLanguage($this->getUser()->getLanguage());
                 }
             } else {
-                // try to authenticate with digest, but this is only allowed for WebDAV
+                // try to authenticate with http basic auth, but this is only allowed for WebDAV
                 if ($this->getParam("module") == "admin" && $this->getParam("controller") == "asset" && $this->getParam("action") == "webdav") {
                     $user = Authentication::authenticateHttpBasic();
                     if($user instanceof Model\User) {
@@ -160,7 +160,7 @@ abstract class Admin extends Action {
 
     /**
      * returns the current user
-     * @return User $user
+     * @return Model\User $user
      */
     public function getUser() {
         return $this->user;

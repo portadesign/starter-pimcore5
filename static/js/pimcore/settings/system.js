@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -1009,11 +1009,6 @@ pimcore.settings.system = Class.create({
                         defaultType: 'textfield',
                         defaults: {width: 150},
                         items :[
-                            {
-                                fieldLabel: t('hostname_for_webdav'),
-                                name: 'assets.webdav.hostname',
-                                value: this.getValue("assets.webdav.hostname")
-                            },
                             {
                                 fieldLabel: t('store_version_history_in_days'),
                                 name: 'assets.versions.days',

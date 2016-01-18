@@ -8,7 +8,7 @@
  *
  * @category   Pimcore
  * @package    Object\Objectbrick
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -285,7 +285,7 @@ class Definition extends Model\Object\Fieldcollection\Definition {
 
                 $fd = $class->getFieldDefinition($cl['fieldname']);
                 if (!$fd) {
-                    throw new \Exception("Coult not resolve field definition for " . $cl['fieldname']);
+                    throw new \Exception("Could not resolve field definition for " . $cl['fieldname']);
                 }
                 $allowedTypes = $fd->getAllowedTypes();
                 if(!in_array($this->key, $allowedTypes)) {

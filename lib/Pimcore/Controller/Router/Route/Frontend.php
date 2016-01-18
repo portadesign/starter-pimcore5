@@ -6,7 +6,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -520,7 +520,11 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract {
 
                         // replace escaped % signs so that they didn't have effects to vsprintf (PIMCORE-1215)
                         $target = str_replace("\\%","###URLENCODE_PLACEHOLDER###", $target);
-                        $url = vsprintf($target, $matches);
+                        $url = @vsprintf($target, $matches);
+                        if(empty($url)) {
+                            // vsprintf() failed, just ose the original again
+                            $url = $target;
+                        }
                         $url = str_replace("###URLENCODE_PLACEHOLDER###", "%", $url);
 
                         // support for pcre backreferences

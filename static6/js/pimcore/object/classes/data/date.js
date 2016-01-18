@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -51,7 +51,7 @@ pimcore.object.classes.data.date = Class.create(pimcore.object.classes.data.data
         var date = {
             fieldLabel:t("default_value"),
             name:"defaultValue",
-            itemCls:"object_field",
+            cls:"object_field",
             width: 300,
             disabled: this.datax.useCurrentDate
         };

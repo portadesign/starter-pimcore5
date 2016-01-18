@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -60,9 +60,9 @@ pimcore.element.selector.selector = Class.create({
             layout: "fit"
         });
 
-        var windowWidth = 850;
+        var windowWidth = 1000;
         if(this.multiselect) {
-            windowWidth = 1100;
+            windowWidth = 1250;
         }
 
         var windowConfig = {
@@ -155,7 +155,7 @@ pimcore.element.selector.selector = Class.create({
         this.tabpanel = new Ext.Panel({
             id: this.myTabId,
             iconCls: "pimcore_icon_search",
-            title: t("search"),
+            title: t(this.current.getTabTitle()),
             border: false,
             layout: "fit",
             closable:true,

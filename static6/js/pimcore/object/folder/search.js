@@ -5,7 +5,7 @@
  * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
  * files that are distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2015 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
  */
 
@@ -215,6 +215,8 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                 }
             });
 
+        this.store.setPageSize(itemsPerPage);
+
             // grid
             this.grid = Ext.create('Ext.grid.Panel', {
                 frame: false,
@@ -327,7 +329,6 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
             this.editor = new Ext.Panel({
                 layout: "border",
                 items: [new Ext.Panel({
-                    autoScroll: true,
                     items: [this.grid],
                     region: "center",
                     layout: "fit",
