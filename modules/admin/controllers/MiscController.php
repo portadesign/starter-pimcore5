@@ -177,6 +177,10 @@ class Admin_MiscController extends \Pimcore\Controller\Action\Admin
                 if (is_dir($file)) {
                     $itemConfig["leaf"] = false;
                     $itemConfig["type"] = "folder";
+                    if (\Pimcore\Tool\Admin::isExtJS6() && is_dir_empty($file)) {
+                        $itemConfig["loaded"] = true;
+                    }
+                    $itemConfig["expandable"] = true;
                 } else if (is_file($file)) {
                     $itemConfig["type"] = "file";
                 }
@@ -241,6 +245,11 @@ class Admin_MiscController extends \Pimcore\Controller\Action\Admin
             $path = $this->getFileexplorerPath("path");
             $file = $path . "/" . $this->getParam("filename");
 
+            $file= resolvePath($file);
+            if (strpos($file, PIMCORE_DOCUMENT_ROOT) !== 0) {
+                throw new Exception("not allowed");
+            }
+
             if (is_writeable(dirname($file))) {
                 File::put($file, "");
 
@@ -262,6 +271,11 @@ class Admin_MiscController extends \Pimcore\Controller\Action\Admin
         if ($this->getParam("filename") && $this->getParam("path")) {
             $path = $this->getFileexplorerPath("path");
             $file = $path . "/" . $this->getParam("filename");
+
+            $file= resolvePath($file);
+            if (strpos($file, PIMCORE_DOCUMENT_ROOT) !== 0) {
+                throw new Exception("not allowed");
+            }
 
             if (is_writeable(dirname($file))) {
                 File::mkdir($file);

@@ -15,16 +15,13 @@ namespace Pimcore\Model\Dao;
 interface DaoInterface {
 
     /**
-     * @abstract
      * @param \Pimcore\Model\AbstractModel $model
      * @return void
      */
     public function setModel($model);
 
     /**
-     * @abstract
-     * @param  $conf
      * @return void
      */
-    public function configure($conf);
+    public function configure();
 }

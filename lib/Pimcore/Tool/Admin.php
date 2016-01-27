@@ -13,6 +13,7 @@
 namespace Pimcore\Tool;
 
 use Pimcore\File;
+use Pimcore\Tool\Text\Csv;
 
 class Admin {
 
@@ -99,7 +100,7 @@ class Admin {
 
     /**
      * @param $file
-     * @return \Csv_Dialect
+     * @return \stdClass
      */
     public static function determineCsvDialect ($file) {
 
@@ -110,11 +111,11 @@ class Admin {
         }
 
         try {
-            $sniffer = new \Csv_AutoDetect();
+            $sniffer = new Csv();
             $dialect = $sniffer->detect($sample);
         } catch (\Exception $e) {
             // use default settings
-            $dialect = new \Csv_Dialect();
+            $dialect = new \stdClass();
         }
 
         // validity check
@@ -131,7 +132,7 @@ class Admin {
      * @return string
      */
     public static function getMaintenanceModeFile () {
-        return PIMCORE_CONFIGURATION_DIRECTORY . "/maintenance.xml";
+        return PIMCORE_CONFIGURATION_DIRECTORY . "/maintenance.php";
     }
 
     /**
@@ -149,15 +150,10 @@ class Admin {
             throw new \Exception("It's not possible to activate the maintenance mode without a session-id");
         }
 
-        $config = new \Zend_Config(array(
+        File::put(self::getMaintenanceModeFile(), to_php_data_file_format([
             "sessionId" => $sessionId
-        ), true);
+        ]));
 
-        $writer = new \Zend_Config_Writer_Xml(array(
-            "config" => $config,
-            "filename" => self::getMaintenanceModeFile()
-        ));
-        $writer->write();
         @chmod(self::getMaintenanceModeFile(), 0777); // so it can be removed also via FTP, ...
     }
 
@@ -166,7 +162,7 @@ class Admin {
      * @return void
      */
     public static function deactivateMaintenanceMode () {
-        unlink(self::getMaintenanceModeFile());
+        @unlink(self::getMaintenanceModeFile());
     }
 
     /**
@@ -177,8 +173,8 @@ class Admin {
         $file = self::getMaintenanceModeFile();
 
         if(is_file($file)) {
-            $conf = new \Zend_Config_Xml($file);
-            if($conf->sessionId) {
+            $conf = include($file);
+            if(isset($conf["sessionId"])) {
                 return true;
             } else {
                 @unlink($file);
@@ -211,8 +207,16 @@ class Admin {
             return true;
         }
 
+        if (isset($_SERVER["HTTP_X_PIMCORE_EXTJS_VERSION_MAJOR"]) && $_SERVER["HTTP_X_PIMCORE_EXTJS_VERSION_MAJOR"] < 6) {
+            return false;
+        }
+
+        if(isset($_REQUEST["extjs3"])) {
+            return false;
+        }
+
         if(isset($_REQUEST["extjs6"])) {
-            return (bool) $_REQUEST["extjs6"];
+            return true;
         }
 
         $config = \Pimcore\Config::getSystemConfig();

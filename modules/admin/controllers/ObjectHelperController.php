@@ -329,36 +329,35 @@ class   Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin {
 
         $success = true;
 
-        $settings = array("views" => array("view" => array()));
+        $settings = ["views" => []];
 
         for ($i = 0; $i < 1000; $i++) {
             if ($this->getParam("name_" . $i)) {
 
+                $classes = $this->getParam("classes_" . $i);
+                if (is_array($classes) || \Pimcore\Tool\Admin::isExtJS6()) {
+                    $classes = implode(',', $classes);
+                }
                 // check for root-folder
                 $rootfolder = "/";
                 if ($this->getParam("rootfolder_" . $i)) {
                     $rootfolder = $this->getParam("rootfolder_" . $i);
                 }
 
-                $settings["views"]["view"][] = array(
+                $settings["views"][] = array(
                     "name" => $this->getParam("name_" . $i),
                     "condition" => $this->getParam("condition_" . $i),
                     "icon" => $this->getParam("icon_" . $i),
                     "id" => ($i + 1),
                     "rootfolder" => $rootfolder,
                     "showroot" => ($this->getParam("showroot_" . $i) == "true") ? true : false,
-                    "classes" => $this->getParam("classes_" . $i)
+                    "classes" => $classes
                 );
             }
         }
 
-
-        $config = new \Zend_Config($settings, true);
-        $writer = new \Zend_Config_Writer_Xml(array(
-            "config" => $config,
-            "filename" => PIMCORE_CONFIGURATION_DIRECTORY . "/customviews.xml"
-        ));
-        $writer->write();
+        $configFile = \Pimcore\Config::locateConfigFile("customviews.php");
+        File::put($configFile, to_php_data_file_format($settings));
 
 
         $this->_helper->json(array("success" => $success));

@@ -36,8 +36,6 @@ if(is_array($_SERVER)
 }
 
 if (!defined("PIMCORE_CONFIGURATION_DIRECTORY"))  define("PIMCORE_CONFIGURATION_DIRECTORY", PIMCORE_WEBSITE_VAR . "/config");
-if (!defined("PIMCORE_CONFIGURATION_SYSTEM"))  define("PIMCORE_CONFIGURATION_SYSTEM", PIMCORE_CONFIGURATION_DIRECTORY . "/system.xml");
-if (!defined("PIMCORE_CONFIGURATION_PLUGINS"))  define("PIMCORE_CONFIGURATION_PLUGINS", PIMCORE_CONFIGURATION_DIRECTORY . "/plugin.xml");
 if (!defined("PIMCORE_ASSET_DIRECTORY"))  define("PIMCORE_ASSET_DIRECTORY", PIMCORE_WEBSITE_VAR . "/assets");
 if (!defined("PIMCORE_VERSION_DIRECTORY"))  define("PIMCORE_VERSION_DIRECTORY", PIMCORE_WEBSITE_VAR . "/versions");
 if (!defined("PIMCORE_WEBDAV_TEMP"))  define("PIMCORE_WEBDAV_TEMP", PIMCORE_WEBSITE_VAR . "/webdav");
@@ -86,19 +84,23 @@ $autoloader->registerNamespace('Pimcore');
 
 // register class map loader => speed
 $autoloaderClassMapFiles = array(
-    PIMCORE_PATH . "/config/autoload-classmap.php",
-    PIMCORE_CONFIGURATION_DIRECTORY . "/autoload-classmap.php"
+    PIMCORE_CONFIGURATION_DIRECTORY . "/autoload-classmap.php",
+    PIMCORE_PATH . "/config/autoload-classmap.php"
 );
 
 foreach ($autoloaderClassMapFiles as $autoloaderClassMapFile) {
     if(file_exists($autoloaderClassMapFile)) {
         $classMapAutoLoader = new \Pimcore\Loader\ClassMapAutoloader(array($autoloaderClassMapFile));
         $classMapAutoLoader->register();
+        break;
     }
 }
 
 // do some general stuff
-$websiteStartup = PIMCORE_CONFIGURATION_DIRECTORY . "/startup.php";
+// this is just for compatibility reasons, pimcore itself doesn't use this constant anymore
+if (!defined("PIMCORE_CONFIGURATION_SYSTEM"))  define("PIMCORE_CONFIGURATION_SYSTEM", \Pimcore\Config::locateConfigFile("system.php"));
+
+$websiteStartup = \Pimcore\Config::locateConfigFile("startup.php");
 if(@is_file($websiteStartup)) {
     include_once($websiteStartup);
 }

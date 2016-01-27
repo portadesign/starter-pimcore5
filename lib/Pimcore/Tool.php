@@ -391,28 +391,21 @@ class Tool {
      * @return array|bool
      */
     public static function getCustomViewConfig() {
-        $cvConfigFile = PIMCORE_CONFIGURATION_DIRECTORY . "/customviews.xml";
-        $cvData = array();
 
-        if (!is_file($cvConfigFile)) {
+
+        $configFile = \Pimcore\Config::locateConfigFile("customviews.php");
+
+        if (!is_file($configFile)) {
             $cvData = false;
-        }
-        else {
-            $config = new \Zend_Config_Xml($cvConfigFile);
-            $confArray = $config->toArray();
+        } else {
+            $confArray = include($configFile);
+            $cvData = [];
 
-            if (empty($confArray["views"]["view"])) {
-                return array();
-            }
-            else if ($confArray["views"]["view"][0]) {
-                $cvData = $confArray["views"]["view"];
-            }
-            else {
-                $cvData[] = $confArray["views"]["view"];
-            }
-
-            foreach ($cvData as &$tmp) {
-                $tmp["showroot"] = (bool) $tmp["showroot"];
+            foreach ($confArray["views"] as $tmp) {
+                if(isset($tmp["name"])) {
+                    $tmp["showroot"] = (bool) $tmp["showroot"];
+                    $cvData[] = $tmp;
+                }
             }
         }
         return $cvData;
@@ -554,12 +547,12 @@ class Tool {
     public static function getModelClassMapping($sourceClassName) {
 
         $targetClassName = $sourceClassName;
-        $lookupName = str_replace(["\\Pimcore\\Model\\", "\\"], ["", "_"], $sourceClassName);
+        $lookupName = str_replace("\\Pimcore\\Model\\", "", $sourceClassName);
         $lookupName = ltrim($lookupName, "\\_");
 
         if($map = Config::getModelClassMappingConfig()) {
-            $tmpClassName = $map->{$lookupName};
-            if($tmpClassName) {
+            if(isset($map[$lookupName])) {
+                $tmpClassName = $map[$lookupName];
                 $tmpClassName = "\\" . ltrim($tmpClassName, "\\");
                 if(self::classExists($tmpClassName)) {
                     if(is_subclass_of($tmpClassName, $sourceClassName)) {
@@ -584,8 +577,6 @@ class Tool {
 
         $autoloader = \Zend_Loader_Autoloader::getInstance();
         if($map = Config::getModelClassMappingConfig()) {
-            $map = $map->toArray();
-
             foreach ($map as $targetClass) {
                 $classParts = explode("_", $targetClass);
                 $autoloader->registerNamespace($classParts[0]);

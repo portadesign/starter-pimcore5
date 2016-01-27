@@ -16,7 +16,7 @@ namespace Pimcore\Model\Staticroute;
 
 use Pimcore\Model;
 
-class Listing extends Model\Listing\AbstractListing {
+class Listing extends Model\Listing\JsonListing {
 
     /**
      * Contains the results of the list. They are all an instance of Staticroute
@@ -24,16 +24,6 @@ class Listing extends Model\Listing\AbstractListing {
      * @var array
      */
     public $routes = array();
-
-    /**
-     * Tests if the given key is an valid order key to sort the results
-     *
-     * @todo remove the dummy-always-true rule
-     * @return boolean
-     */
-    public function isValidOrderKey($key) {
-        return true;
-    }
 
     /**
      * @return array
@@ -50,5 +40,4 @@ class Listing extends Model\Listing\AbstractListing {
         $this->routes = $routes;
         return $this;
     }
-
 }
