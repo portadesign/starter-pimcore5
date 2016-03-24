@@ -23,7 +23,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         this.layoutDefinitions = {};
         this.dataFields = [];
         this.layoutIds = [];
-        
+
         if (data) {
             this.data = data;
         }
@@ -67,15 +67,15 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 load: this.initData.bind(this)
             }
         });
-        
+
         this.fieldstore.load();
 
     },
 
     getLayoutEdit: function () {
-        
+
         this.loadFieldDefinitions();
-        
+
         var panelConf = {
             autoHeight: true,
             border: true,
@@ -87,7 +87,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         if(this.fieldConfig.title) {
             panelConf.title = this.fieldConfig.title;
         }
-        
+
         this.component = new Ext.Panel(panelConf);
 
         this.component.addListener("render", function() {
@@ -98,34 +98,41 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
 
         return this.component;
     },
-    
+
     initData: function () {
-        
+
         if(this.data.length < 1) {
             this.component.add(this.getControls());
         } else {
             for (var i=0; i<this.data.length; i++) {
-                this.addBlockElement(i,this.data[i].type, this.data[i].data, true);
+                this.addBlockElement(
+                    i,
+                    {
+                        type: this.data[i].type,
+                        oIndex: this.data[i].oIndex
+                    },
+                    this.data[i].data,
+                    true);
             }
         }
-        
+
         this.component.updateLayout();
     },
-    
+
     getControls: function (blockElement) {
-        
+
         var collectionMenu = [];
-        
+
         this.fieldstore.each(function (blockElement, rec) {
             collectionMenu.push({
                 text: ts(rec.data.key),
                 handler: this.addBlock.bind(this,blockElement, rec.data.key),
-                iconCls: "pimcore_icon_fieldcollections"
+                iconCls: "pimcore_icon_fieldcollection"
             });
         }.bind(this, blockElement));
-        
+
         var items = [];
-        
+
         if(collectionMenu.length == 1) {
             items.push({
                 disabled: this.fieldConfig.disallowAddRemove,
@@ -146,9 +153,9 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 text: t("no_collections_allowed")
             });
         }
-        
-        
-        
+
+
+
         if(blockElement) {
             items.push({
                 disabled: this.fieldConfig.disallowAddRemove,
@@ -158,7 +165,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     "click": this.removeBlock.bind(this, blockElement)
                 }
             });
-            
+
             items.push({
                 disabled: this.fieldConfig.disallowReorder,
                 cls: "pimcore_block_button_up",
@@ -167,7 +174,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     "click": this.moveBlockUp.bind(this, blockElement)
                 }
             });
-            
+
             items.push({
                 disabled: this.fieldConfig.disallowReorder,
                 cls: "pimcore_block_button_down",
@@ -177,18 +184,18 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 }
             });
         }
-        
+
         var toolbar = new Ext.Toolbar({
             items: items
         });
-        
+
         return toolbar;
     },
-    
+
     detectBlockIndex: function (blockElement) {
         // detect index
         var index;
-        
+
         for(var s=0; s<this.component.items.items.length; s++) {
             if(this.component.items.items[s].key == blockElement.key) {
                 index = s;
@@ -234,20 +241,22 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         if(blockElement) {
             index = this.detectBlockIndex(blockElement);
         }
-        
-        this.addBlockElement(index + 1, type);
+
+        this.addBlockElement(index + 1, {
+            type: type
+        });
     },
-    
+
     removeBlock: function (blockElement) {
 
         this.closeOpenEditors();
 
         var key = blockElement.key;
         this.currentElements[key] = "deleted";
-        
+
         this.component.remove(blockElement);
         this.dirty = true;
-        
+
         // check for remaining elements
         if(this.component.items.items.length < 1) {
             this.component.removeAll();
@@ -256,55 +265,27 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
             this.currentElements = [];
         }
     },
-    
+
     moveBlockUp: function (blockElement) {
 
         this.closeOpenEditors();
 
-        if(blockElement) {
-            index = this.detectBlockIndex(blockElement);
-        }
-        
-        var newIndex = index-1;
-        if(newIndex < 0) {
-            newIndex = 0;
-        }
-        
-        // move this node temorary to an other so ext recognizes a change
-        this.component.remove(blockElement, false);
-        this.object.edit.layout.add(blockElement);
-        this.object.edit.layout.updateLayout();
-        this.component.updateLayout();
-        
-        // move the element to the right position
-        this.object.edit.layout.remove(blockElement,false);
-        this.component.insert(newIndex, blockElement);
-        this.component.updateLayout();
+        this.component.moveBefore(blockElement, blockElement.previousSibling());
         this.dirty = true;
     },
-    
+
     moveBlockDown: function (blockElement) {
 
         this.closeOpenEditors();
 
-        if(blockElement) {
-            index = this.detectBlockIndex(blockElement);
-        }
-        
-        // move this node temorary to an other so ext recognizes a change
-        this.component.remove(blockElement, false);
-        this.object.edit.layout.add(blockElement);
-        this.object.edit.layout.updateLayout();
-        this.component.updateLayout();
-        
-        // move the element to the right position
-        this.object.edit.layout.remove(blockElement,false);
-        this.component.insert(index+1, blockElement);
-        this.component.updateLayout();
+        this.component.moveAfter(blockElement, blockElement.nextSibling());
         this.dirty = true;
     },
-    
-    addBlockElement: function (index, type, blockData, ignoreChange) {
+
+    addBlockElement: function (index, config, blockData, ignoreChange) {
+
+        var type = config.type;
+        var oIndex = config.oIndex;
 
         this.closeOpenEditors();
 
@@ -314,30 +295,31 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         if(!this.layoutDefinitions[type]) {
             return;
         }
-        
+
         // remove the initial toolbar if there is no element
         if(this.currentElements.length < 1) {
             this.component.removeAll();
         }
-        
+
         this.dataFields = [];
         this.currentData = {};
-        
+
         if(blockData) {
             this.currentData = blockData;
         }
 
         var blockElement = new Ext.Panel({
+            pimcore_oIndex: oIndex,
             bodyStyle: "padding:10px;",
             style: "margin: 0 0 10px 0;",
-            autoHeight: true,
+            manageHeight: false,
             border: false,
             items: this.getRecursiveLayout(this.layoutDefinitions[type]).items,
             disabled: this.fieldConfig.noteditable
         });
-        
+
         blockElement.insert(0, this.getControls(blockElement));
-        
+
         blockElement.key = this.currentElements.length;
         blockElement.fieldtype = type;
         this.component.insert(index, blockElement);
@@ -378,28 +360,35 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
     },
 
     getValue: function () {
-        
+
         var data = [];
         var element;
         var elementData = {};
-        
+
         for(var s=0; s<this.component.items.items.length; s++) {
             elementData = {};
             if(this.currentElements[this.component.items.items[s].key]) {
                 element = this.currentElements[this.component.items.items[s].key];
 
-                // no check for dirty, ... always send all field to the server
                 for (var u=0; u<element.fields.length; u++) {
-                    elementData[element.fields[u].getName()] = element.fields[u].getValue();
+                    try {
+                        // no check for dirty, ... always send all field to the server
+                        elementData[element.fields[u].getName()] = element.fields[u].getValue();
+                    } catch (e) {
+                        console.log(e);
+                        elementData[element.fields[u].getName()] = "";
+                    }
+
                 }
-                
+
                 data.push({
                     type: element.type,
-                    data: elementData
+                    data: elementData,
+                    oIndex: element.container.pimcore_oIndex
                 });
             }
         }
-        
+
         return data;
     },
 

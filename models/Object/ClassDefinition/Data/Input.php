@@ -16,7 +16,8 @@ namespace Pimcore\Model\Object\ClassDefinition\Data;
 
 use Pimcore\Model;
 
-class Input extends Model\Object\ClassDefinition\Data {
+class Input extends Model\Object\ClassDefinition\Data
+{
 
     use Model\Object\ClassDefinition\Data\Extension\Text;
 
@@ -68,7 +69,8 @@ class Input extends Model\Object\ClassDefinition\Data {
     /**
      * @return integer
      */
-    public function getWidth() {
+    public function getWidth()
+    {
         return $this->width;
     }
 
@@ -76,7 +78,8 @@ class Input extends Model\Object\ClassDefinition\Data {
      * @param integer $width
      * @return void
      */
-    public function setWidth($width) {
+    public function setWidth($width)
+    {
         $this->width = $width;
         return $this;
     }
@@ -87,7 +90,8 @@ class Input extends Model\Object\ClassDefinition\Data {
      * @param null|Model\Object\AbstractObject $object
      * @return string
      */
-    public function getDataForResource($data, $object = null) {
+    public function getDataForResource($data, $object = null)
+    {
         return $data;
     }
 
@@ -96,7 +100,8 @@ class Input extends Model\Object\ClassDefinition\Data {
      * @param string $data
      * @return string
      */
-    public function getDataFromResource($data) {
+    public function getDataFromResource($data)
+    {
         return $data;
     }
 
@@ -106,7 +111,8 @@ class Input extends Model\Object\ClassDefinition\Data {
      * @param null|Model\Object\AbstractObject $object
      * @return string
      */
-    public function getDataForQueryResource($data, $object = null) {
+    public function getDataForQueryResource($data, $object = null)
+    {
         return $data;
     }
 
@@ -116,7 +122,8 @@ class Input extends Model\Object\ClassDefinition\Data {
      * @param null|Model\Object\AbstractObject $object
      * @return string
      */
-    public function getDataForEditmode($data, $object = null) {
+    public function getDataForEditmode($data, $object = null)
+    {
         return $this->getDataForResource($data, $object);
     }
 
@@ -124,16 +131,19 @@ class Input extends Model\Object\ClassDefinition\Data {
      * @see Model\Object\ClassDefinition\Data::getDataFromEditmode
      * @param string $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataFromEditmode($data, $object = null) {
+    public function getDataFromEditmode($data, $object = null, $params = array())
+    {
         return $this->getDataFromResource($data);
     }
     
     /**
      * @return integer
      */
-    public function getColumnLength() {
+    public function getColumnLength()
+    {
         return $this->columnLength;
     }
 
@@ -141,8 +151,9 @@ class Input extends Model\Object\ClassDefinition\Data {
      * @param $columnLength
      * @return $this
      */
-    public function setColumnLength($columnLength) {
-        if($columnLength) {
+    public function setColumnLength($columnLength)
+    {
+        if ($columnLength) {
             $this->columnLength = $columnLength;
         }
         return $this;
@@ -167,14 +178,16 @@ class Input extends Model\Object\ClassDefinition\Data {
     /**
      * @return string
      */
-    public function getColumnType() {
+    public function getColumnType()
+    {
         return $this->columnType . "(" . $this->getColumnLength() . ")";
     }
 
     /**
      * @return string
      */
-    public function getQueryColumnType() {
+    public function getQueryColumnType()
+    {
         return $this->queryColumnType . "(" . $this->getColumnLength() . ")";
     }
 
@@ -185,9 +198,10 @@ class Input extends Model\Object\ClassDefinition\Data {
      * @param boolean $omitMandatoryCheck
      * @throws \Exception
      */
-    public function checkValidity($data, $omitMandatoryCheck = false){
-        if(!$omitMandatoryCheck && $this->getRegex() && strlen($data) > 0) {
-            if(!preg_match("#" . $this->getRegex() . "#", $data)) {
+    public function checkValidity($data, $omitMandatoryCheck = false)
+    {
+        if (!$omitMandatoryCheck && $this->getRegex() && strlen($data) > 0) {
+            if (!preg_match("#" . $this->getRegex() . "#", $data)) {
                 throw new \Exception("Value in field [ " . $this->getName() . " ] doesn't match input validation '" . $this->getRegex() . "'");
             }
         }
@@ -198,7 +212,8 @@ class Input extends Model\Object\ClassDefinition\Data {
     /**
      * @param Model\Object\ClassDefinition\Data $masterDefinition
      */
-    public function synchronizeWithMasterDefinition(Model\Object\ClassDefinition\Data $masterDefinition) {
+    public function synchronizeWithMasterDefinition(Model\Object\ClassDefinition\Data $masterDefinition)
+    {
         $this->columnLength = $masterDefinition->columnLength;
     }
 }

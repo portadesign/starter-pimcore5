@@ -24,7 +24,7 @@ class ClassesRebuildCommand extends AbstractCommand
     protected function configure()
     {
         $this
-            ->setName('classes-rebuild')
+            ->setName('deployment:classes-rebuild')
             ->setDescription('rebuilds classes and db structure based on updated website/var/classes/*.psf files')
         ;
     }
@@ -36,9 +36,8 @@ class ClassesRebuildCommand extends AbstractCommand
         $list = new ClassDefinition\Listing();
         $list->load();
 
-        foreach($list->getClasses() as $class) {
-
-            if($output->isVerbose()) {
+        foreach ($list->getClasses() as $class) {
+            if ($output->isVerbose()) {
                 $output->writeln($class->getName() . " [" . $class->getId() . "] saved");
             }
 

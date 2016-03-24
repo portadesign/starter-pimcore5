@@ -307,8 +307,8 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
 
             this.toolbarButtons.save = new Ext.SplitButton({
                 text: t('save'),
-                iconCls: "pimcore_icon_save_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_save",
+                scale: "medium",
                 handler: this.unpublish.bind(this),
                 menu:[{
                     text: t('save_close'),
@@ -320,8 +320,8 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
 
             this.toolbarButtons.publish = new Ext.SplitButton({
                 text: t('save_and_publish'),
-                iconCls: "pimcore_icon_publish_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_publish",
+                scale: "medium",
                 handler: this.publish.bind(this),
                 menu: [{
                     text: t('save_pubish_close'),
@@ -341,45 +341,17 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
                 ]
             });
 
-
             this.toolbarButtons.unpublish = new Ext.Button({
                 text: t('unpublish'),
-                iconCls: "pimcore_icon_unpublish_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_unpublish",
+                scale: "medium",
                 handler: this.unpublish.bind(this)
             });
 
-            var reloadConfig = {
-                text: t('reload'),
-                iconCls: "pimcore_icon_reload_medium",
-                scale: "small",
-                handler: this.reload.bind(this, this.data.currentLayoutId)
-            }
-
-            if (this.data["validLayouts"] && this.data.validLayouts.length > 1) {
-                var menu = [];
-                for (var i = 0; i < this.data.validLayouts.length; i++) {
-                    var menuLabel = ts(this.data.validLayouts[i].name);
-                    if (Number(this.data.currentLayoutId) == this.data.validLayouts[i].id) {
-                        menuLabel = "<b>" + menuLabel + "</b>";
-                    }
-                    menu.push(
-                        {
-                            text: menuLabel,
-                            iconCls: "pimcore_icon_reload",
-                            handler: this.reload.bind(this, this.data.validLayouts[i].id)
-                        });
-                    reloadConfig.menu = menu;
-                }
-                this.toolbarButtons.reload = new Ext.SplitButton(reloadConfig);
-            } else {
-                this.toolbarButtons.reload = new Ext.Button(reloadConfig);
-            }
-
             this.toolbarButtons.remove = new Ext.Button({
                 text: t("delete"),
-                iconCls: "pimcore_icon_delete_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_delete",
+                scale: "medium",
                 handler: this.remove.bind(this)
             });
 
@@ -399,46 +371,73 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
 
             buttons.push("-");
 
-            buttons.push(this.toolbarButtons.reload);
+            var moreButtons = [];
+
+            var reloadConfig = {
+                text: t('reload'),
+                iconCls: "pimcore_icon_reload",
+                handler: this.reload.bind(this, this.data.currentLayoutId)
+            }
+
+            if (this.data["validLayouts"] && this.data.validLayouts.length > 1) {
+                var menu = [];
+                for (var i = 0; i < this.data.validLayouts.length; i++) {
+                    var menuLabel = ts(this.data.validLayouts[i].name);
+                    if (Number(this.data.currentLayoutId) == this.data.validLayouts[i].id) {
+                        menuLabel = "<b>" + menuLabel + "</b>";
+                    }
+                    menu.push({
+                        text: menuLabel,
+                        iconCls: "pimcore_icon_reload",
+                        handler: this.reload.bind(this, this.data.validLayouts[i].id)
+                    });
+                }
+                reloadConfig.menu = menu;
+            }
+
+            moreButtons.push(reloadConfig);
 
             if(this.data.general.o_type != "variant" || this.data.general.showVariants) {
-                buttons.push({
+                moreButtons.push({
                     text: t('show_in_tree'),
-                    iconCls: "pimcore_icon_download_showintree",
-                    scale: "small",
+                    iconCls: "pimcore_icon_show_in_tree",
                     handler: this.selectInTree.bind(this, this.data.general.o_type)
                 });
             }
 
-
-            buttons.push({
+            moreButtons.push({
                 text: t("show_metainfo"),
-                scale: "small",
-                iconCls: "pimcore_icon_info_large",
+                iconCls: "pimcore_icon_info",
                 handler: this.showMetaInfo.bind(this)
             });
 
+            buttons.push({
+                text: t("more"),
+                iconCls: "pimcore_icon_more",
+                scale: "medium",
+                menu: moreButtons
+            });
 
             buttons.push("-");
             buttons.push({
                 xtype: 'tbtext',
                 text: t("id") + " " + this.data.general.o_id,
-                scale: "small"
+                scale: "medium"
             });
 
             buttons.push("-");
             buttons.push({
                 xtype: 'tbtext',
                 text: ts(this.data.general.o_className),
-                scale: "small"
+                scale: "medium"
             });
 
             // version notification
             this.newerVersionNotification = new Ext.Toolbar.TextItem({
                 xtype: 'tbtext',
-                text: '&nbsp;&nbsp;<img src="/pimcore/static6/img/icon/error.png" align="absbottom" />&nbsp;&nbsp;'
+                text: '&nbsp;&nbsp;<img src="/pimcore/static6/img/flat-color-icons/medium_priority.svg" style="height: 16px;" align="absbottom" />&nbsp;&nbsp;'
                     + t("this_is_a_newer_not_published_version"),
-                scale: "small",
+                scale: "medium",
                 hidden: true
             });
 
@@ -484,6 +483,7 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
         var data = {};
 
         data.id = this.id;
+        data.modificationDate = this.data.general.o_modificationDate;
 
         // get only scheduled tasks
         if (only == "scheduler") {
@@ -564,23 +564,38 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
             this.toolbarButtons.unpublish.show();
             this.toolbarButtons.save.hide();
 
-            // remove class in tree panel
-            try {
-                var tree = pimcore.globalmanager.get("layout_object_tree").tree;
-                var store = tree.getStore();
-                var record = store.getById(this.id);
-                if (record) {
-                    var view = tree.getView();
-                    var nodeEl = Ext.fly(view.getNodeByRecord(record));
-                    if (nodeEl) {
-                        var nodeElInner = nodeEl.down(".x-grid-td");
-                        if (nodeElInner) {
-                            nodeElInner.removeCls("pimcore_unpublished");
-                        }
-                    }
+            var treeNames = ["layout_object_tree"]
+            if (pimcore.settings.customviews.length > 0) {
+                for (var cvs = 0; cvs < pimcore.settings.customviews.length; cvs++) {
+                    var cv = pimcore.settings.customviews[cvs];
+                    treeNames.push("layout_customviews_tree" + cv.id);
                 }
-            } catch (e) {
-                console.log(e);
+            }
+
+            var index;
+            for (index = 0; index < treeNames.length; index++) {
+                var treeName = treeNames[index];
+
+                // remove class in tree panel
+                try {
+                    var tree = pimcore.globalmanager.get(treeName).tree;
+                    var store = tree.getStore();
+                    var record = store.getById(this.id);
+                    if (record) {
+                        var view = tree.getView();
+                        var nodeEl = Ext.fly(view.getNodeByRecord(record));
+                        if (nodeEl) {
+                            var nodeElInner = nodeEl.down(".x-grid-td");
+                            if (nodeElInner) {
+                                nodeElInner.removeCls("pimcore_unpublished");
+                            }
+                        }
+                        delete record.data.cls;
+                        record.data.published = true;
+                    }
+                } catch (e) {
+                    console.log(e);
+                }
             }
         }
 
@@ -595,23 +610,39 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
             this.toolbarButtons.unpublish.hide();
             this.toolbarButtons.save.show();
 
-            // set class in tree panel
-            try {
-                var tree = pimcore.globalmanager.get("layout_object_tree").tree;
-                var store = tree.getStore();
-                var record = store.getById(this.id);
-                if (record) {
-                    var view = tree.getView();
-                    var nodeEl = Ext.fly(view.getNodeByRecord(record));
-                    if (nodeEl) {
-                        var nodeElInner = nodeEl.down(".x-grid-td");
-                        if (nodeElInner) {
-                            nodeElInner.addCls("pimcore_unpublished");
-                        }
-                    }
+            var treeNames = ["layout_object_tree"]
+            if (pimcore.settings.customviews.length > 0) {
+                for (var cvs = 0; cvs < pimcore.settings.customviews.length; cvs++) {
+                    var cv = pimcore.settings.customviews[cvs];
+                    treeNames.push("layout_customviews_tree" + cv.id);
                 }
-            } catch (e) {
-                console.log(e);
+            }
+
+            var index;
+            for (index = 0; index < treeNames.length; index++) {
+                var treeName = treeNames[index];
+
+                // remove class in tree panel
+                try {
+                    var tree = pimcore.globalmanager.get(treeName).tree;
+
+                    var store = tree.getStore();
+                    var record = store.getById(this.id);
+                    if (record) {
+                        var view = tree.getView();
+                        var nodeEl = Ext.fly(view.getNodeByRecord(record));
+                        if (nodeEl) {
+                            var nodeElInner = nodeEl.down(".x-grid-td");
+                            if (nodeElInner) {
+                                nodeElInner.addCls("pimcore_unpublished");
+                            }
+                        }
+                        record.data.cls = "pimcore_unpublished";
+                        record.data.published = false;
+                    }
+                } catch (e) {
+                    console.log(e);
+                }
             }
         }
     },
@@ -666,6 +697,7 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
                                     pimcore.helpers.showNotification(t("success"), t("your_object_has_been_saved"),
                                         "success");
                                     this.resetChanges();
+                                    Ext.apply(this.data.general,rdata.general);
 
                                     pimcore.helpers.updateObjectQTip(this.id, rdata.treeData);
                                 }

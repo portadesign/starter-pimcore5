@@ -400,12 +400,12 @@ pimcore.object.tree = Class.create({
                         // create menu item
                         tmp = {
                             text: classGroupRecord.get("translatedText"),
-                            iconCls: "pimcore_icon_object_add",
+                            iconCls: "pimcore_icon_object pimcore_icon_overlay_add",
                             handler: this.addObject.bind(this, classGroupRecord.get("id"), classGroupRecord.get("text"), tree, record)
                         };
 
                         // add special icon
-                        if (classGroupRecord.get("icon")) {
+                        if (classGroupRecord.get("icon") != "/pimcore/static6/img/flat-color-icons/timeline.svg") {
                             tmp.icon = classGroupRecord.get("icon");
                             tmp.iconCls = "";
                         }
@@ -418,12 +418,12 @@ pimcore.object.tree = Class.create({
                         // create menu item
                         tmp = {
                             text: classGroupRecord.get("translatedText"),
-                            iconCls: "pimcore_icon_object_import",
+                            iconCls: "pimcore_icon_object pimcore_icon_overlay_add",
                             handler: this.importObjects.bind(this, classGroupRecord.get("id"), classGroupRecord.get("text"), tree, record)
                         };
 
                         // add special icon
-                        if (classGroupRecord.get("icon")) {
+                        if (classGroupRecord.get("icon") != "/pimcore/static6/img/flat-color-icons/timeline.svg") {
                             tmp.icon = classGroupRecord.get("icon");
                             tmp.iconCls = "";
                         }
@@ -443,11 +443,11 @@ pimcore.object.tree = Class.create({
                     /* == menu entry: create new object == */
                     tmpMenuEntry = {
                         text: classGroupRecord.get("translatedText"),
-                        iconCls: "pimcore_icon_object_add",
+                        iconCls: "pimcore_icon_object pimcore_icon_overlay_add",
                         handler: this.addObject.bind(this, classGroupRecord.get("id"), classGroupRecord.get("text"), tree, record)
                     };
 
-                    if (classGroupRecord.get("icon")) {
+                    if (classGroupRecord.get("icon") != "/pimcore/static6/img/flat-color-icons/timeline.svg") {
                         tmpMenuEntry.icon = classGroupRecord.get("icon");
                         tmpMenuEntry.iconCls = "";
                     }
@@ -458,11 +458,11 @@ pimcore.object.tree = Class.create({
                     /* == menu entry: import object == */
                     tmpMenuEntryImport = {
                         text: classGroupRecord.get("translatedText"),
-                        iconCls: "pimcore_icon_object_import",
+                        iconCls: "pimcore_icon_object pimcore_icon_overlay_add",
                         handler: this.importObjects.bind(this, classGroupRecord.get("id"), classGroupRecord.get("text"), tree, record)
                     };
 
-                    if (classGroupRecord.get("icon")) {
+                    if (classGroupRecord.get("icon") != "/pimcore/static6/img/flat-color-icons/timeline.svg") {
                         tmpMenuEntryImport.icon = classGroupRecord.get("icon");
                         tmpMenuEntryImport.iconCls = "";
                     }
@@ -478,7 +478,7 @@ pimcore.object.tree = Class.create({
             if (!isVariant) {
                 menu.add(new Ext.menu.Item({
                     text: t('add_object'),
-                    iconCls: "pimcore_icon_object_add",
+                    iconCls: "pimcore_icon_object pimcore_icon_overlay_add",
                     hideOnClick: false,
                     menu: objectMenu.objects
                 }));
@@ -487,7 +487,7 @@ pimcore.object.tree = Class.create({
             if (record.data.allowVariants) {
                 menu.add(new Ext.menu.Item({
                     text: t("add_variant"),
-                    iconCls: "pimcore_icon_tree_variant",
+                    iconCls: "pimcore_icon_variant",
                     handler: this.createVariant.bind(this, tree, record)
                 }));
             }
@@ -496,7 +496,7 @@ pimcore.object.tree = Class.create({
                 //if (this.attributes.type == "folder") {
                 menu.add(new Ext.menu.Item({
                     text: t('add_folder'),
-                    iconCls: "pimcore_icon_folder_add",
+                    iconCls: "pimcore_icon_folder pimcore_icon_overlay_add",
                     handler: this.addFolder.bind(this, tree, record)
                 }));
                 //}
@@ -505,9 +505,11 @@ pimcore.object.tree = Class.create({
                 menu.add({
                     text: t('import_csv'),
                     hideOnClick: false,
-                    iconCls: "pimcore_icon_object_csv_import",
+                    iconCls: "pimcore_icon_object pimcore_icon_overlay_upload",
                     menu: objectMenu.importer
                 });
+
+                menu.add("-");
 
                 //paste
                 var pasteMenu = [];
@@ -589,13 +591,13 @@ pimcore.object.tree = Class.create({
             if (record.data.published && record.data.permissions.unpublish) {
                 menu.add(new Ext.menu.Item({
                     text: t('unpublish'),
-                    iconCls: "pimcore_icon_tree_unpublish",
+                    iconCls: "pimcore_icon_unpublish",
                     handler: this.publishObject.bind(this, tree, record, 'unpublish')
                 }));
             } else if (!record.data.published && record.data.permissions.publish) {
                 menu.add(new Ext.menu.Item({
                     text: t('publish'),
-                    iconCls: "pimcore_icon_tree_publish",
+                    iconCls: "pimcore_icon_publish",
                     handler: this.publishObject.bind(this, tree, record, 'publish')
                 }));
             }
@@ -610,105 +612,114 @@ pimcore.object.tree = Class.create({
             }));
         }
 
-        if (record.data.permissions.create) {
-            menu.add(new Ext.menu.Item({
-                text: t('search_and_move'),
-                iconCls: "pimcore_icon_search_and_move",
-                handler: this.searchAndMove.bind(this, tree, record)
-            }));
-        }
-
-        if (record.data.permissions.rename && this.id != 1 && !record.data.locked) {
+        if (record.data.permissions.rename && record.data.id != 1 && !record.data.locked) {
             menu.add(new Ext.menu.Item({
                 text: t('rename'),
-                iconCls: "pimcore_icon_edit_key",
+                iconCls: "pimcore_icon_key pimcore_icon_overlay_go",
                 handler: this.editKey.bind(this, tree, record)
             }));
         }
 
 
-        if (this.id != 1) {
-            var user = pimcore.globalmanager.get("user");
-            if (user.admin) { // only admins are allowed to change locks in frontend
+        // advanced menu
+        var advancedMenuItems = [];
+        var user = pimcore.globalmanager.get("user");
 
-                var lockMenu = [];
-                if (record.data.lockOwner) { // add unlock
-                    lockMenu.push({
-                        text: t('unlock'),
-                        iconCls: "pimcore_icon_lock_delete",
-                        handler: function () {
-                            this.updateObject(tree, record, {locked: null}, function () {
-                                this.refresh(this.tree.getRootNode());
-                            }.bind(this));
-                        }.bind(this)
-                    });
-                } else {
-                    lockMenu.push({
-                        text: t('lock'),
-                        iconCls: "pimcore_icon_lock_add",
-                        handler: function () {
-                            try {
-                                this.updateObject(tree, record, {locked: "self"}, function () {
-                                    this.refresh(this.tree.getRootNode());
-                                }.bind(this));
-                            } catch (e) {
-                                console.log(e);
-                            }
-                        }.bind(this)
-                    });
-
-                    lockMenu.push({
-                        text: t('lock_and_propagate_to_childs'),
-                        iconCls: "pimcore_icon_lock_add_propagate",
-                        handler: function () {
-                            try {
-                                this.updateObject(tree, record, {locked: "propagate"},
-                                    function () {
-                                        this.refresh(this.tree.getRootNode());
-                                    }.bind(this));
-                            } catch (e) {
-                                console.log(e);
-                            }
-                        }.bind(this)
-                    });
-                }
-
-                if(record.data.locked) {
-                    // add unlock and propagate to children functionality
-                    lockMenu.push({
-                        text: t('unlock_and_propagate_to_children'),
-                        iconCls: "pimcore_icon_lock_delete",
-                        handler: function () {
-                            Ext.Ajax.request({
-                                url: "/admin/element/unlock-propagate",
-                                params: {
-                                    id: record.data.id,
-                                    type: "object"
-                                },
-                                success: function () {
-                                    this.refresh(record.parentNode);
-                                }.bind(this)
-                            });
-                        }.bind(this)
-                    });
-                }
-
-                menu.add(new Ext.menu.Item({
-                    text: t('lock'),
-                    iconCls: "pimcore_icon_lock",
-                    hideOnClick: false,
-                    menu: lockMenu
-                }));
-            }
+        if (record.data.permissions.create) {
+            advancedMenuItems.push({
+                text: t('search_and_move'),
+                iconCls: "pimcore_icon_search pimcore_icon_overlay_go",
+                handler: this.searchAndMove.bind(this, tree, record)
+            });
         }
 
+        if (record.data.id != 1 && user.admin) {
+            var lockMenu = [];
+            if (record.data.lockOwner) { // add unlock
+                lockMenu.push({
+                    text: t('unlock'),
+                    iconCls: "pimcore_icon_lock pimcore_icon_overlay_delete",
+                    handler: function () {
+                        this.updateObject(tree, record, {locked: null}, function () {
+                            this.refresh(this.tree.getRootNode());
+                        }.bind(this));
+                    }.bind(this)
+                });
+            } else {
+                lockMenu.push({
+                    text: t('lock'),
+                    iconCls: "pimcore_icon_lock pimcore_icon_overlay_add",
+                    handler: function () {
+                        try {
+                            this.updateObject(tree, record, {locked: "self"}, function () {
+                                this.refresh(this.tree.getRootNode());
+                            }.bind(this));
+                        } catch (e) {
+                            console.log(e);
+                        }
+                    }.bind(this)
+                });
 
+                lockMenu.push({
+                    text: t('lock_and_propagate_to_childs'),
+                    iconCls: "pimcore_icon_lock pimcore_icon_overlay_go",
+                    handler: function () {
+                        try {
+                            this.updateObject(tree, record, {locked: "propagate"},
+                                function () {
+                                    this.refresh(this.tree.getRootNode());
+                                }.bind(this));
+                        } catch (e) {
+                            console.log(e);
+                        }
+                    }.bind(this)
+                });
+            }
 
-        menu.add(new Ext.menu.Item({
+            if(record.data.locked) {
+                // add unlock and propagate to children functionality
+                lockMenu.push({
+                    text: t('unlock_and_propagate_to_children'),
+                    iconCls: "pimcore_icon_lock pimcore_icon_overlay_delete",
+                    handler: function () {
+                        Ext.Ajax.request({
+                            url: "/admin/element/unlock-propagate",
+                            params: {
+                                id: record.data.id,
+                                type: "object"
+                            },
+                            success: function () {
+                                this.refresh(record.parentNode);
+                            }.bind(this)
+                        });
+                    }.bind(this)
+                });
+            }
+
+            advancedMenuItems.push({
+                text: t('lock'),
+                iconCls: "pimcore_icon_lock",
+                hideOnClick: false,
+                menu: lockMenu
+            });
+        }
+
+        menu.add("-");
+
+        if(advancedMenuItems.length) {
+            menu.add({
+                text: t('advanced'),
+                iconCls: "pimcore_icon_more",
+                hideOnClick: false,
+                menu: advancedMenuItems
+            });
+        }
+
+        menu.add({
             text: t('refresh'),
             iconCls: "pimcore_icon_reload",
             handler: this.reloadNode.bind(this, tree, record)
-        }));
+        });
 
 
         menu.showAt(e.pageX+1, e.pageY+1);
@@ -1055,34 +1066,58 @@ pimcore.object.tree = Class.create({
             params: parameters,
             success: function (tree, record, task, response) {
                 try {
-                    var ownerTree = record.getOwnerTree();
-                    var view = ownerTree.getView();
-                    var nodeEl = Ext.fly(view.getNodeByRecord(record));
-
-                    if (nodeEl) {
-                        var nodeElInner = nodeEl.down(".x-grid-td");
-                    }
-
                     var rdata = Ext.decode(response.responseText);
                     if (rdata && rdata.success) {
-
-                        if (task == 'unpublish') {
-                            if (nodeElInner) {
-                                nodeElInner.addCls('pimcore_unpublished');
+                        var treeNames = ["layout_object_tree"]
+                        if (pimcore.settings.customviews.length > 0) {
+                            for (var cvs = 0; cvs < pimcore.settings.customviews.length; cvs++) {
+                                var cv = pimcore.settings.customviews[cvs];
+                                treeNames.push("layout_customviews_tree" + cv.id);
                             }
-                            record.data.published = false;
-                            if (pimcore.globalmanager.exists("object_" + record.data.id)) {
-                                pimcore.globalmanager.get("object_" + record.data.id).toolbarButtons.unpublish.hide();
-                            }
+                        }
 
-                        } else {
-                            if (nodeElInner) {
-                                nodeElInner.removeCls('pimcore_unpublished');
-                            }
+                        var index;
+                        for (index = 0; index < treeNames.length; index++) {
+                            var treeName = treeNames[index];
 
-                            record.data.published = true;
-                            if (pimcore.globalmanager.exists("object_" + record.data.id)) {
-                                pimcore.globalmanager.get("object_" + record.data.id).toolbarButtons.unpublish.show();
+                            // remove class in tree panel
+                            try {
+                                var tree = pimcore.globalmanager.get(treeName).tree;
+                                var store = tree.getStore();
+                                // record of sister store
+                                var record = store.getById(record.id);
+
+                                var view = tree.getView();
+                                var nodeEl = Ext.fly(view.getNodeByRecord(record));
+
+                                if (nodeEl) {
+                                    var nodeElInner = nodeEl.down(".x-grid-td");
+                                }
+
+                                if (task == 'unpublish') {
+                                    if (nodeElInner) {
+                                        nodeElInner.addCls('pimcore_unpublished');
+                                    }
+                                    record.data.published = false;
+                                    record.data.cls = "pimcore_unpublished";
+
+                                    if (pimcore.globalmanager.exists("object_" + record.data.id)) {
+                                        pimcore.globalmanager.get("object_" + record.data.id).toolbarButtons.unpublish.hide();
+                                    }
+
+                                } else {
+                                    if (nodeElInner) {
+                                        nodeElInner.removeCls('pimcore_unpublished');
+                                    }
+                                    delete record.data.cls;
+
+                                    record.data.published = true;
+                                    if (pimcore.globalmanager.exists("object_" + record.data.id)) {
+                                        pimcore.globalmanager.get("object_" + record.data.id).toolbarButtons.unpublish.show();
+                                    }
+                                }
+                            } catch (e) {
+                                console.log(e);
                             }
                         }
 

@@ -21,20 +21,30 @@ pimcore.document.tags.multihref = Class.create(pimcore.document.tag, {
 
         this.setupWrapper();
 
+        var modelName = 'DocumentsMultihrefEntry';
+        if(!Ext.ClassManager.isCreated(modelName) ) {
+            Ext.define(modelName, {
+                extend: 'Ext.data.Model',
+                idProperty: 'rowId',
+                fields: [
+                    'id',
+                    'path',
+                    'type',
+                    'subtype'
+                ]
+            });
+        }
+
         this.store = new Ext.data.ArrayStore({
             data: this.data,
-            fields: [
-                "id",
-                "path",
-                "type",
-                "subtype"
-            ]
+            model: modelName
         });
 
         var elementConfig = {
             store: this.store,
             bodyStyle: "color:#000",
             selModel: Ext.create('Ext.selection.RowModel', {}),
+
             columns: {
                 defaults: {
                     sortable: false
@@ -50,7 +60,7 @@ pimcore.document.tags.multihref = Class.create(pimcore.document.tag, {
                         items:[
                             {
                                 tooltip:t('up'),
-                                icon:"/pimcore/static6/img/icon/arrow_up.png",
+                                icon:"/pimcore/static6/img/flat-color-icons/up.svg",
                                 handler:function (grid, rowIndex) {
                                     if (rowIndex > 0) {
                                         var rec = grid.getStore().getAt(rowIndex);
@@ -67,7 +77,7 @@ pimcore.document.tags.multihref = Class.create(pimcore.document.tag, {
                         items:[
                             {
                                 tooltip:t('down'),
-                                icon:"/pimcore/static6/img/icon/arrow_down.png",
+                                icon:"/pimcore/static6/img/flat-color-icons/down.svg",
                                 handler:function (grid, rowIndex) {
                                     if (rowIndex < (grid.getStore().getCount() - 1)) {
                                         var rec = grid.getStore().getAt(rowIndex);
@@ -83,7 +93,7 @@ pimcore.document.tags.multihref = Class.create(pimcore.document.tag, {
                         width: 30,
                         items: [{
                             tooltip: t('open'),
-                            icon: "/pimcore/static6/img/icon/pencil_go.png",
+                            icon: "/pimcore/static6/img/flat-color-icons/cursor.svg",
                             handler: function (grid, rowIndex) {
                                 var data = grid.getStore().getAt(rowIndex);
                                 var subtype = data.data.subtype;
@@ -99,7 +109,7 @@ pimcore.document.tags.multihref = Class.create(pimcore.document.tag, {
                         width: 30,
                         items: [{
                             tooltip: t('remove'),
-                            icon: "/pimcore/static6/img/icon/cross.png",
+                            icon: "/pimcore/static6/img/flat-color-icons/delete.svg",
                             handler: function (grid, rowIndex) {
                                 grid.getStore().removeAt(rowIndex);
                             }.bind(this)
@@ -131,7 +141,7 @@ pimcore.document.tags.multihref = Class.create(pimcore.document.tag, {
                     {
                         xtype: "button",
                         cls: "pimcore_inline_upload",
-                        iconCls: "pimcore_icon_upload_single",
+                        iconCls: "pimcore_icon_upload",
                         handler: this.uploadDialog.bind(this)
                     }
                 ]
@@ -216,6 +226,7 @@ pimcore.document.tags.multihref = Class.create(pimcore.document.tag, {
             this.store.add(initData);
             return true;
         }
+
         return false;
 
     },
@@ -243,6 +254,15 @@ pimcore.document.tags.multihref = Class.create(pimcore.document.tag, {
                 }
                 pimcore.helpers.openElement(record.data.id, record.data.type, subtype);
             }.bind(this, record)
+        }));
+
+        menu.add(new Ext.menu.Item({
+            text: t('show_in_tree'),
+            iconCls: "pimcore_icon_folder pimcore_icon_overlay_search",
+            handler: function (item) {
+                item.parentMenu.destroy();
+                pimcore.treenodelocator.showInTree(record.data.id, record.data.type);
+            }.bind(this)
         }));
 
         menu.add(new Ext.menu.Item({

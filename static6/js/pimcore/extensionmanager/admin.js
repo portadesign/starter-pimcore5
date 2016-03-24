@@ -28,7 +28,7 @@ pimcore.extensionmanager.admin = Class.create({
             this.panel = new Ext.Panel({
                 id: "pimcore_extensionmanager_admin",
                 title: t("manage_extensions"),
-                iconCls: "pimcore_icon_extensionmanager_admin",
+                iconCls: "pimcore_icon_plugin pimcore_icon_overlay_edit",
                 border: false,
                 layout: "fit",
                 closable:true,
@@ -85,16 +85,8 @@ pimcore.extensionmanager.admin = Class.create({
 
         var typesColumns = [
             {header: t("type"), width: 50, sortable: false, dataIndex: 'type', renderer:
-                                        function (value, metaData, record, rowIndex, colIndex, store) {
-
-                var icon = "";
-                if(value == "plugin") {
-                    icon = "cog.png";
-                } else if (value == "brick") {
-                    icon = "bricks.png";
-                }
-                return '<img src="/pimcore/static6/img/icon/' + icon + '" alt="'+ t("value") +'" title="'
-                                                             + t("value") +'" />';
+            function (value, metaData, record, rowIndex, colIndex, store) {
+                return '<div class="pimcore_icon_' + value + '" style="min-height: 16px;" title="' + t("value") +'"></div>';
             }},
             {header: "ID", width: 100, sortable: true, dataIndex: 'id', flex: 1},
             {header: t("name"), width: 200, sortable: true, dataIndex: 'name', flex: 2},
@@ -109,7 +101,7 @@ pimcore.extensionmanager.admin = Class.create({
                     getClass: function (v, meta, rec) {
                         var klass = "pimcore_action_column ";
                         if(rec.get("active")) {
-                            klass += "pimcore_icon_disable ";
+                            klass += "pimcore_icon_stop ";
                         } else {
                             klass += "pimcore_icon_add ";
                         }
@@ -161,7 +153,7 @@ pimcore.extensionmanager.admin = Class.create({
                         if(rec.get("installed") == null) {
                             return "";
                         } else if(rec.get("installed")) {
-                            klass += "pimcore_action_column pimcore_icon_disable ";
+                            klass += "pimcore_action_column pimcore_icon_stop ";
                         } else {
                             klass += "pimcore_action_column pimcore_icon_add ";
                         }
@@ -291,7 +283,7 @@ pimcore.extensionmanager.admin = Class.create({
                     handler: this.reload.bind(this)
                 }, "-", {
                     text: t("create_new_plugin_skeleton"),
-                    iconCls: "pimcore_icon_plugin_add",
+                    iconCls: "pimcore_icon_plugin pimcore_icon_overlay_add",
                     handler: function () {
                         Ext.MessageBox.prompt(t('create_new_plugin_skeleton'), t('enter_the_name_of_the_new_extension') + "(a-zA-Z0-9_)",  function (button, value) {
                             var regresult = value.match(/[a-zA-Z0-9_]+/);

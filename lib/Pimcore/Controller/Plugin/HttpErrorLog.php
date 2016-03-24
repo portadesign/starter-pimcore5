@@ -12,32 +12,48 @@
 
 namespace Pimcore\Controller\Plugin;
 
-class HttpErrorLog extends \Zend_Controller_Plugin_Abstract {
+class HttpErrorLog extends \Zend_Controller_Plugin_Abstract
+{
+
+    /**
+     * @var null
+     */
+    protected $cacheKey = null;
 
     /**
      *
      */
-    public function dispatchLoopShutdown() {
-
+    public function dispatchLoopShutdown()
+    {
         $code = (string) $this->getResponse()->getHttpResponseCode();
-        if($code && ($code[0] == "4" || $code[0] == "5")) {
+        if ($code && ($code[0] == "4" || $code[0] == "5")) {
             $this->writeLog();
 
             // put the response into the cache, this is read in Pimcore\Controller\Action\Frontend::checkForErrors()
             $responseData = $this->getResponse()->getBody();
-            if(strlen($responseData) > 20 && !session_id()) {
+            if (strlen($responseData) > 20 && !session_id()) {
                 // do not cache if there's no data or an active session
-                $cacheKey = "error_page_response_" . \Pimcore\Tool\Frontend::getSiteKey();
-                \Pimcore\Cache::save($responseData, $cacheKey, array("output"), 900, 9992);
+
+                if ($this->cacheKey) {
+                    \Pimcore\Cache::save($responseData, $this->cacheKey, array("output"), 900, 9992);
+                }
             }
         }
     }
 
     /**
+     * @param $cacheKey
+     */
+    public function setCacheKey($cacheKey)
+    {
+        $this->cacheKey = $cacheKey;
+    }
+
+    /**
      *
      */
-    public function writeLog () {
-
+    public function writeLog()
+    {
         $code = (string) $this->getResponse()->getHttpResponseCode();
         $db = \Pimcore\Db::get();
 
@@ -45,7 +61,7 @@ class HttpErrorLog extends \Zend_Controller_Plugin_Abstract {
             $uri = $this->getRequest()->getScheme() . "://" . $this->getRequest()->getHttpHost() . $this->getRequest()->getRequestUri();
 
             $exists = $db->fetchOne("SELECT date FROM http_error_log WHERE uri = ?", $uri);
-            if($exists) {
+            if ($exists) {
                 $db->query("UPDATE http_error_log SET `count` = `count` + 1, date = ? WHERE uri = ?", [time(), $uri]);
             } else {
                 $db->insert("http_error_log", array(

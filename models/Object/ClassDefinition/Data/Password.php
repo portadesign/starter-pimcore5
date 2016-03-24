@@ -17,7 +17,9 @@ namespace Pimcore\Model\Object\ClassDefinition\Data;
 use Pimcore\Model;
 use Pimcore\Model\Object;
 
-class Password extends Model\Object\ClassDefinition\Data {
+class Password extends Model\Object\ClassDefinition\Data
+{
+    const HASH_FUNCTION_PASSWORD_HASH = 'password_hash';
 
     /**
      * Static type of this element
@@ -60,7 +62,7 @@ class Password extends Model\Object\ClassDefinition\Data {
     /**
      * @var string
      */
-    public $salt = "";  
+    public $salt = "";
       
     /**
      * @var string
@@ -70,7 +72,8 @@ class Password extends Model\Object\ClassDefinition\Data {
     /**
      * @return integer
      */
-    public function getWidth() {
+    public function getWidth()
+    {
         return $this->width;
     }
 
@@ -78,7 +81,8 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param integer $width
      * @return void
      */
-    public function setWidth($width) {
+    public function setWidth($width)
+    {
         $this->width = $this->getAsIntegerCast($width);
         return $this;
     }
@@ -137,32 +141,105 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param null|Model\Object\AbstractObject $object
      * @return string
      */
-    public function getDataForResource($data, $object = null) {
-		
-        // is already a hashed string
-        if(strlen($data) >= 32) {
-            return $data;
-        } else if (empty($data)) {
+    public function getDataForResource($data, $object = null)
+    {
+        if (empty($data)) {
             return null;
         }
-	
-        if ($this->salt != ''){
-        	if ($this->saltlocation == 'back'){
-        		$data = $data . $this->salt;
-        	}else if ($this->saltlocation == 'front'){
-        		$data = $this->salt . $data;
-        	}
+
+        if ($this->algorithm === static::HASH_FUNCTION_PASSWORD_HASH) {
+            $info = password_get_info($data);
+
+            // is already a hashed string
+            if ($info['algo'] !== 0) {
+                return $data;
+            }
+        } else {
+            // is already a hashed string
+            if (strlen($data) >= 32) {
+                return $data;
+            }
         }
-        
-        $hashed = hash($this->algorithm, $data);
+
+        $hashed = $this->calculateHash($data);
 
         // set the hashed password back to the object, to be sure that is not plain-text after the first save
         // this is especially to aviod plaintext passwords in the search-index see: PIMCORE-1406
-        if($object) {
+        if ($object) {
             $setter = "set" . ucfirst($this->getName());
             $object->$setter($hashed);
         }
+
         return $hashed;
+    }
+
+    /**
+     * Calculate hash according to configured parameters
+     *
+     * @param $data
+     * @return bool|null|string
+     */
+    public function calculateHash($data)
+    {
+        $hash = null;
+        if ($this->algorithm === static::HASH_FUNCTION_PASSWORD_HASH) {
+            $hash = password_hash($data, PASSWORD_DEFAULT);
+        } else {
+            if (!empty($this->salt)) {
+                if ($this->saltlocation == 'back') {
+                    $data = $data . $this->salt;
+                } elseif ($this->saltlocation == 'front') {
+                    $data = $this->salt . $data;
+                }
+            }
+
+            $hash = hash($this->algorithm, $data);
+        }
+
+        return $hash;
+    }
+
+    /**
+     * Verify password. Optionally re-hash the password if needed.
+     *
+     * Re-hash will be performed if PHP's password_hash default params (algorithm, cost) differ
+     * from the ones which were used to create the hash (e.g. cost was increased from 10 to 12).
+     * In this case, the hash will be re-calculated with the new parameters and saved back to the object.
+     *
+     * @param $password
+     * @param Object\AbstractObject $object
+     * @param bool|true $updateHash
+     * @return bool
+     */
+    public function verifyPassword($password, Object\AbstractObject $object, $updateHash = true)
+    {
+        $getter = 'get' . ucfirst($this->getName());
+        $setter = 'set' . ucfirst($this->getName());
+
+        $objectHash = $object->$getter();
+        if (null === $objectHash || empty($objectHash)) {
+            return false;
+        }
+
+        $result = false;
+        if ($this->getAlgorithm() === static::HASH_FUNCTION_PASSWORD_HASH) {
+            $result = (true === password_verify($password, $objectHash));
+
+            if ($result && $updateHash) {
+                // password needs rehash (e.g PASSWORD_DEFAULT changed to a stronger algorithm)
+                if (true === password_needs_rehash($objectHash, PASSWORD_DEFAULT)) {
+                    $newHash = $this->calculateHash($password);
+
+                    $object->$setter($newHash);
+                    $object->save();
+                }
+            }
+        } else {
+            $hash   = $this->calculateHash($password);
+            $result = $hash === $objectHash;
+        }
+
+        return $result;
     }
 
     /**
@@ -170,7 +247,8 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param string $data
      * @return string
      */
-    public function getDataFromResource($data) {
+    public function getDataFromResource($data)
+    {
         return $data;
     }
 
@@ -180,7 +258,8 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param null|Model\Object\AbstractObject $object
      * @return string
      */
-    public function getDataForQueryResource($data, $object = null) {
+    public function getDataForQueryResource($data, $object = null)
+    {
         return $this->getDataForResource($data, $object);
     }
 
@@ -190,7 +269,8 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param null|Model\Object\AbstractObject $object
      * @return string
      */
-    public function getDataForEditmode($data, $object = null) {
+    public function getDataForEditmode($data, $object = null)
+    {
         return $data;
     }
 
@@ -198,9 +278,11 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @see Model\Object\ClassDefinition\Data::getDataFromEditmode
      * @param string $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataFromEditmode($data, $object = null) {
+    public function getDataFromEditmode($data, $object = null, $params = array())
+    {
         return $data;
     }
 
@@ -209,11 +291,13 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param string $data
      * @return string
      */
-    public function getVersionPreview($data) {
+    public function getVersionPreview($data)
+    {
         return "******";
     }
 
-    public function getDataForGrid ($data, $object) {
+    public function getDataForGrid($data, $object)
+    {
         return "******";
     }
 
@@ -227,7 +311,8 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param Object\AbstractObject $abstract
      * @return Object\ClassDefinition\Data
      */
-    public function getFromCsvImport($importValue) {
+    public function getFromCsvImport($importValue)
+    {
         return $this->getDataFromEditmode($importValue);
     }
 
@@ -236,7 +321,8 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param string $object
      * @return mixed
      */
-    public function getForWebserviceExport ($object) {
+    public function getForWebserviceExport($object)
+    {
         //neither hash nor password is exported via WS
         return null;
     }
@@ -244,7 +330,8 @@ class Password extends Model\Object\ClassDefinition\Data {
     /** True if change is allowed in edit mode.
      * @return bool
      */
-    public function isDiffChangeAllowed() {
+    public function isDiffChangeAllowed()
+    {
         return true;
     }
 
@@ -254,7 +341,8 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @return null|Pimcore_Date
      */
 
-    public function getDiffDataFromEditmode($data, $object = null) {
+    public function getDiffDataFromEditmode($data, $object = null)
+    {
         return $data[0]["data"];
     }
 
@@ -264,7 +352,8 @@ class Password extends Model\Object\ClassDefinition\Data {
      * @param null $object
      * @return array|null
      */
-    public function getDiffDataForEditMode($data, $object = null) {
+    public function getDiffDataForEditMode($data, $object = null)
+    {
         $diffdata = array();
         $diffdata["data"] = $data;
         $diffdata["disabled"] = !($this->isDiffChangeAllowed());
@@ -287,10 +376,10 @@ class Password extends Model\Object\ClassDefinition\Data {
     /**
      * @param Object\ClassDefinition\Data $masterDefinition
      */
-    public function synchronizeWithMasterDefinition(Object\ClassDefinition\Data $masterDefinition) {
+    public function synchronizeWithMasterDefinition(Object\ClassDefinition\Data $masterDefinition)
+    {
         $this->algorithm = $masterDefinition->algorithm;
         $this->salt = $masterDefinition->salt;
         $this->saltlcoation = $masterDefinition->saltlcoation;
     }
-
 }

@@ -85,12 +85,12 @@ pimcore.object.tags.hotspotimage = Class.create(pimcore.object.tags.image, {
                 },{
                     xtype: "button",
                     tooltip: t("add_marker_or_hotspots"),
-                    iconCls: "pimcore_icon_image_add_hotspot",
+                    iconCls: "pimcore_icon_marker pimcore_icon_overlay_edit",
                     handler: this.openHotspotWindow.bind(this)
                 },{
                     xtype: "button",
                     tooltip: t("clear_marker_or_hotspots"),
-                    iconCls: "pimcore_icon_clear_marker",
+                    iconCls: "pimcore_icon_marker pimcore_icon_overlay_delete",
                     handler: this.clearData.bind(this)
                 },{
                     xtype: "button",
@@ -106,7 +106,7 @@ pimcore.object.tags.hotspotimage = Class.create(pimcore.object.tags.image, {
                     handler: this.openSearchEditor.bind(this)
                 },{
                     xtype: "button",
-                    iconCls: "pimcore_icon_upload_single",
+                    iconCls: "pimcore_icon_upload",
                     cls: "pimcore_inline_upload",
                     handler: this.uploadDialog.bind(this)
                 }]
@@ -194,6 +194,7 @@ pimcore.object.tags.hotspotimage = Class.create(pimcore.object.tags.image, {
             backgroundRepeat: "no-repeat"
         });
 
+        body.removeCls("pimcore_droptarget_image");
         body.repaint();
 
         this.getFileInfo(path);

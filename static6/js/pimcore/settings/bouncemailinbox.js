@@ -27,7 +27,7 @@ pimcore.settings.bouncemailinbox = Class.create({
             this.panel = new Ext.Panel({
                 id: "pimcore_bouncemailinbox",
                 title: t("bounce_mail_inbox"),
-                iconCls: "pimcore_icon_bouncemail",
+                iconCls: "pimcore_icon_email pimcore_icon_overlay_error",
                 border: false,
                 layout: "fit",
                 closable:true,
@@ -70,7 +70,7 @@ pimcore.settings.bouncemailinbox = Class.create({
                 width: 30,
                 items: [{
                     tooltip: t('open'),
-                    icon: "/pimcore/static6/img/icon/arrow_right.png",
+                    icon: "/pimcore/static6/img/flat-color-icons/right.svg",
                     handler: function (grid, rowIndex) {
                         this.showMessage(grid.getStore().getAt(rowIndex).get("id"));
                     }.bind(this)

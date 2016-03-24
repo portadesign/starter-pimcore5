@@ -142,7 +142,7 @@ pimcore.document.tags.areablock = Class.create(pimcore.document.tag, {
                     text: typebuttontext,
                     handleMouseEvents: false,
                     tooltip: t("drag_me"),
-                    icon: "/pimcore/static6/img/icon/arrow_nw_ne_sw_se.png",
+                    iconCls: "pimcore_icon_move",
                     style: "cursor: move;"
                 });
                 typeButton.on("afterrender", function (index, v) {
@@ -193,7 +193,7 @@ pimcore.document.tags.areablock = Class.create(pimcore.document.tag, {
                 optionsDiv = Ext.get(this.elements[i]).query(".pimcore_block_options_" + this.name)[0];
                 optionsButton = new Ext.Button({
                     cls: "pimcore_block_button_options",
-                    iconCls: "pimcore_icon_options",
+                    iconCls: "pimcore_icon_area pimcore_icon_overlay_edit",
                     listeners: {
                         "click": this.optionsClickhandler.bind(this, this.elements[i])
                     }
@@ -426,7 +426,7 @@ pimcore.document.tags.areablock = Class.create(pimcore.document.tag, {
         // plus button
         var optionsButton = new Ext.Button({
             cls: "pimcore_block_button_options",
-            iconCls: "pimcore_icon_options",
+            iconCls: "pimcore_icon_area pimcore_icon_overlay_edit",
             listeners: {
                 click: this.optionsClickhandler.bind(this, false)
             }
@@ -472,7 +472,7 @@ pimcore.document.tags.areablock = Class.create(pimcore.document.tag, {
 
     getMenuConfigForBrick: function (brick, scope, element) {
 
-        var menuText = "<b>" + brick.name + "</b>";
+        var menuText = brick.name;
         if(brick.description) {
             menuText += " | " + brick.description;
         }
@@ -632,6 +632,11 @@ pimcore.document.tags.areablock = Class.create(pimcore.document.tag, {
 
         var content = Ext.get(element).down(".pimcore_area_editmode");
 
+        if( content === null && element.getAttribute('data-editmmode-button-ref') !== null)
+        {
+            content = Ext.getBody().down( '#' + element.getAttribute('data-editmmode-button-ref' ) );
+        }
+
         this.editmodeWindow = new Ext.Window({
             modal: true,
             width: 550,
@@ -669,7 +674,15 @@ pimcore.document.tags.areablock = Class.create(pimcore.document.tag, {
                 listeners: {
                     "click": this.editmodeSave.bind(this)
                 },
-                icon: "/pimcore/static6/img/icon/tick.png"
+                iconCls: "pimcore_icon_save"
+            },{
+                text: t("cancel"),
+                handler: function() {
+                    content.addCls("pimcore_area_editmode_hidden");
+                    element.setAttribute('data-editmmode-button-ref', content.getAttribute("id") );
+                    this.editmodeWindow.close();
+                }.bind(this),
+                iconCls: "pimcore_icon_cancel"
             }]
         });
         this.editmodeWindow.show();
@@ -816,16 +829,16 @@ pimcore.document.tags.areablock = Class.create(pimcore.document.tag, {
         var areaBlockToolbarSettings = this.options["areablock_toolbar"];
         var maxButtonCharacters = areaBlockToolbarSettings.buttonMaxCharacters;
         // this contains fallback-icons
-        var iconStore = ["flag_black","flag_blue","flag_checked","flag_france","flag_green","flag_grey",
-            "flag_orange","flag_pink","flag_purple","flag_red","flag_white","flag_yellow",
-            "award_star_bronze_1","award_star_bronze_2","award_star_bronze_3","award_star_gold_1",
-            "award_star_gold_1","award_star_gold_1","award_star_silver_1","award_star_silver_2",
-            "award_star_silver_3","medal_bronze_1","medal_bronze_2","medal_bronze_3","medal_gold_1",
-            "medal_gold_1","medal_gold_1","medal_silver_1","medal_silver_2","medal_silver_3"];
+        var iconStore = ["circuit","display","biomass","deployment","electrical_sensor","dam",
+            "light_at_the_end_of_tunnel","like","icons8_cup","sports_mode","landscape","selfie","cable_release",
+            "bookmark","briefcase","graduation_cap","in_transit","diploma_2","circuit","display","biomass","deployment",
+            "electrical_sensor","dam",
+            "light_at_the_end_of_tunnel","like","icons8_cup","sports_mode","landscape","selfie","cable_release",
+            "bookmark","briefcase","graduation_cap","in_transit","diploma_2"];
 
 
         if(!brick.icon) {
-            brick.icon = "/pimcore/static6/img/icon/" + iconStore[itemCount] + ".png";
+            brick.icon = "/pimcore/static6/img/flat-color-icons/" + iconStore[itemCount] + ".svg";
         }
 
         var button = {

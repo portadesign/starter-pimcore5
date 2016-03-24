@@ -59,7 +59,7 @@ pimcore.object.helpers.gridTabAbstract = Class.create({
 
         var columnConfig = new Ext.menu.Item({
             text: t("grid_column_config"),
-            iconCls: "pimcore_icon_grid_column_config",
+            iconCls: "pimcore_icon_table_col pimcore_icon_overlay_edit",
             handler: this.openColumnConfig.bind(this)
         });
         var menu = grid.headerCt.getMenu();
@@ -67,7 +67,7 @@ pimcore.object.helpers.gridTabAbstract = Class.create({
         //
         var batchAllMenu = new Ext.menu.Item({
             text: t("batch_change"),
-            iconCls: "pimcore_icon_batch",
+            iconCls: "pimcore_icon_table pimcore_icon_overlay_go",
             handler: function (grid) {
                 menu = grid.headerCt.getMenu();
                 var columnDataIndex = menu.activeHeader;
@@ -78,7 +78,7 @@ pimcore.object.helpers.gridTabAbstract = Class.create({
 
         var batchSelectedMenu = new Ext.menu.Item({
             text: t("batch_change_selected"),
-            iconCls: "pimcore_icon_batch",
+            iconCls: "pimcore_icon_table pimcore_icon_overlay_go",
             handler: function (grid) {
                 menu = grid.headerCt.getMenu();
                 var columnDataIndex = menu.activeHeader;

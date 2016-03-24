@@ -58,7 +58,7 @@ pimcore.object.classificationstore.keySelectionWindow = Class.create({
                 "->",{
                     xtype: "button",
                     text: t("cancel"),
-                    icon: "/pimcore/static6/img/icon/cancel.png",
+                    iconCls: "pimcore_icon_cancel",
                     handler: function () {
                         this.searchWindow.close();
                     }.bind(this)
@@ -195,11 +195,9 @@ pimcore.object.classificationstore.keySelectionWindow = Class.create({
             iconCls: "pimcore_icon_classificationstore_icon_cs_collections",
             enableToggle: true,
             pressed: this.isCollectionSearch,
-            disabled: !this.enableCollections
+            hidden: !this.enableCollections
         });
         items.push(this.toolbarbuttons.collection);
-
-        items.push("-");
 
         this.toolbarbuttons.group = new Ext.Button({
             text: t("keyValue_group"),
@@ -207,20 +205,18 @@ pimcore.object.classificationstore.keySelectionWindow = Class.create({
             iconCls: "pimcore_icon_keys",
             enableToggle: true,
             pressed: this.isGroupSearch,
-            disabled: !this.enableGroups
+            hidden: !this.enableGroups
 
         });
         items.push(this.toolbarbuttons.group);
 
-
-        items.push("-");
         this.toolbarbuttons.key = new Ext.Button({
             text: t("key"),
             handler: this.searchKey.bind(this),
             iconCls: "pimcore_icon_key",
             enableToggle: true,
             pressed: !this.isGroupSearch && !this.isCollectionSearch,
-            disabled: !this.enableKeys
+            hidden: !this.enableKeys
         });
         items.push(this.toolbarbuttons.key);
 
@@ -230,7 +226,7 @@ pimcore.object.classificationstore.keySelectionWindow = Class.create({
         items.push({
             xtype: "button",
             text: t("search"),
-            icon: "/pimcore/static6/img/icon/magnifier.png",
+            iconCls: "pimcore_icon_search",
             handler: function () {
                 var formValue = this.searchfield.getValue();
 

@@ -112,9 +112,8 @@ pimcore.settings.website = Class.create({
                 header: t("name"),
                 dataIndex: 'name',
                 width: 200,
-                editor: new Ext.form.TextField({
-                    allowBlank: false
-                }),
+                editable: true,
+                getEditor: this.getCellEditor.bind(this),
                 sortable: true
             },
             {
@@ -133,6 +132,7 @@ pimcore.settings.website = Class.create({
                         store: pimcore.globalmanager.get("sites"),
                         valueField: "id",
                         displayField: "domain",
+                        editable: false,
                         triggerAction: "all"
                 }),
                 renderer: function (siteId) {
@@ -174,7 +174,7 @@ pimcore.settings.website = Class.create({
                 xtype:'actioncolumn',
                 width:40,
                 tooltip:t('empty'),
-                icon: "/pimcore/static6/img/icon/bin_empty.png",
+                icon: "/pimcore/static6/img/flat-color-icons/full_trash.svg",
                 handler:function (grid, rowIndex) {
                     grid.getStore().getAt(rowIndex).set("data","");
                 }.bind(this)
@@ -185,7 +185,7 @@ pimcore.settings.website = Class.create({
                 xtype:'actioncolumn',
                 width:40,
                 tooltip:t('delete'),
-                icon:"/pimcore/static6/img/icon/cross.png",
+                icon:"/pimcore/static6/img/flat-color-icons/delete.svg",
                 handler:function (grid, rowIndex) {
                     grid.getStore().removeAt(rowIndex);
                 }.bind(this)
@@ -230,7 +230,9 @@ pimcore.settings.website = Class.create({
                 beforeedit: function(editor, context, eOpts) {
                     //need to clear cached editors of cell-editing editor in order to
                     //enable different editors per row
-                    editor.editors.each(Ext.destroy, Ext);
+                    editor.editors.each(function() {
+                        Ext.destroy, Ext
+                    });
                     editor.editors.clear();
                 }
             }
@@ -295,8 +297,7 @@ pimcore.settings.website = Class.create({
 
     getTypeRenderer: function (value, metaData, record, rowIndex, colIndex, store) {
 
-        return '<div style="background: url(/pimcore/static6/img/icon/' + value + '.png) center center no-repeat; '
-            + 'height: 16px;" data-id="' + record.get("id") + '">&nbsp;</div>';
+        return '<div class="pimcore_icon_' + value + '" data-id="' + record.get("id") + '">&nbsp;</div>';
     },
 
     getCellEditor: function (record) {

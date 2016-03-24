@@ -52,9 +52,9 @@ pimcore.document.edit = Class.create({
                 });
             };
 
-            var tbar = [{
-                text: t("refresh"),
+            var lbar = [{
                 iconCls: "pimcore_icon_reload",
+                tooltip: t("refresh"),
                 handler: this.reload.bind(this)
             },"-",{
                 tooltip: t("highlight_editable_elements"),
@@ -102,8 +102,6 @@ pimcore.document.edit = Class.create({
                     editable: false,
                     triggerAction: 'all',
                     width: 240,
-                    cls: "pimcore_icon_persona_select",
-                    emptyText: t("edit_content_for_persona"),
                     listeners: {
                         select: function (el) {
                             if(this.document.isDirty()) {
@@ -122,7 +120,14 @@ pimcore.document.edit = Class.create({
                     }
                 });
 
-                tbar.push("->", this.persona, {
+
+                lbar.push("->", {
+                    tooltip: t("edit_content_for_persona"),
+                    iconCls: "pimcore_icon_personas",
+                    arrowVisible: false,
+                    menuAlign: "tl",
+                    menu: [this.persona]
+                }, {
                     tooltip: t("clear_content_of_selected_persona"),
                     iconCls: "pimcore_icon_cleanup",
                     handler: cleanupFunction.bind(this)
@@ -138,8 +143,8 @@ pimcore.document.edit = Class.create({
                 bodyCls: "pimcore_overflow_scrolling",
                 forceLayout: true,
                 hideMode: "offsets",
-                iconCls: "pimcore_icon_tab_edit",
-                tbar: tbar
+                iconCls: "pimcore_icon_edit",
+                lbar: lbar
             };
 
             if(typeof additionalConfig == "object") {
@@ -179,7 +184,7 @@ pimcore.document.edit = Class.create({
 
     setLayoutFrameDimensions: function (width, height) {
         Ext.get(this.iframeName).setStyle({
-            height: (height-52) + "px"
+            height: (height-7) + "px"
         });
     },
 

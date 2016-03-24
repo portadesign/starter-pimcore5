@@ -38,7 +38,7 @@ pimcore.object.variantsTab = Class.create(pimcore.object.helpers.gridTabAbstract
             this.layout = new Ext.Panel({
                 title: t('variants'),
                 border: false,
-                iconCls: "pimcore_icon_tab_variants",
+                iconCls: "pimcore_icon_variant",
                 layout: "fit"
             });
         }
@@ -85,7 +85,7 @@ pimcore.object.variantsTab = Class.create(pimcore.object.helpers.gridTabAbstract
             items: [
                 {
                     tooltip: t('open'),
-                    icon: "/pimcore/static6/img/icon/pencil_go.png",
+                    icon: "/pimcore/static6/img/flat-color-icons/cursor.svg",
                     handler: function (grid, rowIndex) {
                         var data = grid.getStore().getAt(rowIndex);
                         pimcore.helpers.openObject(data.id, "variant");
@@ -100,7 +100,7 @@ pimcore.object.variantsTab = Class.create(pimcore.object.helpers.gridTabAbstract
             items: [
                 {
                     tooltip: t('remove'),
-                    icon: "/pimcore/static6/img/icon/cross.png",
+                    icon: "/pimcore/static6/img/flat-color-icons/delete.svg",
                     handler: function (grid, rowIndex) {
                         var data = grid.getStore().getAt(rowIndex);
                         Ext.MessageBox.confirm(t('remove_variant'), t('remove_variant_text'),
@@ -184,7 +184,7 @@ pimcore.object.variantsTab = Class.create(pimcore.object.helpers.gridTabAbstract
                     }.bind(this)
                 },"-",{
                     text: t("grid_column_config"),
-                    iconCls: "pimcore_icon_grid_column_config",
+                    iconCls: "pimcore_icon_table_col pimcore_icon_overlay_edit",
                     handler: this.openColumnConfig.bind(this)
                 } 
             ],
@@ -227,7 +227,7 @@ pimcore.object.variantsTab = Class.create(pimcore.object.helpers.gridTabAbstract
 
         menu.add(new Ext.menu.Item({
             text: t('rename'),
-            iconCls: "pimcore_icon_edit_key",
+            iconCls: "pimcore_icon_key pimcore_icon_overlay_go",
             handler: function (data) {
                 Ext.MessageBox.prompt(t('rename'), t('please_enter_the_new_name'),
                                                 this.editKey.bind(this, data.id), null, null, data.data.filename);

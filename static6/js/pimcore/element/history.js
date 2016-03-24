@@ -29,7 +29,7 @@ pimcore.element.history = Class.create({
                 title:t("element_history"),
                 border:false,
                 layout:"fit",
-                iconCls:"pimcore_icon_tab_schedule",
+                iconCls:"pimcore_icon_schedule",
                 closable:true
             });
 
@@ -70,7 +70,7 @@ pimcore.element.history = Class.create({
                             items: [
                                 {
                                     tooltip: t('open'),
-                                    icon: "/pimcore/static6/img/icon/pencil_go.png",
+                                    icon: "/pimcore/static6/img/flat-color-icons/cursor.svg",
                                     handler: function (grid, rowIndex) {
                                         var data = grid.getStore().getAt(rowIndex).data;
                                         pimcore.helpers.openElement(data.id, data.type);

@@ -116,23 +116,23 @@ pimcore.document.hardlink = Class.create(pimcore.document.document, {
 
             this.toolbarButtons.publish = new Ext.Button({
                 text: t('save_and_publish'),
-                iconCls: "pimcore_icon_publish_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_publish",
+                scale: "medium",
                 handler: this.publish.bind(this)
             });
 
 
             this.toolbarButtons.unpublish = new Ext.Button({
                 text: t('unpublish'),
-                iconCls: "pimcore_icon_unpublish_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_unpublish",
+                scale: "medium",
                 handler: this.unpublish.bind(this)
             });
 
             this.toolbarButtons.remove = new Ext.Button({
                 text: t('delete'),
-                iconCls: "pimcore_icon_delete_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_delete",
+                scale: "medium",
                 handler: this.remove.bind(this)
             });
 
@@ -153,26 +153,34 @@ pimcore.document.hardlink = Class.create(pimcore.document.document, {
 
             buttons.push("-");
 
-            this.toolbarButtons.reload = new Ext.Button({
+            var moreButtons = [];
+
+            moreButtons.push({
                 text: t('reload'),
-                iconCls: "pimcore_icon_reload_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_reload",
                 handler: this.reload.bind(this)
             });
-            buttons.push(this.toolbarButtons.reload);
+
+            moreButtons.push({
+                text: t('show_in_tree'),
+                iconCls: "pimcore_icon_show_in_tree",
+                handler: this.selectInTree.bind(this)
+            });
+
+            moreButtons.push(this.getTranslationButtons());
 
             buttons.push({
-                text: t('show_in_tree'),
-                iconCls: "pimcore_icon_download_showintree",
-                scale: "small",
-                handler: this.selectInTree.bind(this)
+                text: t("more"),
+                iconCls: "pimcore_icon_more",
+                scale: "medium",
+                menu: moreButtons
             });
 
             buttons.push("-");
             buttons.push({
                 xtype: 'tbtext',
                 text: this.data.id,
-                scale: "small"
+                scale: "medium"
             });
 
             this.toolbar = new Ext.Toolbar({

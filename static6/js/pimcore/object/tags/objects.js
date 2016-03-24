@@ -225,7 +225,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                 collectionMenu.push({
                     text: ts(allowedClasses[i]),
                     handler: this.create.bind(this, allowedClasses[i]),
-                    iconCls: "pimcore_icon_fieldcollections"
+                    iconCls: "pimcore_icon_fieldcollection"
                 });
             }
         }
@@ -257,9 +257,8 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
 
     getLayoutEdit: function () {
 
-        var autoHeight = false;
         if (intval(this.fieldConfig.height) < 15) {
-            autoHeight = true;
+            this.fieldConfig.height = null;
         }
 
         var cls = 'object_field';
@@ -293,7 +292,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                         items:[
                             {
                                 tooltip:t('up'),
-                                icon:"/pimcore/static6/img/icon/arrow_up.png",
+                                icon:"/pimcore/static6/img/flat-color-icons/up.svg",
                                 handler:function (grid, rowIndex) {
                                     if (rowIndex > 0) {
                                         var rec = grid.getStore().getAt(rowIndex);
@@ -310,7 +309,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                         items:[
                             {
                                 tooltip:t('down'),
-                                icon:"/pimcore/static6/img/icon/arrow_down.png",
+                                icon:"/pimcore/static6/img/flat-color-icons/down.svg",
                                 handler:function (grid, rowIndex) {
                                     if (rowIndex < (grid.getStore().getCount() - 1)) {
                                         var rec = grid.getStore().getAt(rowIndex);
@@ -327,7 +326,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                         items: [
                             {
                                 tooltip: t('open'),
-                                icon: "/pimcore/static6/img/icon/pencil_go.png",
+                                icon: "/pimcore/static6/img/flat-color-icons/cursor.svg",
                                 handler: function (grid, rowIndex) {
                                     var data = grid.getStore().getAt(rowIndex);
                                     pimcore.helpers.openObject(data.data.id, "object");
@@ -341,7 +340,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                         items: [
                             {
                                 tooltip: t('remove'),
-                                icon: "/pimcore/static6/img/icon/cross.png",
+                                icon: "/pimcore/static6/img/flat-color-icons/delete.svg",
                                 handler: function (grid, rowIndex) {
                                     grid.getStore().removeAt(rowIndex);
                                 }.bind(this)
@@ -382,7 +381,6 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                 ctCls: "pimcore_force_auto_width",
                 cls: "pimcore_force_auto_width"
             },
-            autoHeight: autoHeight,
             bodyCssClass: "pimcore_object_tag_objects"
         });
 
@@ -484,7 +482,7 @@ pimcore.object.tags.objects = Class.create(pimcore.object.tags.abstract, {
                     items: [
                         {
                             tooltip: t('open'),
-                            icon: "/pimcore/static6/img/icon/pencil_go.png",
+                            icon: "/pimcore/static6/img/flat-color-icons/cursor.svg",
                             handler: function (grid, rowIndex) {
                                 var data = grid.getStore().getAt(rowIndex);
                                 pimcore.helpers.openObject(data.data.id, "object");

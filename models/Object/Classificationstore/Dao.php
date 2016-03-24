@@ -18,7 +18,8 @@ use Pimcore\Model;
 use Pimcore\Model\Object;
 use Pimcore\Tool;
 
-class Dao extends Model\Dao\AbstractDao {
+class Dao extends Model\Dao\AbstractDao
+{
 
     /**
      * @var null
@@ -28,14 +29,16 @@ class Dao extends Model\Dao\AbstractDao {
     /**
      * @return string
      */
-    public function getDataTableName () {
+    public function getDataTableName()
+    {
         return "object_classificationstore_data_" . $this->model->getClass()->getId();
     }
 
     /**
      * @return string
      */
-    public function getGroupsTableName () {
+    public function getGroupsTableName()
+    {
         return "object_classificationstore_groups_" . $this->model->getClass()->getId();
     }
 
@@ -43,14 +46,15 @@ class Dao extends Model\Dao\AbstractDao {
     /**
      *
      */
-    public function save () {
+    public function save()
+    {
         $object = $this->model->object;
         $objectId = $object->getId();
         $dataTable = $this->getDataTableName();
         $fieldname = $this->model->getFieldname();
 
         $condition = $this->db->quoteInto("o_id = ?", $objectId)
-                        . " AND " . $this->db->quoteInto("fieldname = ?", $fieldname);
+            . " AND " . $this->db->quoteInto("fieldname = ?", $fieldname);
         $this->db->delete($dataTable, $condition);
 
         $items = $this->model->getItems();
@@ -72,15 +76,15 @@ class Dao extends Model\Dao\AbstractDao {
                         "o_id" => $objectId,
                         "collectionId" => $collectionId,
                         "groupId" => $groupId,
+                        "value" => $value["value"],
+                        "value2" =>$value["value2"],
                         "keyId" => $keyId,
-                        "value" => $value,
                         "fieldname" => $fieldname,
                         "language" => $language,
                         "type" => $keyConfig->getType()
-
                     );
-                    $this->db->insertOrUpdate($dataTable, $data);
 
+                    $this->db->insertOrUpdate($dataTable, $data);
                 }
             }
         }
@@ -110,7 +114,8 @@ class Dao extends Model\Dao\AbstractDao {
     /**
      *
      */
-    public function delete () {
+    public function delete()
+    {
         $object = $this->model->object;
         $objectId = $object->getId();
         $dataTable = $this->getDataTableName();
@@ -126,7 +131,8 @@ class Dao extends Model\Dao\AbstractDao {
     /**
      *
      */
-    public function load () {
+    public function load()
+    {
         /** @var  $classificationStore Object\Classificationstore */
         $classificationStore = $this->model;
         $object = $this->model->getObject();
@@ -146,9 +152,17 @@ class Dao extends Model\Dao\AbstractDao {
             $collectionId = $item["collectionId"];
             $groupCollectionMapping[$groupId] = $collectionId;
 
-            $value = $item["value"];
+            $value = array(
+                "value" => $item["value"],
+                "value2" => $item["value2"]
+            );
 
             $keyConfig = DefinitionCache::get($keyId);
+            if (!$keyConfig) {
+                \Logger::error("Could not resolve key with ID: " . $keyId);
+                continue;
+            }
+
             $fd = Service::getFieldDefinitionFromKeyConfig($keyConfig);
             $value = $fd->unmarshal($value, $object);
 
@@ -174,13 +188,11 @@ class Dao extends Model\Dao\AbstractDao {
         $classificationStore->setGroupCollectionMappings($groupCollectionMapping);
     }
 
-
-
-
     /**
      *
      */
-    public function createUpdateTable () {
+    public function createUpdateTable()
+    {
         $groupsTable = $this->getGroupsTableName();
         $dataTable = $this->getDataTableName();
 
@@ -188,7 +200,9 @@ class Dao extends Model\Dao\AbstractDao {
             `o_id` BIGINT(20) NOT NULL,
             `groupId` BIGINT(20) NOT NULL,
             `fieldname` VARCHAR(70) NOT NULL,
-            PRIMARY KEY (`groupId`, `o_id`, `fieldname`)
+            PRIMARY KEY (`groupId`, `o_id`, `fieldname`),
+            INDEX `o_id` (`o_id`),
+            INDEX `fieldname` (`fieldname`)
         ) DEFAULT CHARSET=utf8;");
 
         $this->db->query("CREATE TABLE IF NOT EXISTS `" . $dataTable . "` (
@@ -197,16 +211,18 @@ class Dao extends Model\Dao\AbstractDao {
             `groupId` BIGINT(20) NOT NULL,
             `keyId` BIGINT(20) NOT NULL,
             `value` LONGTEXT NOT NULL,
+	        `value2` LONGTEXT NULL,
             `fieldname` VARCHAR(70) NOT NULL,
             `language` VARCHAR(10) NOT NULL,
             `type` VARCHAR(50) NULL,
-            PRIMARY KEY (`groupId`, `keyId`, `o_id`, `fieldname`, `language`)
+            PRIMARY KEY (`groupId`, `keyId`, `o_id`, `fieldname`, `language`),
+            INDEX `o_id` (`o_id`),
+            INDEX `groupId` (`groupId`),
+            INDEX `keyId` (`keyId`),
+            INDEX `fieldname` (`fieldname`),
+            INDEX `language` (`language`)
         ) DEFAULT CHARSET=utf8;");
 
-
-//
         $this->tableDefinitions = null;
     }
-
-
 }

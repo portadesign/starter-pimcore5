@@ -23,7 +23,7 @@ pimcore.report.webmastertools.settings = Class.create({
     getLayout: function () {
 
         this.panel = new Ext.FormPanel({
-            title: "Google Webmastertools",
+            title: "Google Search Console",
             bodyStyle: "padding: 10px;",
             autoScroll: true,
             items: [
@@ -31,7 +31,7 @@ pimcore.report.webmastertools.settings = Class.create({
                     xtype: "displayfield",
                     width: 670,
                     hideLabel: true,
-                    value: "&nbsp;<br />" + t("webastertools_settings_description"),
+                    value: "&nbsp;<br />" + t("search_console_settings_description"),
                     cls: "pimcore_extra_label"
                 },
                 {
@@ -67,10 +67,6 @@ pimcore.report.webmastertools.settings = Class.create({
     },
 
     getConfiguration: function (key, name, id) {
-
-        id = id + "";
-        var itemId = id.replace(/\./g, '_');
-
         var config = {
             xtype: "fieldset",
             title: name,
@@ -82,7 +78,7 @@ pimcore.report.webmastertools.settings = Class.create({
                     labelWidth: 250,
                     width: 650,
                     value: this.parent.getValue("webmastertools.sites." + key + ".verification"),
-                    id: "report_settings_webmastertools_verification_" + itemId
+                    id: "report_settings_webmastertools_verification_" + id
                 }
             ]
         };
@@ -97,16 +93,15 @@ pimcore.report.webmastertools.settings = Class.create({
         var sitesData = {};
 
         sites.each(function (record) {
-            var id = record.data.id;
+            var id = record.get("id");
             if (id == "default") {
                 key = "default";
             } else {
                 key = "site_" + id;
             }
-            var itemId = id.replace(/\./g, '_');
 
             sitesData[key] = {
-                verification: Ext.getCmp("report_settings_webmastertools_verification_" + itemId).getValue()
+                verification: Ext.getCmp("report_settings_webmastertools_verification_" + id).getValue()
             };
         }, this);
 

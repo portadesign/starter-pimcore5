@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Pimcore
  *
@@ -17,25 +17,27 @@ namespace Pimcore\Model\Object\Objectbrick;
 use Pimcore\Model;
 use Pimcore\Model\Object;
 
-class Dao extends Model\Object\Fieldcollection\Dao {
+class Dao extends Model\Object\Fieldcollection\Dao
+{
 
     /**
      * @param Object\Concrete $object
      * @return array
      */
-    public function load(Object\Concrete $object) {
+    public function load(Object\Concrete $object)
+    {
         $fieldDef = $object->getClass()->getFieldDefinition($this->model->getFieldname());
         $values = array();
-        
+
         foreach ($fieldDef->getAllowedTypes() as $type) {
             try {
                 $definition = Object\Objectbrick\Definition::getByKey($type);
             } catch (\Exception $e) {
                 continue;
             }
-             
+
             $tableName = $definition->getTableName($object->getClass(), false);
-            
+
             try {
                 $results = $this->db->fetchAll("SELECT * FROM ".$tableName." WHERE o_id = ? AND fieldname = ?", array($object->getId(), $this->model->getFieldname()));
             } catch (\Exception $e) {
@@ -52,11 +54,10 @@ class Dao extends Model\Object\Fieldcollection\Dao {
                 $brick->setObject($object);
 
                 foreach ($fieldDefinitions as $key => $fd) {
-
                     if (method_exists($fd, "load")) {
                         // datafield has it's own loader
                         $value = $fd->load($brick);
-                        if($value === 0 || !empty($value)) {
+                        if ($value === 0 || !empty($value)) {
                             $brick->setValue($key, $value);
                         }
                     } else {
@@ -68,14 +69,12 @@ class Dao extends Model\Object\Fieldcollection\Dao {
                             $brick->setValue(
                                 $key,
                                 $fd->getDataFromResource($multidata));
-
                         } else {
                             $brick->setValue(
                                 $key,
                                 $fd->getDataFromResource($result[$key]));
                         }
                     }
-
                 }
 
                 $setter = "set" . ucfirst($type);
@@ -92,7 +91,19 @@ class Dao extends Model\Object\Fieldcollection\Dao {
      * @param Object\Concrete $object
      * @return void
      */
-    public function delete (Object\Concrete $object) {
-        throw new \Exception("Not implemented yet");
+    public function delete(Object\Concrete $object)
+    {
+        // this is to clean up also the inherited values
+        $fieldDef = $object->getClass()->getFieldDefinition($this->model->getFieldname());
+        foreach ($fieldDef->getAllowedTypes() as $type) {
+            try {
+                $definition = Object\Objectbrick\Definition::getByKey($type);
+            } catch (\Exception $e) {
+                continue;
+            }
+
+            $tableName = $definition->getTableName($object->getClass(), true);
+            $this->db->delete($tableName, "o_id = " . $object->getId());
+        }
     }
 }

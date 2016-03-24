@@ -44,7 +44,7 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
 
     selectInTree: function (button) {
         try {
-            pimcore.treenodelocator.showInTree(this, "asset", button)
+            pimcore.treenodelocator.showInTree(this.id, "asset", button)
         } catch (e) {
             console.log(e);
         }
@@ -127,8 +127,8 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
 
                 this.toolbarButtons.publish = Ext.create("Ext.button.Split", {
                     text: t("save_and_publish"),
-                    iconCls: "pimcore_icon_publish_medium",
-                    scale: "small",
+                    iconCls: "pimcore_icon_publish",
+                    scale: "medium",
                     handler: this.save.bind(this),
                     menu: [{
                         text: t('save_pubish_close'),
@@ -149,8 +149,8 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
             if (this.isAllowed("delete") && !this.data.locked) {
                 this.toolbarButtons.remove = new Ext.Button({
                     text: t('delete'),
-                    iconCls: "pimcore_icon_delete_medium",
-                    scale: "small",
+                    iconCls: "pimcore_icon_delete",
+                    scale: "medium",
                     handler: this.remove.bind(this)
                 });
                 buttons.push(this.toolbarButtons.remove);
@@ -161,55 +161,49 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
             if (this.isAllowed("publish")) {
                 this.toolbarButtons.upload = new Ext.Button({
                     text: t("upload"),
-                    iconCls: "pimcore_icon_upload_medium",
-                    scale: "small",
+                    iconCls: "pimcore_icon_upload",
+                    scale: "medium",
                     handler: this.upload.bind(this)
                 });
                 buttons.push(this.toolbarButtons.upload);
             }
 
-            buttons.push("-");
-
-            buttons.push({
-                text: t('reload'),
-                iconCls: "pimcore_icon_reload_medium",
-                scale: "small",
-                handler: this.reload.bind(this)
-            });
-
-            buttons.push({
-                text: t('show_in_tree'),
-                iconCls: "pimcore_icon_download_showintree",
-                scale: "small",
-                handler: this.selectInTree.bind(this)
-            });
-
-
-            buttons.push({
-                text: t("show_metainfo"),
-                scale: "small",
-                iconCls: "pimcore_icon_info_large",
-                handler: this.showMetaInfo.bind(this)
-            });
-
-
-            buttons.push("-");
-
             buttons.push({
                 text: t("download"),
-                iconCls: "pimcore_icon_download_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_download",
+                scale: "medium",
                 handler: function () {
                     pimcore.helpers.download("/admin/asset/download/id/" + this.data.id);
                 }.bind(this)
             });
 
+            buttons.push("-");
+
+            var moreButtons = [];
+
+            moreButtons.push({
+                text: t('reload'),
+                iconCls: "pimcore_icon_reload",
+                handler: this.reload.bind(this)
+            });
+
+            moreButtons.push({
+                text: t('show_in_tree'),
+                iconCls: "pimcore_icon_show_in_tree",
+                handler: this.selectInTree.bind(this)
+            });
+
+            moreButtons.push({
+                text: t("show_metainfo"),
+                iconCls: "pimcore_icon_info",
+                handler: this.showMetaInfo.bind(this)
+            });
+
             // only for videos and images
             if (this.isAllowed("publish") && in_array(this.data.type,["image","video"])) {
-                buttons.push({
+                moreButtons.push({
                     text: t("clear_thumbnails"),
                     iconCls: "pimcore_icon_menu_clear_thumbnails",
-                    scale: "small",
                     handler: function () {
                         Ext.Ajax.request({
                             url: "/admin/asset/clear-thumbnail",
@@ -221,11 +215,18 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
                 });
             }
 
+            buttons.push({
+                text: t("more"),
+                iconCls: "pimcore_icon_more",
+                scale: "medium",
+                menu: moreButtons
+            });
+
             buttons.push("-");
             buttons.push({
                 xtype: 'tbtext',
                 text: t("id") + " " + this.data.id,
-                scale: "small"
+                scale: "medium"
             });
 
 

@@ -67,11 +67,9 @@ pimcore.asset.listfolder = Class.create({
         this.selectionColumn = new Ext.selection.CheckboxModel();
 
         var typesColumns = [
-            this.selectionColumn,
             {header: t("id"), sortable: true, dataIndex: 'id', editable: false, flex: 40},
             {header: t("filename"), sortable: true, dataIndex: 'fullpath', editable: false, flex: 100, filter: 'string'},
             {header: t("type"), sortable: true, dataIndex: 'type', editable: false, flex: 50, filter: 'string'}
-
         ];
 
 
@@ -125,6 +123,7 @@ pimcore.asset.listfolder = Class.create({
             width: 80,
             value: 20,
             triggerAction: "all",
+            editable: false,
             listeners: {
                 select: function (box, rec, index) {
                     this.store.setPageSize(intval(rec.data.field1));
@@ -213,18 +212,16 @@ pimcore.asset.listfolder = Class.create({
             menu.add(new Ext.menu.Item({
                 text: t('show_in_tree'),
                 iconCls: "pimcore_icon_show_in_tree",
-                handler: function (data) {
+                handler: function () {
                     try {
                         try {
-                            Ext.getCmp("pimcore_panel_tree_assets").expand();
-                            var tree = pimcore.globalmanager.get("layout_asset_tree");
-                            pimcore.helpers.selectPathInTree(tree.tree, data.data.idPath);
+                            pimcore.treenodelocator.showInTree(record.id, "asset", this);
                         } catch (e) {
                             console.log(e);
                         }
 
                     } catch (e2) { console.log(e2); }
-                }.bind(grid, data)
+                }
             }));
             menu.add(new Ext.menu.Item({
                 text: t('delete'),

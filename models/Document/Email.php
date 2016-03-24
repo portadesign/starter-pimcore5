@@ -190,7 +190,8 @@ class Email extends Model\Document\PageSnippet
      */
     public function getFromAsArray()
     {
-        return $this->getAsArray('From');
+        $emailAddresses = preg_split('/,|;/', $this->getFrom());
+        return $emailAddresses;
     }
 
     /**
@@ -256,5 +257,4 @@ class Email extends Model\Document\PageSnippet
     {
         return $this->getAsArray('Bcc');
     }
-
 }

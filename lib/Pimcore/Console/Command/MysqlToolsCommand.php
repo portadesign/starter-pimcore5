@@ -34,14 +34,14 @@ class MysqlToolsCommand extends AbstractCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         // display error message
-        if(!$input->getOption("mode")) {
+        if (!$input->getOption("mode")) {
             $this->writeError("Please specify the mode!");
             exit;
         }
 
         $db = \Pimcore\Db::get();
 
-        if($input->getOption("mode") == "optimize") {
+        if ($input->getOption("mode") == "optimize") {
             $tables = $db->fetchAll("SHOW TABLES");
 
             foreach ($tables as $table) {
@@ -49,11 +49,11 @@ class MysqlToolsCommand extends AbstractCommand
                 try {
                     \Logger::debug("Running: OPTIMIZE TABLE " . $t);
                     $db->query("OPTIMIZE TABLE " . $t);
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     \Logger::error($e);
                 }
             }
-        } else if ($input->getOption("mode") == "warmup") {
+        } elseif ($input->getOption("mode") == "warmup") {
             $tables = $db->fetchAll("SHOW TABLES");
 
             foreach ($tables as $table) {
@@ -62,7 +62,7 @@ class MysqlToolsCommand extends AbstractCommand
                     \Logger::debug("Running: SELECT COUNT(*) FROM $t");
                     $res = $db->fetchOne("SELECT COUNT(*) FROM $t");
                     \Logger::debug("Result: " . $res);
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     \Logger::error($e);
                 }
             }

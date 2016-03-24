@@ -25,6 +25,7 @@ pimcore.helpers.registerKeyBindings = function (bindEl, ExtJS) {
             key: "s",
             ctrl: true,
             shift: false,
+            alt: false,
             fn: top.pimcore.helpers.handleCtrlS
         }, {
             key:116,
@@ -39,6 +40,22 @@ pimcore.helpers.registerKeyBindings = function (bindEl, ExtJS) {
             fn: top.pimcore.helpers.openElementByIdDialog.bind(this, "object"),
             ctrl:true,
             shift:true
+        },  {
+            key:"c",
+            fn: top.pimcore.helpers.openClassEditor,
+            ctrl:true,
+            shift:true
+        }, {
+            key:"l",
+            fn: top.pimcore.helpers.openInTree,
+            ctrl:true,
+            shift:true
+        }, {
+            key:"i",
+            fn: top.pimcore.helpers.showMetaInfo,
+            ctrl: false,
+            shift:false,
+            alt: true
         }, {
             key:"d",
             fn: top.pimcore.helpers.openElementByIdDialog.bind(this, "document"),
@@ -52,6 +69,14 @@ pimcore.helpers.registerKeyBindings = function (bindEl, ExtJS) {
         }]
     });
 };
+
+pimcore.helpers.openClassEditor = function() {
+    var user = pimcore.globalmanager.get("user");
+    if (user.isAllowed("classes")) {
+        var toolbar = pimcore.globalmanager.get("layout_toolbar");
+        toolbar.editClasses();
+    }
+}
 
 pimcore.helpers.openWelcomePage = function(keyCode, e) {
 
@@ -418,7 +443,7 @@ pimcore.helpers.showNotification = function (title, text, type, errorText, hideD
 
         var errWin = new Ext.Window({
             modal: true,
-            iconCls: "icon_notification_error",
+            iconCls: "pimcore_icon_error",
             title: title,
             width: 700,
             height: 500,
@@ -481,6 +506,44 @@ pimcore.helpers.handleCtrlS = function (keyCode, e) {
         }
     }
 };
+
+pimcore.helpers.showMetaInfo = function (keyCode, e) {
+
+    e.stopEvent();
+
+    var tabpanel = Ext.getCmp("pimcore_panel_tabs");
+    var activeTab = tabpanel.getActiveTab();
+
+    if (activeTab) {
+        if (activeTab.initialConfig.document) {
+            activeTab.initialConfig.document.showMetaInfo();
+        } else if (activeTab.initialConfig.asset) {
+            activeTab.initialConfig.asset.showMetaInfo();
+        } else if (activeTab.initialConfig.object) {
+            activeTab.initialConfig.object.showMetaInfo();
+        }
+    }
+};
+
+pimcore.helpers.openInTree = function (keyCode, e) {
+
+    e.stopEvent();
+
+    var tabpanel = Ext.getCmp("pimcore_panel_tabs");
+    var activeTab = tabpanel.getActiveTab();
+
+    if (activeTab) {
+        if (activeTab.initialConfig.document || activeTab.initialConfig.asset || activeTab.initialConfig.object) {
+            var tabId = activeTab.id;
+            var parts = tabId.split("_");
+            var type = parts[0];
+            var elementId = parts[1];
+            pimcore.treenodelocator.showInTree(elementId, type);
+
+        }
+    }
+};
+
 
 
 pimcore.helpers.handleF5 = function (keyCode, e) {
@@ -1165,7 +1228,7 @@ pimcore.helpers.assetSingleUploadDialog = function (parent, parentType, success,
             name: 'Filedata',
             buttonText: "",
             buttonConfig: {
-                iconCls: 'pimcore_icon_upload_single'
+                iconCls: 'pimcore_icon_upload'
             },
             listeners: {
                 change: function () {
@@ -1230,7 +1293,7 @@ pimcore.helpers.uploadDialog = function (url, filename, success, failure) {
             name: filename,
             buttonText: "",
             buttonConfig: {
-                iconCls: 'pimcore_icon_upload_single'
+                iconCls: 'pimcore_icon_upload'
             },
             listeners: {
                 change: function () {
@@ -1259,64 +1322,6 @@ pimcore.helpers.uploadDialog = function (url, filename, success, failure) {
     uploadWindowCompatible.updateLayout();
 };
 
-pimcore.helpers.selectPathInTreeActiveSelections = {};
-pimcore.helpers.selectPathInTree = function (tree, path, callback) {
-    try {
-
-        var hash = tree.getId() + "~" + path;
-        if(typeof pimcore.helpers.selectPathInTreeActiveSelections[hash] != "undefined") {
-            if(typeof callback == "function") {
-                callback(false);
-            }
-            return false;
-        }
-        pimcore.helpers.selectPathInTreeActiveSelections[hash] = hash;
-
-        var initialData = {
-            tree: tree,
-            path: path,
-            callback: callback
-        };
-
-        tree.selectPath(path, null, '/', function (success, node) {
-            if(!success) {
-                Ext.MessageBox.alert(t("error"), t("not_possible_with_paging"));
-            } else {
-                if(typeof initialData["callback"] == "function") {
-                    initialData["callback"]();
-                }
-            }
-
-            delete pimcore.helpers.selectPathInTreeActiveSelections[hash];
-        });
-
-    } catch (e) {
-        delete pimcore.helpers.selectPathInTreeActiveSelections[hash];
-        console.log(e);
-    }
-};
-
-pimcore.helpers.selectElementInTree = function (type, id) {
-    try {
-        Ext.Ajax.request({
-            url: "/admin/element/get-id-path/",
-            params: {
-                id: id,
-                type: type
-            },
-            success: function (response) {
-                var res = Ext.decode(response.responseText);
-                if(res.success) {
-                    Ext.getCmp("pimcore_panel_tree_" + type + "s").expand();
-                    var tree = pimcore.globalmanager.get("layout_" + type + "_tree");
-                    pimcore.helpers.selectPathInTree(tree.tree, res.idPath);
-                }
-            }
-        });
-    } catch (e) {
-        console.log(e);
-    }
-};
 
 pimcore.helpers.getClassForIcon = function (icon) {
 
@@ -1893,7 +1898,7 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
             }
         }
     });
-    
+
     fieldPath.on("render", function (el) {
         // add drop zone
         new Ext.dd.DropZone(el.getEl(), {
@@ -2056,7 +2061,7 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
                 listeners: {
                     "click": callback["save"]
                 },
-                icon: "/pimcore/static6/img/icon/tick.png"
+                iconCls: "pimcore_icon_save"
             }
         ]
     });
@@ -2211,7 +2216,7 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
             fieldLabel: t('type'),
             name: 'type',
             triggerAction: 'all',
-            editable: true,
+            editable: false,
             width: 270,
             mode: "local",
             store: ["asset","youtube","vimeo"],
@@ -2254,7 +2259,7 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
                 listeners: {
                     "click": callback["save"]
                 },
-                icon: "/pimcore/static6/img/icon/tick.png"
+                iconCls: "pimcore_icon_save"
             }
         ]
     });
@@ -2628,7 +2633,7 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
 
             menu.add(new Ext.menu.Item({
                 text: t("add_data"),
-                iconCls: "pimcore_icon_add_data",
+                iconCls: "pimcore_icon_metadata pimcore_icon_overlay_add",
                 handler: function (id, item) {
                     item.parentMenu.destroy();
 
@@ -2696,7 +2701,7 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
         this.editTextVersionWindow = new Ext.Window({
             width: 800,
             height: 400,
-            iconCls: "pimcore_icon_edit_pdf_text",
+            iconCls: "pimcore_icon_text",
             title: t('pimcore_icon_edit_pdf_text'),
             layout: "fit",
             closeAction:'close',
@@ -2744,13 +2749,13 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
             tbar: [{
                 xtype: "button",
                 text: t("add_hotspot"),
-                iconCls: "pimcore_icon_add_hotspot",
+                iconCls: "pimcore_icon_image_region pimcore_icon_overlay_add",
                 handler: addHotspot
             },
                 {
                     xtype: "button",
                     text: t("pimcore_icon_edit_pdf_text"),
-                    iconCls: "pimcore_icon_edit_pdf_text",
+                    iconCls: "pimcore_icon_text",
                     handler: editTextVersion
                 },
                 "->",
@@ -2910,3 +2915,30 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
 
     this.metaDataWindow.show();
 };
+
+pimcore.helpers.showAbout = function () {
+
+    var html = '<div class="pimcore_about_window">';
+    html += '<br><img src="/pimcore/static6/img/logo.svg" style="width: 300px;"><br>';
+    html += '<br><b>Version: ' + pimcore.settings.version + '</b>';
+    html += '<br><b>Build: ' + pimcore.settings.build + '</b>';
+    html += '<br><br>&copy; by pimcore GmbH, Salzburg, Austria (<a href="http://www.pimcore.org/" target="_blank">pimcore.org</a>)';
+    html += '<br>a proud member of the <a href="http://elements.at" target="_blank">elements group</a>';
+    html += '<br><br><a href="https://github.com/pimcore/pimcore/blob/master/LICENSE.md" target="_blank">License</a> | ';
+    html += '<a href="https://www.pimcore.org/en/company/contact" target="_blank">Contact</a> | ';
+    html += '<a href="https://www.pimcore.org/en/company/team" target="_blank">Team</a>';
+    html += '<img src="/pimcore/static6/img/austria-heart.svg" style="position:absolute;top:172px;right:45px;width:32px;">';
+    html += '</div>';
+
+    var win = new Ext.Window({
+        title: t("about"),
+        width:500,
+        height: 300,
+        bodyStyle: "padding: 10px;",
+        modal: true,
+        html: html
+    });
+
+    win.show();
+};
+

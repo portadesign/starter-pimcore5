@@ -15,7 +15,7 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
     fieldObject: {},
 
     title: t('search_edit'),
-    icon: "pimcore_icon_tab_search",
+    icon: "pimcore_icon_search",
     onlyDirectChildren: false,
 
     sortinfo: {},
@@ -66,6 +66,7 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                     valueField: 'id',
                     displayField: 'translatedText',
                     triggerAction: 'all',
+                    editable: false,
                     value: this.object.data["selectedClass"],
                     listeners: {
                         "select": this.changeClassSelect.bind(this)
@@ -237,7 +238,7 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                 cls: 'pimcore_object_grid_panel',
                 tbar: [this.languageInfo, "-", this.toolbarFilterInfo, "->", this.checkboxOnlyDirectChildren, "-", this.sqlEditor, this.sqlButton, "-", {
                     text: t("search_and_move"),
-                    iconCls: "pimcore_icon_search_and_move",
+                    iconCls: "pimcore_icon_search pimcore_icon_overlay_go",
                     handler: pimcore.helpers.searchAndMove.bind(this, this.object.id,
                         function () {
                             this.store.reload();
@@ -263,7 +264,7 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                     }.bind(this)
                 }, "-", {
                     text: t("grid_column_config"),
-                    iconCls: "pimcore_icon_grid_column_config",
+                    iconCls: "pimcore_icon_table_col pimcore_icon_overlay_edit",
                     handler: this.openColumnConfig.bind(this)
                 }]
             });
@@ -314,6 +315,7 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                 ],
                 mode: "local",
                 width: 80,
+                editable: false,
                 value: itemsPerPage,
                 triggerAction: "all",
                 listeners: {
@@ -372,18 +374,16 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
             menu.add(new Ext.menu.Item({
                 text: t('show_in_tree'),
                 iconCls: "pimcore_icon_show_in_tree",
-                handler: function (data) {
+                handler: function () {
                     try {
                         try {
-                            Ext.getCmp("pimcore_panel_tree_objects").expand();
-                            var tree = pimcore.globalmanager.get("layout_object_tree");
-                            pimcore.helpers.selectPathInTree(tree.tree, data.data.idPath);
+                            pimcore.treenodelocator.showInTree(record.id, "object", this);
                         } catch (e) {
                             console.log(e);
                         }
 
                     } catch (e2) { console.log(e2); }
-                }.bind(grid, data)
+                }
             }));
             menu.add(new Ext.menu.Item({
                 text: t('delete'),

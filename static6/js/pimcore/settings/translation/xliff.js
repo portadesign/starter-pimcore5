@@ -86,7 +86,7 @@ pimcore.settings.translation.xliff = Class.create({
                         width: 30,
                         items: [{
                             tooltip: t('remove'),
-                            icon: "/pimcore/static6/img/icon/cross.png",
+                            icon: "/pimcore/static6/img/flat-color-icons/delete.svg",
                             handler: function (grid, rowIndex) {
                                 grid.getStore().removeAt(rowIndex);
                             }.bind(this)
@@ -319,7 +319,7 @@ pimcore.settings.translation.xliff = Class.create({
             html: '<div style="font: 12px tahoma,arial,helvetica; padding: 10px;">' + t("xliff_import_notice") + '</div>',
             buttons: [{
                 text: t("select_a_file") + " (.xlf / .xliff)",
-                iconCls: "pimcore_icon_newfile",
+                iconCls: "pimcore_icon_file pimcore_icon_overlay_add",
                 handler: function () {
                     pimcore.helpers.uploadDialog('/admin/translation/xliff-import-upload', "file", function(res) {
 

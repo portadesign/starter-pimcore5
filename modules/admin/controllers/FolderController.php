@@ -13,9 +13,11 @@
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
 
-class Admin_FolderController extends \Pimcore\Controller\Action\Admin\Document {
+class Admin_FolderController extends \Pimcore\Controller\Action\Admin\Document
+{
 
-    public function getDataByIdAction() {
+    public function getDataByIdAction()
+    {
 
         // check for lock
         if (Element\Editlock::isLocked($this->getParam("id"), "document")) {
@@ -26,11 +28,14 @@ class Admin_FolderController extends \Pimcore\Controller\Action\Admin\Document {
         Element\Editlock::lock($this->getParam("id"), "document");
 
         $folder = Document\Folder::getById($this->getParam("id"));
+        $folder = clone $folder;
+
         $folder->idPath = Element\Service::getIdPath($folder);
         $folder->userPermissions = $folder->getUserPermissions();
         $folder->setLocked($folder->isLocked());
         $folder->setParent(null);
 
+        $this->addTranslationsData($folder);
         $this->minimizeProperties($folder);
 
         if ($folder->isAllowed("view")) {
@@ -40,7 +45,8 @@ class Admin_FolderController extends \Pimcore\Controller\Action\Admin\Document {
         $this->_helper->json(false);
     }
 
-    public function saveAction() {
+    public function saveAction()
+    {
         if ($this->getParam("id")) {
             $folder = Document\Folder::getById($this->getParam("id"));
             $folder->setModificationDate(time());
@@ -56,10 +62,8 @@ class Admin_FolderController extends \Pimcore\Controller\Action\Admin\Document {
         $this->_helper->json(false);
     }
 
-    protected function setValuesToDocument(Document\Folder $folder) {
-
+    protected function setValuesToDocument(Document\Folder $folder)
+    {
         $this->addPropertiesToDocument($folder);
-
     }
-
 }

@@ -249,6 +249,10 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
 
         this.component = new Ext.Panel(wrapperConfig);
         this.component.updateLayout();
+
+        this.fieldConfig.datatype ="data";
+        this.fieldConfig.fieldtype = "localizedfields";
+
         return this.component;
     },
 
@@ -307,9 +311,18 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
             localizedData[currentLanguage] = {};
 
             for (var s=0; s<this.languageElements[currentLanguage].length; s++) {
-                if(this.languageElements[currentLanguage][s].isDirty()) {
-                    localizedData[currentLanguage][this.languageElements[currentLanguage][s].getName()]
-                        = this.languageElements[currentLanguage][s].getValue();
+                try {
+
+                    if(this.languageElements[currentLanguage][s].isDirty()) {
+                        localizedData[currentLanguage][this.languageElements[currentLanguage][s].getName()]
+                            = this.languageElements[currentLanguage][s].getValue();
+                    }
+
+                } catch (e) {
+
+                    console.log(e);
+                    localizedData[currentLanguage][this.languageElements[currentLanguage][s].getName()] = "";
+
                 }
             }
         }

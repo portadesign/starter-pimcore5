@@ -120,7 +120,7 @@ pimcore.object.versions = Class.create({
                 bodyStyle:'padding:20px 5px 20px 5px;',
                 border: false,
                 layout: "border",
-                iconCls: "pimcore_icon_tab_versions",
+                iconCls: "pimcore_icon_versions",
                 items: [grid,preview]
             });
 
@@ -142,11 +142,12 @@ pimcore.object.versions = Class.create({
     },
 
     onRowClick: function(grid, record, tr, rowIndex, e, eOpts ) {
-        if (grid.getSelectionModel().getCount() > 1) {
-            if (grid.getSelectionModel().getCount() > 2) {
-                grid.getSelectionModel().clearSelections();
-                return;
-            }
+        var selModel = grid.getSelectionModel();
+        if (selModel.getCount() > 2) {
+            selModel.select(record);
+        }
+
+        if (selModel.getCount() > 1) {
             this.compareVersions(grid, rowIndex, event);
         }
         else {

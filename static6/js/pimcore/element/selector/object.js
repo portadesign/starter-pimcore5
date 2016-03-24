@@ -20,7 +20,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
     getTabTitle: function() {
         return "object_search";
     },
-    
+
     getForm: function () {
         var i;
 
@@ -46,10 +46,10 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                 handler: function () {
                     window.open("http://dev.mysql.com/doc/refman/5.6/en/fulltext-boolean.html");
                 },
-                iconCls: "pimcore_icon_menu_help"
+                iconCls: "pimcore_icon_help"
             })]
         };
-        
+
         // check for restrictions
         var possibleRestrictions = ["folder", "object", "variant"];
         var filterStore = [];
@@ -61,7 +61,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                 selectedStore.push(possibleRestrictions[i]);
            }
         }
-        
+
         // add all to store if empty
         if(filterStore.length < 1) {
             for (var i=0; i<possibleRestrictions.length; i++) {
@@ -69,12 +69,12 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                 selectedStore.push(possibleRestrictions[i]);
             }
         }
-        
+
         var selectedValue = selectedStore.join(",");
         if(filterStore.length > 1) {
             filterStore.splice(0,0,[selectedValue, t("all_types")]);
         }
-        
+
         if(!this.parent.initialRestrictions.specific || (!this.parent.initialRestrictions.specific.classes
                             || this.parent.initialRestrictions.specific.classes.length < 1)) {
             // only add the subtype filter if there is no class restriction
@@ -84,19 +84,19 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                 mode: "local",
                 name: "subtype",
                 triggerAction: "all",
-                forceSelection: true,
+                editable: false,
                 value: selectedValue
             });
         }
 
-        
+
         // classes
         var possibleClassRestrictions = [];
         var classStore = pimcore.globalmanager.get("object_types_store");
         classStore.each(function (rec) {
              possibleClassRestrictions.push(rec.data.text);
         });
-        
+
         var filterClassStore = [];
         var selectedClassStore = [];
         for (i=0; i<possibleClassRestrictions.length; i++) {
@@ -105,7 +105,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                 selectedClassStore.push(possibleClassRestrictions[i]);
            }
         }
-        
+
         // add all to store if empty
         if(filterClassStore.length < 1) {
             for (i=0; i<possibleClassRestrictions.length; i++) {
@@ -113,28 +113,28 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                 selectedClassStore.push(possibleClassRestrictions[i]);
             }
         }
-        
+
         var selectedClassValue = selectedClassStore.join(",");
         if(filterClassStore.length > 1) {
             filterClassStore.splice(0,0,[selectedClassValue, t("all_types")]);
         }
-            
+
         this.classChangeCombo = new Ext.form.ComboBox({
             xtype: "combo",
             store: filterClassStore,
             mode: "local",
             name: "class",
             triggerAction: "all",
-            forceSelection: true,
+            editable: false,
             value: selectedClassValue,
             listeners: {
                 select: this.changeClass.bind(this)
             }
         });
-        
+
         compositeConfig.items.push(this.classChangeCombo);
-    
-        
+
+
         // add button
         compositeConfig.items.push({
             xtype: "button",
@@ -142,7 +142,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
             text: t("search"),
             handler: this.search.bind(this)
         });
-        
+
         if(!this.formPanel) {
             this.formPanel = new Ext.form.FormPanel({
                 region: "north",
@@ -150,20 +150,20 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                 items: [compositeConfig]
             });
         }
-        
+
         return this.formPanel;
     },
-    
+
     getSelectionPanel: function () {
         if(!this.selectionPanel) {
-            
+
             this.selectionStore = new Ext.data.JsonStore({
                 data: [],
                 fields: ["id", "type", "filename", "fullpath", "subtype", {name:"classname",convert: function(v, rec){
                     return ts(rec.data.classname);
                 }}]
             });
-            
+
             this.selectionPanel = new Ext.grid.GridPanel({
                region: "east",
                title: t("your_selection"),
@@ -191,7 +191,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                     rowcontextmenu: function (grid, record, tr, rowIndex, e, eOpts ) {
                         var menu = new Ext.menu.Menu();
                         var data = grid.getStore().getAt(rowIndex);
-                
+
                         menu.add(new Ext.menu.Item({
                             text: t('remove'),
                             iconCls: "pimcore_icon_delete",
@@ -215,28 +215,28 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                 }]
             });
         }
-        
+
         return this.selectionPanel;
     },
-    
+
     getResultPanel: function () {
         if (!this.resultPanel) {
             this.resultPanel = new Ext.Panel({
                 region: "center",
                 layout: "fit"
             });
-            
+
             this.resultPanel.on("afterrender", this.changeClass.bind(this));
         }
-        
+
         return this.resultPanel;
     },
-    
-    
+
+
     changeClass: function () {
-        
+
         var selectedClass = this.classChangeCombo.getValue();
-        
+
         if(selectedClass.indexOf(",") > 0) { // multiple classes because of a comma in the string
             // init default store
             this.initDefaultStore();
@@ -249,7 +249,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
             });
         }
     },
-    
+
     initClassStore: function (selectedClass, response) {
         var fields = [];
         if(response.responseText) {
@@ -260,10 +260,11 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
         } else {
             fields = response;
         }
-        
-        var gridHelper = new pimcore.object.helpers.grid(selectedClass, fields, "/admin/search/search/find");
+
+        var gridHelper = new pimcore.object.helpers.grid(selectedClass, fields, "/admin/search/search/find", null, true);
         this.store = gridHelper.getStore();
         this.store.setPageSize(50);
+        this.store.getProxy().extraParams.limit = 50;
         var gridColumns = gridHelper.getGridColumns();
         var gridfilters = gridHelper.getGridFilters();
 
@@ -273,10 +274,10 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
         }
 
         //TODO set up filter
-        
+
         this.getGridPanel(gridColumns, gridfilters, selectedClass);
     },
-    
+
     initDefaultStore: function () {
         this.store = new Ext.data.Store({
             autoDestroy: true,
@@ -294,7 +295,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
                     return ts(rec.data.classname);
                 }},"published"]
         });
-        
+
         var columns = [
             {header: t("type"), width: 40, sortable: true, dataIndex: 'subtype',
                 renderer: function (value, metaData, record, rowIndex, colIndex, store) {
@@ -308,11 +309,11 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
             {header: t("filename"), width: 200, sortable: true, dataIndex: 'filename', hidden: true},
             {header: t("class"), width: 200, sortable: true, dataIndex: 'classname'}
         ];
-        
+
 
         this.getGridPanel(columns, null);
     },
-    
+
     getGridPanel: function (columns, gridfilters, selectedClass) {
 
         this.pagingtoolbar = this.getPagingToolbar(t("no_objects_found"));
@@ -332,9 +333,9 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
             bbar: this.pagingtoolbar,
             listeners: {
                 rowdblclick: function (grid, record, tr, rowIndex, e, eOpts ) {
-                    
+
                     var data = grid.getStore().getAt(rowIndex);
-                                            
+
                     if(this.parent.multiselect) {
                         this.addToSelection(data.data);
                     } else {
@@ -358,7 +359,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
 
                 var columnConfig = new Ext.menu.Item({
                     text: t("grid_column_config"),
-                    iconCls: "pimcore_icon_grid_column_config",
+                    iconCls: "pimcore_icon_table_col pimcore_icon_overlay_edit",
                     handler: this.openColumnConfig.bind(this, selectedClass, classId)
                 });
                 var menu = grid.headerCt.getMenu();
@@ -369,7 +370,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
         if(this.parent.multiselect) {
             this.gridPanel.on("rowcontextmenu", this.onRowContextmenu.bind(this));
         }
-        
+
         this.resultPanel.removeAll();
         this.resultPanel.add(this.gridPanel);
         this.resultPanel.updateLayout();
@@ -409,25 +410,28 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
             sortinfo: this.sortinfo,
             columns: {}
         };
-        var cm = this.gridPanel.getColumnModel();
-        for (var i=0; i<cm.config.length; i++) {
-            if(cm.config[i].dataIndex) {
-                config.columns[cm.config[i].dataIndex] = {
-                    name: cm.config[i].dataIndex,
+
+        var cm = this.gridPanel.getView().getHeaderCt().getGridColumns();
+
+        for (var i=0; i < cm.length; i++) {
+            if(cm[i].dataIndex) {
+                config.columns[cm[i].dataIndex] = {
+                    name: cm[i].dataIndex,
                     position: i,
-                    hidden: cm.config[i].hidden,
-                    fieldConfig: this.fieldObject[cm.config[i].dataIndex]
+                    hidden: cm[i].hidden,
+                    fieldConfig: this.fieldObject[cm[i].dataIndex]
                 };
+
             }
         }
 
         return config;
     },
-    
+
     getGrid: function () {
         return this.gridPanel;
     },
-    
+
     search: function () {
         var formValues = this.formPanel.getForm().getFieldValues();
 

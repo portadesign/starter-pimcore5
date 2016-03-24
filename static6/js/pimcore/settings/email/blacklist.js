@@ -28,7 +28,7 @@ pimcore.settings.email.blacklist = Class.create({
             this.panel = new Ext.Panel({
                 id:"email_blacklist",
                 title:t("email_blacklist"),
-                iconCls:"pimcore_icon_email_blacklist",
+                iconCls:"pimcore_icon_email pimcore_icon_overlay_delete",
                 border:false,
                 layout:"fit",
                 closable:true,
@@ -117,7 +117,7 @@ pimcore.settings.email.blacklist = Class.create({
                 items:[
                     {
                         tooltip:t('delete'),
-                        icon:"/pimcore/static6/img/icon/cross.png",
+                        icon:"/pimcore/static6/img/flat-color-icons/delete.svg",
                         handler:function (grid, rowIndex) {
                             grid.getStore().removeAt(rowIndex);
                         }.bind(this)

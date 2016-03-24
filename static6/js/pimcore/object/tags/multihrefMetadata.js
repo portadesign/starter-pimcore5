@@ -50,9 +50,17 @@ pimcore.object.tags.multihrefMetadata = Class.create(pimcore.object.tags.abstrac
         }
 
 
+        var modelName = 'ObjectsMultihrefMetadataEntry';
+        if(!Ext.ClassManager.isCreated(modelName) ) {
+            Ext.define(modelName, {
+                extend: 'Ext.data.Model',
+                idProperty: 'rowId',
+                fields: fields
+            });
+        }
+
         this.store = new Ext.data.JsonStore({
             data: this.data,
-            idProperty: 'id',
             listeners: {
                 add:function() {
                     this.dataChanged = true;
@@ -67,7 +75,7 @@ pimcore.object.tags.multihrefMetadata = Class.create(pimcore.object.tags.abstrac
                     this.dataChanged = true;
                 }.bind(this)
             },
-            fields: fields
+            model: modelName
         });
 
     },
@@ -176,7 +184,7 @@ pimcore.object.tags.multihrefMetadata = Class.create(pimcore.object.tags.abstrac
                 items: [
                     {
                         tooltip: t('up'),
-                        icon: "/pimcore/static6/img/icon/arrow_up.png",
+                        icon: "/pimcore/static6/img/flat-color-icons/up.svg",
                         handler: function (grid, rowIndex) {
                             if(rowIndex > 0) {
                                 var rec = grid.getStore().getAt(rowIndex);
@@ -193,7 +201,7 @@ pimcore.object.tags.multihrefMetadata = Class.create(pimcore.object.tags.abstrac
                 items: [
                     {
                         tooltip: t('down'),
-                        icon: "/pimcore/static6/img/icon/arrow_down.png",
+                        icon: "/pimcore/static6/img/flat-color-icons/down.svg",
                         handler: function (grid, rowIndex) {
                             if(rowIndex < (grid.getStore().getCount()-1)) {
                                 var rec = grid.getStore().getAt(rowIndex);
@@ -212,7 +220,7 @@ pimcore.object.tags.multihrefMetadata = Class.create(pimcore.object.tags.abstrac
             items: [
                 {
                     tooltip: t('open'),
-                    icon: "/pimcore/static6/img/icon/pencil_go.png",
+                    icon: "/pimcore/static6/img/flat-color-icons/cursor.svg",
                     handler: function (grid, rowIndex) {
                         var data = grid.getStore().getAt(rowIndex);
                         var subtype = data.data.subtype;
@@ -233,7 +241,7 @@ pimcore.object.tags.multihrefMetadata = Class.create(pimcore.object.tags.abstrac
                 items: [
                     {
                         tooltip: t('remove'),
-                        icon: "/pimcore/static6/img/icon/cross.png",
+                        icon: "/pimcore/static6/img/flat-color-icons/delete.svg",
                         handler: function (grid, rowIndex) {
                             grid.getStore().removeAt(rowIndex);
                         }.bind(this)
@@ -269,14 +277,14 @@ pimcore.object.tags.multihrefMetadata = Class.create(pimcore.object.tags.abstrac
                 }
                 //,
                 //this.getCreateControl()
-                 ]);
+            ]);
         }
 
         if (this.fieldConfig.assetsAllowed) {
             tbarItems.push({
                 xtype: "button",
                 cls: "pimcore_inline_upload",
-                iconCls: "pimcore_icon_upload_single",
+                iconCls: "pimcore_icon_upload",
                 handler: this.uploadDialog.bind(this)
             });
         }

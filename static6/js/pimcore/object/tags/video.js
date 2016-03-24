@@ -41,7 +41,7 @@ pimcore.object.tags.video = Class.create(pimcore.object.tags.abstract, {
                                             + '/width/88/height/88/frame/true" />';
                                     }
                                 }.bind(this, field.key)};
-    },    
+    },
 
     getLayoutEdit: function () {
 
@@ -62,7 +62,7 @@ pimcore.object.tags.video = Class.create(pimcore.object.tags.abstract, {
                 text: "<b>" + this.fieldConfig.title + "</b>"
             },"->",{
                 xtype: "button",
-                iconCls: "pimcore_icon_videoedit",
+                iconCls: "pimcore_icon_video pimcore_icon_overlay_edit",
                 handler: this.openEdit.bind(this)
             }, {
                 xtype: "button",
@@ -180,17 +180,23 @@ pimcore.object.tags.video = Class.create(pimcore.object.tags.abstract, {
                             Possible Links
                             # http://vimeo.com/11696823
                             # http://player.vimeo.com/video/22775048?title=0&byline=0&portrait=0
+                            # http://vimeo.com/groups/1615/videos/151603026
                          */
 
                         var path = el.getValue();
                         var parts = parse_url(path);
 
-                        var pathParts = trim(parts["path"]," /").split("/");
-
-                        for(var i=0; i<pathParts.length; i++) {
-                            if(intval(pathParts[i]) > 0 && pathParts[i].length > 3) {
-                                tmpId = pathParts[i];
-                                break;
+                        if (path.indexOf("groups") >= 0) {
+                            var explodedPath = trim(parts["path"]," /").split("/");
+                            var tmpIndex = intval(array_search('videos', explodedPath)) + 1;
+                            tmpId = explodedPath[tmpIndex];
+                        } else {
+                            var pathParts = trim(parts["path"], " /").split("/");
+                            for (var i = 0; i < pathParts.length; i++) {
+                                if (intval(pathParts[i]) > 0 && pathParts[i].length > 3) {
+                                    tmpId = pathParts[i];
+                                    break;
+                                }
                             }
                         }
 
@@ -233,7 +239,7 @@ pimcore.object.tags.video = Class.create(pimcore.object.tags.abstract, {
                 fieldLabel: t('type'),
                 name: 'type',
                 triggerAction: 'all',
-                editable: true,
+                editable: false,
                 mode: "local",
                 store: ["asset","youtube","vimeo"],
                 value: this.data.type,
@@ -287,7 +293,7 @@ pimcore.object.tags.video = Class.create(pimcore.object.tags.abstract, {
                             this.updateVideo();
                         }.bind(this)
                     },
-                    icon: "/pimcore/static6/img/icon/tick.png"
+                    iconCls: "pimcore_icon_save"
                 }
             ]
         });
@@ -419,7 +425,7 @@ pimcore.object.tags.video = Class.create(pimcore.object.tags.abstract, {
         var bodyId = result[0].getAttribute("id");
         return Ext.get(bodyId);
     },
-    
+
     empty: function () {
         this.data = {
             type: "asset",
@@ -430,7 +436,7 @@ pimcore.object.tags.video = Class.create(pimcore.object.tags.abstract, {
 
         this.dirty = true;
     },
-    
+
     getValue: function () {
         return this.data;
     },

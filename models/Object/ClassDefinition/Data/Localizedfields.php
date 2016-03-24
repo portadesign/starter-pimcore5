@@ -112,8 +112,8 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         $result = $this->doGetDataForEditMode($data, $object, $fieldData, $metaData, 1);
 
         // replace the real data with the data for the editmode
-        foreach($result["data"] as $language => &$data) {
-            foreach($data as $key => &$value) {
+        foreach ($result["data"] as $language => &$data) {
+            foreach ($data as $key => &$value) {
                 $fieldDefinition = $this->getFielddefinition($key);
                 if (!$fieldDefinition instanceof CalculatedValue) {
                     $value = $fieldDefinition->getDataForEditmode($value, $object);
@@ -128,8 +128,6 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
 
             foreach ($childs as $childDef) {
                 if ($childDef instanceof CalculatedValue) {
-
-
                     foreach ($validLanguages as $language) {
                         $childData = new Object\Data\CalculatedValue($childDef->getName());
                         $childData->setContextualData("localizedfield", $this->getName(), null, $language);
@@ -151,7 +149,8 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * @param int $level
      * @return array
      */
-    private function doGetDataForEditMode($data, $object, &$fieldData, &$metaData, $level = 1) {
+    private function doGetDataForEditMode($data, $object, &$fieldData, &$metaData, $level = 1)
+    {
         $class = $object->getClass();
         $inheritanceAllowed = $class->getAllowInherit();
         $inherited = false;
@@ -213,15 +212,19 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * @see Model\Object\ClassDefinition\Data::getDataFromEditmode
      * @param string $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataFromEditmode($data, $object = null)
+    public function getDataFromEditmode($data, $object = null, $params = array())
     {
-        $localizedFields = $this->getDataFromObjectParam($object);
+        $localizedFields = $this->getDataFromObjectParam($object, $params);
 
-        if(!$localizedFields instanceof Object\Localizedfield) {
+        if (!$localizedFields instanceof Object\Localizedfield) {
             $localizedFields = new Object\Localizedfield();
         }
+
+        $context = isset($params["context"]) ? $params["context"] : null;
+        $localizedFields->setContext($context);
 
         if (is_array($data)) {
             foreach ($data as $language => $fields) {
@@ -239,12 +242,13 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * @param null $object
      * @return \stdClass
      */
-    public function getDataForGrid($data, $object = null) {
+    public function getDataForGrid($data, $object = null)
+    {
         $result = new \stdClass();
         foreach ($this->getFieldDefinitions() as $fd) {
             $key = $fd->getName();
             $result->$key = $object->{"get".ucfirst($fd->getName())}();
-            if(method_exists($fd, "getDataForGrid")) {
+            if (method_exists($fd, "getDataForGrid")) {
                 $result->$key = $fd->getDataForGrid($result->$key);
             }
         }
@@ -264,10 +268,13 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     }
 
     /**
-     * @param Model\Object\AbstractObject $object
+     * converts object data to a simple string value or CSV Export
+     * @abstract
+     * @param Object\AbstractObject $object
+     * @param array $params
      * @return string
      */
-    public function getForCsvExport($object)
+    public function getForCsvExport($object, $params = array())
     {
         return "NOT SUPPORTED";
     }
@@ -285,15 +292,15 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * @param $object
      * @return string
      */
-    public function getDataForSearchIndex($object) {
-
+    public function getDataForSearchIndex($object)
+    {
         $dataString = "";
         $lfData = $this->getDataFromObjectParam($object);
 
         if ($lfData instanceof Object\Localizedfield) {
             foreach ($lfData->getItems() as $language => $values) {
                 foreach ($values as $lData) {
-                    if(is_string($lData)) {
+                    if (is_string($lData)) {
                         $dataString .= $lData . " ";
                     }
                 }
@@ -309,7 +316,6 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      */
     public function getForWebserviceExport($object)
     {
-
         $data = $object->{$this->getName()};
         $wsData = array();
 
@@ -321,7 +327,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
             $items = $data->getItems();
         }
 
-        if(\Zend_Registry::isRegistered("Zend_Locale")) {
+        if (\Zend_Registry::isRegistered("Zend_Locale")) {
             $localeBak = \Zend_Registry::get("Zend_Locale");
         } else {
             $localeBak = null;
@@ -341,9 +347,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         $validLanguages = Tool::getValidLanguages();
 
         if ($validLanguages) {
-
             foreach ($validLanguages as $language) {
-
                 foreach ($this->getFieldDefinitions() as $fd) {
                     \Zend_Registry::set("Zend_Locale", new \Zend_Locale($language));
 
@@ -380,11 +384,10 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function getFromWebserviceImport($value, $object = null, $idMapper = null)
     {
         if (is_array($value)) {
-
             $validLanguages = Tool::getValidLanguages();
 
             if (!$idMapper || !$idMapper->ignoreMappingFailures()) {
-                foreach($value as $v){
+                foreach ($value as $v) {
                     if (!in_array($v->language, $validLanguages)) {
                         throw new \Exception("Invalid language in localized fields");
                     }
@@ -396,7 +399,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
                 $localizedFields = new Object\Localizedfield();
             }
 
-            if($object instanceof Object\Concrete) {
+            if ($object instanceof Object\Concrete) {
                 $localizedFields->setObject($object);
             }
 
@@ -417,7 +420,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
                     $field = Tool\Cast::castToClass("\\Pimcore\\Model\\Webservice\\Data\\Object\\Element", $field);
                 }
 
-                if ($idMapper && $idMapper->ignoreMappingFailures()){
+                if ($idMapper && $idMapper->ignoreMappingFailures()) {
                     if (!in_array($field->language, $validLanguages)) {
                         continue;
                     }
@@ -429,16 +432,16 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
                     continue;
                 }
 
-                if(!$field instanceof Model\Webservice\Data\Object\Element){
+                if (!$field instanceof Model\Webservice\Data\Object\Element) {
                     throw new \Exception("Invalid import data in field [ $field->name ] for language [ $field->language ] in localized fields [ ".$this->getName()." ]");
                 }
                 $fd = $this->getFielddefinition($field->name);
                 if (!$fd instanceof Object\ClassDefinition\Data) {
-                    if ($idMapper && $idMapper->ignoreMappingFailures()){
+                    if ($idMapper && $idMapper->ignoreMappingFailures()) {
                         continue;
                     }
                     throw new \Exception("Unknown field [ $field->name ] for language [ $field->language ] in localized fields [ ".$this->getName()." ] ");
-                } else if ($fd->getFieldtype() != $field->type){
+                } elseif ($fd->getFieldtype() != $field->type) {
                     throw new \Exception("Type mismatch for field [ $field->name ] for language [ $field->language ] in localized fields [ ".$this->getName()." ]. Should be [ ".$fd->getFieldtype()." ], but is [ ".$field->type." ] ");
                 }
 
@@ -446,9 +449,11 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
             }
 
             return $localizedFields;
-        } else if (!empty($value)) {
+        } elseif (!empty($value)) {
             throw new \Exception("Invalid data in localized fields");
-        } else return null;
+        } else {
+            return null;
+        }
     }
 
 
@@ -511,7 +516,8 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     /**
      * @param $field
      */
-    public function addReferencedField($field) {
+    public function addReferencedField($field)
+    {
         $this->referencedFields[] = $field;
     }
 
@@ -541,7 +547,12 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     {
         $localizedFields = $this->getDataFromObjectParam($object);
         if ($localizedFields instanceof Object\Localizedfield) {
+            if ($object instanceof Object\Fieldcollection\Data\AbstractData) {
+                $object = $object->getObject();
+            }
             $localizedFields->setObject($object);
+            $context = isset($params["context"]) ? $params["context"] : null;
+            $localizedFields->setContext($context);
             $localizedFields->save();
         }
     }
@@ -553,9 +564,15 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      */
     public function load($object, $params = array())
     {
+        if ($object instanceof Object\Fieldcollection\Data\AbstractData) {
+            $object = $object->getObject();
+        }
+
         $localizedFields = new Object\Localizedfield();
         $localizedFields->setObject($object);
-        $localizedFields->load();
+        $context = isset($params["context"]) ? $params["context"] : null;
+        $localizedFields->setContext($context);
+        $localizedFields->load($object, $params);
 
         return $localizedFields;
     }
@@ -563,12 +580,14 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     /**
      * @param $object
      */
-    public function delete($object)
+    public function delete($object, $params = array())
     {
         $localizedFields = $this->getDataFromObjectParam($object);
 
         if ($localizedFields instanceof Object\Localizedfield) {
             $localizedFields->setObject($object);
+            $context = isset($params["context"]) ? $params["context"] : null;
+            $localizedFields->setContext($context);
             $localizedFields->delete();
         }
     }
@@ -577,17 +596,18 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * This method is called in Object|Class::save() and is used to create the database table for the localized data
      * @return void
      */
-    public function classSaved($class)
+    public function classSaved($class, $params = array())
     {
         $localizedFields = new Object\Localizedfield();
         $localizedFields->setClass($class);
+        $context = isset($params["context"]) ? $params["context"] : null;
+        $localizedFields->setContext($context);
         $localizedFields->createUpdateTable();
 
         foreach ($this->getFieldDefinitions() as $fd) {
             if (method_exists($fd, "classSaved")) {
-                $fd->classSaved($class);
+                $fd->classSaved($class, $params);
             }
-
         }
     }
 
@@ -599,12 +619,15 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      */
     public function preGetData($object, $params = array())
     {
-        if(!$object instanceof Object\Concrete) {
-            throw new \Exception("Localized Fields are only valid in Objects");
+        if (!$object instanceof Object\Concrete && !$object instanceof Object\Fieldcollection\Data\AbstractData) {
+            throw new \Exception("Localized Fields are only valid in Objects and Fieldcollections");
         }
 
         if (!$object->localizedfields instanceof Object\Localizedfield) {
             $lf = new Object\Localizedfield();
+            if ($object instanceof  Object\Fieldcollection\Data\AbstractData) {
+                $object = $object->getObject();
+            }
             $lf->setObject($object);
 
             $object->localizedfields = $lf;
@@ -618,7 +641,6 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      */
     public function getGetterCode($class)
     {
-
         $code = "";
         $code .= parent::getGetterCode($class);
 
@@ -628,7 +650,6 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
              * @var $fd Object\ClassDefinition\Data
              */
             $code .= $fd->getGetterCodeLocalizedfields($class);
-
         }
 
         return $code;
@@ -640,7 +661,6 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      */
     public function getSetterCode($class)
     {
-
         $code = "";
         $code .= parent::getSetterCode($class);
 
@@ -673,10 +693,10 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      */
     public function getFieldDefinitions()
     {
-        if(empty($this->fieldDefinitionsCache)) {
+        if (empty($this->fieldDefinitionsCache)) {
             $definitions = $this->doGetFieldDefinitions();
-            foreach($this->getReferencedFields() as $rf) {
-                if($rf instanceof Object\ClassDefinition\Data\Localizedfields) {
+            foreach ($this->getReferencedFields() as $rf) {
+                if ($rf instanceof Object\ClassDefinition\Data\Localizedfields) {
                     $definitions = array_merge($definitions, $this->doGetFieldDefinitions($rf->getChilds()));
                 }
             }
@@ -694,7 +714,6 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      */
     public function doGetFieldDefinitions($def = null, $fields = array())
     {
-
         if ($def === null) {
             $def = $this->getChilds();
         }
@@ -881,15 +900,15 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * @param boolean $omitMandatoryCheck
      * @throws \Exception
      */
-    public function checkValidity($data, $omitMandatoryCheck = false){
-
+    public function checkValidity($data, $omitMandatoryCheck = false)
+    {
         $data = $data->getItems();
         $conf = \Pimcore\Config::getSystemConfig();
-        if($conf->general->validLanguages) {
-            $languages = explode(",",$conf->general->validLanguages);
+        if ($conf->general->validLanguages) {
+            $languages = explode(",", $conf->general->validLanguages);
         }
 
-        if(!$omitMandatoryCheck){
+        if (!$omitMandatoryCheck) {
             foreach ($languages as $language) {
                 foreach ($this->getFieldDefinitions() as $fd) {
                     $fd->checkValidity($data[$language][$fd->getName()]);
@@ -959,7 +978,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         $localData = array();
 
         // get existing data
-        if($localFields instanceof Object\Localizedfield) {
+        if ($localFields instanceof Object\Localizedfield) {
             $localData = $localFields->getItems();
         }
 
@@ -984,12 +1003,9 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         }
 
         foreach ($mapping as $language => $fields) {
-
             foreach ($fields as $key => $value) {
-
                 $fd = $this->getFielddefinition($key);
                 if ($fd & $fd->isDiffChangeAllowed()) {
-
                     if ($value == null) {
                         unset($localData[$language][$key]);
                     } else {
@@ -1000,21 +1016,23 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         }
 
         $localizedFields = new Object\Localizedfield($localData);
-        $localizedFields->setObject( $object );
+        $localizedFields->setObject($object);
         return $localizedFields;
     }
 
     /** True if change is allowed in edit mode.
      * @return bool
      */
-    public function isDiffChangeAllowed() {
+    public function isDiffChangeAllowed()
+    {
         return true;
     }
 
     /**
      * @return array
      */
-    public function __sleep() {
+    public function __sleep()
+    {
         $vars = get_object_vars($this);
         unset($vars['fieldDefinitionsCache']);
         unset($vars['referencedFields']);
@@ -1036,14 +1054,15 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * @param array $params
      * @return Element\ElementInterface
      */
-    public function rewriteIds($object, $idMapping, $params = array()) {
+    public function rewriteIds($object, $idMapping, $params = array())
+    {
         $data = $this->getDataFromObjectParam($object, $params);
 
         $validLanguages = Tool::getValidLanguages();
 
         foreach ($validLanguages as $language) {
             foreach ($this->getFieldDefinitions() as $fd) {
-                if(method_exists($fd, "rewriteIds")) {
+                if (method_exists($fd, "rewriteIds")) {
                     $d = $fd->rewriteIds($data, $idMapping, array("language" => $language));
                     $data->setLocalizedValue($fd->getName(), $d, $language);
                 }

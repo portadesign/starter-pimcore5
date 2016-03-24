@@ -84,7 +84,7 @@ pimcore.asset.folder = Class.create(pimcore.asset.asset, {
             layout:'fit',
             bodyCls: "asset_folder_preview",
             title: t("content"),
-            iconCls: "pimcore_icon_asset_folder_preview",
+            iconCls: "pimcore_icon_asset",
             items: new Ext.DataView({
                 store: this.store,
                 autoScroll: true,
@@ -97,11 +97,12 @@ pimcore.asset.folder = Class.create(pimcore.asset.asset, {
                         pimcore.helpers.openAsset(data[1], data[0]);
                     },
                     "afterrender": function(el) {
-                        el.on("itemcontextmenu",  function(view, record, item, index, e, eOpts ) {
-                            e.stopEvent();
-                            this.showContextMenu(item, event);
-                        }.bind(this), null, {preventDefault: true});
-
+                        el.on("itemcontextmenu",
+                            function(view, record, item, index, e, eOpts ) {
+                                e.stopEvent();
+                                this.showContextMenu(item, event, record);
+                            }.bind(this),
+                        null, {preventDefault: true});
                     }.bind(this)
                 }
             }),
@@ -148,9 +149,8 @@ pimcore.asset.folder = Class.create(pimcore.asset.asset, {
         return this.tabbar;
     },
 
-    showContextMenu: function(node, event) {
-        var data = node.getAttribute("id");
-        var idPath = node.getAttribute("data-idpath");
+    showContextMenu: function(domEl, event, node) {
+        var data = domEl.getAttribute("id");
         var splitted = data.split("_");
         var type = splitted[0];
         var id = splitted[1];
@@ -166,18 +166,16 @@ pimcore.asset.folder = Class.create(pimcore.asset.asset, {
         menu.add(new Ext.menu.Item({
             text: t('show_in_tree'),
             iconCls: "pimcore_icon_show_in_tree",
-            handler: function (idPath) {
+            handler: function () {
                 try {
                     try {
-                        Ext.getCmp("pimcore_panel_tree_assets").expand();
-                        var tree = pimcore.globalmanager.get("layout_asset_tree");
-                        pimcore.helpers.selectPathInTree(tree.tree, idPath);
+                        pimcore.treenodelocator.showInTree(node.id, "asset", this);
                     } catch (e) {
                         console.log(e);
                     }
 
                 } catch (e2) { console.log(e2); }
-            }.bind(this, idPath)
+            }
         }));
         menu.add(new Ext.menu.Item({
             text: t('delete'),
@@ -206,8 +204,8 @@ pimcore.asset.folder = Class.create(pimcore.asset.asset, {
 
             this.toolbarButtons.publish = new Ext.Button({
                 text: t("save"),
-                iconCls: "pimcore_icon_publish_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_publish",
+                scale: "medium",
                 handler: this.save.bind(this)
             });
 
@@ -217,54 +215,57 @@ pimcore.asset.folder = Class.create(pimcore.asset.asset, {
 
             this.toolbarButtons.remove = new Ext.Button({
                 text: t('delete_folder'),
-                iconCls: "pimcore_icon_delete_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_delete",
+                scale: "medium",
                 handler: this.remove.bind(this)
             });
             if (this.isAllowed("delete") && !this.data.locked && this.data.id != 1) {
                 buttons.push(this.toolbarButtons.remove);
             }
 
-            this.toolbarButtons.download = new Ext.Button({
-                text: t("download_as_zip"),
-                iconCls: "pimcore_icon_download_zip_medium",
-                scale: "small",
-                handler: this.downloadZip.bind(this)
-            });
-            buttons.push(this.toolbarButtons.download);
-
             buttons.push("-");
 
-            this.toolbarButtons.reload = new Ext.Button({
+            var moreButtons = [];
+
+            moreButtons.push({
+                text: t("download_as_zip"),
+                iconCls: "pimcore_icon_zip pimcore_icon_overlay_download",
+                handler: this.downloadZip.bind(this)
+            });
+
+            moreButtons.push({
                 text: t('reload'),
-                iconCls: "pimcore_icon_reload_medium",
-                scale: "small",
+                iconCls: "pimcore_icon_reload",
                 handler: this.reload.bind(this)
             });
-            buttons.push(this.toolbarButtons.reload);
 
-            buttons.push({
+            moreButtons.push({
                 text: t('show_in_tree'),
-                iconCls: "pimcore_icon_download_showintree",
-                scale: "small",
+                iconCls: "pimcore_icon_show_in_tree",
                 handler: this.selectInTree.bind(this)
             });
 
             var user = pimcore.globalmanager.get("user");
             if (user.admin) {
-                buttons.push({
+                moreButtons.push({
                     text: t("show_metainfo"),
-                    scale: "small",
-                    iconCls: "pimcore_icon_info_large",
+                    iconCls: "pimcore_icon_info",
                     handler: this.showMetaInfo.bind(this)
                 });
             }
+
+            buttons.push({
+                text: t("more"),
+                iconCls: "pimcore_icon_more",
+                scale: "medium",
+                menu: moreButtons
+            });
 
             buttons.push("-");
             buttons.push({
                 xtype: 'tbtext',
                 text: this.data.id,
-                scale: "small"
+                scale: "medium"
             });
 
             this.toolbar = new Ext.Toolbar({

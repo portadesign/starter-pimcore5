@@ -131,7 +131,7 @@ pimcore.document.tags.image = Class.create(pimcore.document.tag, {
 
             menu.add(new Ext.menu.Item({
                 text: t('add_marker_or_hotspots'),
-                iconCls: "pimcore_icon_image_add_hotspot",
+                iconCls: "pimcore_icon_image pimcore_icon_overlay_edit",
                 handler: function (item) {
                     item.parentMenu.destroy();
 
@@ -160,10 +160,10 @@ pimcore.document.tags.image = Class.create(pimcore.document.tag, {
 
             menu.add(new Ext.menu.Item({
                 text: t('show_in_tree'),
-                iconCls: "pimcore_icon_fileexplorer",
+                iconCls: "pimcore_icon_folder pimcore_icon_overlay_search",
                 handler: function (item) {
                     item.parentMenu.destroy();
-                    pimcore.helpers.selectElementInTree("asset", this.datax.id);
+                    pimcore.treenodelocator.showInTree(this.datax.id, "asset");
                 }.bind(this)
             }));
         }
@@ -180,7 +180,7 @@ pimcore.document.tags.image = Class.create(pimcore.document.tag, {
         menu.add(new Ext.menu.Item({
             text: t('upload'),
             cls: "pimcore_inline_upload",
-            iconCls: "pimcore_icon_upload_single",
+            iconCls: "pimcore_icon_upload",
             handler: function (item) {
                 item.parentMenu.destroy();
                 this.uploadDialog();

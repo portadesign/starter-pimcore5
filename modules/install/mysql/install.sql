@@ -146,7 +146,7 @@ CREATE TABLE `documents` (
 DROP TABLE IF EXISTS `documents_elements`;
 CREATE TABLE `documents_elements` (
   `documentId` int(11) unsigned NOT NULL DEFAULT '0',
-  `name` varchar(255) NOT NULL DEFAULT '',
+  `name` varchar(750) CHARACTER SET ascii NOT NULL DEFAULT '',
   `type` varchar(50) DEFAULT NULL,
   `data` longtext,
   PRIMARY KEY (`documentId`,`name`),
@@ -215,6 +215,17 @@ CREATE TABLE `documents_snippet` (
   `template` varchar(255) DEFAULT NULL,
   `contentMasterDocumentId` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
+) DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `documents_translations`;
+CREATE TABLE `documents_translations` (
+  `id` int(11) unsigned NOT NULL DEFAULT '0',
+  `sourceId` int(11) unsigned NOT NULL DEFAULT '0',
+  `language` varchar(10) NOT NULL DEFAULT '',
+  PRIMARY KEY (`sourceId`,`language`),
+  KEY `id` (`id`),
+  KEY `sourceId` (`sourceId`),
+  KEY `language` (`language`)
 ) DEFAULT CHARSET=utf8;
 
 DROP TABLE IF EXISTS `edit_lock`;
@@ -390,7 +401,7 @@ CREATE TABLE `properties` (
   `ctype` enum('document','asset','object') NOT NULL DEFAULT 'document',
   `cpath` varchar(765) CHARACTER SET ascii DEFAULT NULL, /* path in ascii using the full key length of 765 bytes (PIMCORE-2654) */
   `name` varchar(255) NOT NULL DEFAULT '',
-  `type` enum('text','date','document','asset','object','bool','select') DEFAULT NULL,
+  `type` enum('text','document','asset','object','bool','select') DEFAULT NULL,
   `data` text,
   `inheritable` tinyint(1) unsigned DEFAULT '1',
   PRIMARY KEY (`cid`,`ctype`,`name`),
@@ -790,9 +801,10 @@ DROP TABLE IF EXISTS `classificationstore_relations`;
 CREATE TABLE `classificationstore_relations` (
 	`groupId` BIGINT(20) NOT NULL,
 	`keyId` BIGINT(20) NOT NULL,
-  `sorter` INT(10) NULL DEFAULT '0',
+  `sorter` INT(11) NULL DEFAULT NULL,
 	PRIMARY KEY (`groupId`, `keyId`),
 	INDEX `FK_classificationstore_relations_classificationstore_keys` (`keyId`),
+	INDEX `groupId` (`groupId`),
 	CONSTRAINT `FK_classificationstore_relations_classificationstore_groups` FOREIGN KEY (`groupId`) REFERENCES `classificationstore_groups` (`id`) ON DELETE CASCADE,
 	CONSTRAINT `FK_classificationstore_relations_classificationstore_keys` FOREIGN KEY (`keyId`) REFERENCES `classificationstore_keys` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8;
@@ -814,6 +826,7 @@ CREATE TABLE `classificationstore_collectionrelations` (
 	`groupId` BIGINT(20) NOT NULL,
     `sorter` INT(10) NULL DEFAULT '0',
 	PRIMARY KEY (`colId`, `groupId`),
+	INDEX `colId` (`colId`),
 	CONSTRAINT `FK_classificationstore_collectionrelations_groups` FOREIGN KEY (`groupId`) REFERENCES `classificationstore_groups` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8;
 

@@ -65,7 +65,7 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
                     text: "<b>" + this.fieldConfig.title + "</b>"
                 },"->",{
                     xtype: "button",
-                    iconCls: "pimcore_icon_upload_single",
+                    iconCls: "pimcore_icon_upload",
                 cls: "pimcore_inline_upload",
                     handler: this.uploadDialog.bind(this)
                 },{
@@ -218,10 +218,11 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
 
     updateImage: function () {
 
+
         // 5px padding (-10)
         var body = this.getBody();
         var width = body.getWidth()-10;
-        var height = body.getHeight()-10;
+        var height = this.fieldConfig.height-60; // strage body.getHeight() returns 2? so we use the config instead
 
         var path = "/admin/asset/get-image-thumbnail/id/" + this.data + "/width/" + width + "/height/" + height
             + "/contain/true";
@@ -285,7 +286,7 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
 
                 menu.add(new Ext.menu.Item({
                     text: t('add_marker_or_hotspots'),
-                    iconCls: "pimcore_icon_image_add_hotspot",
+                    iconCls: "pimcore_icon_image pimcore_icon_overlay_edit",
                     handler: function (item) {
                         item.parentMenu.destroy();
 
@@ -307,7 +308,7 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
         menu.add(new Ext.menu.Item({
             text: t('upload'),
             cls: "pimcore_inline_upload",
-            iconCls: "pimcore_icon_upload_single",
+            iconCls: "pimcore_icon_upload",
             handler: function (item) {
                 item.parentMenu.destroy();
                 this.uploadDialog();
@@ -323,7 +324,7 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
         this.data = null;
 
         this.getBody().down('.x-autocontainer-innerCt').setStyle({
-            backgroundImage: "url(/pimcore/static6/img/icon/drop-40.png)"
+            backgroundImage: ""
         });
         this.dirty = true;
         this.getBody().repaint();

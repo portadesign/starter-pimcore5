@@ -17,7 +17,8 @@ use Pimcore\ExtensionManager;
 use Pimcore\Config;
 use Pimcore\Model\Document;
 
-class Editmode extends \Zend_Controller_Plugin_Abstract {
+class Editmode extends \Zend_Controller_Plugin_Abstract
+{
 
     /**
      * @var \Pimcore\Controller\Action\Frontend
@@ -27,14 +28,16 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
     /**
      * @param \Pimcore\Controller\Action\Frontend $controller
      */
-    public function __construct(\Pimcore\Controller\Action\Frontend $controller) {
+    public function __construct(\Pimcore\Controller\Action\Frontend $controller)
+    {
         $this->controller = $controller;
     }
 
     /**
      * @param \Zend_Controller_Request_Abstract $request
      */
-    public function postDispatch(\Zend_Controller_Request_Abstract $request) {
+    public function postDispatch(\Zend_Controller_Request_Abstract $request)
+    {
         $conf = Config::getSystemConfig();
 
         // add scripts to editmode
@@ -82,7 +85,6 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
                 "/pimcore/static6/css/icons.css",
                 "/pimcore/static6/css/editmode.css?_dc=" . time()
             );
-
         } else {
             $editmodeLibraries = array(
                 "/pimcore/static/js/pimcore/namespace.js",
@@ -139,7 +141,6 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
                 "/pimcore/static/css/icons.css",
                 "/pimcore/static/css/editmode.css?asd=" . time(),
             );
-
         }
 
         //add plugin editmode JS and CSS
@@ -151,16 +152,24 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
             if (!empty($pluginConfigs)) {
                 //registering plugins
                 foreach ($pluginConfigs as $p) {
-
                     $pluginJsPaths = array();
-                    if(array_key_exists("pluginDocumentEditmodeJsPaths", $p['plugin'])
-                        && is_array($p['plugin']['pluginDocumentEditmodeJsPaths'])
-                        && isset($p['plugin']['pluginDocumentEditmodeJsPaths']['path'])) {
-                        if (is_array($p['plugin']['pluginDocumentEditmodeJsPaths']['path'])) {
-                            $pluginJsPaths = $p['plugin']['pluginDocumentEditmodeJsPaths']['path'];
-                        }
-                        else if ($p['plugin']['pluginDocumentEditmodeJsPaths']['path'] != null) {
-                            $pluginJsPaths[] = $p['plugin']['pluginDocumentEditmodeJsPaths']['path'];
+
+                    $pluginVersions = [""];
+                    if (\Pimcore\Tool\Admin::isExtJS6()) {
+                        $pluginVersions = ["-extjs6", ""];
+                    }
+
+                    foreach ($pluginVersions as $pluginVersion) {
+                        if (array_key_exists("pluginDocumentEditmodeJsPaths".$pluginVersion, $p['plugin'])
+                            && is_array($p['plugin']['pluginDocumentEditmodeJsPaths'.$pluginVersion])
+                            && isset($p['plugin']['pluginDocumentEditmodeJsPaths'.$pluginVersion]['path'])) {
+                            if (is_array($p['plugin']['pluginDocumentEditmodeJsPaths'.$pluginVersion]['path'])) {
+                                $pluginJsPaths = $p['plugin']['pluginDocumentEditmodeJsPaths'.$pluginVersion]['path'];
+                                break;
+                            } elseif ($p['plugin']['pluginDocumentEditmodeJsPaths'.$pluginVersion]['path'] != null) {
+                                $pluginJsPaths[] = $p['plugin']['pluginDocumentEditmodeJsPaths'.$pluginVersion]['path'];
+                                break;
+                            }
                         }
                     }
 
@@ -175,16 +184,21 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
 
 
                     $pluginCssPaths = array();
-                    if(array_key_exists("pluginDocumentEditmodeCssPaths", $p['plugin'])
-                        && is_array($p['plugin']['pluginDocumentEditmodeCssPaths'])
-                        && isset($p['plugin']['pluginDocumentEditmodeCssPaths']['path'])) {
-                        if (is_array($p['plugin']['pluginDocumentEditmodeCssPaths']['path'])) {
-                            $pluginCssPaths = $p['plugin']['pluginDocumentEditmodeCssPaths']['path'];
-                        }
-                        else if ($p['plugin']['pluginDocumentEditmodeCssPaths']['path'] != null) {
-                            $pluginCssPaths[] = $p['plugin']['pluginDocumentEditmodeCssPaths']['path'];
+                    foreach ($pluginVersions as $pluginVersion) {
+                        if (array_key_exists("pluginDocumentEditmodeCssPaths".$pluginVersion, $p['plugin'])
+                            && is_array($p['plugin']['pluginDocumentEditmodeCssPaths'.$pluginVersion])
+                            && isset($p['plugin']['pluginDocumentEditmodeCssPaths'.$pluginVersion]['path'])
+                        ) {
+                            if (is_array($p['plugin']['pluginDocumentEditmodeCssPaths'.$pluginVersion]['path'])) {
+                                $pluginCssPaths = $p['plugin']['pluginDocumentEditmodeCssPaths'.$pluginVersion]['path'];
+                                break;
+                            } elseif ($p['plugin']['pluginDocumentEditmodeCssPaths'.$pluginVersion]['path'] != null) {
+                                $pluginCssPaths[] = $p['plugin']['pluginDocumentEditmodeCssPaths'.$pluginVersion]['path'];
+                                break;
+                            }
                         }
                     }
+
                     //manipulate path for frontend
                     if (is_array($pluginCssPaths) and count($pluginCssPaths) > 0) {
                         for ($i = 0; $i < count($pluginCssPaths); $i++) {
@@ -193,15 +207,12 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
                             }
                         }
                     }
-
                 }
             }
 
-            $editmodeScripts=array_merge($editmodeScripts,$jsPaths);
-            $editmodeStylesheets=array_merge($editmodeStylesheets,$cssPaths);
-
-        }
-        catch (\Exception $e) {
+            $editmodeScripts=array_merge($editmodeScripts, $jsPaths);
+            $editmodeStylesheets=array_merge($editmodeStylesheets, $cssPaths);
+        } catch (\Exception $e) {
             \Logger::alert("there is a problem with the plugin configuration");
             \Logger::alert($e);
         }
@@ -225,13 +236,12 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
         }
 
         // combine the pimcore scripts in non-devmode
-        if($conf->general->devmode) {
+        if ($conf->general->devmode) {
             foreach ($editmodeScripts as $script) {
                 $editmodeHeadHtml .= '<script type="text/javascript" src="' . $script . '?_dc=' . Version::$revision . '"></script>';
                 $editmodeHeadHtml .= "\n";
             }
-        }
-        else {
+        } else {
             $scriptContents = "";
             foreach ($editmodeScripts as $scriptUrl) {
                 $scriptContents .= file_get_contents(PIMCORE_DOCUMENT_ROOT.$scriptUrl) . "\n\n\n";
@@ -262,45 +272,39 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
 
 
         // add scripts in html header for pages in editmode
-        if ($this->controller->editmode && Document\Service::isValidType($this->controller->document->getType()) ) { //ckogler
+        if ($this->controller->editmode && Document\Service::isValidType($this->controller->document->getType())) { //ckogler
             include_once("simple_html_dom.php");
-            $body = $this->getResponse()->getBody();
+            $html = $this->getResponse()->getBody();
 
-            $html = str_get_html($body);
-            if($html) {
-                $htmlElement = $html->find("html", 0);
-                $head = $html->find("head", 0);
-                $bodyElement = $html->find("body", 0);
+            if ($html) {
+                $htmlElement = preg_match("/<html[^a-zA-Z]?( [^>]+)?>/", $html);
+                $headElement = preg_match("/<head[^a-zA-Z]?( [^>]+)?>/", $html);
+                $bodyElement = preg_match("/<body[^a-zA-Z]?( [^>]+)?>/", $html);
+
+                $skipCheck = false;
 
                 // if there's no head and no body, create a wrapper including these elements
                 // add html headers for snippets in editmode, so there is no problem with javascript
-                if(!$head && !$bodyElement && !$htmlElement) {
-                    $body = "<!DOCTYPE html>\n<html>\n<head></head><body>" . $body . "</body></html>";
-                    $html = str_get_html($body);
-
-                    // get them again with the updated html markup
-                    $htmlElement = $html->find("html", 0);
-                    $head = $html->find("head", 0);
-                    $bodyElement = $html->find("body", 0);
+                if (!$headElement && !$bodyElement && !$htmlElement) {
+                    $html = "<!DOCTYPE html>\n<html>\n<head></head><body>" . $html . "</body></html>";
+                    $skipCheck = true;
                 }
 
-                if($head && $bodyElement && $htmlElement) {
-                    $head->innertext = $head->innertext . "\n\n" . $editmodeHeadHtml;
-                    $bodyElement->onunload = "pimcoreOnUnload();";
-                    if (\Pimcore\Tool\Admin::isExtJS6()) {
-                        $bodyElement->innertext = $bodyElement->innertext . "\n\n" . '<script type="text/javascript" src="/pimcore/static6/js/pimcore/document/edit/startup.js?_dc=' . Version::$revision . '"></script>' . "\n\n";
-                    } else {
-                        $bodyElement->innertext = $bodyElement->innertext . "\n\n" . '<script type="text/javascript" src="/pimcore/static/js/pimcore/document/edit/startup.js?_dc=' . Version::$revision . '"></script>' . "\n\n";
+                if ($skipCheck || ($headElement && $bodyElement && $htmlElement)) {
+                    $html = preg_replace("@</head>@i", $editmodeHeadHtml . "\n\n</head>", $html, 1);
+
+                    $startupJavascript = "/pimcore/static6/js/pimcore/document/edit/startup.js";
+                    if (!\Pimcore\Tool\Admin::isExtJS6()) {
+                        $startupJavascript = "/pimcore/static/js/pimcore/document/edit/startup.js";
                     }
 
-                    $body = $html->save();
-                    $this->getResponse()->setBody($body);
+                    $editmodeBodyHtml = "\n\n" . '<script type="text/javascript" src="' . $startupJavascript . '?_dc=' . Version::$revision . '"></script>' . "\n\n";
+                    $html = preg_replace("@</body>@i", $editmodeBodyHtml . "\n\n</body>", $html, 1);
+
+                    $this->getResponse()->setBody($html);
                 } else {
                     $this->getResponse()->setBody('<div style="font-size:30px; font-family: Arial; font-weight:bold; color:red; text-align: center; margin: 40px 0">You have to define a &lt;html&gt;, &lt;head&gt;, &lt;body&gt;<br />HTML-tag in your view/layout markup!</div>');
                 }
-
-                $html->clear();
-                unset($html);
             }
         }
 
@@ -311,7 +315,8 @@ class Editmode extends \Zend_Controller_Plugin_Abstract {
     /**
      *
      */
-    public function dispatchLoopShutdown() {
+    public function dispatchLoopShutdown()
+    {
         $this->getResponse()->setHeader("X-Frame-Options", "SAMEORIGIN", true);
     }
 }

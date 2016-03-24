@@ -21,7 +21,7 @@ pimcore.object.classes.data.password = Class.create(pimcore.object.classes.data.
         objectbrick: true,
         fieldcollection: true,
         localizedfield: true
-    },        
+    },
 	statics : {
 		CONFIG_DATA : [
 			['front', 'Front'],
@@ -29,7 +29,7 @@ pimcore.object.classes.data.password = Class.create(pimcore.object.classes.data.
 		]
 	},
 	algorithmsStore: {},
-	
+
     initialize: function (treeNode, initData) {
         this.type = "password";
 
@@ -57,24 +57,24 @@ pimcore.object.classes.data.password = Class.create(pimcore.object.classes.data.
     getLayout: function ($super) {
 
         $super();
-		
-        var algorithmsProxy = new Ext.data.HttpProxy({
-            url:'/admin/settings/get-available-algorithms'
-        });
-        
-        var algorithmsReader = new Ext.data.JsonReader({
-            totalProperty:'total',
-            successProperty:'success',
-            root: "data",
+
+        var algorithmsProxy = {
+            type: 'ajax',
+            url:'/admin/settings/get-available-algorithms',
+            reader: {
+                type: 'json',
+                totalProperty:'total',
+                successProperty:'success',
+                rootProperty: "data"
+            }
+        }
+
+        this.algorithmsStore = new Ext.data.Store({
+            proxy: algorithmsProxy,
             fields: [
                 {name:'key'},
                 {name:'value'}
-            ]
-        });
-        
-        this.algorithmsStore = new Ext.data.Store({
-            proxy:algorithmsProxy,
-            reader:algorithmsReader,
+            ],
             listeners: {
 	            load: function() {
 	                if (this.datax.restrictTo) {
@@ -83,8 +83,74 @@ pimcore.object.classes.data.password = Class.create(pimcore.object.classes.data.
 	            }.bind(this)
             }
         });
-        
-        
+
+        var saltCombo = new Ext.form.field.ComboBox({
+            xtype: "combo",
+            width: 300,
+            fieldLabel: t("saltlocation"),
+            hidden: this.datax.algorithm == "password_hash",
+            itemId: "saltlocation",
+            name: "saltlocation",
+            value: this.datax.saltlocation || 'back',
+            triggerAction: 'all',
+            lazyRender:true,
+            mode: 'local',
+            store: new Ext.data.ArrayStore({
+                id: 0,
+                fields: [
+                    'value',
+                    'key'
+                ],
+                data: this.statics.CONFIG_DATA
+            }),
+            valueField: 'value',
+            displayField: 'key',
+            disabled: this.isInCustomLayoutEditor()
+        });
+
+        var salt =  new Ext.form.field.Text({
+            xtype: 'textfield',
+            fieldLabel: t("salt"),
+            hidden: this.datax.algorithm == "password_hash",
+            width: 300,
+            itemId: "salt",
+            name: "salt",
+            value: this.datax.salt,
+            emptyText: '',
+            disabled: this.isInCustomLayoutEditor()
+        });
+
+        var algorithmsCombo = new Ext.form.field.ComboBox({
+            xtype: "combo",
+            width: 300,
+            fieldLabel: t("algorithm"),
+            itemId: "algorithm",
+            name: "algorithm",
+            value: this.datax.algorithm || 'md5',
+            triggerAction: 'all',
+            lazyRender:true,
+            mode: 'local',
+            store: this.algorithmsStore,
+            valueField: 'value',
+            displayField: 'key',
+            editable: false,
+            disabled: this.isInCustomLayoutEditor(),
+            listeners: {
+                select: function (combo, record, index) {
+                    if (record.data.key == "password_hash") {
+                        saltCombo.hide();
+                        salt.hide();
+
+                    } else {
+                        saltCombo.show();
+                        salt.show();
+                    }
+
+                }.bind(this)
+            }
+        });
+
+
         this.specificPanel.removeAll();
         this.specificPanel.add([
             {
@@ -93,58 +159,14 @@ pimcore.object.classes.data.password = Class.create(pimcore.object.classes.data.
                 name: "width",
                 value: this.datax.width
             },
-            {
-                xtype: "combo",
-                width: 300,
-                fieldLabel: t("algorithm"),
-                itemId: "algorithm",
-                name: "algorithm",
-                value: this.datax.algorithm || 'md5',
-                triggerAction: 'all',
-                lazyRender:true,
-                mode: 'local',
-                store: this.algorithmsStore,
-                valueField: 'value',
-                displayField: 'key',
-                disabled: this.isInCustomLayoutEditor()
-            },
-            {
-                xtype: 'textfield',
-                fieldLabel: t("salt"),
-                width: 300,
-                itemId: "salt",
-                name: "salt",
-                value: this.datax.salt,
-                emptyText: '',
-                disabled: this.isInCustomLayoutEditor()
-            },
-            {
-                xtype: "combo",
-                width: 300,
-                fieldLabel: t("saltlocation"),
-                itemId: "saltlocation",
-                name: "saltlocation",
-                value: this.datax.saltlocation || 'back',
-                triggerAction: 'all',
-                lazyRender:true,
-                mode: 'local',
-                store: new Ext.data.ArrayStore({
-                    id: 0,
-                    fields: [
-                        'value',
-                        'key'
-                    ],
-                    data: this.statics.CONFIG_DATA
-                }),
-                valueField: 'value',
-                displayField: 'key',
-                disabled: this.isInCustomLayoutEditor()
-            }
+            algorithmsCombo,
+            salt,
+            saltCombo
 
         ]);
 
         this.algorithmsStore.load();
-        
+
         return this.layout;
     },
 

@@ -81,7 +81,6 @@ class Checkbox extends Model\Object\ClassDefinition\Data
      */
     public function getDataForResource($data, $object = null)
     {
-
         if (is_bool($data)) {
             $data = (int)$data;
         }
@@ -97,7 +96,7 @@ class Checkbox extends Model\Object\ClassDefinition\Data
      */
     public function getDataFromResource($data)
     {
-        if(!is_null($data)) {
+        if (!is_null($data)) {
             $data = (bool) $data;
         }
         return $data;
@@ -129,9 +128,10 @@ class Checkbox extends Model\Object\ClassDefinition\Data
      * @see Object\ClassDefinition\Data::getDataFromEditmode
      * @param boolean $data
      * @param null|Object\AbstractObject $object
+     * @param mixed $params
      * @return boolean
      */
-    public function getDataFromEditmode($data, $object = null)
+    public function getDataFromEditmode($data, $object = null, $params = array())
     {
         if ($data === "false") {
             return false;
@@ -158,7 +158,6 @@ class Checkbox extends Model\Object\ClassDefinition\Data
      */
     public function checkValidity($data, $omitMandatoryCheck = false)
     {
-
         if (!$omitMandatoryCheck and $this->getMandatory() and $data === null) {
             throw new \Exception("Empty mandatory field [ " . $this->getName() . " ]");
         }
@@ -173,9 +172,10 @@ class Checkbox extends Model\Object\ClassDefinition\Data
      * converts object data to a simple string value or CSV Export
      * @abstract
      * @param Object\AbstractObject $object
+     * @param array $params
      * @return string
      */
-    public function getForCsvExport($object)
+    public function getForCsvExport($object, $params = array())
     {
         $data = $this->getDataFromObjectParam($object);
         return strval($data);
@@ -213,14 +213,16 @@ class Checkbox extends Model\Object\ClassDefinition\Data
     /** True if change is allowed in edit mode.
      * @return bool
      */
-    public function isDiffChangeAllowed() {
+    public function isDiffChangeAllowed()
+    {
         return true;
     }
 
     /**
      * @param Object\ClassDefinition\Data $masterDefinition
      */
-    public function synchronizeWithMasterDefinition(Object\ClassDefinition\Data $masterDefinition) {
+    public function synchronizeWithMasterDefinition(Object\ClassDefinition\Data $masterDefinition)
+    {
         $this->defaultValue = $masterDefinition->defaultValue;
     }
 
@@ -231,7 +233,8 @@ class Checkbox extends Model\Object\ClassDefinition\Data
      * @return string
      *
      */
-    public function getFilterCondition($value, $operator) {
+    public function getFilterCondition($value, $operator)
+    {
         $db = \Pimcore\Db::get();
         $value = $db->quote($value);
         $key = $db->quoteIdentifier($this->name, $this->name);

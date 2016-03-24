@@ -145,7 +145,7 @@ pimcore.settings.system = Class.create({
                                 fieldLabel: t('timezone'),
                                 name: 'general.timezone',
                                 xtype: "combo",
-                                //editable: true, // If typeAhead is enabled the combo must be editable: true -- please change one of those settings.
+                                forceSelection: true,
                                 triggerAction: 'all',
                                 store: this.data.config.timezones,
                                 value: this.getValue("general.timezone"),
@@ -155,7 +155,7 @@ pimcore.settings.system = Class.create({
                                 fieldLabel: t("view_suffix"),
                                 xtype: "combo",
                                 width: 600,
-                                //editable: true, // If typeAhead is enabled the combo must be editable: true -- please change one of those settings.
+                                editable: false,
                                 name: "general.viewSuffix",
                                 value: this.getValue("general.viewSuffix"),
                                 store: [
@@ -223,6 +223,7 @@ pimcore.settings.system = Class.create({
                                 fieldLabel: t("user_interface") + " / " + t("extjs_version"),
                                 xtype: "combo",
                                 width: 600,
+                                editable: false,
                                 name: "general.extjs6",
                                 value: this.getValue("general.extjs6"),
                                 store: [
@@ -264,7 +265,6 @@ pimcore.settings.system = Class.create({
                                     xtype: "combo",
                                     id: "system_settings_general_languageSelection",
                                     triggerAction: 'all',
-                                    //resizable: true,
                                     queryMode: 'local',
                                     store: this.languagesStore,
                                     displayField: 'display',
@@ -399,6 +399,7 @@ pimcore.settings.system = Class.create({
                                 ],
                                 mode: "local",
                                 triggerAction: "all",
+                                editable: false,
                                 forceSelection: true
                             },
                             {
@@ -449,6 +450,7 @@ pimcore.settings.system = Class.create({
                                     [0, "EMERG"]
                                 ],
                                 mode: "local",
+                                editable: false,
                                 triggerAction: "all"
                             },
                             {
@@ -537,6 +539,8 @@ pimcore.settings.system = Class.create({
                                         select: this.emailMethodSelected.bind(this, "email")
                                     },
                                     mode: "local",
+                                    editable: false,
+                                    forceSelection: true,
                                     triggerAction: "all"
                                 },
                                 {
@@ -554,7 +558,7 @@ pimcore.settings.system = Class.create({
                                         {
                                             fieldLabel: t("email_smtp_ssl"),
                                             xtype: "combo",
-                                            width: 130,
+                                            width: 425,
                                             name: "email.smtp.ssl",
                                             value: this.getValue("email.smtp.ssl"),
                                             store: [
@@ -563,6 +567,8 @@ pimcore.settings.system = Class.create({
                                                 ["ssl", "SSL"]
                                             ],
                                             mode: "local",
+                                            editable: false,
+                                            forceSelection: true,
                                             triggerAction: "all"
                                         },
                                         {
@@ -578,7 +584,7 @@ pimcore.settings.system = Class.create({
                                         {
                                             fieldLabel: t("email_smtp_auth_method"),
                                             xtype: "combo",
-                                            width: 130,
+                                            width: 425,
                                             name: "email.smtp.auth.method",
                                             value: this.getValue("email.smtp.auth.method"),
                                             store: [
@@ -588,6 +594,8 @@ pimcore.settings.system = Class.create({
                                                 ["crammd5", "CRAM-MD5"]
                                             ],
                                             mode: "local",
+                                            editable: false,
+                                            forceSelection: true,
                                             triggerAction: "all",
                                             listeners: {
                                                 select: this.smtpAuthSelected.bind(this, "email")
@@ -675,6 +683,8 @@ pimcore.settings.system = Class.create({
                                     }.bind(this)
                                 },
                                 mode: "local",
+                                editable: false,
+                                forceSelection: true,
                                 triggerAction: "all"
                             }, {
                                 fieldLabel: t('path'),
@@ -899,6 +909,8 @@ pimcore.settings.system = Class.create({
                                     ["no", t("no")]
                                 ],
                                 mode: "local",
+                                editable: false,
+                                forceSelection: true,
                                 triggerAction: "all"
                             }, {
                                 fieldLabel: t("allow_capitals_for_documents"),
@@ -910,6 +922,8 @@ pimcore.settings.system = Class.create({
                                     ["no", t("no")]
                                 ],
                                 mode: "local",
+                                editable: false,
+                                forceSelection: true,
                                 triggerAction: "all"
                             }, {
                                 fieldLabel: t("generate_previews"),
@@ -1124,25 +1138,6 @@ pimcore.settings.system = Class.create({
                                 fieldLabel: t('browser_api_key'),
                                 name: 'services.google.browserapikey',
                                 value: this.getValue("services.google.browserapikey"),
-                                width: 850
-                            }, {
-                                xtype: "displayfield",
-                                hideLabel: true,
-                                style: "margin-top: 10px;",
-                                width: 800,
-                                value: "&nbsp;"
-                            },
-                            {
-                                xtype: "displayfield",
-                                hideLabel: true,
-                                width: 800,
-                                value: "<b>" + t('translate_api_key') + "</b>",
-                                cls: "pimcore_extra_label"
-                            },
-                            {
-                                fieldLabel: t('api_key'),
-                                name: 'services.translate.apikey',
-                                value: this.getValue("services.translate.apikey"),
                                 width: 850
                             }
                         ]
@@ -1378,6 +1373,8 @@ pimcore.settings.system = Class.create({
                                     listeners: {
                                         select: this.emailMethodSelected.bind(this, "newsletter")
                                     },
+                                    editable: false,
+                                    forceSelection: true,
                                     mode: "local",
                                     triggerAction: "all"
                                 },
@@ -1404,6 +1401,8 @@ pimcore.settings.system = Class.create({
                                                 ["tls", "TLS"],
                                                 ["ssl", "SSL"]
                                             ],
+                                            editable: false,
+                                            forceSelection: true,
                                             mode: "local",
                                             triggerAction: "all"
                                         },
@@ -1429,6 +1428,8 @@ pimcore.settings.system = Class.create({
                                                 ["cram-md5", "CRAM-MD5"]
                                             ],
                                             mode: "local",
+                                            editable: false,
+                                            forceSelection: true,
                                             triggerAction: "all",
                                             listeners: {
                                                 select: this.smtpAuthSelected.bind(this, "newsletter")

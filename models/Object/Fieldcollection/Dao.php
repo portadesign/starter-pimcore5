@@ -17,12 +17,14 @@ namespace Pimcore\Model\Object\Fieldcollection;
 use Pimcore\Model;
 use Pimcore\Model\Object;
 
-class Dao extends Model\Dao\AbstractDao {
+class Dao extends Model\Dao\AbstractDao
+{
 
     /**
      * @param Object\Concrete $object
      */
-    public function save (Object\Concrete $object) {
+    public function save(Object\Concrete $object)
+    {
         $this->delete($object);
     }
 
@@ -30,8 +32,8 @@ class Dao extends Model\Dao\AbstractDao {
      * @param Object\Concrete $object
      * @return array
      */
-    public function load (Object\Concrete $object) {
-        
+    public function load(Object\Concrete $object)
+    {
         $fieldDef = $object->getClass()->getFieldDefinition($this->model->getFieldname());
         $values = array();
 
@@ -51,14 +53,11 @@ class Dao extends Model\Dao\AbstractDao {
                 $results = array();
             }
 
-            //$allRelations = $this->db->fetchAll("SELECT * FROM object_relations_" . $object->getO_classId() . " WHERE src_id = ? AND ownertype = 'fieldcollection' AND ownername = ? ORDER BY `index` ASC", array($object->getO_id(), $this->model->getFieldname()));
-            
             $fieldDefinitions = $definition->getFieldDefinitions();
             $collectionClass = "\\Pimcore\\Model\\Object\\Fieldcollection\\Data\\" . ucfirst($type);
             
-            
+            $index = 0;
             foreach ($results as $result) {
-                
                 $collection = new $collectionClass();
                 $collection->setIndex($result["index"]);
                 $collection->setFieldname($result["fieldname"]);
@@ -67,8 +66,15 @@ class Dao extends Model\Dao\AbstractDao {
                 foreach ($fieldDefinitions as $key => $fd) {
                     if (method_exists($fd, "load")) {
                         // datafield has it's own loader
-                        $value = $fd->load($collection);
-                        if($value === 0 || !empty($value)) {
+                        $value = $fd->load($collection,
+                            array(
+                                "context" => array(
+                                    "containerType" => "fieldcollection",
+                                    "containerKey" => $type,
+                                    "fieldname" =>  $this->model->getFieldname(),
+                                    "index" => $index
+                            )));
+                        if ($value === 0 || !empty($value)) {
                             $collection->setValue($key, $value);
                         }
                     } else {
@@ -78,13 +84,13 @@ class Dao extends Model\Dao\AbstractDao {
                                 $multidata[$key . "__" . $fkey] = $result[$key . "__" . $fkey];
                             }
                             $collection->setValue($key, $fd->getDataFromResource($multidata));
-
                         } else {
-                            $collection->setValue( $key, $fd->getDataFromResource($result[$key]));
+                            $collection->setValue($key, $fd->getDataFromResource($result[$key]));
                         }
                     }
                 }
-                
+
+                $index++;
                 $values[] = $collection;
             }
         }
@@ -104,12 +110,12 @@ class Dao extends Model\Dao\AbstractDao {
     /**
      * @param Object\Concrete $object
      */
-    public function delete (Object\Concrete $object) {
+    public function delete(Object\Concrete $object)
+    {
         // empty or create all relevant tables 
         $fieldDef = $object->getClass()->getFieldDefinition($this->model->getFieldname());
         
         foreach ($fieldDef->getAllowedTypes() as $type) {
-            
             try {
                 $definition = Object\Fieldcollection\Definition::getByKey($type);
             } catch (\Exception $e) {
@@ -130,13 +136,23 @@ class Dao extends Model\Dao\AbstractDao {
             if (is_array($childDefinitions)) {
                 foreach ($childDefinitions as $fd) {
                     if (method_exists($fd, "delete")) {
-                        $fd->delete($object);
+                        $fd->delete($object, array(
+                                "context" => array(
+                                    "containerType" => "fieldcollection",
+                                    "containerKey" => $type,
+                                    "fieldname" =>  $this->model->getFieldname()
+                                )
+                            )
+                        );
                     }
                 }
             }
         }
 
         // empty relation table
-        $this->db->delete("object_relations_" . $object->getClassId(), "ownertype = 'fieldcollection' AND " . $this->db->quoteInto("ownername = ?", $this->model->getFieldname()) . " AND " . $this->db->quoteInto("src_id = ?", $object->getId()));
+        $this->db->delete("object_relations_" . $object->getClassId(),
+            "(ownertype = 'fieldcollection' AND " . $this->db->quoteInto("ownername = ?", $this->model->getFieldname()) . " AND " . $this->db->quoteInto("src_id = ?", $object->getId()) . ")"
+            . " OR (ownertype = 'localizedfield' AND " . $this->db->quoteInto("ownername LIKE ?", "/fieldcollection~" . $this->model->getFieldname() . "/%") . ")"
+        );
     }
 }

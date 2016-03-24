@@ -119,6 +119,7 @@ pimcore.settings.redirects = Class.create({
                 store: pimcore.globalmanager.get("sites"),
                 valueField: "id",
                 displayField: "domain",
+                editable: false,
                 triggerAction: "all"
             }), renderer: function (siteId) {
                 var store = pimcore.globalmanager.get("sites");
@@ -137,6 +138,7 @@ pimcore.settings.redirects = Class.create({
                 store: pimcore.globalmanager.get("sites"),
                 valueField: "id",
                 displayField: "domain",
+                editable: false,
                 triggerAction: "all"
             }), renderer: function (siteId) {
                 var store = pimcore.globalmanager.get("sites");
@@ -223,7 +225,7 @@ pimcore.settings.redirects = Class.create({
                 width: 30,
                 items: [{
                     tooltip: t('delete'),
-                    icon: "/pimcore/static6/img/icon/cross.png",
+                    icon: "/pimcore/static6/img/flat-color-icons/delete.svg",
                     handler: function (grid, rowIndex) {
                         grid.getStore().removeAt(rowIndex);
                         this.updateRows();

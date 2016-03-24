@@ -102,7 +102,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                 ],
                 html: '<iframe src="' + this.getEditUrlPixlr("express") + '" frameborder="0" id="asset_image_edit_'
                                                                             + this.id + '"></iframe>',
-                iconCls: "pimcore_icon_tab_edit"
+                iconCls: "pimcore_icon_edit"
             });
             this.editPanel.on("resize", function (el, width, height, rWidth, rHeight) {
                 Ext.get("asset_image_edit_" + this.id).setStyle({
@@ -166,6 +166,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                         scrollOffset: 2
                     }
                 });
+                dimensionPanel.plugins[0].disable();
                 dimensionPanel.getStore().sort("name","DESC");
 
                 details.push(dimensionPanel);
@@ -191,7 +192,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                     store: [["JPEG", "JPEG"],["PNG","PNG"]],
                     mode: "local",
                     value: "JPEG",
-                    width: 200
+                    editable: false
                 }, {
                     xtype: "numberfield",
                     name: "width",
@@ -228,9 +229,9 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                 var exifPanel = new Ext.grid.PropertyGrid({
                     title: t("exif_data"),
                     source: this.data.imageInfo.exif,
-                    clicksToEdit: 1000,
-                    autoHeight: true
+                    clicksToEdit: 1000
                 });
+                exifPanel.plugins[0].disable();
 
                 details.push(exifPanel);
             }
@@ -238,7 +239,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
             this.displayPanel = new Ext.Panel({
                 title: t("view"),
                 layout: "border",
-                iconCls: "pimcore_icon_tab_view",
+                iconCls: "pimcore_icon_view",
                 items: [{
                     region: "center",
                     html: '&nbsp;',
@@ -248,7 +249,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                     region: "east",
                     width: 300,
                     items: details,
-                    autoScroll: true
+                    scrollable: "y"
                 }]
             });
         }

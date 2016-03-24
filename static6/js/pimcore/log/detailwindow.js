@@ -60,7 +60,7 @@ pimcore.log.detailwindow = Class.create({
 			name: "timestamp",
             readOnly: true,
 			value: this.data.timestamp,
-			width: 400
+			width: 540
 		});
 		items.push({
 			xtype: "textarea",
@@ -68,7 +68,7 @@ pimcore.log.detailwindow = Class.create({
 			name: "message",
             readOnly: true,
 			value: this.data.message,
-			width: 400,
+			width: 540,
             height: 200
 		});
 		items.push({
@@ -77,7 +77,7 @@ pimcore.log.detailwindow = Class.create({
 			name: "type",
             readOnly: true,
 			value: this.data.priority,
-			width: 400
+			width: 540
 		});
         items.push({
             xtype: "textfield",
@@ -85,7 +85,7 @@ pimcore.log.detailwindow = Class.create({
             name: "component",
             readOnly: true,
             value: this.data.component,
-            width: 400
+            width: 540
         });
         items.push(new Ext.form.FieldContainer({
             layout: 'hbox',
@@ -111,13 +111,14 @@ pimcore.log.detailwindow = Class.create({
             text = text.substr(0, 60) + "...";
         }
 
+        var html = Ext.String.format('<a href="{0}" target="_blank">{1}</a>', this.data.fileobject, text);
         items.push({
             xtype: "displayfield",
             fieldLabel: t('log_fileobject'),
             name: "fileobject",
             readOnly: true,
-            html: Ext.String.format('<a href="{0}" target="_blank">{1}</a>', this.data.fileobject, text),
-            width: 400
+            value: html,
+            width: 540
         });
 
 

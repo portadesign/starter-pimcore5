@@ -316,13 +316,13 @@ pimcore.object.tags.keyValue = Class.create(pimcore.object.tags.abstract, {
                         getClass: function (v, meta, rec) {
                             var klass = "pimcore_action_column";
                             if (!rec.data.inherited) {
-                                klass +=  " pimcore_icon_cross";
+                                klass +=  " pimcore_icon_cancel";
                             }
                             return klass;
 
                         },
                         tooltip: t('remove'),
-                        // icon: "/pimcore/static6/img/icon/cross.png",
+                        // icon: "/pimcore/static6/img/flat-color-icons/delete.svg",
                         handler: function (grid, rowIndex) {
                             var store = grid.getStore();
                             var record = store.getAt(rowIndex);

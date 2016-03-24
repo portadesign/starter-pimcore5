@@ -58,7 +58,7 @@
 <?php // define stylesheets ?>
 <?php
 $styles = array(
-    "/admin/misc/admin-css",
+    "/admin/misc/admin-css?extjs3=true",
     "/pimcore/static/css/icons.css",
     "/pimcore/static/js/lib/ext/resources/css/ext-all.css",
     "/pimcore/static/js/lib/ext/resources/css/xtheme-gray.css",
@@ -512,7 +512,6 @@ $googleMapsApiKey = $this->config->services->google->browserapikey;
         customviews: <?= \Zend_Json::encode($this->customview_config) ?>,
         language: '<?= $this->language; ?>',
         websiteLanguages: <?= \Zend_Json::encode(explode(",",$this->config->general->validLanguages)); ?>,
-        google_translate_api_key: "<?= $this->config->services->translate->apikey; ?>",
         google_maps_api_key: "<?= $googleMapsApiKey ?>",
         showCloseConfirmation: true,
         debug_admin_translations: <?= \Zend_Json::encode((bool) $this->config->general->debug_admin_translations) ?>,
