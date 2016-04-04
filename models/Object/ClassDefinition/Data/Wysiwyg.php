@@ -127,9 +127,10 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
      * @see Object\ClassDefinition\Data::getDataForResource
      * @param string $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataForResource($data, $object = null)
+    public function getDataForResource($data, $object = null, $params = array())
     {
         return Text::wysiwygText($data);
     }
@@ -137,9 +138,11 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
     /**
      * @see Object\ClassDefinition\Data::getDataFromResource
      * @param string $data
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataFromResource($data)
+    public function getDataFromResource($data, $object = null, $params = array())
     {
         return Text::wysiwygText($data);
     }
@@ -148,11 +151,12 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
      * @see Object\ClassDefinition\Data::getDataForQueryResource
      * @param string $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataForQueryResource($data, $object = null)
+    public function getDataForQueryResource($data, $object = null, $params = array())
     {
-        $data = $this->getDataForResource($data);
+        $data = $this->getDataForResource($data, $object, $params);
 
         $data = strip_tags($data, "<a><img>");
         $data = str_replace("\r\n", " ", $data);
@@ -169,11 +173,12 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
      * @see Object\ClassDefinition\Data::getDataForEditmode
      * @param string $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataForEditmode($data, $object = null)
+    public function getDataForEditmode($data, $object = null, $params = array())
     {
-        return $this->getDataForResource($data, $object);
+        return $this->getDataForResource($data, $object, $params);
     }
 
     /**
@@ -219,14 +224,14 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
     public function checkValidity($data, $omitMandatoryCheck = false)
     {
         if (!$omitMandatoryCheck and $this->getMandatory() and empty($data)) {
-            throw new \Exception("Empty mandatory field [ ".$this->getName()." ]");
+            throw new Element\ValidationException("Empty mandatory field [ ".$this->getName()." ]");
         }
         $dependencies = Text::getDependenciesOfWysiwygText($data);
         if (is_array($dependencies)) {
             foreach ($dependencies as $key => $value) {
                 $el = Element\Service::getElementById($value['type'], $value['id']);
                 if (!$el) {
-                    throw new \Exception("invalid dependency in wysiwyg text");
+                    throw new Element\ValidationException("Invalid dependency in wysiwyg text");
                 }
             }
         }
@@ -256,9 +261,10 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
      * a image URL. See the ObjectMerger plugin documentation for details
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @return array|string
      */
-    public function getDiffVersionPreview($data, $object = null)
+    public function getDiffVersionPreview($data, $object = null, $params = array())
     {
         if ($data) {
             $value = array();

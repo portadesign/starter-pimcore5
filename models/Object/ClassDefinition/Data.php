@@ -157,15 +157,17 @@ abstract class Data
      *
      * @param mixed $data
      * @param null|Object\AbstractObject $object
+     * @param mixed $params
      * @return mixed
      */
-    abstract public function getDataForEditmode($data, $object = null);
+    abstract public function getDataForEditmode($data, $object = null, $params = array());
 
     /**
      * Converts data from editmode to internal eg. Image-Id to Asset\Image object
      *
      * @param mixed $data
      * @param null|Object\AbstractObject $object
+     * @param mixed $params
      * @return mixed
      */
     abstract public function getDataFromEditmode($data, $object = null, $params = array());
@@ -193,7 +195,7 @@ abstract class Data
         }
 
         if (!$omitMandatoryCheck && $this->getMandatory() && $isEmpty) {
-            throw new \Exception("Empty mandatory field [ " . $this->getName() . " ]");
+            throw new Model\Element\ValidationException("Empty mandatory field [ " . $this->getName() . " ]");
         }
     }
 
@@ -211,39 +213,45 @@ abstract class Data
 
     /**
      * @param $importValue
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return mixed
      */
-    public function getFromCsvImport($importValue)
+    public function getFromCsvImport($importValue, $object = null, $params = array())
     {
         return $importValue;
     }
 
     /**
      * @param $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataForSearchIndex($object)
+    public function getDataForSearchIndex($object, $params = array())
     {
         // this is the default, but csv doesn't work for all data types
-        return $this->getForCsvExport($object);
+        return $this->getForCsvExport($object, $params);
     }
 
     /**
      * converts data to be exposed via webservices
      * @param Object\AbstractObject $object
+     * @param mixed $params
      * @return mixed
      */
-    public function getForWebserviceExport($object)
+    public function getForWebserviceExport($object, $params = array())
     {
-        return $this->getDataFromObjectParam($object);
+        return $this->getDataFromObjectParam($object, $params);
     }
 
     /**
      * converts data to be imported via webservices
      * @param mixed $value
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return mixed
      */
-    public function getFromWebserviceImport($value, $object = null, $idMapper = null)
+    public function getFromWebserviceImport($value, $object = null, $params = array(), $idMapper = null)
     {
         return $value;
     }
@@ -800,7 +808,7 @@ abstract class Data
         $code = "";
 
         $code .= '/**' . "\n";
-        $code .= '* Get ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Set ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocType() . ' $' . $key . "\n";
         $code .= "* @return \\Pimcore\\Model\\Object\\" . ucfirst($fieldcollectionDefinition->getKey()) . "\n";
         $code .= '*/' . "\n";
@@ -835,11 +843,13 @@ abstract class Data
 
         $code .= "\t" . '$data = $this->getLocalizedfields()->getLocalizedValue("' . $key . '", $language);' . "\n";
 
-        // adds a hook preGetValue which can be defined in an extended class
-        $code .= "\t" . '$preValue = $this->preGetValue("' . $key . '");' . " \n";
-        $code .= "\t" . 'if($preValue !== null && !\Pimcore::inAdmin()) { ' . "\n";
-        $code .= "\t\t" . 'return $preValue;' . "\n";
-        $code .= "\t" . '}' . "\n";
+        if (!$class instanceof  Object\Fieldcollection\Definition) {
+            // adds a hook preGetValue which can be defined in an extended class
+            $code .= "\t" . '$preValue = $this->preGetValue("' . $key . '");' . " \n";
+            $code .= "\t" . 'if($preValue !== null && !\Pimcore::inAdmin()) { ' . "\n";
+            $code .= "\t\t" . 'return $preValue;' . "\n";
+            $code .= "\t" . '}' . "\n";
+        }
 
         // we don't need to consider preGetData, because this is already managed directly by the localized fields within getLocalizedValue()
 
@@ -857,11 +867,16 @@ abstract class Data
     public function getSetterCodeLocalizedfields($class)
     {
         $key = $this->getName();
+        if ($class instanceof  Object\Fieldcollection\Definition) {
+            $classname = ucfirst($class->getKey());
+        } else {
+            $classname = $class->getName();
+        }
 
         $code  = '/**' . "\n";
         $code .= '* Set ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocType() . ' $' . $key . "\n";
-        $code .= "* @return \\Pimcore\\Model\\Object\\" . ucfirst($class->getName()) . "\n";
+        $code .= "* @return \\Pimcore\\Model\\Object\\" . ucfirst($classname) . "\n";
         $code .= '*/' . "\n";
         $code .= "public function set" . ucfirst($key) . " (" . '$' . $key . ', $language = null) {' . "\n";
 
@@ -893,9 +908,11 @@ abstract class Data
 
     /**
      * @param $data
+     * @param null|Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getVersionPreview($data)
+    public function getVersionPreview($data, $object = null, $params = array())
     {
         return "no preview";
     }
@@ -913,9 +930,11 @@ abstract class Data
     }
 
     /** True if change is allowed in edit mode.
+     * @param string $object
+     * @param mixed $params
      * @return bool
      */
-    public function isDiffChangeAllowed()
+    public function isDiffChangeAllowed($object, $params = array())
     {
         return false;
     }
@@ -927,11 +946,12 @@ abstract class Data
      *  - "data" => the data
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @return mixed
      */
-    public function getDiffDataFromEditmode($data, $object = null)
+    public function getDiffDataFromEditmode($data, $object = null, $params = array())
     {
-        $thedata = $this->getDataFromEditmode($data[0]["data"], $object);
+        $thedata = $this->getDataFromEditmode($data[0]["data"], $object, $params);
         return $thedata;
     }
 
@@ -952,21 +972,22 @@ abstract class Data
      *
      * @param mixed $data
      * @param null|Object\AbstractObject $object
+     * @param mixed $params
      * @return null|array
      */
-    public function getDiffDataForEditMode($data, $object = null)
+    public function getDiffDataForEditMode($data, $object = null, $params = array())
     {
         $diffdata = array();
-        $diffdata["data"] = $this->getDataForEditmode($data, $object);
+        $diffdata["data"] = $this->getDataForEditmode($data, $object, $params);
         $diffdata["disabled"] = !($this->isDiffChangeAllowed());
         $diffdata["field"] = $this->getName();
         $diffdata["key"] = $this->getName();
         $diffdata["type"] = $this->fieldtype;
 
         if (method_exists($this, "getDiffVersionPreview")) {
-            $value = $this->getDiffVersionPreview($data, $object);
+            $value = $this->getDiffVersionPreview($data, $object, $params);
         } else {
-            $value = $this->getVersionPreview($data);
+            $value = $this->getVersionPreview($data, $object, $params);
         }
 
         $diffdata["title"] = !empty($this->title) ? $this->title : $this->name;
@@ -1087,9 +1108,10 @@ abstract class Data
     /** Encode value for packing it into a single column.
      * @param mixed $value
      * @param Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return mixed
      */
-    public function marshal($value, $object = null)
+    public function marshal($value, $object = null, $params = array())
     {
         return array("value" => $value);
     }
@@ -1099,7 +1121,7 @@ abstract class Data
      * @param Model\Object\AbstractObject $object
      * @return mixed
      */
-    public function unmarshal($data, $object = null)
+    public function unmarshal($data, $object = null, $params = array())
     {
         if (is_array($data)) {
             return $data["value"];

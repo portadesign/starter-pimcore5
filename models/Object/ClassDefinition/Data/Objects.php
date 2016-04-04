@@ -78,9 +78,10 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
      * @see Object\ClassDefinition\Data::getDataForResource
      * @param array $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array
      */
-    public function getDataForResource($data, $object = null)
+    public function getDataForResource($data, $object = null, $params = array())
     {
         $return = array();
 
@@ -110,9 +111,11 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     /**
      * @see Object\ClassDefinition\Data::getDataFromResource
      * @param array $data
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array
      */
-    public function getDataFromResource($data)
+    public function getDataFromResource($data, $object = null, $params = array())
     {
         $objects = array();
         if (is_array($data) && count($data) > 0) {
@@ -130,9 +133,10 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     /**
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @throws \Exception
      */
-    public function getDataForQueryResource($data, $object = null)
+    public function getDataForQueryResource($data, $object = null, $params = array())
     {
 
         //return null when data is not set
@@ -161,9 +165,10 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
      * @see Object\ClassDefinition\Data::getDataForEditmode
      * @param array $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array
      */
-    public function getDataForEditmode($data, $object = null)
+    public function getDataForEditmode($data, $object = null, $params = array())
     {
         $return = array();
 
@@ -212,9 +217,10 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     /**
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @return array
      */
-    public function getDataForGrid($data, $object = null)
+    public function getDataForGrid($data, $object = null, $params = array())
     {
         if (is_array($data)) {
             $pathes = array();
@@ -230,9 +236,11 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     /**
      * @see Object\ClassDefinition\Data::getVersionPreview
      * @param array $data
+     * @param null|Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getVersionPreview($data)
+    public function getVersionPreview($data, $object = null, $params = array())
     {
         if (is_array($data) && count($data) > 0) {
             foreach ($data as $o) {
@@ -290,7 +298,7 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     public function checkValidity($data, $omitMandatoryCheck = false)
     {
         if (!$omitMandatoryCheck and $this->getMandatory() and empty($data)) {
-            throw new \Exception("Empty mandatory field [ ".$this->getName()." ]");
+            throw new Element\ValidationException("Empty mandatory field [ ".$this->getName()." ]");
         }
 
         if (is_array($data)) {
@@ -306,7 +314,7 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
                     } else {
                         $id = "??";
                     }
-                    throw new \Exception("Invalid object relation to object [".$id."] in field " . $this->getName(), null, null);
+                    throw new Element\ValidationException("Invalid object relation to object [".$id."] in field " . $this->getName(), null, null);
                 }
             }
         }
@@ -337,9 +345,11 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
 
     /**
      * @param $importValue
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array|mixed
      */
-    public function getFromCsvImport($importValue)
+    public function getFromCsvImport($importValue, $object = null, $params = array())
     {
         $values = explode(",", $importValue);
 
@@ -397,11 +407,12 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
 
     /**
      * @param Object\AbstractObject $object
+     * @param mixed $params
      * @return array|mixed|null
      */
-    public function getForWebserviceExport($object)
+    public function getForWebserviceExport($object, $params = array())
     {
-        $data = $this->getDataFromObjectParam($object);
+        $data = $this->getDataFromObjectParam($object, $params);
         if (is_array($data)) {
             $items = array();
             foreach ($data as $eo) {
@@ -421,11 +432,12 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     /**
      * @param mixed $value
      * @param null $object
+     * @param mixed $params
      * @param null $idMapper
      * @return array|mixed
      * @throws \Exception
      */
-    public function getFromWebserviceImport($value, $object = null, $idMapper = null)
+    public function getFromWebserviceImport($value, $object = null, $params = array(), $idMapper = null)
     {
         $relatedObjects = array();
         if (empty($value)) {
@@ -548,9 +560,11 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     }
 
     /** True if change is allowed in edit mode.
+     * @param string $object
+     * @param mixed $params
      * @return bool
      */
-    public function isDiffChangeAllowed()
+    public function isDiffChangeAllowed($object, $params = array())
     {
         return true;
     }
@@ -559,16 +573,17 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
      * a image URL. See the ObjectMerger plugin documentation for details
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @return array|string
      */
-    public function getDiffVersionPreview($data, $object = null)
+    public function getDiffVersionPreview($data, $object = null, $params = array())
     {
         $value = array();
         $value["type"] = "html";
         $value["html"] = "";
 
         if ($data) {
-            $html = $this->getVersionPreview($data);
+            $html = $this->getVersionPreview($data, $object, $params);
             $value["html"] = $html;
         }
         return $value;
@@ -577,9 +592,10 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     /** See parent class.
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @return null|Pimcore_Date
      */
-    public function getDiffDataFromEditmode($data, $object = null)
+    public function getDiffDataFromEditmode($data, $object = null, $params = array())
     {
         if ($data) {
             $tabledata = $data[0]["data"];
@@ -597,7 +613,7 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
                 $result[] = $out;
             }
 
-            return $this->getDataFromEditmode($result);
+            return $this->getDataFromEditmode($result, $object, $params);
         }
         return;
     }

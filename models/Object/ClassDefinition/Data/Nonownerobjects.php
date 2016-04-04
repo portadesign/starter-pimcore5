@@ -39,7 +39,11 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
      */
     public $ownerClassName;
 
-
+    /**
+     * @var number
+     */
+    public $ownerClassId;
+    
     /**
      * @var string
      */
@@ -108,6 +112,22 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
         }
         return $this->ownerClassName;
     }
+    
+    /**
+     * @return number
+     */
+    public function getOwnerClassId()
+    {
+        if (empty($this->ownerClassId)) {
+            try {
+                $class = Object\ClassDefinition::getByName($this->ownerClassName);
+                $this->ownerClassId =  $class->getId();
+            } catch (\Exception $e) {
+                \Logger::error($e->getMessage());
+            }
+        }
+        return $this->ownerClassId;
+    }
 
     /**
      * @return string
@@ -132,9 +152,10 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
      * @see Object\ClassDefinition\Data::getDataForResource
      * @param array $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array
      */
-    public function getDataForResource($data, $object = null)
+    public function getDataForResource($data, $object = null, $params = array())
     {
         return null;
     }
@@ -143,9 +164,10 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
      * @see Object\ClassDefinition\Data::getDataForQueryResource
      * @param array $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataForQueryResource($data, $object = null)
+    public function getDataForQueryResource($data, $object = null, $params = array())
     {
         return null;
     }
@@ -182,14 +204,14 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
     {
         //TODO
         if (!$omitMandatoryCheck and $this->getMandatory() and empty($data)) {
-            throw new \Exception("Empty mandatory field [ ".$this->getName()." ]");
+            throw new Model\Element\ValidationException("Empty mandatory field [ ".$this->getName()." ]");
         }
 
         if (is_array($data)) {
             foreach ($data as $o) {
                 $allowClass = $this->allowObjectRelation($o);
                 if (!$allowClass or!($o instanceof Object\Concrete)) {
-                    throw new \Exception("Invalid non owner object relation to object [".$o->getId()."]", null, null);
+                    throw new Model\Element\ValidationException("Invalid non owner object relation to object [".$o->getId()."]", null, null);
                 }
             }
         }
@@ -211,9 +233,11 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
      * fills object field data values from CSV Import String
      * @abstract
      * @param string $importValue
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return Object\ClassDefinition\Data
      */
-    public function getFromCsvImport($importValue)
+    public function getFromCsvImport($importValue, $object = null, $params = array())
     {
         return null;
     }
@@ -241,9 +265,10 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
 
     /**
      * @param Object\AbstractObject $object
+     * @param mixed $params
      * @return array|null
      */
-    public function getForWebserviceExport($object)
+    public function getForWebserviceExport($object, $params = array())
     {
         return null;
     }
@@ -251,9 +276,11 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
     /**
      * converts data to be imported via webservices
      * @param mixed $value
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return mixed
      */
-    public function getFromWebserviceImport($value, $object = null, $idMapper = null)
+    public function getFromWebserviceImport($value, $object = null, $params = array(), $idMapper = null)
     {
         return null;
     }

@@ -20,9 +20,6 @@ use Pimcore\Model\Asset;
 
 class Video extends Model\Document\Tag
 {
-
-    public static $playerJsEmbedded = false;
-
     /**
      * contains depending on the type of the video the unique identifier eg. "http://www.youtube.com", "789", ...
      *
@@ -384,6 +381,8 @@ class Video extends Model\Document\Tag
             } else {
                 return $this->getErrorCode("The given thumbnail doesn't exist: '" . $options["thumbnail"] . "'");
             }
+        } else {
+            return $this->getEmptyCode();
         }
     }
 
@@ -754,11 +753,12 @@ class Video extends Model\Document\Tag
     }
 
     /**
-     * @param Model\Document\Webservice\Data\Document\Element $wsElement
+     * @param Model\Webservice\Data\Document\Element $wsElement
+     * @param mixed $params
      * @param null $idMapper
      * @throws \Exception
      */
-    public function getFromWebserviceImport($wsElement, $idMapper = null)
+    public function getFromWebserviceImport($wsElement, $document = null, $params = array(), $idMapper = null)
     {
         $data = $wsElement->value;
         if ($data->id) {

@@ -56,9 +56,10 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
      * @see Object\ClassDefinition\Data::getDataForResource
      * @param array $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array
      */
-    public function getDataForResource($data, $object = null)
+    public function getDataForResource($data, $object = null, $params = array())
     {
         $return = array();
 
@@ -89,9 +90,11 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     /**
      * @see Object\ClassDefinition\Data::getDataFromResource
      * @param array $data
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array
      */
-    public function getDataFromResource($data)
+    public function getDataFromResource($data, $object = null, $params = array())
     {
         $objects = array();
 
@@ -120,9 +123,10 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     /**
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @throws \Exception
      */
-    public function getDataForQueryResource($data, $object = null)
+    public function getDataForQueryResource($data, $object = null, $params = array())
     {
 
         //return null when data is not set
@@ -152,9 +156,10 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
      * @see Object\ClassDefinition\Data::getDataForEditmode
      * @param array $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array
      */
-    public function getDataForEditmode($data, $object = null)
+    public function getDataForEditmode($data, $object = null, $params = array())
     {
         $return = array();
 
@@ -219,7 +224,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
      * @param null $object
      * @return array
      */
-    public function getDataForGrid($data, $object = null)
+    public function getDataForGrid($data, $object = null, $params = array())
     {
         if (is_array($data)) {
             $pathes = array();
@@ -236,9 +241,11 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     /**
      * @see Object\ClassDefinition\Data::getVersionPreview
      * @param array $data
+     * @param null|Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getVersionPreview($data)
+    public function getVersionPreview($data, $object = null, $params = array())
     {
         if (is_array($data) && count($data) > 0) {
             foreach ($data as $metaObject) {
@@ -259,13 +266,13 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     public function checkValidity($data, $omitMandatoryCheck = false)
     {
         if (!$omitMandatoryCheck and $this->getMandatory() and empty($data)) {
-            throw new \Exception("Empty mandatory field [ ".$this->getName()." ]");
+            throw new Element\ValidationException("Empty mandatory field [ ".$this->getName()." ]");
         }
 
         if (is_array($data)) {
             foreach ($data as $objectMetadata) {
                 if (!($objectMetadata instanceof Object\Data\ObjectMetadata)) {
-                    throw new \Exception("Expected Object\\Data\\ObjectMetadata");
+                    throw new Element\ValidationException("Expected Object\\Data\\ObjectMetadata");
                 }
 
                 $o = $objectMetadata->getObject();
@@ -275,7 +282,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                     } else {
                         $id = "??";
                     }
-                    throw new \Exception("Invalid object relation to object [".$id."] in field " . $this->getName(), null, null);
+                    throw new Element\ValidationException("Invalid object relation to object [".$id."] in field " . $this->getName(), null, null);
                 }
             }
         }
@@ -307,9 +314,11 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
 
     /**
      * @param $importValue
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return array|mixed
      */
-    public function getFromCsvImport($importValue)
+    public function getFromCsvImport($importValue, $object = null, $params = array())
     {
         $values = explode(",", $importValue);
 
@@ -372,11 +381,12 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
 
     /**
      * @param Object\AbstractObject $object
+     * @param mixed $params
      * @return array|mixed|null
      */
-    public function getForWebserviceExport($object)
+    public function getForWebserviceExport($object, $params = array())
     {
-        $data = $this->getDataFromObjectParam($object);
+        $data = $this->getDataFromObjectParam($object, $params);
         if (is_array($data)) {
             $items = array();
             foreach ($data as $metaObject) {
@@ -403,11 +413,12 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     /**
      * @param mixed $value
      * @param null $object
+     * @param mixed $params
      * @param null $idMapper
      * @return array|mixed
      * @throws \Exception
      */
-    public function getFromWebserviceImport($value, $object = null, $idMapper = null)
+    public function getFromWebserviceImport($value, $object = null, $params = array(), $idMapper = null)
     {
         $objects = array();
         if (empty($value)) {
@@ -740,11 +751,12 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     public function enrichLayoutDefinition($object)
     {
         $classId = $this->allowedClassId;
-        $class = Object\ClassDefinition::getById($classId);
 
         if (!$classId) {
             return;
         }
+
+        $class = Object\ClassDefinition::getById($classId);
 
         if (!$this->visibleFields) {
             return;

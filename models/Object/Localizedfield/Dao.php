@@ -20,6 +20,7 @@ use Pimcore\Tool;
 
 class Dao extends Model\Dao\AbstractDao
 {
+    use Object\ClassDefinition\Helper\Dao;
 
     /**
      * @var null
@@ -260,23 +261,27 @@ class Dao extends Model\Dao\AbstractDao
     {
         try {
             $object = $this->model->getObject();
-            if ($deleteQuery) {
-                $id = $object->getId();
-                $tablename = $this->getTableName();
-                $this->db->delete($tablename, $this->db->quoteInto("ooo_id = ?", $id));
 
-                $validLanguages = Tool::getValidLanguages();
-                foreach ($validLanguages as $language) {
-                    $queryTable = $this->getQueryTableName() . "_" . $language;
-                    $this->db->delete($queryTable, $this->db->quoteInto("ooo_id = ?", $id));
-                }
-            }
             $context = $this->model->getContext();
             if ($context && $context["containerType"] == "fieldcollection") {
                 $containerKey = $context["containerKey"];
                 $container = Object\Fieldcollection\Definition::getByKey($containerKey);
             } else {
                 $container =  $object->getClass();
+            }
+
+            if ($deleteQuery) {
+                $id = $object->getId();
+                $tablename = $this->getTableName();
+                $this->db->delete($tablename, $this->db->quoteInto("ooo_id = ?", $id));
+
+                if (!$container instanceof  Object\Fieldcollection\Definition) {
+                    $validLanguages = Tool::getValidLanguages();
+                    foreach ($validLanguages as $language) {
+                        $queryTable = $this->getQueryTableName() . "_" . $language;
+                        $this->db->delete($queryTable, $this->db->quoteInto("ooo_id = ?", $id));
+                    }
+                }
             }
 
             $childDefinitions = $container->getFieldDefinition("localizedfields")->getFielddefinitions();
@@ -591,95 +596,5 @@ QUERY;
         }
 
         $this->tableDefinitions = null;
-    }
-
-    /**
-     * @param $field
-     * @param $table
-     */
-    private function addIndexToField($field, $table)
-    {
-        if ($field->getIndex()) {
-            if (is_array($field->getColumnType())) {
-                // multicolumn field
-                foreach ($field->getColumnType() as $fkey => $fvalue) {
-                    $columnName = $field->getName() . "__" . $fkey;
-                    try {
-                        $this->db->query("ALTER TABLE `" . $table . "` ADD INDEX `p_index_" . $columnName . "` (`" . $columnName . "`);");
-                    } catch (\Exception $e) {
-                    }
-                }
-            } else {
-                // single -column field
-                $columnName = $field->getName();
-                try {
-                    $this->db->query("ALTER TABLE `" . $table . "` ADD INDEX `p_index_" . $columnName . "` (`" . $columnName . "`);");
-                } catch (\Exception $e) {
-                }
-            }
-        } else {
-            if (is_array($field->getColumnType())) {
-                // multicolumn field
-                foreach ($field->getColumnType() as $fkey => $fvalue) {
-                    $columnName = $field->getName() . "__" . $fkey;
-                    try {
-                        $this->db->query("ALTER TABLE `" . $table . "` DROP INDEX `p_index_" . $columnName . "`;");
-                    } catch (\Exception $e) {
-                    }
-                }
-            } else {
-                // single -column field
-                $columnName = $field->getName();
-                try {
-                    $this->db->query("ALTER TABLE `" . $table . "` DROP INDEX `p_index_" . $columnName . "`;");
-                } catch (\Exception $e) {
-                }
-            }
-        }
-    }
-
-    /**
-     * @param $table
-     * @param $colName
-     * @param $type
-     * @param $default
-     * @param $null
-     */
-    private function addModifyColumn($table, $colName, $type, $default, $null)
-    {
-        $existingColumns = $this->getValidTableColumns($table, false);
-        $existingColName = null;
-
-        // check for existing column case insensitive eg a rename from myInput to myinput
-        $matchingExisting = preg_grep('/^' . preg_quote($colName, '/') . '$/i', $existingColumns);
-        if (is_array($matchingExisting) && !empty($matchingExisting)) {
-            $existingColName = current($matchingExisting);
-        }
-
-        if ($existingColName === null) {
-            $this->db->query('ALTER TABLE `' . $table . '` ADD COLUMN `' . $colName . '` ' . $type . $default . ' ' . $null . ';');
-            $this->resetValidTableColumnsCache($table);
-        } else {
-            if (!Object\ClassDefinition\Service::skipColumn($this->tableDefinitions, $table, $colName, $type, $default, $null)) {
-                $this->db->query('ALTER TABLE `' . $table . '` CHANGE COLUMN `' . $existingColName . '` `' . $colName . '` ' . $type . $default . ' ' . $null . ';');
-            }
-        }
-    }
-
-    /**
-     * @param $table
-     * @param $columnsToRemove
-     * @param $protectedColumns
-     */
-    private function removeUnusedColumns($table, $columnsToRemove, $protectedColumns)
-    {
-        if (is_array($columnsToRemove) && count($columnsToRemove) > 0) {
-            foreach ($columnsToRemove as $value) {
-                //if (!in_array($value, $protectedColumns)) {
-                if (!in_array(strtolower($value), array_map('strtolower', $protectedColumns))) {
-                    $this->db->query('ALTER TABLE `' . $table . '` DROP COLUMN `' . $value . '`;');
-                }
-            }
-        }
     }
 }

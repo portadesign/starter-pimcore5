@@ -86,6 +86,11 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
     public $localized;
 
     /**
+     * @var integer
+     */
+    public $storeId;
+
+    /**
      * contains further localized field definitions if there are more than one localized fields in on class
      * @var array
      */
@@ -104,9 +109,10 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
      * @see Object\ClassDefinition\Data::getDataForEditmode
      * @param string $data
      * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataForEditmode($data, $object = null)
+    public function getDataForEditmode($data, $object = null, $params = array())
     {
         $fieldData = array();
         $metaData = array();
@@ -124,7 +130,7 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
                     $keyConfig = Object\Classificationstore\DefinitionCache::get($keyId);
                     $fd = Object\Classificationstore\Service::getFieldDefinitionFromKeyConfig($keyConfig);
 
-                    $keyValue = $fd->getDataForEditmode($keyValue, $object);
+                    $keyValue = $fd->getDataForEditmode($keyValue, $object, $params);
                 }
             }
         }
@@ -153,7 +159,7 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
                     $childData = new Object\Data\CalculatedValue($this->getName());
                     $childData->setContextualData("classificationstore", $this->getName(), null, $language, $groupId, $keyId, $childDef);
-                    $childData = $childDef->getDataForEditmode($childData, $object);
+                    $childData = $childDef->getDataForEditmode($childData, $object, $params);
                     $result["data"][$language][$groupId][$keyId]= $childData;
                 }
             }
@@ -329,19 +335,21 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
     /**
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @return \stdClass
      */
-    public function getDataForGrid($data, $object = null)
+    public function getDataForGrid($data, $object = null, $params = array())
     {
         return "not supported";
     }
 
     /**
      * @see Object\ClassDefinition\Data::getVersionPreview
-     * @param string $data
+     * @param null|Object\AbstractObject $object
+     * @param mixed $params
      * @return string
      */
-    public function getVersionPreview($data)
+    public function getVersionPreview($data, $object = null, $params = array())
     {
         // this is handled directly in the template
         // /pimcore/modules/admin/views/scripts/object/preview-version.php
@@ -362,18 +370,21 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
     /**
      * @param string $importValue
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @return null
      */
-    public function getFromCsvImport($importValue)
+    public function getFromCsvImport($importValue, $object = null, $params = array())
     {
         return;
     }
 
     /**
      * @param $object
+     * @param mixed $params
      * @return string
      */
-    public function getDataForSearchIndex($object)
+    public function getDataForSearchIndex($object, $params = array())
     {
         $dataString = "";
         $getter = "get" . ucfirst($this->getName());
@@ -386,7 +397,7 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
                     $fieldDefinition = Object\Classificationstore\Service::getFieldDefinitionFromKeyConfig($keyConfig);
 
                     foreach ($values as $language => $value) {
-                        $value = $fieldDefinition->getDataForResource($value, $object);
+                        $value = $fieldDefinition->getDataForResource($value, $object, $params);
                         $dataString .= $value . " ";
                     }
                 }
@@ -399,21 +410,23 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
     /**
      * @param Object\AbstractObject $object
+     * @param mixed $params
      * @throws \Exception
      */
-    public function getForWebserviceExport($object)
+    public function getForWebserviceExport($object, $params = array())
     {
         throw new \Exception("not supported");
     }
 
     /**
      * @param mixed $value
-     * @param null $object
+     * @param null|Model\Object\AbstractObject $object
+     * @param mixed $params
      * @param null $idMapper
      * @return mixed|null|Object\Localizedfield
      * @throws \Exception
      */
-    public function getFromWebserviceImport($value, $object = null, $idMapper = null)
+    public function getFromWebserviceImport($value, $object = null, $params = array(), $idMapper = null)
     {
         throw new \Exception("not supported");
     }
@@ -751,9 +764,10 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
     /**
      * @param mixed $data
      * @param null $object
+     * @param mixed $params
      * @throws \Exception
      */
-    public function getDiffDataForEditmode($data, $object = null)
+    public function getDiffDataForEditmode($data, $object = null, $params = array())
     {
         throw new \Exception("not supported");
     }
@@ -761,17 +775,20 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
     /**
      * @param $data
      * @param null $object
+     * @param mixed $params
      * @throws \Exception
      */
-    public function getDiffDataFromEditmode($data, $object = null)
+    public function getDiffDataFromEditmode($data, $object = null, $params = array())
     {
         throw new \Exception("not supported");
     }
 
     /** True if change is allowed in edit mode.
+     * @param string $object
+     * @param mixed $params
      * @return bool
      */
-    public function isDiffChangeAllowed()
+    public function isDiffChangeAllowed($object, $params = array())
     {
         return false;
     }
@@ -839,6 +856,9 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
     public function recursiveGetActiveGroupCollectionMapping($object, $mergedMapping = array())
     {
+        if (!$object) {
+            return;
+        }
         $getter = "get" . ucfirst($this->getName());
         /** @var  $classificationStore Object\Classificationstore */
         $classificationStore = $object->$getter();
@@ -873,6 +893,10 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
      */
     public function recursiveGetActiveGroupsIds($object, $activeGroups = array())
     {
+        if (!$object) {
+            return;
+        }
+
         $getter = "get" . ucfirst($this->getName());
         /** @var  $classificationStore Object\Classificationstore */
         $classificationStore = $object->$getter();
@@ -1005,5 +1029,21 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
         }
 
         $this->allowedGroupIds = $parts;
+    }
+
+    /**
+     * @return int
+     */
+    public function getStoreId()
+    {
+        return $this->storeId ? $this->storeId : 1;
+    }
+
+    /**
+     * @param int $storeId
+     */
+    public function setStoreId($storeId)
+    {
+        $this->storeId = $storeId ? $storeId : 1;
     }
 }

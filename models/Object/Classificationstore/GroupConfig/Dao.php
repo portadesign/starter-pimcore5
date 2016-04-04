@@ -53,8 +53,9 @@ class Dao extends Model\Dao\AbstractDao
         }
 
         $name = $this->model->getName();
+        $storeId = $this->model->getStoreId();
 
-        $data = $this->db->fetchRow("SELECT * FROM " . self::TABLE_NAME_GROUPS . " WHERE name = ?", $name);
+        $data = $this->db->fetchRow("SELECT * FROM " . self::TABLE_NAME_GROUPS . " WHERE name = ? and storeId = ?", array($name, $storeId));
 
         if ($data["id"]) {
             $this->assignVariablesToModel($data);
