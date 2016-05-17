@@ -1,12 +1,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 
@@ -57,7 +59,8 @@ pimcore.object.classificationstore.storeTree = Class.create({
     getEditContainer: function() {
         this.editContainer = new Ext.TabPanel({
             region: 'center',
-            layout: 'fit'
+            layout: 'fit',
+            cls: "pimcore-panel-header-no-border",
         });
 
 
@@ -115,17 +118,20 @@ pimcore.object.classificationstore.storeTree = Class.create({
 
     openStore: function(storeConfig) {
         try {
+            var panel;
+
             if (storeConfig.id != this.activeStoreId) {
                 this.editContainer.removeAll();
                 //this.editPanel = null;
 
                 this.editContainer.setTitle(storeConfig.text + " (ID: " + storeConfig.id + ")");
-                var panel = new pimcore.object.classificationstore.collectionsPanel(storeConfig).getPanel();
+                panel = new pimcore.object.classificationstore.collectionsPanel(storeConfig).getPanel();
                 this.editContainer.add(panel);
+                this.editContainer.setActiveTab(panel);
 
-                var panel = new pimcore.object.classificationstore.groupsPanel(storeConfig).getPanel();
+                panel = new pimcore.object.classificationstore.groupsPanel(storeConfig).getPanel();
                 this.editContainer.add(panel);
-                var panel = new pimcore.object.classificationstore.propertiespanel(storeConfig).getPanel();
+                panel = new pimcore.object.classificationstore.propertiespanel(storeConfig).getPanel();
                 this.editContainer.add(panel);
                 this.editContainer.updateLayout();
                 this.activeStoreId = storeConfig.id;

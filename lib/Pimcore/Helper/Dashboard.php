@@ -2,16 +2,19 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Helper;
 
+use Pimcore\Config;
 use Pimcore\Tool\Serialize;
 use Pimcore\File;
 use Pimcore\Model\User;
@@ -79,38 +82,9 @@ class Dashboard
             }
 
             if (empty($this->dashboards)) {
-
-                // if no configuration exists, return the base config
-                $this->dashboards = array(
-                    "welcome" => array(
-                        "positions" => array(
-                            array(
-                                array(
-                                    "id" => 1,
-                                    "type" => "pimcore.layout.portlets.modificationStatistic",
-                                    "config" => null
-                                ),
-                                array(
-                                    "id" => 2,
-                                    "type" => "pimcore.layout.portlets.modifiedAssets",
-                                    "config" => null
-                                )
-                            ),
-                            array(
-                                array(
-                                    "id" => 3,
-                                    "type" => "pimcore.layout.portlets.modifiedObjects",
-                                    "config" => null
-                                ),
-                                array(
-                                    "id" => 4,
-                                    "type" => "pimcore.layout.portlets.modifiedDocuments",
-                                    "config" => null
-                                )
-                            )
-                        )
-                    )
-                );
+                $perspectiveCfg = Config::getRuntimePerspective();
+                $dasboardCfg = $perspectiveCfg["dashboards"] ? $perspectiveCfg["dashboards"] : array();
+                $this->dashboards = $dasboardCfg["predefined"] ? $dasboardCfg["predefined"] : array();
             }
         }
         return $this->dashboards;
@@ -131,7 +105,27 @@ class Dashboard
     public function getDashboard($key = "welcome")
     {
         $dashboards = $this->loadFile();
-        return $dashboards[$key];
+        $dashboard = $dashboards[$key];
+
+
+        if ($dashboard) {
+            $disabledPortlets = array_keys($this->getDisabledPortlets());
+            $positions = $dashboard["positions"];
+            if (is_array($positions)) {
+                foreach ($positions as $columnKey => $column) {
+                    if ($column) {
+                        foreach ($column as $portletKey => $portletCfg) {
+                            $type = $portletCfg["type"];
+                            if (in_array($type, $disabledPortlets)) {
+                                unset($dashboard["positions"][$columnKey][$portletKey]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $dashboard;
     }
 
     /**
@@ -158,5 +152,16 @@ class Dashboard
         $this->loadFile();
         unset($this->dashboards[$key]);
         File::put($this->getConfigFile(), Serialize::serialize($this->dashboards));
+    }
+
+
+    /**
+     * @return array
+     */
+    public function getDisabledPortlets()
+    {
+        $perspectiveCfg = Config::getRuntimePerspective();
+        $dasboardCfg = $perspectiveCfg["dashboards"] ? $perspectiveCfg["dashboards"] : array();
+        return $dasboardCfg["disabledPortlets"] ? $dasboardCfg["disabledPortlets"] : array();
     }
 }

@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\Config;
@@ -50,29 +52,16 @@ class Pimcore
      */
     public static function run()
     {
-        self::setSystemRequirements();
+        $throwExceptions = false;
 
         // detect frontend (website)
         $frontend = Tool::isFrontend();
 
         // enable the output-buffer, why? see in self::outputBufferStart()
-        //if($frontend) {
         self::outputBufferStart();
-        //}
-
-        self::initAutoloader();
-        self::initConfiguration();
-        self::setupFramework();
-
-        // config is loaded now init the real logger
-        self::initLogger();
 
         // initialize cache
         Cache::init();
-
-        // load plugins and modules (=core plugins)
-        self::initModules();
-        self::initPlugins();
 
         // init front controller
         $front = \Zend_Controller_Front::getInstance();
@@ -80,10 +69,13 @@ class Pimcore
         $conf = Config::getSystemConfig();
         if (!$conf) {
             // redirect to installer if configuration isn't present
-            if (!preg_match("/^\/install.*/", $_SERVER["REQUEST_URI"])) {
+            if (!Tool::isInstaller()) {
                 header("Location: /install/");
                 exit;
             }
+
+            // not installed, we display all error messages
+            $throwExceptions = true;
         }
 
         if (self::inDebugMode() && $frontend && !$conf->general->disable_whoops && !defined("HHVM_VERSION")) {
@@ -244,7 +236,6 @@ class Pimcore
         self::getEventManager()->trigger("system.startup", $front);
 
         // throw exceptions also when in preview or in editmode (documents) to see it immediately when there's a problem with this page
-        $throwExceptions = false;
         if (Tool::isFrontentRequestByAdmin()) {
             $user = \Pimcore\Tool\Authentication::authenticateSession();
             if ($user instanceof User) {
@@ -810,6 +801,7 @@ class Pimcore
 
         // close mysql-connection
         Db::close();
+        Cache\Runtime::clear();
 
         $protectedItems = array(
             "Zend_Locale",

@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\Tool;
@@ -356,6 +358,8 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
         $userData["contentLanguages"] = $contentLanguages;
         unset($userData["password"]);
 
+        $availablePerspectives = \Pimcore\Config::getAvailablePerspectives(null);
+
         $conf = \Pimcore\Config::getSystemConfig();
         $this->_helper->json(array(
             "success" => true,
@@ -364,6 +368,7 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
             "roles" => $roles,
             "permissions" => $user->generatePermissionList(),
             "availablePermissions" => $availableUserPermissions,
+            "availablePerspectives" => $availablePerspectives,
             "objectDependencies" => array(
                 "hasHidden" => $hasHidden,
                 "dependencies" => $userObjectData
@@ -551,13 +556,16 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
         $availableUserPermissionsList = new User\Permission\Definition\Listing();
         $availableUserPermissions = $availableUserPermissionsList->load();
 
+        $availablePerspectives = \Pimcore\Config::getAvailablePerspectives(null);
+
         $this->_helper->json(array(
             "success" => true,
             "role" => $role,
             "permissions" => $role->generatePermissionList(),
             "classes" => $role->getClasses(),
             "docTypes" => $role->getDocTypes(),
-            "availablePermissions" => $availableUserPermissions
+            "availablePermissions" => $availableUserPermissions,
+            "availablePerspectives" => $availablePerspectives
         ));
     }
 

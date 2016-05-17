@@ -1,12 +1,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 pimcore.registerNS("pimcore.report.custom.report");
@@ -77,12 +79,12 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
 
         }
 
-        var itemsPerPage = 40;
+        var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize();
         var url = '/admin/reports/custom-report/data?';
         this.store = pimcore.helpers.grid.buildDefaultStore(
             url, storeFields, itemsPerPage
         );
-        this.pagingtoolbar = pimcore.helpers.grid.buildDefaultPagingToolbar(this.store, itemsPerPage);
+        this.pagingtoolbar = pimcore.helpers.grid.buildDefaultPagingToolbar(this.store);
 
         var proxy = this.store.getProxy();
         proxy.extraParams.name = this.config["name"];
@@ -360,8 +362,6 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
             series.provideLegendInfo = function (target) {
                 var me = this,
                     store = me.getStore();
-
-                console.log("hello");
 
                 if (store) {
                     var items = store.getData().items,

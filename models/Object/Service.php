@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model\Object;
@@ -197,11 +199,11 @@ class Service extends Model\Element\Service
     }
 
 
-    /**
+    /** Language only user for classification store !!!
      * @param  AbstractObject $object
      * @return array
      */
-    public static function gridObjectData($object, $fields = null)
+    public static function gridObjectData($object, $fields = null, $requestedLanguage = null)
     {
         $localizedPermissionsResolved = false;
         $data = Element\Service::gridElementData($object);
@@ -232,7 +234,29 @@ class Service extends Model\Element\Service
 
                 if (substr($key, 0, 1) == "~") {
                     $type = $keyParts[1];
-                    if ($type == "keyvalue") {
+                    if ($type == "classificationstore") {
+                        $field = $keyParts[2];
+                        $groupKeyId = explode("-", $keyParts[3]);
+
+                        $groupId = $groupKeyId[0];
+                        $keyid = $groupKeyId[1];
+                        $getter = "get" . ucfirst($field);
+                        if (method_exists($object, $getter)) {
+                            /** @var  $classificationStoreData Classificationstore */
+                            $classificationStoreData = $object->$getter();
+                            $fielddata = $classificationStoreData->getLocalizedKeyValue($groupId, $keyid, $requestedLanguage, true, true);
+
+                            $keyConfig = Model\Object\Classificationstore\KeyConfig::getById($keyid);
+                            $type = $keyConfig->getType();
+                            $definition = json_decode($keyConfig->getDefinition());
+                            $definition = \Pimcore\Model\Object\Classificationstore\Service::getFieldDefinitionFromJson($definition, $type);
+
+                            if (method_exists($definition, "getDataForGrid")) {
+                                $fielddata = $definition->getDataForGrid($fielddata, $object);
+                            }
+                            $data[$key] = $fielddata;
+                        }
+                    } elseif ($type == "keyvalue") {
                         $field = $keyParts[2];
                         $keyid = $keyParts[3];
 
@@ -270,9 +294,6 @@ class Service extends Model\Element\Service
                                         if ($pair["inherited"]) {
                                             $data['inheritedFields'][$dataKey] = array("inherited" => $pair["inherited"], "objectid" => $pair["source"]);
                                         }
-
-
-//                                   break;
                                     }
                                 }
                             }
@@ -540,6 +561,100 @@ class Service extends Model\Element\Service
                 }
             }
         }
+    }
+
+
+    /**
+     *
+     * @param string $filterJson
+     * @param ClassDefinition $class
+     * @return string
+     */
+    public static function getFeatureFilters($filterJson, $class)
+    {
+        $joins = array();
+        $conditions = array();
+
+        // create filter condition
+        $conditionPartsFilters = array();
+
+        if ($filterJson) {
+            $db = \Pimcore\Db::get();
+            $filters = \Zend_Json::decode($filterJson);
+            foreach ($filters as $filter) {
+                $operator = "=";
+
+                $filterField = $filter["property"];
+                $filterOperator = $filter["operator"];
+
+                if ($filter["type"] == "string") {
+                    $operator = "LIKE";
+                } elseif ($filter["type"] == "numeric") {
+                    if ($filterOperator == "lt") {
+                        $operator = "<";
+                    } elseif ($filterOperator == "gt") {
+                        $operator = ">";
+                    } elseif ($filterOperator == "eq") {
+                        $operator = "=";
+                    }
+                } elseif ($filter["type"] == "date") {
+                    if ($filterOperator == "lt") {
+                        $operator = "<";
+                    } elseif ($filterOperator == "gt") {
+                        $operator = ">";
+                    } elseif ($filterOperator == "eq") {
+                        $operator = "=";
+                    }
+                    $filter["value"] = strtotime($filter["value"]);
+                } elseif ($filter["type"] == "list") {
+                    $operator = "=";
+                } elseif ($filter["type"] == "boolean") {
+                    $operator = "=";
+                    $filter["value"] = (int) $filter["value"];
+                }
+
+                $keyParts = explode("~", $filterField);
+
+                if (substr($filterField, 0, 1) != "~") {
+                    continue;
+                }
+
+                $type = $keyParts[1];
+                if ($type != "classificationstore") {
+                    continue;
+                }
+
+                $fieldName = $keyParts[2];
+                $groupKeyId = explode("-", $keyParts[3]);
+
+                $groupId = $groupKeyId[0];
+                $keyid = $groupKeyId[1];
+
+                $keyConfig = Model\Object\Classificationstore\KeyConfig::getById($keyid);
+                $type = $keyConfig->getType();
+                $definition = json_decode($keyConfig->getDefinition());
+                $field = \Pimcore\Model\Object\Classificationstore\Service::getFieldDefinitionFromJson($definition, $type);
+
+                if ($field instanceof ClassDefinition\Data) {
+                    $mappedKey = "cskey_" . $fieldName . "_" . $groupId . "_" . $keyid;
+                    $joins[] =  array('fieldname' => $fieldName, 'groupId' => $groupId, "keyId"=> $keyid);
+                    $condition = $field->getFilterConditionExt($filter["value"], $operator,
+                        array(
+                            "name" => $mappedKey)
+                    );
+
+                    $conditions[$mappedKey] = $condition;
+                }
+            }
+        }
+
+        $result = array(
+            "joins" => $joins,
+            "conditions" => $conditions
+        );
+
+
+        return $result;
     }
 
     /**
@@ -1286,5 +1401,55 @@ class Service extends Model\Element\Service
         }
 
         return null;
+    }
+
+    /** Adds all the query stuff that is needed for displaying, filtering and exporting the feature grid data.
+     * @param $list list
+     * @param $featureJoins
+     * @param $class
+     * @param $featureFilters
+     * @param $requestedLanguage
+     */
+    public static function addGridFeatureJoins($list, $featureJoins, $class, $featureFilters, $requestedLanguage)
+    {
+        if ($featureJoins) {
+            $me = $list;
+            $list->onCreateQuery(function (\Zend_Db_Select $select) use ($list, $featureJoins, $class, $featureFilters, $requestedLanguage, $me) {
+
+                $db = \Pimcore\Db::get();
+
+                $alreadyJoined = array();
+
+                foreach ($featureJoins as $featureJoin) {
+                    $fieldname = $featureJoin["fieldname"];
+                    $mappedKey = "cskey_" . $fieldname . "_" . $featureJoin["groupId"] . "_" . $featureJoin["keyId"];
+                    if ($alreadyJoined[$mappedKey]) {
+                        continue;
+                    }
+                    $alreadyJoined[$mappedKey] = 1;
+
+                    $table = $me->getDao()->getTableName();
+                    $select->joinLeft(
+                        array($mappedKey => "object_classificationstore_data_" . $class->getId()),
+                        "("
+                        . $mappedKey . ".o_id = " . $table . ".o_id"
+                        . " and " . $mappedKey . ".fieldname = " . $db->quote($fieldname)
+                        . " and " . $mappedKey . ".groupId=" . $featureJoin["groupId"]
+                        . " and " . $mappedKey . ".keyId=" . $featureJoin["keyId"]
+                        . " and " . $mappedKey . ".language = " . $db->quote($requestedLanguage)
+                        . ")",
+                        array(
+                            $mappedKey => "value"
+                        )
+                    );
+                }
+
+                $havings = $featureFilters["conditions"];
+                if ($havings) {
+                    $havings = implode(" AND ", $havings);
+                    $select->having($havings);
+                }
+            });
+        }
     }
 }

@@ -1,12 +1,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 pimcore.registerNS("pimcore.object.classificationstore.propertiespanel");
@@ -47,6 +49,26 @@ pimcore.object.classificationstore.propertiespanel = Class.create({
         var readerFields = [];
         for (var i = 0; i < this.fields.length; i++) {
             readerFields.push({name: this.fields[i], allowBlank: true});
+        }
+        
+        var dataComps = Object.keys(pimcore.object.classes.data);
+        var allowedDataTypes = [];
+
+        for (var i = 0; i < dataComps.length; i++) {
+            var dataComp = pimcore.object.classes.data[dataComps[i]];
+
+            var allowed = false;
+
+            if('object' !== typeof dataComp) {
+                var tt = typeof dataComp;
+                if (dataComp.prototype.allowIn['classificationstore']) {
+                    allowed = true;
+                }
+            }
+
+            if (allowed) {
+                allowedDataTypes.push(dataComps[i]);
+            }
         }
 
         var url = "/admin/classificationstore/properties?";
@@ -106,16 +128,18 @@ pimcore.object.classificationstore.propertiespanel = Class.create({
                 editor: new Ext.form.TextField({})
             }
 
-        );gridColumns.push({header: t("title"), width: 200, sortable: false, dataIndex: 'title',editor: new Ext.form.TextField({}), filter: 'string'});
+        );
+        
+        gridColumns.push({header: t("title"), width: 200, sortable: false, dataIndex: 'title',editor: new Ext.form.TextField({}), filter: 'string'});
         gridColumns.push({header: t("description"), width: 300, sortable: true, dataIndex: 'description',editor: new Ext.form.TextField({}), filter: 'string'});
         gridColumns.push({header: t("definition"), width: 300, sortable: true, hidden: true, dataIndex: 'definition',editor: new Ext.form.TextField({})});
         gridColumns.push({header: t("type"), width: 150, sortable: true, dataIndex: 'type', filter: 'string',
             editor: new Ext.form.ComboBox({
                 triggerAction: 'all',
                 editable: false,
-                store: ['input','textarea','wysiwyg','checkbox','numeric','slider', 'select','multiselect',
-                    'date','datetime','language','languagemultiselect','country','countrymultiselect','table','quantityValue','calculatedValue']
-            })});
+                store: allowedDataTypes
+            })
+        });
 
 
         gridColumns.push({
@@ -180,13 +204,8 @@ pimcore.object.classificationstore.propertiespanel = Class.create({
         });
 
 
-        this.pagingtoolbar = new Ext.PagingToolbar({
-            pageSize: 15,
-            store: this.store,
-            displayInfo: true,
-            displayMsg: '{0} - {1} / {2}',
-            emptyMsg: t("classificationstore_no_keys")
-        });
+        var pageSize = pimcore.helpers.grid.getDefaultPageSize(-1);
+        this.pagingtoolbar = pimcore.helpers.grid.buildDefaultPagingToolbar(this.store, {pageSize: pageSize});
 
         var cellEditing = Ext.create('Ext.grid.plugin.CellEditing', {
             listeners: {

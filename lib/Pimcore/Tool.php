@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore;
@@ -227,7 +229,7 @@ class Tool
         $languageCountryMapping = [
             "aa" => "er", "af" => "za", "am" => "et", "as" => "in", "ast" => "es", "asa" => "tz",
             "az" => "az", "bas" => "cm", "eu" => "es", "be" => "by", "bem" => "zm", "bez" => "tz", "bg" => "bg",
-            "bm" => "ml", "bn" => "bd", "br" => "fr", "brx" => "in", "bs" => "ba", "cs" => "cz", "da" => "da",
+            "bm" => "ml", "bn" => "bd", "br" => "fr", "brx" => "in", "bs" => "ba", "cs" => "cz", "da" => "dk",
             "de" => "de", "dz" => "bt", "el" => "gr", "en" => "gb", "es" => "es", "et" => "ee", "fi" => "fi",
             "fo" => "fo", "fr" => "fr", "ga" => "ie", "gv" => "im", "he" => "il", "hi" => "in", "hr" => "hr",
             "hu" => "hu", "hy" => "am", "id" => "id", "ig" => "ng", "is" => "is", "it" => "it", "ja" => "ja",
@@ -307,6 +309,17 @@ class Tool
         }
 
         return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public static function isInstaller()
+    {
+        if (preg_match("@^/install@", $_SERVER["REQUEST_URI"])) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -434,6 +447,11 @@ class Tool
             foreach ($confArray["views"] as $tmp) {
                 if (isset($tmp["name"])) {
                     $tmp["showroot"] = (bool) $tmp["showroot"];
+
+                    if ((bool) $tmp["hidden"]) {
+                        continue;
+                    }
+
                     $cvData[] = $tmp;
                 }
             }

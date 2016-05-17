@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model\Object;
@@ -133,7 +135,7 @@ class Localizedfield extends Model\AbstractModel
      */
     public function setObject($object)
     {
-        if (!$object instanceof Concrete) {
+        if ($object && !$object instanceof Concrete) {
             throw new \Exception("must be instance of object concrete");
         }
         $this->object = $object;
@@ -271,7 +273,9 @@ class Localizedfield extends Model\AbstractModel
             foreach (Tool::getFallbackLanguagesFor($language) as $l) {
                 if ($this->languageExists($l)) {
                     if (array_key_exists($name, $this->items[$l])) {
-                        $data = $this->getLocalizedValue($name, $l);
+                        if ($data = $this->getLocalizedValue($name, $l)) {
+                            break;
+                        }
                     }
                 }
             }

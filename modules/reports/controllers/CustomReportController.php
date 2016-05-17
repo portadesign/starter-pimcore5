@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\Model\Tool\CustomReport;
@@ -70,6 +72,12 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
     {
         $report = CustomReport\Config::getByName($this->getParam("name"));
         $data = \Zend_Json::decode($this->getParam("configuration"));
+
+        if (\Pimcore\Tool\Admin::isExtJS6() && !is_array($data["yAxis"])) {
+            $data["yAxis"] = strlen($data["yAxis"]) ? array($data["yAxis"]) : array();
+        }
+
+
         foreach ($data as $key => $value) {
             $setter = "set" . ucfirst($key);
             if (method_exists($report, $setter)) {
@@ -84,6 +92,12 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
 
     public function columnConfigAction()
     {
+        $report = CustomReport\Config::getByName($this->getParam("name"));
+        $columnConfiguration = $report->getColumnConfiguration();
+        if (!is_array($columnConfiguration)) {
+            $columnConfiguration = array();
+        }
+
         $configuration = json_decode($this->getParam("configuration"));
         $configuration = $configuration[0];
 
@@ -91,19 +105,36 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
         $columns = null;
         $errorMessage = null;
 
+        $result = array();
+
         try {
             $adapter = CustomReport\Config::getAdapter($configuration);
             $columns = $adapter->getColumns($configuration);
+            if (!is_array($columns)) {
+                $columns = array();
+            }
+
+            foreach ($columnConfiguration as $item) {
+                $name = $item["name"];
+                if (in_array($name, $columns)) {
+                    $result[] = $name;
+                    array_splice($columns, array_search($name, $columns), 1);
+                }
+            }
+            foreach ($columns as $remainingColumn) {
+                $result[] = $remainingColumn;
+            }
+
             $success = true;
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
         }
 
         $this->_helper->json(array(
-                                  "success" => $success,
-                                  "columns" => $columns,
-                                  "errorMessage" => $errorMessage
-                             ));
+            "success" => $success,
+            "columns" => $result,
+            "errorMessage" => $errorMessage
+        ));
     }
 
 
@@ -155,10 +186,10 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
 
 
         $this->_helper->json(array(
-                                  "success" => true,
-                                  "data" => $result['data'],
-                                  "total" => $result['total']
-                             ));
+            "success" => true,
+            "data" => $result['data'],
+            "total" => $result['total']
+        ));
     }
 
     public function drillDownOptionsAction()
@@ -195,10 +226,10 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
         $result = $adapter->getData($filters, $sort, $dir, null, null, null, $drillDownFilters);
 
         $this->_helper->json(array(
-                                  "success" => true,
-                                  "data" => $result['data'],
-                                  "total" => $result['total']
-                             ));
+            "success" => true,
+            "data" => $result['data'],
+            "total" => $result['total']
+        ));
     }
 
     public function downloadCsvAction()

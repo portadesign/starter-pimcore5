@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Asset
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model;
@@ -613,7 +615,9 @@ class Asset extends Element\AbstractElement
         }
 
         // create foldertree
-        $destinationPath = $this->getFileSystemPath();
+        // use current file name in order to prevent problems when filename has changed
+        // (otherwise binary data would be overwritten with old binary data with rename() in save method)
+        $destinationPath = PIMCORE_ASSET_DIRECTORY . $this->getDao()->getCurrentFullPath();
 
         $dirPath = dirname($destinationPath);
         if (!is_dir($dirPath)) {
@@ -651,7 +655,7 @@ class Asset extends Element\AbstractElement
 
                 // set mime type
 
-                $mimetype = Mime::detect($this->getFileSystemPath());
+                $mimetype = Mime::detect($destinationPath);
                 $this->setMimetype($mimetype);
 
                 // set type
@@ -663,6 +667,12 @@ class Asset extends Element\AbstractElement
             }
 
             // scheduled tasks are saved in $this->saveVersion();
+        } else {
+            if (!is_dir($this->getFileSystemPath())) {
+                if (!File::mkdir($this->getFileSystemPath())) {
+                    throw new \Exception("Unable to create directory: ". $this->getFileSystemPath() . " for asset :" . $this->getId());
+                }
+            }
         }
 
 

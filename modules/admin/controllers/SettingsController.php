@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\Cache;
@@ -525,6 +527,8 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
         // PIMCORE-1854 - recreate .dummy file => should remain
         \Pimcore\File::put(PIMCORE_CACHE_DIRECTORY . "/.dummy", "");
 
+        \Pimcore::getEventManager()->trigger("system.cache.clear", $this);
+
         $this->_helper->json(array("success" => true));
     }
 
@@ -537,6 +541,8 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
 
         // empty document cache
         Cache::clearTag("output");
+
+        \Pimcore::getEventManager()->trigger("system.cache.clearOutputCache", $this);
 
         $this->_helper->json(array("success" => true));
     }
@@ -554,6 +560,8 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
         // recreate .dummy files # PIMCORE-2629
         \Pimcore\File::put(PIMCORE_TEMPORARY_DIRECTORY . "/.dummy", "");
         \Pimcore\File::put(PIMCORE_SYSTEM_TEMP_DIRECTORY . "/.dummy", "");
+
+        \Pimcore::getEventManager()->trigger("system.cache.clearTemporaryFiles", $this);
 
         $this->_helper->json(array("success" => true));
     }

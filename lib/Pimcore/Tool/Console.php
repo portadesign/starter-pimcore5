@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Tool;
@@ -20,6 +22,11 @@ class Console
      * @var string system environment
      */
     private static $systemEnvironment;
+
+    /**
+     * @var null|bool
+     */
+    protected static $timeoutKillAfterSupport = null;
 
     /**
      * @static
@@ -82,6 +89,55 @@ class Console
     }
 
     /**
+     * @param $script
+     * @param $arguments
+     * @return string
+     */
+    protected static function buildPhpScriptCmd($script, $arguments)
+    {
+        $phpCli = Console::getPhpCli();
+
+        $cmd = $phpCli . " " . $script;
+
+        if (Config::getEnvironment()) {
+            $cmd .= " --environment=" . Config::getEnvironment();
+        }
+
+        if (!empty($arguments)) {
+            $cmd .= " " . $arguments;
+        }
+
+        return $cmd;
+    }
+
+    /**
+     * @param $script
+     * @param $arguments
+     * @param $outputFile
+     * @param $timeout
+     * @return string
+     */
+    public static function runPhpScript($script, $arguments = "", $outputFile = null, $timeout = null)
+    {
+        $cmd = self::buildPhpScriptCmd($script, $arguments);
+        $return = Console::exec($cmd, $outputFile, $timeout);
+        return $return;
+    }
+
+    /**
+     * @param $script
+     * @param $arguments
+     * @param $outputFile
+     * @return string
+     */
+    public static function runPhpScriptInBackground($script, $arguments = "", $outputFile = null)
+    {
+        $cmd = self::buildPhpScriptCmd($script, $arguments);
+        $return = Console::execInBackground($cmd, $outputFile);
+        return $return;
+    }
+
+    /**
      * @param $cmd
      * @param null $outputFile
      * @param null $timeout
@@ -92,13 +148,21 @@ class Console
         if ($timeout && self::getTimeoutBinary()) {
 
             // check if --kill-after flag is supported in timeout
-            $killafter = "";
-            $out = self::exec(self::getTimeoutBinary() . " --help");
-            if (strpos($out, "--kill-after")) {
-                $killafter = " -k 1m";
+            if (self::$timeoutKillAfterSupport === null) {
+                $out = self::exec(self::getTimeoutBinary() . " --help");
+                if (strpos($out, "--kill-after")) {
+                    self::$timeoutKillAfterSupport = true;
+                } else {
+                    self::$timeoutKillAfterSupport = false;
+                }
             }
 
-            $cmd = self::getTimeoutBinary() . $killafter . " " . $timeout . "s " . $cmd;
+            $killAfter = "";
+            if (self::$timeoutKillAfterSupport) {
+                $killAfter = " -k 1m";
+            }
+
+            $cmd = self::getTimeoutBinary() . $killAfter . " " . $timeout . "s " . $cmd;
         } elseif ($timeout) {
             \Logger::warn("timeout binary not found, executing command without timeout");
         }

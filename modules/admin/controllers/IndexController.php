@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\Config;
@@ -59,25 +61,25 @@ class Admin_IndexController extends \Pimcore\Controller\Action\Admin
         }
         $this->view->mail_settings_complete =  \Zend_Json::encode(!$mailIncomplete);
 
-
-
-
         // report configuration
         $this->view->report_config = Config::getReportConfig();
 
-        // customviews config
-        $cvConfig = Tool::getCustomViewConfig();
         $cvData = array();
+
+        // still needed when publishing objects
+        $cvConfig = Tool::getCustomViewConfig();
 
         if ($cvConfig) {
             foreach ($cvConfig as $node) {
                 $tmpData = $node;
-                $rootNode = Model\Object::getByPath($tmpData["rootfolder"]);
+                // backwards compatibility
+                $treeType = $tmpData["treetype"] ? $tmpData["treetype"] : "object";
+                $rootNode = Model\Element\Service::getElementByPath($treeType, $tmpData["rootfolder"]);
 
                 if ($rootNode) {
                     $tmpData["rootId"] = $rootNode->getId();
-                    $tmpData["allowedClasses"] = explode(",", $tmpData["classes"]);
-                    $tmpData["showroot"] = (bool) $tmpData["showroot"];
+                    $tmpData["allowedClasses"] = $tmpData["classes"] ? explode(",", $tmpData["classes"]) : null;
+                    $tmpData["showroot"] = (bool)$tmpData["showroot"];
 
                     $cvData[] = $tmpData;
                 }
@@ -86,7 +88,6 @@ class Admin_IndexController extends \Pimcore\Controller\Action\Admin
 
         $this->view->customview_config = $cvData;
 
-
         // upload limit
         $max_upload = filesize2bytes(ini_get("upload_max_filesize") . "B");
         $max_post = filesize2bytes(ini_get("post_max_size") . "B");
@@ -94,6 +95,12 @@ class Admin_IndexController extends \Pimcore\Controller\Action\Admin
 
         $this->view->upload_max_filesize = $upload_mb;
 
+        // session lifetime (gc)
+        $session_gc_maxlifetime = ini_get("session.gc_maxlifetime");
+        if (empty($session_gc_maxlifetime)) {
+            $session_gc_maxlifetime = 120;
+        }
+        $this->view->session_gc_maxlifetime = $session_gc_maxlifetime;
 
         // csrf token
         $user = $this->getUser();

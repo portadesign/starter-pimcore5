@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\Model\Document;
@@ -86,26 +88,29 @@ class Admin_LinkController extends \Pimcore\Controller\Action\Admin\Document
     {
 
         // data
-        $data = \Zend_Json::decode($this->getParam("data"));
+        if ($this->getParam("data")) {
+            $data = \Zend_Json::decode($this->getParam("data"));
 
-        if (!empty($data["path"])) {
-            if ($document = Document::getByPath($data["path"])) {
-                $data["linktype"] = "internal";
-                $data["internalType"] = "document";
-                $data["internal"] = $document->getId();
-            } elseif ($asset = Asset::getByPath($data["path"])) {
-                $data["linktype"] = "internal";
-                $data["internalType"] = "asset";
-                $data["internal"] = $asset->getId();
-            } else {
-                $data["linktype"] = "direct";
-                $data["direct"] = $data["path"];
+            if (!empty($data["path"])) {
+                if ($document = Document::getByPath($data["path"])) {
+                    $data["linktype"] = "internal";
+                    $data["internalType"] = "document";
+                    $data["internal"] = $document->getId();
+                } elseif ($asset = Asset::getByPath($data["path"])) {
+                    $data["linktype"] = "internal";
+                    $data["internalType"] = "asset";
+                    $data["internal"] = $asset->getId();
+                } else {
+                    $data["linktype"] = "direct";
+                    $data["direct"] = $data["path"];
+                }
             }
+
+            unset($data["path"]);
+
+            $link->setValues($data);
         }
 
-        unset($data["path"]);
-
-        $link->setValues($data);
         $this->addPropertiesToDocument($link);
     }
 }

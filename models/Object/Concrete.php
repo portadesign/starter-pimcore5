@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model\Object;
@@ -567,22 +569,47 @@ class Concrete extends AbstractObject
         $propertyName = implode("", preg_grep('/^' . preg_quote($propertyName, '/') . '$/i', $fieldnames));
 
         if (property_exists($tmpObj, $propertyName)) {
-
             // check if the given fieldtype is valid for this shorthand
-            $allowedDataTypes = array("input","numeric","checkbox","country","date","datetime","image","language","multihref","multiselect","select","slider","time","user","email","firstname","lastname");
+            $allowedDataTypes = array("input","numeric","checkbox","country","date","datetime","image","language","multihref","multiselect","select","slider","time","user","email","firstname","lastname","localizedfields");
 
             $field = $tmpObj->getClass()->getFieldDefinition($propertyName);
             if (!in_array($field->getFieldType(), $allowedDataTypes)) {
                 throw new \Exception("Static getter '::getBy".ucfirst($propertyName)."' is not allowed for fieldtype '" . $field->getFieldType() . "', it's only allowed for the following fieldtypes: " . implode(",", $allowedDataTypes));
             }
 
-            $arguments = array_pad($arguments, 3, 0);
-            list($value, $limit, $offset) = $arguments;
+            if ($field instanceof Model\Object\ClassDefinition\Data\Localizedfields) {
+                $arguments = array_pad($arguments, 5, 0);
 
-            $defaultCondition = $propertyName . " = " . \Pimcore\Db::get()->quote($value) . " ";
-            $listConfig = array(
-                "condition" => $defaultCondition
-            );
+                list($localizedPropertyName, $value, $locale, $limit, $offset) = $arguments;
+
+                $localizedField = $field->getFielddefinition($localizedPropertyName);
+
+                if (!$localizedField instanceof Model\Object\ClassDefinition\Data) {
+                    \Logger::error("Class: Object\\Concrete => call to undefined static method " . $method);
+                    throw new \Exception("Call to undefined static method " . $method . " in class Object\\Concrete");
+                }
+
+                if (!in_array($localizedField->getFieldType(), $allowedDataTypes)) {
+                    throw new \Exception("Static getter '::getBy".ucfirst($propertyName)."' is not allowed for fieldtype '" . $localizedField->getFieldType() . "', it's only allowed for the following fieldtypes: " . implode(",", $allowedDataTypes));
+                }
+
+                $defaultCondition = $localizedPropertyName . " = " . \Pimcore\Db::get()->quote($value) . " ";
+                $listConfig = array(
+                    "condition" => $defaultCondition
+                );
+
+                if ($locale) {
+                    $listConfig["locale"] = $locale;
+                }
+            } else {
+                $arguments = array_pad($arguments, 3, 0);
+                list($value, $limit, $offset) = $arguments;
+
+                $defaultCondition = $propertyName . " = " . \Pimcore\Db::get()->quote($value) . " ";
+                $listConfig = array(
+                    "condition" => $defaultCondition
+                );
+            }
 
             if (!is_array($limit)) {
                 if ($limit) {

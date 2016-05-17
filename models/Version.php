@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Version
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model;
@@ -120,6 +122,7 @@ class Version extends AbstractModel
      */
     public function save()
     {
+        \Pimcore::getEventManager()->trigger("version.preSave", $this);
 
         // check if versioning is disabled for this process
         if (self::$disabled) {
@@ -176,6 +179,7 @@ class Version extends AbstractModel
                 fclose($handle);
             }
         }
+        \Pimcore::getEventManager()->trigger("version.postSave", $this);
     }
 
     /**
@@ -183,6 +187,8 @@ class Version extends AbstractModel
      */
     public function delete()
     {
+        \Pimcore::getEventManager()->trigger("version.preDelete", $this);
+
         foreach ([$this->getFilePath(), $this->getLegacyFilePath()] as $path) {
             if (is_file($path)) {
                 @unlink($path);
@@ -199,6 +205,7 @@ class Version extends AbstractModel
         }
 
         $this->getDao()->delete();
+        \Pimcore::getEventManager()->trigger("version.postDelete", $this);
     }
 
     /**
@@ -254,7 +261,7 @@ class Version extends AbstractModel
 
         return $data;
     }
-    
+
 
     /**
      * Returns the path on the file system
@@ -505,7 +512,7 @@ class Version extends AbstractModel
     {
         return $this->public;
     }
-    
+
     /**
      * @return bool
      */

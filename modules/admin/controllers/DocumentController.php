@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\Tool\Session;
@@ -61,7 +63,12 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
             if (!$this->getParam("limit")) {
                 $limit = 100000000;
             }
+
             $offset = intval($this->getParam("start"));
+
+            if ($this->getParam("view")) {
+                $cv = \Pimcore\Model\Element\Service::getCustomViewById($this->getParam("view"));
+            }
 
             $list = new Document\Listing();
             if ($this->getUser()->isAdmin()) {
@@ -83,8 +90,9 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
             $list->setLimit($limit);
             $list->setOffset($offset);
 
+            \Pimcore\Model\Element\Service::addTreeFilterJoins($cv, $list);
             $childsList = $list->load();
-
+            
             foreach ($childsList as $childDocument) {
                 // only display document if listing is allowed for the current user
                 if ($childDocument->isAllowed("list")) {
@@ -221,10 +229,11 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
             if ($this->getParam("translationsBaseDocument")) {
                 $translationsBaseDocument = Document::getById($this->getParam("translationsBaseDocument"));
 
-                if ($document->getProperty("language") != $this->getParam("language")) {
-                    $document->setProperty("language", "text", $this->getParam("language"));
-                    $document->save();
-                }
+                $properties = $translationsBaseDocument->getProperties();
+                $properties = array_merge($properties, $document->getProperties());
+                $document->setProperties($properties);
+                $document->setProperty("language", "text", $this->getParam("language"));
+                $document->save();
 
                 $service = new Document\Service();
                 $service->addTranslation($translationsBaseDocument, $document);

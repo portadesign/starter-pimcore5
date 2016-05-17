@@ -2,15 +2,20 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore;
+
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Process;
 
 class Update
 {
@@ -65,9 +70,9 @@ class Update
         self::cleanup();
 
         if (PIMCORE_DEVMODE) {
-            $xmlRaw = Tool::getHttpData("http://" . self::$updateHost . "/v2/getUpdateInfo.php?devmode=1&revision=" . $currentRev);
+            $xmlRaw = Tool::getHttpData("https://" . self::$updateHost . "/v2/getUpdateInfo.php?devmode=1&revision=" . $currentRev);
         } else {
-            $xmlRaw = Tool::getHttpData("http://" . self::$updateHost . "/v2/getUpdateInfo.php?revision=" . $currentRev);
+            $xmlRaw = Tool::getHttpData("https://" . self::$updateHost . "/v2/getUpdateInfo.php?revision=" . $currentRev);
         }
 
         $xml = simplexml_load_string($xmlRaw, null, LIBXML_NOCDATA);
@@ -97,7 +102,7 @@ class Update
                 }
             }
         } else {
-            throw new \Exception("Unable to retrieve response from update server. Please ensure that your server is allowed to connect to update.pimcore.org:80");
+            throw new \Exception("Unable to retrieve response from update server. Please ensure that your server is allowed to connect to update.pimcore.org:443");
         }
 
         return array(
@@ -117,7 +122,7 @@ class Update
             $currentRev = Version::$revision;
         }
 
-        $xmlRaw = Tool::getHttpData("http://" . self::$updateHost . "/v2/getDownloads.php?from=" . $currentRev . "&to=" . $toRevision);
+        $xmlRaw = Tool::getHttpData("https://" . self::$updateHost . "/v2/getDownloads.php?from=" . $currentRev . "&to=" . $toRevision);
         $xml = simplexml_load_string($xmlRaw, null, LIBXML_NOCDATA);
 
         $jobs = array();
@@ -176,6 +181,10 @@ class Update
 
         $jobs["procedural"][] = array(
             "type" => "cleanup"
+        );
+
+        $jobs["procedural"][] = array(
+            "type" => "composer-dump-autoload"
         );
 
         return $jobs;
@@ -378,6 +387,29 @@ class Update
         recursiveDelete(PIMCORE_SYSTEM_TEMP_DIRECTORY . "/update", true);
     }
 
+    /**
+     *
+     */
+    public static function composerDumpAutoload()
+    {
+        $process = new Process('composer dump-autoload -o -d ' . PIMCORE_DOCUMENT_ROOT);
+        $process->mustRun();
+    }
+
+    /**
+     * @return bool
+     */
+    public static function isComposerAvailable()
+    {
+        $process = new Process('composer list');
+        $process->run();
+
+        return $process->isSuccessful();
+    }
+
+    /**
+     *
+     */
     public static function updateMaxmindDb()
     {
         $downloadUrl = "http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz";

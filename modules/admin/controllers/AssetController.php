@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code. dsf sdaf asdf asdf
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\File;
@@ -120,6 +122,10 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
             $offset = intval($this->getParam("start"));
 
 
+            if ($this->getParam("view")) {
+                $cv = \Pimcore\Model\Element\Service::getCustomViewById($this->getParam("view"));
+            }
+
             // get assets
             $childsList = new Asset\Listing();
             if ($this->getUser()->isAdmin()) {
@@ -136,8 +142,9 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
             }
             $childsList->setLimit($limit);
             $childsList->setOffset($offset);
-            $childsList->setOrderKey("FIELD(type, 'folder') DESC, filename ASC", false);
+            $childsList->setOrderKey("FIELD(assets.type, 'folder') DESC, assets.filename ASC", false);
 
+            \Pimcore\Model\Element\Service::addTreeFilterJoins($cv, $childsList);
             $childs = $childsList->load();
 
             foreach ($childs as $childAsset) {
@@ -1676,7 +1683,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
 
                 /** @var $asset Asset */
                 $filename = PIMCORE_ASSET_DIRECTORY . "/" . $asset->getFullPath();
-                $size = filesize($filename);
+                $size = @filesize($filename);
 
                 $assets[] = array(
                     "id" => $asset->getid(),

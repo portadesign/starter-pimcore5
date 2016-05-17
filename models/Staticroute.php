@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Staticroute
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model;
@@ -454,9 +456,20 @@ class Staticroute extends AbstractModel
         $forbiddenCharacters = array("#",":","?");
 
         // check for named variables
+        uksort($urlParams, function ($a, $b) {
+            // order by key length, longer key have priority
+            // (%abcd prior %ab, so that %ab doesn't replace %ab in [%ab]cd)
+            return strlen($b) - strlen($a);
+        });
+
+        $tmpReversePattern = $this->getReverse();
         foreach ($urlParams as $key => $param) {
-            if (strpos($this->getReverse(), "%" . $key) !== false) {
+            if (strpos($tmpReversePattern, "%" . $key) !== false) {
                 $parametersInReversePattern[$key] = $param;
+
+                // we need to replace the found variable to that it cannot match again a placeholder
+                // eg. %abcd prior %ab if %abcd matches already %ab shouldn't match again on the same placeholder
+                $tmpReversePattern = str_replace("%" . $key, "---", $tmpReversePattern);
             } else {
                 // only append the get parameters if there are defined in $urlOptions
                 // or if they are defined in $_GET an $reset is false
@@ -552,6 +565,12 @@ class Staticroute extends AbstractModel
             // check for dynamic controller / action / module
             $dynamicRouteReplace = function ($item, $params) {
                 if (strpos($item, "%") !== false) {
+                    uksort($params, function ($a, $b) {
+                        // order by key length, longer key have priority
+                        // (%abcd prior %ab, so that %ab doesn't replace %ab in [%ab]cd)
+                        return strlen($b) - strlen($a);
+                    });
+
                     foreach ($params as $key => $value) {
                         $dynKey = "%" . $key;
                         if (strpos($item, $dynKey) !== false) {

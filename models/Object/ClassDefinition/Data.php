@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Object|Class
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model\Object\ClassDefinition;
@@ -610,8 +612,23 @@ abstract class Data
      */
     public function getFilterCondition($value, $operator)
     {
+        return $this->getFilterConditionExt($value, $operator, array(
+            "name" => $this->name)
+        );
+    }
+
+    /**
+     * returns sql query statement to filter according to this data types value(s)
+     * @param  $value
+     * @param  $operator
+     * @param  $params optional params used to change the behavior
+     * @return string
+     */
+    public function getFilterConditionExt($value, $operator, $params = array())
+    {
         $db = \Pimcore\Db::get();
-        $key = $db->quoteIdentifier($this->name);
+        $name = $params["name"] ? $params["name"] : $this->name;
+        $key = $db->quoteIdentifier($name);
 
         if ($value === "NULL") {
             if ($operator == '=') {
@@ -633,6 +650,7 @@ abstract class Data
             return "";
         }
     }
+
 
     /**
      * Creates getter code which is used for generation of php file for object classes using this data type
@@ -1060,6 +1078,19 @@ abstract class Data
                     } elseif ($object instanceof Object\Localizedfield) {
                         $data = $object->getLocalizedValue($this->getName(), $params["language"], true);
                     }
+                }
+            } elseif ($context["containerType"] == "classificationstore") {
+                $fieldname = $context["fieldname"];
+                $getter = "get" . ucfirst($fieldname);
+                if (method_exists($object, $getter)) {
+                    $groupId = $context["groupId"];
+                    $keyId = $context["keyId"];
+                    $language = $context["language"];
+
+                    /** @var  $classificationStoreData Object\Classificationstore */
+                    $classificationStoreData = $object->$getter();
+                    $data = $classificationStoreData->getLocalizedKeyValue($groupId, $keyId, $language, true, true);
+                    return $data;
                 }
             }
         }

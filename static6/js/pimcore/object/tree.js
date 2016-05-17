@@ -1,12 +1,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 pimcore.registerNS("pimcore.object.tree");
@@ -14,22 +16,28 @@ pimcore.object.tree = Class.create({
 
     treeDataUrl: "/admin/object/tree-get-childs-by-id/",
 
-    initialize: function (config) {
+    initialize: function (config, perspectiveCfg) {
 
-        this.position = "left";
+        this.perspectiveCfg = perspectiveCfg;
+        if (!perspectiveCfg) {
+            this.perspectiveCfg = {
+                position: "left"
+            };
+        }
+
+        this.position = this.perspectiveCfg.position ? this.perspectiveCfg.position : "left";
+
+        var parentPanel = Ext.getCmp("pimcore_panel_tree_" + this.position);
 
         if (!config) {
             this.config = {
-                //rootId: 1,
                 rootVisible: true,
-                allowedClasses: "all",
+                allowedClasses: null,
                 loaderBaseParams: {},
                 treeId: "pimcore_panel_tree_objects",
                 treeIconCls: "pimcore_icon_object",
                 treeTitle: t('objects'),
-                parentPanel: Ext.getCmp("pimcore_panel_tree_left")
-                //,
-                //index: 3
+                parentPanel: parentPanel
             };
         }
         else {
@@ -42,7 +50,8 @@ pimcore.object.tree = Class.create({
         Ext.Ajax.request({
             url: "/admin/object/tree-get-root",
             params: {
-                id: this.config.rootId
+                id: this.config.rootId,
+                view: this.config.customViewId
             },
             success: function (response) {
                 var res = Ext.decode(response.responseText);
@@ -79,20 +88,18 @@ pimcore.object.tree = Class.create({
                     rootProperty: 'nodes'
                 },
                 extraParams: {
-                    limit: itemsPerPage
+                    limit: itemsPerPage,
+                    view: this.config.customViewId
                 }
             },
             pageSize: itemsPerPage,
             root: rootNodeConfig
-            //folderSort: true,
-            //extraParams: this.config.loaderBaseParams
         });
 
 
         // objects
         this.tree = Ext.create('pimcore.tree.Panel', {
             store: store,
-            border: true,
             region: "center",
             autoLoad: false,
             iconCls: this.config.treeIconCls,
@@ -119,11 +126,12 @@ pimcore.object.tree = Class.create({
             },
             tools: [{
                 type: "right",
-                handler: pimcore.layout.treepanelmanager.toRight.bind(this)
+                handler: pimcore.layout.treepanelmanager.toRight.bind(this),
+                hidden: this.position == "right"
             },{
                 type: "left",
                 handler: pimcore.layout.treepanelmanager.toLeft.bind(this),
-                hidden: true
+                hidden: this.position == "left"
             }],
             root: rootNodeConfig
         });
@@ -147,6 +155,13 @@ pimcore.object.tree = Class.create({
 
         this.config.parentPanel.insert(this.config.index, this.tree);
         this.config.parentPanel.updateLayout();
+
+
+        if (!this.config.parentPanel.alreadyExpanded && this.perspectiveCfg.expanded) {
+            this.config.parentPanel.alreadyExpanded = true;
+            this.tree.expand();
+        }
+
     },
 
     getTreeNodeListeners: function () {
@@ -199,9 +214,9 @@ pimcore.object.tree = Class.create({
     },
 
     onTreeNodeMove: function (node, oldParent, newParent, index, eOpts ) {
-        var tree = node.getOwnerTree();
+        var tree = oldParent.getOwnerTree();
 
-        this.updateObject(tree, node, {
+        pimcore.elementservice.updateObject(node.data.id, {
             parentId: newParent.data.id
         }, function (newParent, oldParent, tree, response) {
             try{
@@ -214,19 +229,19 @@ pimcore.object.tree = Class.create({
                     }
                     node.data.basePath = newBasePath;
                     node.data.path = node.data.basePath + "/" + node.data.text;
-                }
-                else {
+                    pimcore.elementservice.nodeMoved("object", oldParent, newParent);
+                }  else {
                     tree.loadMask.hide();
                     pimcore.helpers.showNotification(t("error"), t("cant_move_node_to_target"),
                         "error",t(rdata.message));
-                    this.refresh(oldParent);
-                    this.refresh(newParent);
+                    pimcore.elementservice.refreshNode(oldParent);
+                    pimcore.elementservice.refreshNode(newParent);
                 }
             } catch(e){
                 tree.loadMask.hide();
                 pimcore.helpers.showNotification(t("error"), t("cant_move_node_to_target"), "error");
-                this.refresh(oldParent);
-                this.refresh(newParent);
+                pimcore.elementservice.refreshNode(oldParent);
+                pimcore.elementservice.refreshNode(newParent);
             }
             tree.loadMask.hide();
 
@@ -235,6 +250,12 @@ pimcore.object.tree = Class.create({
 
     onTreeNodeBeforeMove: function (node, oldParent, newParent, index, eOpts ) {
         var tree = node.getOwnerTree();
+
+        if (oldParent.getOwnerTree().getId() != newParent.getOwnerTree().getId()) {
+            Ext.MessageBox.alert(t('error'), t('cross_tree_moves_not_supported'));
+            return false;
+        }
+
 
         // check for locks
         if (node.data.locked && oldParent.data.id != newParent.data.id) {
@@ -262,7 +283,6 @@ pimcore.object.tree = Class.create({
         tree.select();
 
         var menu = new Ext.menu.Menu();
-
 
         /**
          * case-insensitive string comparison
@@ -393,7 +413,7 @@ pimcore.object.tree = Class.create({
                 // add items
                 for (var i = 0; i < classGroups[groupName].length; i++) {
                     classGroupRecord = classGroups[groupName][i];
-                    if (this.config.allowedClasses == "all" || in_array(classGroupRecord.get("id"),  this.config.allowedClasses)) {
+                    if (!this.config.allowedClasses || in_array(classGroupRecord.get("id"),  this.config.allowedClasses)) {
 
                         /* == menu entry: create new object == */
 
@@ -437,7 +457,7 @@ pimcore.object.tree = Class.create({
             }  else {
                 classGroupRecord = classGroups[groupName][0];
 
-                if (this.config.allowedClasses == "all" || in_array(classGroupRecord.get("id"),
+                if (!this.config.allowedClasses || in_array(classGroupRecord.get("id"),
                         this.config.allowedClasses)) {
 
                     /* == menu entry: create new object == */
@@ -514,7 +534,7 @@ pimcore.object.tree = Class.create({
                 //paste
                 var pasteMenu = [];
 
-                if (this.cacheObjectId && record.data.permissions.create) {
+                if (pimcore.cachedObjectId && record.data.permissions.create) {
                     pasteMenu.push({
                         text: t("paste_recursive_as_childs"),
                         iconCls: "pimcore_icon_paste",
@@ -543,15 +563,15 @@ pimcore.object.tree = Class.create({
             }
 
             if (!isVariant) {
-                if (this.cutObject && record.data.permissions.create) {
+                if (pimcore.cutObject && record.data.permissions.create) {
                     pasteMenu.push({
                         text: t("paste_cut_element"),
                         iconCls: "pimcore_icon_paste",
                         handler: function () {
-                            this.pasteCutObject(this.cutObject,
-                                       this.cutParentNode, record, this.tree);
-                     this.cutParentNode = null;
-                            this.cutObject = null;
+                            this.pasteCutObject(pimcore.cutObject,
+                                pimcore.cutObjectParentNode, record, this.tree);
+                            pimcore.cutObjectParentNode = null;
+                            pimcore.cutObject = null;
                         }.bind(this)
                     });
                 }
@@ -616,7 +636,7 @@ pimcore.object.tree = Class.create({
             menu.add(new Ext.menu.Item({
                 text: t('rename'),
                 iconCls: "pimcore_icon_key pimcore_icon_overlay_go",
-                handler: this.editKey.bind(this, tree, record)
+                handler: this.editObjectKey.bind(this, tree, record)
             }));
         }
 
@@ -640,9 +660,11 @@ pimcore.object.tree = Class.create({
                     text: t('unlock'),
                     iconCls: "pimcore_icon_lock pimcore_icon_overlay_delete",
                     handler: function () {
-                        this.updateObject(tree, record, {locked: null}, function () {
-                            this.refresh(this.tree.getRootNode());
-                        }.bind(this));
+                        pimcore.elementservice.lockElement({
+                            elementType: "object",
+                            id: record.data.id,
+                            mode: "null"
+                        });
                     }.bind(this)
                 });
             } else {
@@ -650,13 +672,11 @@ pimcore.object.tree = Class.create({
                     text: t('lock'),
                     iconCls: "pimcore_icon_lock pimcore_icon_overlay_add",
                     handler: function () {
-                        try {
-                            this.updateObject(tree, record, {locked: "self"}, function () {
-                                this.refresh(this.tree.getRootNode());
-                            }.bind(this));
-                        } catch (e) {
-                            console.log(e);
-                        }
+                        pimcore.elementservice.lockElement({
+                            elementType: "object",
+                            id: record.data.id,
+                            mode: "self"
+                        });
                     }.bind(this)
                 });
 
@@ -664,14 +684,11 @@ pimcore.object.tree = Class.create({
                     text: t('lock_and_propagate_to_childs'),
                     iconCls: "pimcore_icon_lock pimcore_icon_overlay_go",
                     handler: function () {
-                        try {
-                            this.updateObject(tree, record, {locked: "propagate"},
-                                function () {
-                                    this.refresh(this.tree.getRootNode());
-                                }.bind(this));
-                        } catch (e) {
-                            console.log(e);
-                        }
+                            pimcore.elementservice.lockElement({
+                                elementType: "object",
+                                id: record.data.id,
+                                mode: "propagate"
+                            });
                     }.bind(this)
                 });
             }
@@ -682,15 +699,9 @@ pimcore.object.tree = Class.create({
                     text: t('unlock_and_propagate_to_children'),
                     iconCls: "pimcore_icon_lock pimcore_icon_overlay_delete",
                     handler: function () {
-                        Ext.Ajax.request({
-                            url: "/admin/element/unlock-propagate",
-                            params: {
-                                id: record.data.id,
-                                type: "object"
-                            },
-                            success: function () {
-                                this.refresh(record.parentNode);
-                            }.bind(this)
+                        pimcore.elementservice.unlockElement({
+                            elementType: "object",
+                            id: record.data.id
                         });
                     }.bind(this)
                 });
@@ -726,16 +737,16 @@ pimcore.object.tree = Class.create({
     },
 
     reloadNode: function(tree, record) {
-        this.refresh(record);
+        pimcore.elementservice.refreshNode(record);
     },
 
     copy: function (tree, record) {
-        this.cacheObjectId = record.data.id;
+        pimcore.cachedObjectId = record.data.id;
     },
 
     cut: function (tree, record) {
-        this.cutObject = record;
-        this.cutParentNode = record.parentNode;
+        pimcore.cutObject = record;
+        pimcore.cutObjectParentNode = record.parentNode;
     },
 
     createVariant: function (tree, record) {
@@ -743,27 +754,67 @@ pimcore.object.tree = Class.create({
             this.addVariantCreate.bind(this, tree, record));
     },
 
-    addVariantCreate: function (tree, record, button, value, object) {
+    addFolderCreate: function (tree, record, button, value, object) {
 
-        // check for identical filename in current level
-        if (this.isExistingKeyInLevel(record, value)) {
+        // check for ident filename in current level
+        if (pimcore.elementservice.isKeyExistingInLevel(record, value)) {
             return;
         }
 
         if (button == "ok") {
-            Ext.Ajax.request({
-                url: "/admin/object/add",
-                params: {
-                    className: record.data.className,
-                    variantViaTree: true,
-//                    classId: this.element.data.general.o_classId,
-                    parentId: record.data.id,
-                    objecttype: "variant",
-                    key: pimcore.helpers.getValidFilename(value)
-                },
-                success: this.addVariantComplete.bind(this, tree, record)
-            });
+            var options =  {
+                url: "/admin/object/add-folder",
+                elementType : "object",
+                sourceTree: tree,
+                parentId: record.data.id,
+                key: pimcore.helpers.getValidFilename(value)
+            };
+            pimcore.elementservice.addObject(options);
+        }
+    },
 
+    addObjectCreate: function (classId, className, tree, record, button, value, object) {
+
+        if (button == "ok") {
+            // check for identical filename in current level
+            if (pimcore.elementservice.isKeyExistingInLevel(record, value)) {
+                return;
+            }
+
+            var options = {
+                url: "/admin/object/add",
+                elementType: "object",
+                sourceTree: tree,
+                parentId: record.data.id,
+                className: className,
+                classId: classId,
+                key: pimcore.helpers.getValidFilename(value)
+            };
+            pimcore.elementservice.addObject(options);
+        }
+
+    },
+
+    addVariantCreate: function (tree, record, button, value, object) {
+
+        if (button == "ok") {
+            // check for identical filename in current level
+
+            if (pimcore.elementservice.isKeyExistingInLevel(record, value)) {
+                return;
+            }
+
+            var options = {
+                url: "/admin/object/add",
+                elementType: "object",
+                sourceTree: tree,
+                className: record.data.className,
+                parentId: record.data.id,
+                variantViaTree: true,
+                objecttype: "variant",
+                key: pimcore.helpers.getValidFilename(value)
+            };
+            pimcore.elementservice.addObject(options);
         }
     },
 
@@ -786,12 +837,12 @@ pimcore.object.tree = Class.create({
         } catch (e) {
             pimcore.helpers.showNotification(t("error"), t("error_creating_variant"), "error");
         }
-        this.refresh(record);
+        pimcore.elementservice.refreshNode(record);
     },
 
 
     pasteCutObject: function (record, oldParent, newParent, tree) {
-        this.updateObject(tree, record, {
+        pimcore.elementservice.updateObject(record.data.id, {
             parentId: newParent.id
         }, function (record, newParent, oldParent, tree, response) {
             try {
@@ -813,9 +864,9 @@ pimcore.object.tree = Class.create({
                 tree.loadMask.hide();
                 pimcore.helpers.showNotification(t("error"), t("error_moving_object"), "error");
             }
-            this.refresh(oldParent);
-            this.refresh(newParent);
-
+            pimcore.elementservice.refreshNodeAllTrees("object", oldParent.id);
+            pimcore.elementservice.refreshNodeAllTrees("object", newParent.id);
+            newParent.expand();
             tree.loadMask.hide();
         }.bind(this, record, newParent, oldParent, tree));
     },
@@ -829,7 +880,7 @@ pimcore.object.tree = Class.create({
             url: "/admin/object/copy-info/",
             params: {
                 targetId: record.data.id,
-                sourceId: this.cacheObjectId,
+                sourceId: pimcore.cachedObjectId,
                 type: type
             },
             success: this.paste.bind(this, tree, record)
@@ -869,7 +920,7 @@ pimcore.object.tree = Class.create({
                         } catch (e) {
                             console.log(e);
                             pimcore.helpers.showNotification(t("error"), t("error_pasting_object"), "error");
-                            this.refresh(record);
+                            pimcore.elementservice.refreshNodeAllTrees("object", record.id);
                         }
                     }.bind(this),
                     update: function (currentStep, steps, percent) {
@@ -884,8 +935,7 @@ pimcore.object.tree = Class.create({
 
                         pimcore.helpers.showNotification(t("error"), t("error_pasting_object"), "error", t(message));
 
-                        this.refresh(record.parentNode);
-
+                        pimcore.elementservice.refreshNodeAllTrees("object", record.parentNode.id);
                     }.bind(this),
                     jobs: res.pastejobs
                 });
@@ -909,7 +959,7 @@ pimcore.object.tree = Class.create({
 
         //this.tree.loadMask.hide();
         pimcore.helpers.removeTreeNodeLoadingIndicator("object", record.id);
-        this.refresh(record);
+        pimcore.elementservice.refreshNodeAllTrees("object", record.id);
     },
 
     importObjects: function (classId, className, tree, record) {
@@ -921,138 +971,29 @@ pimcore.object.tree = Class.create({
             this.addObjectCreate.bind(this, classId, className, tree, record));
     },
 
-    addObjectCreate: function (classId, className, tree, record, button, value, object) {
-
-        if (button == "ok") {
-            // check for identical filename in current level
-            if (this.isExistingKeyInLevel(record, value)) {
-                return;
-            }
-
-            Ext.Ajax.request({
-                url: "/admin/object/add",
-                params: {
-                    className: className,
-                    classId: classId,
-                    parentId: record.data.id,
-                    key: pimcore.helpers.getValidFilename(value)
-                },
-                success: this.addObjectComplete.bind(this, tree, record)
-            });
-        }
-    },
 
     addFolder: function (tree, record) {
         Ext.MessageBox.prompt(t('add_folder'), t('please_enter_the_name_of_the_new_folder'),
             this.addFolderCreate.bind(this, tree, record));
     },
 
-    addFolderCreate: function (tree, record, button, value, object) {
-
-        // check for ident filename in current level
-        if (this.isExistingKeyInLevel(record, value)) {
-            return;
-        }
-
-        if (button == "ok") {
-
-            Ext.Ajax.request({
-                url: "/admin/object/add-folder",
-                params: {
-                    parentId: record.data.id,
-                    key: pimcore.helpers.getValidFilename(value)
-                },
-                success: this.addObjectComplete.bind(this, tree, record)
-            });
-        }
-    },
-
-    addObjectComplete: function (tree, record, response) {
-        try {
-            var rdata = Ext.decode(response.responseText);
-            if (rdata && rdata.success) {
-                this.leaf = false;
-                tree.expand(record);
-
-                if (rdata.id && rdata.type) {
-                    if (rdata.type == "object") {
-                        pimcore.helpers.openObject(rdata.id, rdata.type);
-                    }
-                }
-            }
-            else {
-                pimcore.helpers.showNotification(t("error"), t("error_creating_object"), "error", t(rdata.message));
-            }
-        } catch (e) {
-            pimcore.helpers.showNotification(t("error"), t("error_creating_object"), "error");
-        }
-        this.reloadNode(tree, record);
-    },
-
-
-    isExistingKeyInLevel: function (parentNode, key, node) {
-
-        key = pimcore.helpers.getValidFilename(key);
-        var parentChilds = parentNode.childNodes;
-        for (var i = 0; i < parentChilds.length; i++) {
-            if (parentChilds[i].data.text == key && node != parentChilds[i]) {
-                Ext.MessageBox.alert(t('edit_key'),
-                    t('the_key_is_already_in_use_in_this_level_please_choose_an_other_key'));
-                return true;
-            }
-        }
-        return false;
-    },
-
     remove: function (tree, record) {
-        pimcore.helpers.deleteObject(record.data.id);
+        var options = {
+            "elementType" : "object",
+            "id": record.data.id
+        };
+        pimcore.elementservice.deleteElement(options);
     },
 
-    editKey: function (tree, record) {
-        Ext.MessageBox.prompt(t('rename'), t('please_enter_the_new_name'),
-            this.editKeyComplete.bind(this, tree, record), window, false, record.data.text);
-    },
-
-    editKeyComplete: function (tree, record, button, value, object) {
-        if (button == "ok") {
-
-        // check for ident filename in current level
-        if (this.isExistingKeyInLevel(record.parentNode, value, record)) {
-            return;
-        }
-
-            value = pimcore.helpers.getValidFilename(value);
-
-            record.set("text", value);
-            record.data.path = record.data.basePath + value;
-
-            var tree = record.getOwnerTree();
-            tree.loadMask.show();
-
-            this.updateObject(tree, record, {key: value}, function (response) {
-
-                record.getOwnerTree().loadMask.hide();
-                this.refresh(record);
-
-                try {
-                    var rdata = Ext.decode(response.responseText);
-                    if (rdata && rdata.success) {
-                        if (pimcore.globalmanager.exists("object_" + record.id)) {
-                            pimcore.helpers.closeObject(record.data.id);
-                            pimcore.helpers.openObject(record.data.id, record.data.type);
-                        }
-                    }
-                    else {
-                        pimcore.helpers.showNotification(t("error"), t("error_renaming_object"), "error",
-                            t(rdata.message));
-                        this.refresh(record.parentNode);
-                    }
-                } catch (e) {
-                    pimcore.helpers.showNotification(t("error"), t("error_renaming_object"), "error");
-                    this.refresh(record.parentNode);
-                }
-            }.bind(this));
-        }
+    editObjectKey: function (tree, record) {
+        var options = {
+            sourceTree: tree,
+            elementType: "object",
+            elementSubType: record.data.type,
+            id: record.data.id,
+            default: record.data.text
+        };
+        pimcore.elementservice.editElementKey(options);
     },
 
     publishObject: function (tree, record, task) {
@@ -1067,73 +1008,21 @@ pimcore.object.tree = Class.create({
             success: function (tree, record, task, response) {
                 try {
                     var rdata = Ext.decode(response.responseText);
+                    var id = record.data.id;
+
                     if (rdata && rdata.success) {
-                        var treeNames = ["layout_object_tree"]
-                        if (pimcore.settings.customviews.length > 0) {
-                            for (var cvs = 0; cvs < pimcore.settings.customviews.length; cvs++) {
-                                var cv = pimcore.settings.customviews[cvs];
-                                treeNames.push("layout_customviews_tree" + cv.id);
-                            }
-                        }
+                        var options = {
+                            elementType: "object",
+                            id: record.data.id,
+                            published: task != "unpublish"
+                        };
 
-                        var index;
-                        for (index = 0; index < treeNames.length; index++) {
-                            var treeName = treeNames[index];
-
-                            // remove class in tree panel
-                            try {
-                                var tree = pimcore.globalmanager.get(treeName).tree;
-                                var store = tree.getStore();
-                                // record of sister store
-                                var record = store.getById(record.id);
-
-                                var view = tree.getView();
-                                var nodeEl = Ext.fly(view.getNodeByRecord(record));
-
-                                if (nodeEl) {
-                                    var nodeElInner = nodeEl.down(".x-grid-td");
-                                }
-
-                                if (task == 'unpublish') {
-                                    if (nodeElInner) {
-                                        nodeElInner.addCls('pimcore_unpublished');
-                                    }
-                                    record.data.published = false;
-                                    record.data.cls = "pimcore_unpublished";
-
-                                    if (pimcore.globalmanager.exists("object_" + record.data.id)) {
-                                        pimcore.globalmanager.get("object_" + record.data.id).toolbarButtons.unpublish.hide();
-                                    }
-
-                                } else {
-                                    if (nodeElInner) {
-                                        nodeElInner.removeCls('pimcore_unpublished');
-                                    }
-                                    delete record.data.cls;
-
-                                    record.data.published = true;
-                                    if (pimcore.globalmanager.exists("object_" + record.data.id)) {
-                                        pimcore.globalmanager.get("object_" + record.data.id).toolbarButtons.unpublish.show();
-                                    }
-                                }
-                            } catch (e) {
-                                console.log(e);
-                            }
-                        }
-
-                        if (pimcore.globalmanager.exists("object_" + record.data.id)) {
-                            // reload versions
-                            if (pimcore.globalmanager.get("object_" + record.data.id).versions) {
-                                if (typeof pimcore.globalmanager.get("object_" + record.data.id).versions.reload
-                                    == "function") {
-                                    pimcore.globalmanager.get("object_" + record.data.id).versions.reload();
-                                }
-                            }
-                        }
+                        pimcore.elementservice.setElementPublishedState(options);
+                        pimcore.elementservice.setElementToolbarButtons(options);
+                        pimcore.elementservice.reloadVersions(options);
 
                         pimcore.helpers.showNotification(t("success"), t("successful_" + task + "_object"), "success");
-                    }
-                    else {
+                    }  else {
                         pimcore.helpers.showNotification(t("error"), t("error_" + task + "_object"), "error",
                             t(rdata.message));
                     }
@@ -1151,34 +1040,7 @@ pimcore.object.tree = Class.create({
 
     searchAndMove: function(tree, record) {
         pimcore.helpers.searchAndMove(record.parentId, function() {
-            this.refresh(record);
+            pimcore.elementservice.refreshNode(record);
         }.bind(this), "object");
-    },
-
-    updateObject: function (tree, record, values, callback) {
-
-        if (!callback) {
-            callback = function () {
-            };
-        }
-
-        Ext.Ajax.request({
-            url: "/admin/object/update",
-            method: "post",
-            params: {
-                id: record.data.id,
-                values: Ext.encode(values)
-            },
-            success: callback
-        });
-    },
-
-    refresh: function (record) {
-        var ownerTree = record.getOwnerTree();
-
-        record.data.expanded = true;
-        ownerTree.getStore().load({
-            node: record
-        });
     }
 });

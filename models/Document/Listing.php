@@ -2,19 +2,22 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Document
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model\Document;
 
 use Pimcore\Model;
+use Pimcore\Model\Document;
 
 class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterAggregate, \Iterator
 {
@@ -32,12 +35,12 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
      * @var array
      */
     public $documents = null;
-    
+
     /**
      * @var boolean
      */
     public $unpublished = false;
-    
+
     /**
      * Valid order keys
      *
@@ -81,7 +84,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
         $this->documents = $documents;
         return $this;
     }
-    
+
     /**
      * @return bool
      */
@@ -89,7 +92,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     {
         return $this->unpublished;
     }
-    
+
     /**
      * @return bool
      */
@@ -98,7 +101,22 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
         $this->unpublished = (bool) $unpublished;
         return $this;
     }
-    
+
+    public function getCondition()
+    {
+        $condition = parent::getCondition();
+
+        if ($condition) {
+            if (Document::doHideUnpublished() && !$this->getUnpublished()) {
+                $condition = " (" . $condition . ") AND published = 1";
+            }
+        } elseif (Document::doHideUnpublished() && !$this->getUnpublished()) {
+            $condition = "published = 1";
+        }
+
+        return $condition;
+    }
+
     /**
      *
      * Methods for \Zend_Paginator_Adapter_Interface
@@ -120,7 +138,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     {
         return $this;
     }
-    
+
 
     /**
      * Methods for Iterator

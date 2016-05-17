@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Image;
@@ -37,17 +39,15 @@ class Optimizer
             if ($format == "png") {
                 $optimizer = self::getPngOptimizerCli();
                 if ($optimizer) {
-                    /*if($optimizer["type"] == "pngquant") {
-                        Console::exec($optimizer["path"] . " --ext xxxoptimized.png " . $path, null, 60);
-                        $newFile = preg_replace("/\.png$/", "", $path);
-                        $newFile .= "xxxoptimized.png";
-
-                        if(file_exists($newFile)) {
+                    if ($optimizer["type"] == "pngcrush") {
+                        $newFile = $path . ".xxxoptimized";
+                        Console::exec($optimizer["path"] . " " . $path . " " . $newFile, null, 60);
+                        if (file_exists($newFile)) {
                             unlink($path);
                             rename($newFile, $path);
+                            @chmod($path, File::getDefaultMode());
                         }
-                    } else */
-                    if ($optimizer["type"] == "pngcrush") {
+                    } elseif ($optimizer["type"] == "zopflipng") {
                         $newFile = $path . ".xxxoptimized";
                         Console::exec($optimizer["path"] . " " . $path . " " . $newFile, null, 60);
                         if (file_exists($newFile)) {
@@ -101,16 +101,16 @@ class Optimizer
                     "type" => "pngcrush"
                 );
 
-                return $configPath;
+                return self::$optimizerBinaries["pngOptimizer"];
             } else {
                 \Logger::critical("Binary: " . $configPath . " is not executable");
             }
         }
 
         $paths = array(
-            /*"/usr/local/bin/pngquant",
-            "/usr/bin/pngquant",
-            "/bin/pngquant",*/
+            "/usr/local/bin/zopflipng",
+            "/usr/bin/zopflipng",
+            "/bin/zopflipng",
             "/usr/local/bin/pngcrush",
             "/usr/bin/pngcrush",
             "/bin/pngcrush",
@@ -152,7 +152,7 @@ class Optimizer
                         "type" => $type
                     );
 
-                    return $configPath;
+                    return self::$optimizerBinaries["jpegOptimizer"];
                 } else {
                     \Logger::critical("Binary: " . $configPath . " is not executable");
                 }

@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Element
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model\Element;
@@ -20,6 +22,7 @@ use Pimcore\Model\Asset;
 use Pimcore\Model\Object;
 use Pimcore\Model\Dependency;
 use Pimcore\File;
+use Pimcore\Tool;
 
 class Service extends Model\AbstractModel
 {
@@ -717,5 +720,66 @@ class Service extends Model\AbstractModel
             return $foundElement;
         }
         return $lastFolder;
+    }
+
+    /** Changes the query according to the custom view config
+     * @param $cv array
+     * @param $childsList
+     */
+    public static function addTreeFilterJoins($cv, $childsList)
+    {
+        if ($cv) {
+            $childsList->onCreateQuery(function (\Zend_Db_Select $select) use ($cv, $childsList) {
+                $where = $cv["where"];
+                if ($where) {
+                    $select->where($where);
+                }
+
+                $customViewJoins = $cv["joins"];
+                if ($customViewJoins) {
+                    foreach ($customViewJoins as $joinConfig) {
+                        $type = $joinConfig["type"];
+                        $method = $type == "left" || $type == "right" ? $method = "join" . ucfirst($type) : "join";
+                        $name = $joinConfig["name"];
+                        $condition = $joinConfig["condition"];
+                        $columns = $joinConfig["columns"];
+                        $select->$method($name, $condition, $columns);
+                    }
+                }
+
+                if ($cv["having"]) {
+                    $select->having($cv["having"]);
+                };
+            });
+        }
+    }
+
+    public static function getCustomViewById($id)
+    {
+        $customViews = Tool::getCustomViewConfig();
+        if ($customViews) {
+            foreach ($customViews as $customView) {
+                if ($customView["id"] == $id) {
+                    return $customView;
+                }
+            }
+        }
+    }
+
+    /**
+     * returns a unique key for an element
+     *
+     * @param $element
+     * @return string
+     */
+    public static function getUniqueKey($element)
+    {
+        if ($element instanceof Object\AbstractObject) {
+            return Object\Service::getUniqueKey($element);
+        } elseif ($element instanceof Document) {
+            return Document\Service::getUniqueKey($element);
+        } elseif ($element instanceof Asset) {
+            return Asset\Service::getUniqueKey($element);
+        }
     }
 }

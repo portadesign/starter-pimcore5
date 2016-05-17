@@ -2,14 +2,16 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @category   Pimcore
  * @package    Document
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model\Document\Tag;
@@ -351,18 +353,14 @@ class Video extends Model\Document\Tag
                     if ($asset->getCustomSetting("image_thumbnail_asset")) {
                         $image = $asset->getImageThumbnail($imageThumbnailConf);
                     } else {
-                        if ($thumbnail["status"] == "finished" && (array_key_exists("animatedGifPreview", $options) && $options["animatedGifPreview"] !== false)) {
-                            $image = $asset->getPreviewAnimatedGif(null, null, $imageThumbnailConf);
-                        } else {
-                            $image = $asset->getImageThumbnail($imageThumbnailConf);
-                        }
+                        $image = $asset->getImageThumbnail($imageThumbnailConf);
                     }
                 }
 
                 if ($inAdmin && isset($options["editmodeImagePreview"]) && $options["editmodeImagePreview"]) {
                     $code = '<div id="pimcore_video_' . $this->getName() . '" class="pimcore_tag_video">';
                     $code .= '<img width="' . $this->getWidth() . '" src="' . $image . '" />';
-                    $code .= '</div';
+                    $code .= '</div>';
                     return $code;
                 }
 
@@ -509,7 +507,7 @@ class Video extends Model\Document\Tag
         }
 
         $code .= '<div id="pimcore_video_' . $this->getName() . '" class="pimcore_tag_video">
-            <iframe width="' . $width . '" height="' . $height . '" src="//www.youtube.com/embed/' . $youtubeId . '?wmode=transparent' . $additional_params .'" frameborder="0" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
+            <iframe width="' . $width . '" height="' . $height . '" src="//www.youtube-nocookie.com/embed/' . $youtubeId . '?wmode=transparent' . $additional_params .'" frameborder="0" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
         </div>';
 
         return $code;
@@ -721,16 +719,6 @@ class Video extends Model\Document\Tag
         </div>';
 
         $options = $this->getOptions();
-
-        if (!$this->editmode && !$options['disableProgressReload']) {
-            $code .= '
-                <script type="text/javascript">
-                    window.setTimeout(function() {
-                        location.reload();
-                    },6000);
-                </script>
-            ';
-        }
 
         return $code;
     }

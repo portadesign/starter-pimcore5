@@ -2,12 +2,14 @@
 /**
  * Pimcore
  *
- * This source file is subject to the GNU General Public License version 3 (GPLv3)
- * For the full copyright and license information, please view the LICENSE.md and gpl-3.0.txt
- * files that are distributed with this source code.
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Enterprise License (PEL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GNU General Public License version 3 (GPLv3)
+ * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 use Pimcore\Tool;
@@ -38,7 +40,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
     public function treeGetChildsByIdAction()
     {
-        $object = Object::getById($this->getParam("node"));
+        $object = Object\AbstractObject::getById($this->getParam("node"));
         $objectTypes = null;
         $objects = [];
 
@@ -62,21 +64,20 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
 
             $childsList = new Object\Listing();
-            $condition = "o_parentId = '" . $object->getId() . "'";
+            $condition = "objects.o_parentId = '" . $object->getId() . "'";
 
             // custom views start
             if ($this->getParam("view")) {
-                $cvConfig = Tool::getCustomViewConfig();
-                $cv = $cvConfig[($this->getParam("view") - 1)];
+                $cv = \Pimcore\Model\Element\Service::getCustomViewById($this->getParam("view"));
 
                 if ($cv["classes"]) {
                     $cvConditions = array();
                     $cvClasses = explode(",", $cv["classes"]);
                     foreach ($cvClasses as $cvClass) {
-                        $cvConditions[] = "o_classId = '" . $cvClass . "'";
+                        $cvConditions[] = "objects.o_classId = '" . $cvClass . "'";
                     }
 
-                    $cvConditions[] = "o_type = 'folder'";
+                    $cvConditions[] = "objects.o_type = 'folder'";
 
                     if (count($cvConditions) > 0) {
                         $condition .= " AND (" . implode(" OR ", $cvConditions) . ")";
@@ -99,8 +100,10 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             $childsList->setCondition($condition);
             $childsList->setLimit($limit);
             $childsList->setOffset($offset);
-            $childsList->setOrderKey("FIELD(o_type, 'folder') DESC, o_key ASC", false);
+            $childsList->setOrderKey("FIELD(objects.o_type, 'folder') DESC, objects.o_key ASC", false);
             $childsList->setObjectTypes($objectTypes);
+
+            Element\Service::addTreeFilterJoins($cv, $childsList);
 
             $childs = $childsList->load();
 
@@ -966,7 +969,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         } else {
             \Logger::debug("prevented update object because of missing permissions.");
         }
-
+        
         $this->_helper->json(array("success" => $success));
     }
 
@@ -1129,34 +1132,21 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
+
     public function saveFolderAction()
     {
         $object = Object::getById($this->getParam("id"));
-        $classId = $this->getParam("class_id");
-
-        // general settings
-        $general = \Zend_Json::decode($this->getParam("general"));
-        $object->setValues($general);
-        $object->setUserModification($this->getUser()->getId());
-
-        $object = $this->assignPropertiesFromEditmode($object);
 
         if ($object->isAllowed("publish")) {
             try {
+                $classId = $this->getParam("class_id");
 
-                // grid config
-                $gridConfig = \Zend_Json::decode($this->getParam("gridconfig"));
-                if ($classId) {
-                    $configFile = PIMCORE_CONFIGURATION_DIRECTORY . "/object/grid/" . $object->getId() . "_" . $classId . "-user_" . $this->getUser()->getId() . ".psf";
-                } else {
-                    $configFile = PIMCORE_CONFIGURATION_DIRECTORY . "/object/grid/" . $object->getId() . "-user_" . $this->getUser()->getId() . ".psf";
-                }
+                // general settings
+                $general = \Zend_Json::decode($this->getParam("general"));
+                $object->setValues($general);
+                $object->setUserModification($this->getUser()->getId());
 
-                $configDir = dirname($configFile);
-                if (!is_dir($configDir)) {
-                    File::mkdir($configDir);
-                }
-                File::put($configFile, Tool\Serialize::serialize($gridConfig));
+                $object = $this->assignPropertiesFromEditmode($object);
 
                 $object->save();
                 $this->_helper->json(array("success" => true));
@@ -1282,8 +1272,13 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
     public function gridProxyAction()
     {
-        if ($this->getParam("language")) {
-            $this->setLanguage($this->getParam("language"), true);
+        $requestedLanguage = $this->getParam("language");
+        if ($requestedLanguage) {
+            if ($requestedLanguage != "default") {
+                $this->setLanguage($requestedLanguage, true);
+            }
+        } else {
+            $requestedLanguage = $this->getLanguage();
         }
 
         if ($this->getParam("data")) {
@@ -1314,18 +1309,31 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                             $field = $parts[2];
                             $keyid = $parts[3];
 
-                            $getter = "get" . ucfirst($field);
-                            $setter = "set" . ucfirst($field);
-                            $keyValuePairs = $object->$getter();
+                            if ($type == "classificationstore") {
+                                $groupKeyId = explode("-", $keyid);
+                                $groupId = $groupKeyId[0];
+                                $keyid = $groupKeyId[1];
 
-                            if (!$keyValuePairs) {
-                                $keyValuePairs = new Object\Data\KeyValue();
-                                $keyValuePairs->setObjectId($object->getId());
-                                $keyValuePairs->setClass($object->getClass());
+                                $getter = "get" . ucfirst($field);
+                                if (method_exists($object, $getter)) {
+                                    /** @var  $classificationStoreData Object\Classificationstore */
+                                    $classificationStoreData = $object->$getter();
+                                    $classificationStoreData->setLocalizedKeyValue($groupId, $keyid, $value, $requestedLanguage);
+                                }
+                            } else {
+                                $getter = "get" . ucfirst($field);
+                                $setter = "set" . ucfirst($field);
+                                $keyValuePairs = $object->$getter();
+
+                                if (!$keyValuePairs) {
+                                    $keyValuePairs = new Object\Data\KeyValue();
+                                    $keyValuePairs->setObjectId($object->getId());
+                                    $keyValuePairs->setClass($object->getClass());
+                                }
+
+                                $keyValuePairs->setPropertyWithId($keyid, $value, true);
+                                $object->$setter($keyValuePairs);
                             }
-
-                            $keyValuePairs->setPropertyWithId($keyid, $value, true);
-                            $object->$setter($keyValuePairs);
                         } elseif (count($parts) > 1) {
                             $brickType = $parts[0];
                             $brickKey = $parts[1];
@@ -1369,7 +1377,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
 
                     $object->save();
-                    $this->_helper->json(array("data" => Object\Service::gridObjectData($object, $this->getParam("fields")), "success" => true));
+                    $this->_helper->json(array("data" => Object\Service::gridObjectData($object, $this->getParam("fields"), $requestedLanguage), "success" => true));
                 } catch (\Exception $e) {
                     $this->_helper->json(array("success" => false, "message" => $e->getMessage()));
                 }
@@ -1403,10 +1411,12 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                     $parts = explode("~", $f);
                     $sub = substr($f, 0, 1);
                     if (substr($f, 0, 1) == "~") {
-                        //                        $type = $parts[1];
+                        $type = $parts[1];
 //                        $field = $parts[2];
 //                        $keyid = $parts[3];
                         // key value, ignore for now
+                        if ($type == "classificationstore") {
+                        }
                     } elseif (count($parts) > 1) {
                         $bricks[$parts[0]] = $parts[0];
                     }
@@ -1431,6 +1441,9 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                 if (!(substr($orderKey, 0, 1) == "~")) {
                     if (array_key_exists($orderKey, $colMappings)) {
                         $orderKey = $colMappings[$orderKey];
+                    } elseif ($class->getFieldDefinition($orderKey) instanceof  Object\ClassDefinition\Data\QuantityValue) {
+                        $orderKey = "concat(" . $orderKey . "__unit, " . $orderKey . "__value)";
+                        $doNotQuote = true;
                     }
                 }
             }
@@ -1444,9 +1457,27 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                 $conditionFilters[] = "(o_path = '" . $folder->getFullPath() . "' OR o_path LIKE '" . str_replace("//", "/", $folder->getFullPath() . "/") . "%')";
             }
 
+            if (!$this->getUser()->isAdmin()) {
+                $userIds = $this->getUser()->getRoles();
+                $userIds[] = $this->getUser()->getId();
+                $conditionFilters[] .= " (
+                                                    (select list from users_workspaces_object where userId in (" . implode(',', $userIds) . ") and LOCATE(CONCAT(o_path,o_key),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                                                    OR
+                                                    (select list from users_workspaces_object where userId in (" . implode(',', $userIds) . ") and LOCATE(cpath,CONCAT(o_path,o_key))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                                                 )";
+            }
+
+
+
+            $featureJoins = array();
+
             // create filter condition
             if ($this->getParam("filter")) {
                 $conditionFilters[] = Object\Service::getFilterCondition($this->getParam("filter"), $class);
+                $featureFilters = Object\Service::getFeatureFilters($this->getParam("filter"), $class);
+                if ($featureFilters) {
+                    $featureJoins = array_merge($featureJoins, $featureFilters["joins"]);
+                }
             }
             if ($this->getParam("condition")) {
                 $conditionFilters[] = "(" . $this->getParam("condition") . ")";
@@ -1462,17 +1493,30 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             $list->setCondition(implode(" AND ", $conditionFilters));
             $list->setLimit($limit);
             $list->setOffset($start);
+
+
+            if ($sortingSettings["isFeature"]) {
+                $orderKey = "cskey_" . $sortingSettings["fieldname"] . "_" . $sortingSettings["groupId"]. "_" . $sortingSettings["keyId"];
+                $list->setOrderKey($orderKey);
+                $list->setGroupBy("o_id");
+
+                $featureJoins[] = $sortingSettings;
+            } else {
+                $list->setOrderKey($orderKey, !$doNotQuote);
+            }
             $list->setOrder($order);
-            $list->setOrderKey($orderKey);
+
             if ($class->getShowVariants()) {
                 $list->setObjectTypes([Object\AbstractObject::OBJECT_TYPE_OBJECT, Object\AbstractObject::OBJECT_TYPE_VARIANT]);
             }
+
+            Object\Service::addGridFeatureJoins($list, $featureJoins, $class, $featureFilters, $requestedLanguage);
 
             $list->load();
 
             $objects = array();
             foreach ($list->getObjects() as $object) {
-                $o = Object\Service::gridObjectData($object, $fields);
+                $o = Object\Service::gridObjectData($object, $fields, $requestedLanguage);
                 $objects[] = $o;
             }
             $this->_helper->json(array("data" => $objects, "success" => true, "total" => $list->getTotalCount()));
