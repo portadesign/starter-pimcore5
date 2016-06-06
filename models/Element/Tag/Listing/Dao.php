@@ -22,7 +22,7 @@ class Dao extends Model\Listing\Dao\AbstractDao
 {
 
     /**
-     * Loads a list of tags for the specifies parameters, returns an array of Element\Tag elements
+     * Loads a list of tags for the specified parameters, returns an array of Element\Tag elements
      *
      * @return array
      */
@@ -30,7 +30,7 @@ class Dao extends Model\Listing\Dao\AbstractDao
     {
         $tagsData = $this->db->fetchCol("SELECT id FROM tags" . $this->getCondition() . $this->getOrder() . $this->getOffsetLimit(), $this->model->getConditionVariables());
 
-        $tags = array();
+        $tags = [];
         foreach ($tagsData as $tagData) {
             if ($tag = Model\Element\Tag::getById($tagData)) {
                 $tags[] = $tag;

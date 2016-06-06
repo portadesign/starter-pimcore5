@@ -318,7 +318,7 @@ Ext.onReady(function () {
     });
 
     pimcore.globalmanager.add("document_types_store", store);
-    pimcore.globalmanager.add("document_documenttype_store", ["page","snippet","email"]);
+    pimcore.globalmanager.add("document_documenttype_store", ["page","snippet","email","printpage","printcontainer"]);
 
     //translation admin keys
     pimcore.globalmanager.add("translations_admin_missing", new Array());
@@ -530,6 +530,7 @@ Ext.onReady(function () {
                                     Ext.create('Ext.ux.TabCloseMenu', {
                                         pluginId: 'tabclosemenu',
                                         showCloseAll: false,
+                                        closeTabText: t("close_tab"),
                                         showCloseOthers: false,
                                         extraItemsTail: pimcore.helpers.getMainTabMenuItems()
                                     }),
@@ -566,19 +567,7 @@ Ext.onReady(function () {
                     Ext.get("pimcore_avatar").show();
                     Ext.get("pimcore_logout").show();
 
-                    $("[data-menu-tooltip]").mouseenter(function (e) {
-                        $("#pimcore_menu_tooltip").show();
-                        $("#pimcore_menu_tooltip").html($(this).data("menu-tooltip"));
-
-                        var offset = $(e.target).offset();
-                        var top = offset.top;
-                        top = top + ($(e.target).height() / 2);
-
-                        $("#pimcore_menu_tooltip").css({top: top});
-                    });
-                    $("[data-menu-tooltip]").mouseleave(function () {
-                        $("#pimcore_menu_tooltip").hide();
-                    });
+                    pimcore.helpers.initMenuTooltips();
 
                     var loadMask = new Ext.LoadMask(
                         {
@@ -689,7 +678,7 @@ Ext.onReady(function () {
     if (user.isAllowed("dashboards") && pimcore.globalmanager.get("user").welcomescreen) {
         window.setTimeout(function () {
             layoutPortal = new pimcore.layout.portal();
-            pimcore.globalmanager.add("layout_portal", layoutPortal);
+            pimcore.globalmanager.add("layout_portal_welcome", layoutPortal);
         }, 1000);
     }
 

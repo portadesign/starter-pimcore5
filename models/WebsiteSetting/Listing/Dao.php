@@ -20,7 +20,7 @@ class Dao extends Model\Listing\Dao\AbstractDao
 {
 
     /**
-     * Loads a list of static routes for the specifies parameters, returns an array of Staticroute elements
+     * Loads a list of static routes for the specified parameters, returns an array of Staticroute elements
      *
      * @return array
      */
@@ -29,7 +29,7 @@ class Dao extends Model\Listing\Dao\AbstractDao
         $sql = "SELECT id FROM website_settings" . $this->getCondition() . $this->getOrder() . $this->getOffsetLimit();
         $settingsData = $this->db->fetchCol($sql, $this->model->getConditionVariables());
 
-        $settings = array();
+        $settings = [];
         foreach ($settingsData as $settingData) {
             $settings[] = Model\WebsiteSetting::getById($settingData);
         }

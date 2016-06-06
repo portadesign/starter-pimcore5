@@ -2,13 +2,14 @@
 <html>
 <head>
 
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta charset="utf-8">
     <meta name="robots" content="noindex, nofollow" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
 
     <link rel="icon" type="image/png" href="/pimcore/static6/img/favicon/favicon-32x32.png" />
+    <meta name="google" value="notranslate">
 
     <style type="text/css">
         body {
@@ -67,7 +68,7 @@
         }
     </style>
 
-    <title><?= htmlentities($this->getRequest()->getHttpHost(), ENT_QUOTES, 'UTF-8') ?> :: pimcore</title>
+    <title><?= htmlentities(\Pimcore\Tool::getHostname(), ENT_QUOTES, 'UTF-8') ?> :: pimcore</title>
 </head>
 
 <body>
@@ -81,7 +82,7 @@
 </div>
 
 <div id="pimcore_avatar" style="display:none;">
-    <img src="/admin/user/get-image" />
+    <img src="/admin/user/get-image" data-menu-tooltip="<?= \Pimcore\Tool\Admin::getCurrentUser()->getName() ?>" />
 </div>
 
 <a id="pimcore_logout" href="/admin/login/logout/" style="display: none"></a>
@@ -147,7 +148,7 @@ $styles = array(
     // see also: http://blogs.telerik.com/blogs/posts/10-05-03/internet-explorer-css-limits.aspx
     // @import bypasses this problem in an elegant way
     foreach ($styles as $style) { ?>
-        @import url(<?= $style ?>?_dc=<?= \Pimcore\Version::$revision ?>);
+    @import url(<?= $style ?>?_dc=<?= \Pimcore\Version::$revision ?>);
     <?php } ?>
 </style>
 
@@ -250,6 +251,7 @@ $scripts = array(
     "pimcore/settings/properties/predefined.js",
     "pimcore/settings/docTypes.js",
     "pimcore/settings/system.js",
+    "pimcore/settings/web2print.js",
     "pimcore/settings/website.js",
     "pimcore/settings/staticroutes.js",
     "pimcore/settings/update.js",
@@ -304,6 +306,7 @@ $scripts = array(
     "pimcore/document/page_snippet.js",
     "pimcore/document/edit.js",
     "pimcore/document/versions.js",
+    "pimcore/document/settings_abstract.js",
     "pimcore/document/pages/settings.js",
     "pimcore/document/pages/preview.js",
     "pimcore/document/snippets/settings.js",
@@ -315,6 +318,10 @@ $scripts = array(
     "pimcore/document/snippet.js",
     "pimcore/document/email.js",
     "pimcore/document/page.js",
+    "pimcore/document/printpages/pdf_preview.js",
+    "pimcore/document/printabstract.js",
+    "pimcore/document/printpage.js",
+    "pimcore/document/printcontainer.js",
     "pimcore/document/seopanel.js",
     "pimcore/document/customviews/tree.js",
 
@@ -528,7 +535,6 @@ $scripts = array(
     "pimcore/object/keyvalue/translatorConfigWindow.js",
 
     // classification store
-    "pimcore/object/classificationstore/configPanel.js",
     "pimcore/object/classificationstore/groupsPanel.js",
     "pimcore/object/classificationstore/propertiesPanel.js",
     "pimcore/object/classificationstore/collectionsPanel.js",

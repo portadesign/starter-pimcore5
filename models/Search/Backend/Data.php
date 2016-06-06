@@ -334,7 +334,7 @@ class Data extends \Pimcore\Model\AbstractModel
         $this->data = null;
 
         $this->id = new Data\Id($element);
-        $this->fullPath = $element->getFullPath();
+        $this->fullPath = $element->getRealFullPath();
         $this->creationDate=$element->getCreationDate();
         $this->modificationDate=$element->getModificationDate();
         $this->userModification = $element->getUserModification();
@@ -382,7 +382,7 @@ class Data extends \Pimcore\Model\AbstractModel
                 }
                 if ($element instanceof Document\Page) {
                     $this->published = $element->isPublished();
-                    $this->data .= " ".$element->getTitle()." ".$element->getDescription()." ".$element->getKeywords() . " " . $element->getPrettyUrl();
+                    $this->data .= " ".$element->getTitle()." ".$element->getDescription()." " . $element->getPrettyUrl();
                 }
             }
         } elseif ($element instanceof Asset) {

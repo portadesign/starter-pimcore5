@@ -357,6 +357,21 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
                 handler: this.remove.bind(this)
             });
 
+            this.toolbarButtons.rename = new Ext.Button({
+                tooltip: t('rename'),
+                iconCls: "pimcore_icon_key pimcore_icon_overlay_go",
+                scale: "medium",
+                handler: function () {
+                    var options = {
+                        elementType: "object",
+                        elementSubType: this.data.general.o_type,
+                        id: this.id,
+                        default: this.data.general.o_key
+                    }
+                    pimcore.elementservice.editElementKey(options);
+                }.bind(this)
+            });
+
             if (this.isAllowed("save")) {
                 buttons.push(this.toolbarButtons.save);
             }
@@ -371,6 +386,9 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
 
             if(this.isAllowed("delete") && !this.data.general.o_locked) {
                 buttons.push(this.toolbarButtons.remove);
+            }
+            if(this.isAllowed("rename") && !this.data.general.o_locked) {
+                buttons.push(this.toolbarButtons.rename);
             }
 
             var reloadConfig = {
@@ -435,7 +453,7 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
             this.newerVersionNotification = new Ext.Toolbar.TextItem({
                 xtype: 'tbtext',
                 text: '&nbsp;&nbsp;<img src="/pimcore/static6/img/flat-color-icons/medium_priority.svg" style="height: 16px;" align="absbottom" />&nbsp;&nbsp;'
-                + t("this_is_a_newer_not_published_version"),
+                    + t("this_is_a_newer_not_published_version"),
                 scale: "medium",
                 hidden: true
             });
@@ -627,51 +645,51 @@ pimcore.object.object = Class.create(pimcore.object.abstract, {
                 }
             }
 
-            pimcore.plugin.broker.fireEvent("preSaveObject", this.id);
+            pimcore.plugin.broker.fireEvent("preSaveObject", this);
 
             Ext.Ajax.request({
                 url: '/admin/object/save/task/' + task,
                 method: "post",
                 params: saveData,
                 success: function (response) {
-                    if (task != "session") {
-                        try {
-                            var rdata = Ext.decode(response.responseText);
-                            if (rdata && rdata.success) {
-                                pimcore.helpers.showNotification(t("success"), t("your_object_has_been_saved"),
-                                    "success");
-                                this.resetChanges();
-                                Ext.apply(this.data.general,rdata.general);
+                        if (task != "session") {
+                            try {
+                                var rdata = Ext.decode(response.responseText);
+                                if (rdata && rdata.success) {
+                                    pimcore.helpers.showNotification(t("success"), t("your_object_has_been_saved"),
+                                        "success");
+                                    this.resetChanges();
+                                    Ext.apply(this.data.general,rdata.general);
 
-                                pimcore.helpers.updateObjectQTip(this.id, rdata.treeData);
-                                pimcore.plugin.broker.fireEvent("postSaveObject", this.id);
+                                    pimcore.helpers.updateObjectStyle(this.id, rdata.treeData);
+                                    pimcore.plugin.broker.fireEvent("postSaveObject", this);
+                                }
+                                else {
+                                    pimcore.helpers.showPrettyError(rdata.type, t("error"), t("error_saving_object"),
+                                        rdata.message, rdata.stack, rdata.code);
+                                }
+                            } catch (e) {
+                                pimcore.helpers.showNotification(t("error"), t("error_saving_object"), "error");
                             }
-                            else {
-                                pimcore.helpers.showPrettyError(rdata.type, t("error"), t("error_saving_object"),
-                                    rdata.message, rdata.stack, rdata.code);
-                            }
-                        } catch (e) {
-                            pimcore.helpers.showNotification(t("error"), t("error_saving_object"), "error");
-                        }
-                        // reload versions
-                        if (this.isAllowed("versions")) {
-                            if (typeof this.versions.reload == "function") {
-                                try {
-                                    //TODO remove this as soon as it works
-                                    this.versions.reload();
-                                } catch (e) {
-                                    console.log(e);
+                            // reload versions
+                            if (this.isAllowed("versions")) {
+                                if (typeof this.versions.reload == "function") {
+                                    try {
+                                        //TODO remove this as soon as it works
+                                        this.versions.reload();
+                                    } catch (e) {
+                                        console.log(e);
+                                    }
                                 }
                             }
                         }
-                    }
 
 
                     this.tab.unmask();
 
-                    if (typeof callback == "function") {
-                        callback();
-                    }
+                        if (typeof callback == "function") {
+                            callback();
+                        }
 
                 }.bind(this),
                 failure: function (response) {

@@ -114,7 +114,7 @@ abstract class Data
     /**
      * @var array
      */
-    public static $validFilterOperators = array(
+    public static $validFilterOperators = [
         "LIKE",
         "NOT LIKE",
         "=",
@@ -125,7 +125,7 @@ abstract class Data
         ">",
         ">=",
         "<="
-    );
+    ];
 
     /**
      * Returns the the data that should be stored in the resource
@@ -162,7 +162,7 @@ abstract class Data
      * @param mixed $params
      * @return mixed
      */
-    abstract public function getDataForEditmode($data, $object = null, $params = array());
+    abstract public function getDataForEditmode($data, $object = null, $params = []);
 
     /**
      * Converts data from editmode to internal eg. Image-Id to Asset\Image object
@@ -172,7 +172,7 @@ abstract class Data
      * @param mixed $params
      * @return mixed
      */
-    abstract public function getDataFromEditmode($data, $object = null, $params = array());
+    abstract public function getDataFromEditmode($data, $object = null, $params = []);
 
     /**
      * Checks if data is valid for current data field
@@ -208,7 +208,7 @@ abstract class Data
      * @param array $params
      * @return string
      */
-    public function getForCsvExport($object, $params = array())
+    public function getForCsvExport($object, $params = [])
     {
         return $this->getDataFromObjectParam($object, $params);
     }
@@ -219,7 +219,7 @@ abstract class Data
      * @param mixed $params
      * @return mixed
      */
-    public function getFromCsvImport($importValue, $object = null, $params = array())
+    public function getFromCsvImport($importValue, $object = null, $params = [])
     {
         return $importValue;
     }
@@ -229,7 +229,7 @@ abstract class Data
      * @param mixed $params
      * @return string
      */
-    public function getDataForSearchIndex($object, $params = array())
+    public function getDataForSearchIndex($object, $params = [])
     {
         // this is the default, but csv doesn't work for all data types
         return $this->getForCsvExport($object, $params);
@@ -241,7 +241,7 @@ abstract class Data
      * @param mixed $params
      * @return mixed
      */
-    public function getForWebserviceExport($object, $params = array())
+    public function getForWebserviceExport($object, $params = [])
     {
         return $this->getDataFromObjectParam($object, $params);
     }
@@ -253,7 +253,7 @@ abstract class Data
      * @param mixed $params
      * @return mixed
      */
-    public function getFromWebserviceImport($value, $object = null, $params = array(), $idMapper = null)
+    public function getFromWebserviceImport($value, $object = null, $params = [], $idMapper = null)
     {
         return $value;
     }
@@ -334,7 +334,7 @@ abstract class Data
      * @param array $data
      * @return void
      */
-    public function setValues($data = array())
+    public function setValues($data = [])
     {
         foreach ($data as $key => $value) {
             $method = "set" . $key;
@@ -589,7 +589,7 @@ abstract class Data
      * @param array $tags
      * @return array
      */
-    public function getCacheTags($data, $tags = array())
+    public function getCacheTags($data, $tags = [])
     {
         return $tags;
     }
@@ -600,7 +600,7 @@ abstract class Data
      */
     public function resolveDependencies($data)
     {
-        return array();
+        return [];
     }
 
     /**
@@ -612,8 +612,8 @@ abstract class Data
      */
     public function getFilterCondition($value, $operator)
     {
-        return $this->getFilterConditionExt($value, $operator, array(
-            "name" => $this->name)
+        return $this->getFilterConditionExt($value, $operator, [
+            "name" => $this->name]
         );
     }
 
@@ -624,7 +624,7 @@ abstract class Data
      * @param  $params optional params used to change the behavior
      * @return string
      */
-    public function getFilterConditionExt($value, $operator, $params = array())
+    public function getFilterConditionExt($value, $operator, $params = [])
     {
         $db = \Pimcore\Db::get();
         $name = $params["name"] ? $params["name"] : $this->name;
@@ -663,7 +663,7 @@ abstract class Data
         $code = "";
 
         $code .= '/**' . "\n";
-        $code .= '* Get ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Get ' . str_replace(["/**", "*/", "//"], "", $this->getName()) . " - " . str_replace(["/**", "*/", "//"], "", $this->getTitle()) . "\n";
         $code .= '* @return ' . $this->getPhpdocType() . "\n";
         $code .= '*/' . "\n";
         $code .= "public function get" . ucfirst($key) . " () {\n";
@@ -704,7 +704,7 @@ abstract class Data
         $code = "";
 
         $code .= '/**' . "\n";
-        $code .= '* Set ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Set ' . str_replace(["/**", "*/", "//"], "", $this->getName()) . " - " . str_replace(["/**", "*/", "//"], "", $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocType() . ' $' . $key . "\n";
         $code .= "* @return \\Pimcore\\Model\\Object\\" . ucfirst($class->getName()) . "\n";
         $code .= '*/' . "\n";
@@ -733,7 +733,7 @@ abstract class Data
         $key = $this->getName();
         $code = "";
         $code .= '/**' . "\n";
-        $code .= '* Set ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Set ' . str_replace(["/**", "*/", "//"], "", $this->getName()) . " - " . str_replace(["/**", "*/", "//"], "", $this->getTitle()) . "\n";
         $code .= '* @return ' . $this->getPhpdocType() . "\n";
         $code .= '*/' . "\n";
         $code .= "public function get" . ucfirst($key) . " () {\n";
@@ -766,7 +766,7 @@ abstract class Data
 
         $code = "";
         $code .= '/**' . "\n";
-        $code .= '* Set ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Set ' . str_replace(["/**", "*/", "//"], "", $this->getName()) . " - " . str_replace(["/**", "*/", "//"], "", $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocType() . ' $' . $key . "\n";
         $code .= "* @return \\Pimcore\\Model\\Object\\" . ucfirst($brickClass->getKey()) . "\n";
         $code .= '*/' . "\n";
@@ -796,7 +796,7 @@ abstract class Data
 
         $code = "";
         $code .= '/**' . "\n";
-        $code .= '* Get ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Get ' . str_replace(["/**", "*/", "//"], "", $this->getName()) . " - " . str_replace(["/**", "*/", "//"], "", $this->getTitle()) . "\n";
         $code .= '* @return ' . $this->getPhpdocType() . "\n";
         $code .= '*/' . "\n";
         $code .= "public function get" . ucfirst($key) . " () {\n";
@@ -826,7 +826,7 @@ abstract class Data
         $code = "";
 
         $code .= '/**' . "\n";
-        $code .= '* Set ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Set ' . str_replace(["/**", "*/", "//"], "", $this->getName()) . " - " . str_replace(["/**", "*/", "//"], "", $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocType() . ' $' . $key . "\n";
         $code .= "* @return \\Pimcore\\Model\\Object\\" . ucfirst($fieldcollectionDefinition->getKey()) . "\n";
         $code .= '*/' . "\n";
@@ -854,7 +854,7 @@ abstract class Data
     {
         $key = $this->getName();
         $code  = '/**' . "\n";
-        $code .= '* Get ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Get ' . str_replace(["/**", "*/", "//"], "", $this->getName()) . " - " . str_replace(["/**", "*/", "//"], "", $this->getTitle()) . "\n";
         $code .= '* @return ' . $this->getPhpdocType() . "\n";
         $code .= '*/' . "\n";
         $code .= "public function get" . ucfirst($key) . ' ($language = null) {' . "\n";
@@ -892,7 +892,7 @@ abstract class Data
         }
 
         $code  = '/**' . "\n";
-        $code .= '* Set ' . str_replace(array("/**", "*/", "//"), "", $this->getName()) . " - " . str_replace(array("/**", "*/", "//"), "", $this->getTitle()) . "\n";
+        $code .= '* Set ' . str_replace(["/**", "*/", "//"], "", $this->getName()) . " - " . str_replace(["/**", "*/", "//"], "", $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocType() . ' $' . $key . "\n";
         $code .= "* @return \\Pimcore\\Model\\Object\\" . ucfirst($classname) . "\n";
         $code .= '*/' . "\n";
@@ -930,7 +930,7 @@ abstract class Data
      * @param mixed $params
      * @return string
      */
-    public function getVersionPreview($data, $object = null, $params = array())
+    public function getVersionPreview($data, $object = null, $params = [])
     {
         return "no preview";
     }
@@ -952,7 +952,7 @@ abstract class Data
      * @param mixed $params
      * @return bool
      */
-    public function isDiffChangeAllowed($object, $params = array())
+    public function isDiffChangeAllowed($object, $params = [])
     {
         return false;
     }
@@ -967,7 +967,7 @@ abstract class Data
      * @param mixed $params
      * @return mixed
      */
-    public function getDiffDataFromEditmode($data, $object = null, $params = array())
+    public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
         $thedata = $this->getDataFromEditmode($data[0]["data"], $object, $params);
         return $thedata;
@@ -993,9 +993,9 @@ abstract class Data
      * @param mixed $params
      * @return null|array
      */
-    public function getDiffDataForEditMode($data, $object = null, $params = array())
+    public function getDiffDataForEditMode($data, $object = null, $params = [])
     {
-        $diffdata = array();
+        $diffdata = [];
         $diffdata["data"] = $this->getDataForEditmode($data, $object, $params);
         $diffdata["disabled"] = !($this->isDiffChangeAllowed());
         $diffdata["field"] = $this->getName();
@@ -1011,7 +1011,7 @@ abstract class Data
         $diffdata["title"] = !empty($this->title) ? $this->title : $this->name;
         $diffdata["value"] = $value;
 
-        $result = array();
+        $result = [];
         $result[] = $diffdata;
         return $result;
     }
@@ -1038,10 +1038,9 @@ abstract class Data
      * @param array $params
      * @return mixed
      */
-    protected function getDataFromObjectParam($object, $params = array())
+    protected function getDataFromObjectParam($object, $params = [])
     {
         $data = null;
-        $resolved = false;
 
         $context = $params && $params["context"] ? $params["context"] : null;
 
@@ -1069,7 +1068,7 @@ abstract class Data
                                         $data = $data->getLocalizedValue($this->getName(), $params["language"], true);
                                     }
 
-                                    $resolved = true;
+                                    return $data;
                                 } else {
                                     throw new \Exception("object seems to be modified, item with orginal index " . $originalndex . " not found, new index: " . $index);
                                 }
@@ -1077,6 +1076,7 @@ abstract class Data
                         }
                     } elseif ($object instanceof Object\Localizedfield) {
                         $data = $object->getLocalizedValue($this->getName(), $params["language"], true);
+                        return $data;
                     }
                 }
             } elseif ($context["containerType"] == "classificationstore") {
@@ -1095,15 +1095,14 @@ abstract class Data
             }
         }
 
-        if (!$resolved) {
-            $container = $object;
 
-            $getter = "get" . ucfirst($this->getName());
-            if (method_exists($container, $getter)) { // for Object\Concrete, Object\Fieldcollection\Data\AbstractData, Object\Objectbrick\Data\AbstractData
-                $data = $container->$getter();
-            } elseif ($object instanceof Object\Localizedfield) {
-                $data = $object->getLocalizedValue($this->getName(), $params["language"], true);
-            }
+        $container = $object;
+
+        $getter = "get" . ucfirst($this->getName());
+        if (method_exists($container, $getter)) { // for Object\Concrete, Object\Fieldcollection\Data\AbstractData, Object\Objectbrick\Data\AbstractData
+            $data = $container->$getter();
+        } elseif ($object instanceof Object\Localizedfield) {
+            $data = $object->getLocalizedValue($this->getName(), $params["language"], true);
         }
 
         return $data;
@@ -1123,7 +1122,7 @@ abstract class Data
     public function adoptMasterDefinition(Object\ClassDefinition\Data $masterDefinition)
     {
         $vars = get_object_vars($this);
-        $protectedFields = array("noteditable", "invisible");
+        $protectedFields = ["noteditable", "invisible"];
         foreach ($vars as $name => $value) {
             if (!in_array($name, $protectedFields)) {
                 unset($this->$name);
@@ -1142,9 +1141,9 @@ abstract class Data
      * @param mixed $params
      * @return mixed
      */
-    public function marshal($value, $object = null, $params = array())
+    public function marshal($value, $object = null, $params = [])
     {
-        return array("value" => $value);
+        return ["value" => $value];
     }
 
     /** See marshal
@@ -1152,7 +1151,7 @@ abstract class Data
      * @param Model\Object\AbstractObject $object
      * @return mixed
      */
-    public function unmarshal($data, $object = null, $params = array())
+    public function unmarshal($data, $object = null, $params = [])
     {
         if (is_array($data)) {
             return $data["value"];

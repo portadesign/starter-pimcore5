@@ -51,7 +51,7 @@ class Service extends Model\Element\Service
      * @param bool $useLayout
      * @return string
      */
-    public static function render(Document $document, $params = array(), $useLayout = false)
+    public static function render(Document $document, $params = [], $useLayout = false)
     {
         $layout = null;
         $existingActionHelper = null;
@@ -60,7 +60,7 @@ class Service extends Model\Element\Service
             $existingActionHelper = \Zend_Controller_Action_HelperBroker::getExistingHelper("layout");
         }
         $layoutInCurrentAction = (\Zend_Layout::getMvcInstance() instanceof \Zend_Layout) ? \Zend_Layout::getMvcInstance()->getLayout() : false;
-        
+
         $viewHelper = \Zend_Controller_Action_HelperBroker::getExistingHelper("ViewRenderer");
         if ($viewHelper) {
             if ($viewHelper->view === null) {
@@ -203,7 +203,7 @@ class Service extends Model\Element\Service
 
         // avoid recursion
         if (!$this->_copyRecursiveIds) {
-            $this->_copyRecursiveIds = array();
+            $this->_copyRecursiveIds = [];
         }
         if (in_array($source->getId(), $this->_copyRecursiveIds)) {
             return;
@@ -281,7 +281,7 @@ class Service extends Model\Element\Service
         }
 
         if ($enableInheritance && ($new instanceof Document\PageSnippet)) {
-            $new->setElements(array());
+            $new->setElements([]);
             $new->setContentMasterDocumentId($source->getId());
         }
 
@@ -316,7 +316,6 @@ class Service extends Model\Element\Service
             if ($source instanceof Document\Page) {
                 $target->setTitle($source->getTitle());
                 $target->setDescription($source->getDescription());
-                $target->setKeywords($source->getKeywords());
             }
         } elseif ($source instanceof Document\Link) {
             $target->setInternalType($source->getInternalType());
@@ -350,11 +349,9 @@ class Service extends Model\Element\Service
         if ($document instanceof Document\Page) {
             $data["title"] = $document->getTitle();
             $data["description"] = $document->getDescription();
-            $data["keywords"] = $document->getKeywords();
         } else {
             $data["title"] = "";
             $data["description"] = "";
-            $data["keywords"] = "";
             $data["name"] = "";
         }
 
@@ -426,14 +423,14 @@ class Service extends Model\Element\Service
      * @param $rewriteConfig
      * @return Document
      */
-    public static function rewriteIds($document, $rewriteConfig, $params = array())
+    public static function rewriteIds($document, $rewriteConfig, $params = [])
     {
 
         // rewriting elements only for snippets and pages
         if ($document instanceof Document\PageSnippet) {
             if (array_key_exists("enableInheritance", $params) && $params["enableInheritance"]) {
                 $elements = $document->getElements();
-                $changedElements = array();
+                $changedElements = [];
                 $contentMaster = $document->getContentMasterDocument();
                 if ($contentMaster instanceof Document\PageSnippet) {
                     $contentMasterElements = $contentMaster->getElements();
@@ -528,9 +525,9 @@ class Service extends Model\Element\Service
         }
 
         if (!$item->getId()) {
-            $list->setCondition('parentId = ? AND `key` = ? ', array($parent->getId(), $key));
+            $list->setCondition('parentId = ? AND `key` = ? ', [$parent->getId(), $key]);
         } else {
-            $list->setCondition('parentId = ? AND `key` = ? AND id != ? ', array($parent->getId(), $key, $item->getId()));
+            $list->setCondition('parentId = ? AND `key` = ? AND id != ? ', [$parent->getId(), $key, $item->getId()]);
         }
         $check = $list->loadIdList();
         if (!empty($check)) {

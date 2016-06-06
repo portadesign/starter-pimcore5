@@ -38,7 +38,7 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
         this.drillDownStores = [];
 
         var storeFields = [];
-        var gridColums = [];
+        var gridColumns = [];
         var colConfig;
         var gridColConfig = {};
         var filters = [];
@@ -47,7 +47,7 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
         this.gridfilters = {};
 
         for(var f=0; f<data.columnConfiguration.length; f++) {
-            colConfig = data.columnConfiguration[f];
+            var colConfig = data.columnConfiguration[f];
             storeFields.push(colConfig["name"]);
 
             this.columnLabels[colConfig["name"]] = colConfig["label"] ? ts(colConfig["label"]) : ts(colConfig["name"]);
@@ -74,7 +74,34 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
             }
 
             if(colConfig["filter_drilldown"] != 'only_filter') {
-                gridColums.push(gridColConfig);
+                gridColumns.push(gridColConfig);
+            }
+
+            if (colConfig["columnAction"]) {
+                gridColumns.push({
+                        header: t("open"),
+                        xtype: 'actioncolumn',
+                        width: 40,
+                        items: [
+                        {
+                            tooltip: t("open") + " " + (colConfig["label"] ? ts(colConfig["label"]) : ts(colConfig["name"])),
+                            icon: "/pimcore/static6/img/flat-color-icons/cursor.svg",
+                            handler: function (colConfig, grid, rowIndex) {
+                                var data = grid.getStore().getAt(rowIndex).getData();
+                                var columnName = colConfig["name"];
+                                var id = data[columnName];
+                                var action = colConfig["columnAction"]
+                                if (action == "openDocument") {
+                                    pimcore.helpers.openElement(id, "document");
+                                } else if (action == "openAsset") {
+                                    pimcore.helpers.openElement(id, "asset");
+                                } else if (action == "openObject") {
+                                    pimcore.helpers.openElement(id, "object");
+                                }
+                            }.bind(this, colConfig)
+                        }
+                    ]
+                });
             }
 
         }
@@ -155,7 +182,7 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
             region: "center",
             store: this.store,
             bbar: this.pagingtoolbar,
-            columns: gridColums,
+            columns: gridColumns,
             columnLines: true,
             plugins: ['gridfilters'],
             stripeRows: true,
@@ -321,7 +348,10 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
                 chartFields.push(data.pieLabelColumn);
             };
             if (data.pieColumn) {
-                chartFields.push(data.pieColumn);
+                chartFields.push({
+                    name: data.pieColumn,
+                    type: "int"
+                });
             }
 
             this.chartStore = pimcore.helpers.grid.buildDefaultStore(
@@ -350,8 +380,14 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
                     tooltip: {
                         trackMouse: true,
                         renderer: function (tooltip, record, item) {
-                            tooltip.setHtml(record.get(data.pieLabelColumn) + ': ' + record.get(data.pieColumn) + '%');
-                        }
+                            var count = this.chartStore.getCount();
+                            var value = record.get(data.pieColumn);
+
+
+                            var sum = this.chartStore.sum(data.pieColumn);
+                            var percentage = sum > 0 ? " (" + Math.round((value * 100 / sum)) + ' %)' : "";
+                            tooltip.setHtml(record.get(data.pieLabelColumn) + ': ' + value + percentage);
+                        }.bind(this)
                     }
                 }]
             });

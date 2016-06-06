@@ -23,16 +23,16 @@ class Dao extends Model\Listing\Dao\AbstractDao
 {
 
     /**
-     * Loads a list of Classificationstore group configs for the specifies parameters, returns an array of config elements
+     * Loads a list of Classificationstore group configs for the specified parameters, returns an array of config elements
      *
      * @return array
      */
     public function load()
     {
         $sql = "SELECT id FROM " . Object\Classificationstore\GroupConfig\Dao::TABLE_NAME_GROUPS . $this->getCondition() . $this->getOrder() . $this->getOffsetLimit();
-        $configsData = $this->db->fetchCol($sql,  $this->model->getConditionVariables());
+        $configsData = $this->db->fetchCol($sql, $this->model->getConditionVariables());
 
-        $configData = array();
+        $configData = [];
         foreach ($configsData as $config) {
             $configData[] = Object\Classificationstore\GroupConfig::getById($config);
         }

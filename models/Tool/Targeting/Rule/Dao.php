@@ -36,7 +36,8 @@ class Dao extends Model\Dao\AbstractDao
 
         if ($data["id"]) {
             $data["conditions"] = Serialize::unserialize($data["conditions"]);
-            $data["actions"] = Serialize::unserialize($data["actions"]);
+            $data["actions"] = (isset($data["actions"]) ? Serialize::unserialize($data["actions"]) : []);
+
             $this->assignVariablesToModel($data);
         } else {
             throw new \Exception("target with id " . $this->model->getId() . " doesn't exist");
@@ -118,7 +119,7 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function create()
     {
-        $this->db->insert("targeting_rules", array());
+        $this->db->insert("targeting_rules", []);
 
         $this->model->setId($this->db->lastInsertId());
 

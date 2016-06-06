@@ -22,12 +22,12 @@ class Dao extends Model\Listing\Dao\AbstractDao
 {
 
     /**
-     * Loads a list of users for the specifies parameters, returns an array of User elements
+     * Loads a list of users for the specified parameters, returns an array of User elements
      * @return array
      */
     public function load()
     {
-        $items = array();
+        $items = [];
         $usersData = $this->db->fetchAll("SELECT id,type FROM users" . $this->getCondition() . $this->getOrder() . $this->getOffsetLimit(), $this->model->getConditionVariables());
 
         foreach ($usersData as $userData) {
@@ -54,7 +54,7 @@ class Dao extends Model\Listing\Dao\AbstractDao
             $condition = " WHERE ";
         }
 
-        $types = array($this->model->getType(), $this->model->getType() . "folder");
+        $types = [$this->model->getType(), $this->model->getType() . "folder"];
         $condition .= "id > 0 AND `type` IN ('" . implode("','", $types) . "')";
 
         return $condition;

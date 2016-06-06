@@ -27,7 +27,7 @@ class Thumbnail
     /**
      * @var mixed|string
      */
-    protected $path;
+    protected $filesystemPath;
 
     /**
      * @var int
@@ -88,21 +88,56 @@ class Thumbnail
 
     /**
      * @param bool $deferredAllowed
+     * @return mixed|string
+     */
+    public function getPath($deferredAllowed = true)
+    {
+        $fsPath = $this->getFileSystemPath($deferredAllowed);
+        $path = str_replace(PIMCORE_DOCUMENT_ROOT, "", $fsPath);
+
+        $results = \Pimcore::getEventManager()->trigger("frontend.path.asset.image.thumbnail", $this, [
+            "filesystemPath" => $fsPath,
+            "frontendPath" => $path
+        ]);
+
+        if ($results->count()) {
+            $path = $results->last();
+        }
+
+        return $path;
+    }
+
+    /**
+     * @param bool $deferredAllowed
+     * @return mixed|string
+     */
+    public function getFileSystemPath($deferredAllowed = false)
+    {
+        $this->generate($deferredAllowed);
+        return $this->filesystemPath;
+    }
+
+    /**
+     * @param bool $deferredAllowed
      */
     public function generate($deferredAllowed = true)
     {
-        if (!$this->path) {
+        $errorImage = PIMCORE_PATH . '/static6/img/filetype-not-supported.png';
+
+        if (!$this->asset) {
+            $this->filesystemPath = $errorImage;
+        } elseif (!$this->filesystemPath) {
             // if no correct thumbnail config is given use the original image as thumbnail
             if (!$this->config) {
                 $fsPath = $this->asset->getFileSystemPath();
-                $this->path = str_replace(PIMCORE_DOCUMENT_ROOT, "", $fsPath);
+                $this->filesystemPath = str_replace(PIMCORE_DOCUMENT_ROOT, "", $fsPath);
             } else {
                 try {
                     $deferred = ($deferredAllowed && $this->deferred) ? true : false;
-                    $this->path = Thumbnail\Processor::process($this->asset, $this->config, null, $deferred);
+                    $this->filesystemPath = Thumbnail\Processor::process($this->asset, $this->config, null, $deferred, true);
                 } catch (\Exception $e) {
-                    $this->path = '/pimcore/static/img/filetype-not-supported.png';
-                    \Logger::error("Couldn't create thumbnail of image " . $this->asset->getFullPath());
+                    $this->filesystemPath = $errorImage;
+                    \Logger::error("Couldn't create thumbnail of image " . $this->asset->getRealFullPath());
                     \Logger::error($e);
                 }
             }
@@ -114,7 +149,7 @@ class Thumbnail
      */
     public function reset()
     {
-        $this->path = null;
+        $this->filesystemPath = null;
         $this->width = null;
         $this->height = null;
         $this->realHeight = null;
@@ -130,16 +165,6 @@ class Thumbnail
     public function __toString()
     {
         return $this->getPath(true);
-    }
-
-    /**
-     * @param bool $deferredAllowed
-     * @return mixed|string
-     */
-    public function getPath($deferredAllowed = true)
-    {
-        $this->generate($deferredAllowed);
-        return $this->path;
     }
 
     /**
@@ -286,10 +311,10 @@ class Thumbnail
     * @param array $removeAttributes Listof key-value pairs of HTML attributes that should be removed
     * @return string IMG-element with at least the attributes src, width, height, alt.
     */
-    public function getHTML($attributes = array(), $removeAttributes = [])
+    public function getHTML($attributes = [], $removeAttributes = [])
     {
         $image = $this->getAsset();
-        $attr = array();
+        $attr = [];
         $pictureAttribs = []; // this is used for the html5 <picture> element
 
         // re-add support for disableWidthHeightAttributes
@@ -514,14 +539,6 @@ class Thumbnail
         }
 
         return null;
-    }
-
-    /**
-     * @return string
-     */
-    public function getFileSystemPath()
-    {
-        return PIMCORE_DOCUMENT_ROOT . $this->getPath(false);
     }
 
     /**

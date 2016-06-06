@@ -100,7 +100,7 @@ class Service extends Model\AbstractModel
      */
     public static function getIdList($list, $idGetter = 'getId')
     {
-        $ids = array();
+        $ids = [];
         if (is_array($list)) {
             foreach ($list as $entry) {
                 if (is_object($entry) && method_exists($entry, $idGetter)) {
@@ -125,7 +125,7 @@ class Service extends Model\AbstractModel
     public static function getRequiredByDependenciesForFrontend(Dependency $d)
     {
         $dependencies["hasHidden"] = false;
-        $dependencies["requiredBy"] = array();
+        $dependencies["requiredBy"] = [];
 
         // requiredBy
         foreach ($d->getRequiredBy() as $r) {
@@ -147,7 +147,7 @@ class Service extends Model\AbstractModel
     public static function getRequiresDependenciesForFrontend(Dependency $d)
     {
         $dependencies["hasHidden"] = false;
-        $dependencies["requires"] = array();
+        $dependencies["requires"] = [];
 
         // requires
         foreach ($d->getRequires() as $r) {
@@ -170,12 +170,12 @@ class Service extends Model\AbstractModel
     public static function getDependencyForFrontend($element)
     {
         if ($element instanceof ElementInterface) {
-            return array(
+            return [
                 "id" => $element->getId(),
-                "path" => $element->getFullPath(),
+                "path" => $element->getRealFullPath(),
                 "type" => self::getElementType($element),
                 "subtype" => $element->getType()
-            );
+            ];
         }
     }
 
@@ -245,7 +245,7 @@ class Service extends Model\AbstractModel
      */
     public static function getSaveCopyName($type, $sourceKey, $target)
     {
-        if (self::pathExists($target->getFullPath() . "/" . $sourceKey, $type)) {
+        if (self::pathExists($target->getRealFullPath() . "/" . $sourceKey, $type)) {
             // only for assets: add the prefix _copy before the file extension (if exist) not after to that source.jpg will be source_copy.jpg and not source.jpg_copy
             if ($type == "asset" && $fileExtension = File::getFileExtension($sourceKey)) {
                 $sourceKey = str_replace("." . $fileExtension, "_copy." . $fileExtension, $sourceKey);
@@ -403,11 +403,11 @@ class Service extends Model\AbstractModel
      */
     public static function minimizePropertiesForEditmode($props)
     {
-        $properties = array();
+        $properties = [];
         foreach ($props as $key => $p) {
 
             //$p = object2array($p);
-            $allowedProperties = array(
+            $allowedProperties = [
                 "key",
                 "o_key",
                 "filename",
@@ -417,10 +417,10 @@ class Service extends Model\AbstractModel
                 "o_id",
                 "o_type",
                 "type"
-            );
+            ];
 
             if ($p->getData() instanceof Document || $p->getData() instanceof Asset || $p->getData() instanceof Object\AbstractObject) {
-                $pa = array();
+                $pa = [];
 
                 $vars = get_object_vars($p->getData());
 
@@ -468,10 +468,10 @@ class Service extends Model\AbstractModel
                 }
             }
             if (!$found) {
-                $target->setChilds(array_merge($target->getChilds(), array($new)));
+                $target->setChilds(array_merge($target->getChilds(), [$new]));
             }
         } else {
-            $target->setChilds(array($new));
+            $target->setChilds([$new]);
         }
     }
 
@@ -481,15 +481,15 @@ class Service extends Model\AbstractModel
      */
     public static function gridElementData(ElementInterface $element)
     {
-        $data = array(
+        $data = [
             "id" => $element->getId(),
-            "fullpath" => $element->getFullPath(),
+            "fullpath" => $element->getRealFullPath(),
             "type" => self::getType($element),
             "subtype" => $element->getType(),
             "filename" => self::getFilename($element),
             "creationDate" => $element->getCreationDate(),
             "modificationDate" => $element->getModificationDate()
-        );
+        ];
 
         if (method_exists($element, "isPublished")) {
             $data["published"] = $element->isPublished();
@@ -521,7 +521,7 @@ class Service extends Model\AbstractModel
     public static function findForbiddenPaths($type, $user)
     {
         if ($user->isAdmin()) {
-            return array();
+            return [];
         }
 
         // get workspaces
@@ -531,7 +531,7 @@ class Service extends Model\AbstractModel
             $workspaces = array_merge($workspaces, $role->{"getWorkspaces".ucfirst($type)}());
         }
 
-        $forbidden = array();
+        $forbidden = [];
         if (count($workspaces) > 0) {
             foreach ($workspaces as $workspace) {
                 if (!$workspace->getList()) {
@@ -576,7 +576,7 @@ class Service extends Model\AbstractModel
                         }
 
                         if (!Object\AbstractObject::doNotRestoreKeyAndPath()) {
-                            $data->setPath($originalElement->getPath());
+                            $data->setPath($originalElement->getRealPath());
                         }
                     }
                 }
@@ -651,7 +651,7 @@ class Service extends Model\AbstractModel
      * @return null
      * @throws \Exception
      */
-    public static function createFolderByPath($path, $options = array())
+    public static function createFolderByPath($path, $options = [])
     {
         $calledClass = get_called_class();
         if ($calledClass == __CLASS__) {
@@ -663,7 +663,7 @@ class Service extends Model\AbstractModel
         $folderType = $type . '\Folder';
 
         $lastFolder = null;
-        $pathsArray = array();
+        $pathsArray = [];
         $parts = explode('/', $path);
         $parts = array_filter($parts, "\\Pimcore\\Model\\Element\\Service::filterNullValues");
 
@@ -781,5 +781,29 @@ class Service extends Model\AbstractModel
         } elseif ($element instanceof Asset) {
             return Asset\Service::getUniqueKey($element);
         }
+    }
+
+    public static function fixAllowedTypes($data, $type)
+    {
+        // this is the new method with Ext.form.MultiSelect
+        if ((is_string($data) && !empty($data)) || (\Pimcore\Tool\Admin::isExtJS6() && is_array($data) && count($data))) {
+            if (!\Pimcore\Tool\Admin::isExtJS6()) {
+                $parts = explode(",", $data);
+                $data = [];
+                foreach ($parts as $elementType) {
+                    $data[] = [$type => $elementType];
+                }
+            } else {
+                $first = reset($data);
+                if (!is_array($first)) {
+                    $parts = $data;
+                    $data = [];
+                    foreach ($parts as $elementType) {
+                        $data[] = [$type => $elementType];
+                    }
+                }
+            }
+        }
+        return $data ? $data : [];
     }
 }

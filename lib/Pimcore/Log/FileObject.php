@@ -14,9 +14,10 @@
 
 namespace Pimcore\Log;
 
+use Pimcore\File;
+
 class FileObject
 {
-
     protected $filename;
     protected $data;
 
@@ -27,7 +28,7 @@ class FileObject
     public function __construct($data, $filename=null)
     {
         if (!is_dir(PIMCORE_LOG_FILEOBJECT_DIRECTORY)) {
-            mkdir(PIMCORE_LOG_FILEOBJECT_DIRECTORY, 0755, true);
+            File::mkdir(PIMCORE_LOG_FILEOBJECT_DIRECTORY);
         }
 
         $this->data = $data;
@@ -42,7 +43,7 @@ class FileObject
             $this->filename = $folderpath."/".uniqid("fileobject_", true);
         }
 
-        file_put_contents($this->filename, $this->data);
+        File::put($this->filename, $this->data);
     }
 
     /**

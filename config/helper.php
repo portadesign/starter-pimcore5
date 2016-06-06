@@ -222,7 +222,7 @@ function return_bytes($val)
  */
 function formatBytes($bytes, $precision = 2)
 {
-    $units = array('B', 'KB', 'MB', 'GB', 'TB');
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
 
     $bytes = max($bytes, 0);
     $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
@@ -242,13 +242,13 @@ function filesize2bytes($str)
 {
     $bytes = 0;
 
-    $bytes_array = array(
+    $bytes_array = [
         'K' => 1024,
         'M' => 1024 * 1024,
         'G' => 1024 * 1024 * 1024,
         'T' => 1024 * 1024 * 1024 * 1024,
         'P' => 1024 * 1024 * 1024 * 1024 * 1024,
-    );
+    ];
 
     $bytes = floatval($str);
 
@@ -266,13 +266,13 @@ function filesize2bytes($str)
  * @param array $data
  * @return array
  */
-function rscandir($base = '', &$data = array())
+function rscandir($base = '', &$data = [])
 {
     if (substr($base, -1, 1) != DIRECTORY_SEPARATOR) { //add trailing slash if it doesn't exists
         $base .= DIRECTORY_SEPARATOR;
     }
 
-    $array = array_diff(scandir($base), array('.', '..', '.svn'));
+    $array = array_diff(scandir($base), ['.', '..', '.svn']);
     foreach ($array as $value) {
         if (is_dir($base . $value)) {
             $data[] = $base . $value . DIRECTORY_SEPARATOR;
@@ -312,48 +312,81 @@ function explode_and_trim($delimiter, $string = '', $limit = '', $useArrayFilter
 
 
 /**
- * Recursively delete a directory
- *
- * @param string $dir Directory name
- * @param boolean $deleteRootToo Delete specified top-level directory as well
+ * @param $directory
+ * @param bool $empty
+ * @return bool
  */
 function recursiveDelete($directory, $empty = true)
 {
-    if (substr($directory, -1) == "/") {
-        $directory = substr($directory, 0, -1);
-    }
+    if (is_dir($directory)) {
+        $directory = rtrim($directory, "/");
 
-    if (!file_exists($directory) || !is_dir($directory)) {
-        return false;
-    } elseif (!is_readable($directory)) {
-        return false;
-    } else {
-        $directoryHandle = opendir($directory);
-        $contents = ".";
+        if (!file_exists($directory) || !is_dir($directory)) {
+            return false;
+        } elseif (!is_readable($directory)) {
+            return false;
+        } else {
+            $directoryHandle = opendir($directory);
+            $contents = ".";
 
-        while ($contents) {
-            $contents = readdir($directoryHandle);
-            if (strlen($contents) && $contents != '.' && $contents != '..') {
-                $path = $directory . "/" . $contents;
-                
-                if (is_dir($path)) {
-                    recursiveDelete($path);
-                } else {
-                    unlink($path);
+            while ($contents) {
+                $contents = readdir($directoryHandle);
+                if (strlen($contents) && $contents != '.' && $contents != '..') {
+                    $path = $directory . "/" . $contents;
+
+                    if (is_dir($path)) {
+                        recursiveDelete($path);
+                    } else {
+                        unlink($path);
+                    }
                 }
             }
-        }
-        
-        closedir($directoryHandle);
 
-        if ($empty == true) {
-            if (!rmdir($directory)) {
-                return false;
+            closedir($directoryHandle);
+
+            if ($empty == true) {
+                if (!rmdir($directory)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    } elseif (is_file($directory)) {
+        return unlink($directory);
+    }
+}
+
+/**
+ * @param $source
+ * @param $destination
+ * @return bool
+ */
+function recursiveCopy($source, $destination)
+{
+    if (is_dir($source)) {
+        if (!is_dir($destination)) {
+            \Pimcore\File::mkdir($destination);
+        }
+
+        foreach (
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST) as $item) {
+            if ($item->isDir()) {
+                \Pimcore\File::mkdir($destination . DIRECTORY_SEPARATOR . $iterator->getSubPathName());
+            } else {
+                copy($item, $destination . DIRECTORY_SEPARATOR . $iterator->getSubPathName());
             }
         }
-        
-        return true;
+    } elseif (is_file($source)) {
+        if (is_dir(dirname($destination))) {
+            \Pimcore\File::mkdir(dirname($destination));
+        }
+        copy($source, $destination);
     }
+
+    return true;
 }
 
 /**
@@ -410,9 +443,15 @@ function isAssocArray(array $arr)
  */
 function resolvePath($filename)
 {
+    $protocol = "";
+    if (!stream_is_local($filename)) {
+        $protocol = parse_url($filename, PHP_URL_SCHEME) . "://";
+        $filename = str_replace($protocol, "", $filename);
+    }
+
     $filename = str_replace('//', '/', $filename);
     $parts = explode('/', $filename);
-    $out = array();
+    $out = [];
     foreach ($parts as $part) {
         if ($part == '.') {
             continue;
@@ -423,7 +462,10 @@ function resolvePath($filename)
         }
         $out[] = $part;
     }
-    return implode('/', $out);
+
+    $finalPath = $protocol . implode('/', $out);
+
+    return $finalPath;
 }
 
 /**
@@ -441,10 +483,10 @@ function closureHash(Closure $closure)
         $file->next();
     }
 
-    $hash = md5(json_encode(array(
+    $hash = md5(json_encode([
         $content,
         $ref->getStaticVariables()
-    )));
+    ]));
 
     return $hash;
 }

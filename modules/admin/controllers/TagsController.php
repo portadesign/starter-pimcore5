@@ -16,7 +16,6 @@ use Pimcore\Model\Element\Tag;
 
 class Admin_TagsController extends \Pimcore\Controller\Action\Admin
 {
-
     public function addAction()
     {
         $tag = new Pimcore\Model\Element\Tag();
@@ -218,7 +217,7 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
              )";
         }
 
-        $childsList->setCondition($condition, $object->getFullPath() . '/%');
+        $childsList->setCondition($condition, $object->getRealFullPath() . '/%');
 
         return $childsList->loadIdList();
     }
@@ -237,7 +236,7 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
             )";
         }
 
-        $childsList->setCondition($condition, $asset->getFullPath() . '/%');
+        $childsList->setCondition($condition, $asset->getRealFullPath() . '/%');
 
         return $childsList->loadIdList();
     }
@@ -256,7 +255,7 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
             )";
         }
 
-        $childsList->setCondition($condition, $document->getFullPath() . '/%');
+        $childsList->setCondition($condition, $document->getRealFullPath() . '/%');
 
         return $childsList->loadIdList();
     }

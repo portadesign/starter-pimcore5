@@ -222,10 +222,25 @@ pimcore.helpers.closeObject = function (id) {
     }
 };
 
-pimcore.helpers.updateObjectQTip = function (id, treeData) {
+pimcore.helpers.updateObjectStyle = function (id, treeData) {
     if (treeData) {
+
+        var key = "object_" + id;
+        if (pimcore.globalmanager.exists(key)) {
+            var editMask = pimcore.globalmanager.get(key);
+            if (editMask.tab) {
+                if (typeof treeData.icon !== "undefined") {
+                    editMask.tab.setIcon(treeData.icon);
+                }
+
+                if (typeof treeData.iconCls !== "undefined") {
+                    editMask.tab.setIconCls(treeData.iconCls);
+                }
+            }
+        }
+
         var treeNames = pimcore.elementservice.getElementTreeNames("object");
-        var affectedNodes = [];
+
         for (var index = 0; index < treeNames.length; index++) {
             var treeName = treeNames[index];
             var tree = pimcore.globalmanager.get(treeName);
@@ -238,6 +253,13 @@ pimcore.helpers.updateObjectQTip = function (id, treeData) {
             if (record) {
                 record.set("qtitle", treeData.qtipCfg.title);
                 record.set("qtip", treeData.qtipCfg.text);
+                if (typeof treeData.icon !== "undefined") {
+                    record.set("icon", treeData.icon);
+                }
+
+                if (typeof treeData.iconCls !== "undefined") {
+                    record.set("iconCls", treeData.iconCls);
+                }
             }
         }
     }
@@ -502,7 +524,7 @@ pimcore.helpers.showPrettyError = function (type, title, text, errorText, stack,
                             shadow: false,
                             closable: true,
                             buttons: [{
-                                text: "OK",
+                                text: t("OK"),
                                 handler: function () {
                                     detailedWindow.close();
                                 }
@@ -573,7 +595,7 @@ pimcore.helpers.showNotification = function (title, text, type, errorText, hideD
             shadow: false,
             closable: false,
             buttons: [{
-                text: "OK",
+                text: t("OK"),
                 handler: function () {
                     errWin.close();
                 }
@@ -2652,7 +2674,7 @@ pimcore.helpers.saveColumnConfig = function(objectId, classId, configuration, se
             class_id: classId,
             gridconfig: Ext.encode(configuration),
             searchType: searchType
-        }
+        };
 
         Ext.Ajax.request({
             url: '/admin/object-helper/grid-save-column-config',
@@ -2683,7 +2705,7 @@ pimcore.helpers.saveColumnConfig = function(objectId, classId, configuration, se
     } catch (e3) {
         pimcore.helpers.showNotification(t("error"), t("error_saving_configuration"), "error");
     }
-}
+};
 
 pimcore.helpers.openGenericIframeWindow = function (id, src, iconCls, title) {
     try {
@@ -2693,3 +2715,36 @@ pimcore.helpers.openGenericIframeWindow = function (id, src, iconCls, title) {
         pimcore.globalmanager.add(id, new pimcore.tool.genericiframewindow(id, src, iconCls, title));
     }
 };
+
+pimcore.helpers.hideRedundantSeparators = function(menu) {
+    var showSeparator = false;
+
+    for (var i = 0; i < menu.items.length; i++) {
+        var item = menu.items.getAt(i);
+
+        if (item instanceof Ext.menu.Separator) {
+            if (!showSeparator || i == menu.items.length - 1) {
+                item.hide();
+            }
+            showSeparator = false;
+        } else {
+            showSeparator = true;
+        }
+    }
+}
+
+pimcore.helpers.initMenuTooltips = function(){
+    $("[data-menu-tooltip]").mouseenter(function (e) {
+        $("#pimcore_menu_tooltip").show();
+        $("#pimcore_menu_tooltip").html($(this).data("menu-tooltip"));
+
+        var offset = $(e.target).offset();
+        var top = offset.top;
+        top = top + ($(e.target).height() / 2);
+
+        $("#pimcore_menu_tooltip").css({top: top});
+    });
+    $("[data-menu-tooltip]").mouseleave(function () {
+        $("#pimcore_menu_tooltip").hide();
+    });
+}

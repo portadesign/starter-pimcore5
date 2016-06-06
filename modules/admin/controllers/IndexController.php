@@ -18,13 +18,8 @@ use Pimcore\Model;
 
 class Admin_IndexController extends \Pimcore\Controller\Action\Admin
 {
-
     public function indexAction()
     {
-
-        // IE compatibility
-        //$this->getResponse()->setHeader("X-UA-Compatible", "IE=8; IE=9", true);
-
         // clear open edit locks for this session (in the case of a reload, ...)
         \Pimcore\Model\Element\Editlock::clearSession(session_id());
 
@@ -64,7 +59,7 @@ class Admin_IndexController extends \Pimcore\Controller\Action\Admin
         // report configuration
         $this->view->report_config = Config::getReportConfig();
 
-        $cvData = array();
+        $cvData = [];
 
         // still needed when publishing objects
         $cvConfig = Tool::getCustomViewConfig();

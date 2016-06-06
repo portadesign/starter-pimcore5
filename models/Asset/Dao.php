@@ -35,8 +35,8 @@ class Dao extends Model\Element\Dao
             $this->assignVariablesToModel($data);
 
             if ($data["hasMetaData"]) {
-                $metadataRaw = $this->db->fetchAll("SELECT * FROM assets_metadata WHERE cid = ?", array($data["id"]));
-                $metadata = array();
+                $metadataRaw = $this->db->fetchAll("SELECT * FROM assets_metadata WHERE cid = ?", [$data["id"]]);
+                $metadata = [];
                 foreach ($metadataRaw as $md) {
                     unset($md["cid"]);
                     $metadata[] = $md;
@@ -80,11 +80,11 @@ class Dao extends Model\Element\Dao
     public function create()
     {
         try {
-            $this->db->insert("assets", array(
+            $this->db->insert("assets", [
                 "filename" => $this->model->getFilename(),
-                "path" => $this->model->getPath(),
+                "path" => $this->model->getRealPath(),
                 "parentId" => $this->model->getParentId()
-            ));
+            ]);
 
             $date = time();
             $this->model->setId($this->db->lastInsertId());
@@ -139,11 +139,11 @@ class Dao extends Model\Element\Dao
             // tree_locks
             $this->db->delete("tree_locks", "id = " . $this->model->getId() . " AND type = 'asset'");
             if ($this->model->getLocked()) {
-                $this->db->insert("tree_locks", array(
+                $this->db->insert("tree_locks", [
                     "id" => $this->model->getId(),
                     "type" => "asset",
                     "locked" => $this->model->getLocked()
-                ));
+                ]);
             }
         } catch (\Exception $e) {
             throw $e;
@@ -166,9 +166,9 @@ class Dao extends Model\Element\Dao
 
     public function updateWorkspaces()
     {
-        $this->db->update("users_workspaces_asset", array(
-            "cpath" => $this->model->getFullPath()
-        ), "cid = " . $this->model->getId());
+        $this->db->update("users_workspaces_asset", [
+            "cpath" => $this->model->getRealFullPath()
+        ], "cid = " . $this->model->getId());
     }
 
     public function updateChildsPaths($oldPath)
@@ -182,13 +182,13 @@ class Dao extends Model\Element\Dao
         }
 
         //update assets child paths
-        $this->db->query("update assets set path = replace(path," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getFullPath() . "/") . "), modificationDate = '" . time() . "', userModification = '" . $userId . "' where path like " . $this->db->quote($oldPath . "/%") . ";");
+        $this->db->query("update assets set path = replace(path," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getRealFullPath() . "/") . "), modificationDate = '" . time() . "', userModification = '" . $userId . "' where path like " . $this->db->quote($oldPath . "/%") . ";");
 
         //update assets child permission paths
-        $this->db->query("update users_workspaces_asset set cpath = replace(cpath," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getFullPath() . "/") . ") where cpath like " . $this->db->quote($oldPath . "/%") . ";");
+        $this->db->query("update users_workspaces_asset set cpath = replace(cpath," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getRealFullPath() . "/") . ") where cpath like " . $this->db->quote($oldPath . "/%") . ";");
 
         //update assets child properties paths
-        $this->db->query("update properties set cpath = replace(cpath," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getFullPath() . "/") . ") where cpath like " . $this->db->quote($oldPath . "/%") . ";");
+        $this->db->query("update properties set cpath = replace(cpath," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getRealFullPath() . "/") . ") where cpath like " . $this->db->quote($oldPath . "/%") . ";");
 
 
         return $assets;
@@ -201,7 +201,7 @@ class Dao extends Model\Element\Dao
      */
     public function getProperties($onlyInherited = false)
     {
-        $properties = array();
+        $properties = [];
 
         // collect properties via parent - ids
         $parentIds = $this->getParentIds();
@@ -235,7 +235,7 @@ class Dao extends Model\Element\Dao
 
                 $properties[$propertyRaw["name"]] = $property;
             } catch (\Exception $e) {
-                \Logger::error("can't add property " . $propertyRaw["name"] . " to asset " . $this->model->getFullPath());
+                \Logger::error("can't add property " . $propertyRaw["name"] . " to asset " . $this->model->getRealFullPath());
             }
         }
 
@@ -278,7 +278,7 @@ class Dao extends Model\Element\Dao
     {
         $versionIds = $this->db->fetchAll("SELECT id FROM versions WHERE cid = ? AND ctype='asset' ORDER BY `id` DESC", $this->model->getId());
 
-        $versions = array();
+        $versions = [];
         foreach ($versionIds as $versionId) {
             $versions[] = Model\Version::getById($versionId["id"]);
         }
@@ -371,7 +371,7 @@ class Dao extends Model\Element\Dao
     {
 
         // check for an locked element below this element
-        $belowLocks = $this->db->fetchOne("SELECT tree_locks.id FROM tree_locks INNER JOIN assets ON tree_locks.id = assets.id WHERE assets.path LIKE ? AND tree_locks.type = 'asset' AND tree_locks.locked IS NOT NULL AND tree_locks.locked != '' LIMIT 1", $this->model->getFullpath() . "/%");
+        $belowLocks = $this->db->fetchOne("SELECT tree_locks.id FROM tree_locks INNER JOIN assets ON tree_locks.id = assets.id WHERE assets.path LIKE ? AND tree_locks.type = 'asset' AND tree_locks.locked IS NOT NULL AND tree_locks.locked != '' LIMIT 1", $this->model->getRealFullPath() . "/%");
 
         if ($belowLocks > 0) {
             return true;
@@ -393,7 +393,7 @@ class Dao extends Model\Element\Dao
      */
     public function unlockPropagate()
     {
-        $lockIds = $this->db->fetchCol("SELECT id from assets WHERE path LIKE " . $this->db->quote($this->model->getFullPath() . "/%") . " OR id = " . $this->model->getId());
+        $lockIds = $this->db->fetchCol("SELECT id from assets WHERE path LIKE " . $this->db->quote($this->model->getRealFullPath() . "/%") . " OR id = " . $this->model->getId());
         $this->db->delete("tree_locks", "type = 'asset' AND id IN (" . implode(",", $lockIds) . ")");
         return $lockIds;
     }
@@ -420,7 +420,7 @@ class Dao extends Model\Element\Dao
     {
 
         // collect properties via parent - ids
-        $parentIds = array(1);
+        $parentIds = [1];
 
         $obj = $this->model->getParent();
         if ($obj) {
@@ -444,7 +444,7 @@ class Dao extends Model\Element\Dao
             // exception for list permission
             if (empty($permissionsParent) && $type == "list") {
                 // check for childs with permissions
-                $path = $this->model->getFullPath() . "/";
+                $path = $this->model->getRealFullPath() . "/";
                 if ($this->model->getId() == 1) {
                     $path = "/";
                 }

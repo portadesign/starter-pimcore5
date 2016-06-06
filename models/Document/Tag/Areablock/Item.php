@@ -36,11 +36,11 @@ class Item
     protected $index;
 
     /**
-     * @param Model\Document\Page $doc
-     * @param               $name
-     * @param               $index
+     * @param Model\Document\PageSnippet $doc
+     * @param string                     $name
+     * @param int                        $index
      */
-    public function __construct(Model\Document\Page $doc, $name, $index)
+    public function __construct(Model\Document\PageSnippet $doc, $name, $index)
     {
         $this->doc = $doc;
         $this->name = $name;
@@ -57,7 +57,7 @@ class Item
     {
         $id = sprintf('%s%s%d', $name, $this->name, $this->index);
         $element = $this->doc->getElement($id);
-        $element->suffixes = array( $this->name );
+        $element->suffixes = [ $this->name ];
 
         return $element;
     }

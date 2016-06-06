@@ -65,6 +65,11 @@ class Redirect extends AbstractModel
     public $priority = 1;
 
     /**
+     * @var bool
+     */
+    public $active = true;
+
+    /**
      * @var int
      */
     public $expiry;
@@ -83,13 +88,13 @@ class Redirect extends AbstractModel
     /**
      * StatusCodes
      */
-    public static $statusCodes = array(
+    public static $statusCodes = [
         "300" => "Multiple Choices",
         "301" => "Moved Permanently",
         "302" => "Found",
         "303" => "See Other",
         "307" => "Temporary Redirect"
-    );
+    ];
 
     /**
      * @param integer $id
@@ -221,13 +226,13 @@ class Redirect extends AbstractModel
         }
         return "HTTP/1.1 " . $statusCode . " " . self::$statusCodes[$statusCode];
     }
-    
+
     /**
      * @return void
      */
     public function clearDependentCache()
     {
-        
+
         // this is mostly called in Redirect\Dao not here
         try {
             \Pimcore\Cache::clearTag("redirect");
@@ -291,6 +296,28 @@ class Redirect extends AbstractModel
     public function getSourceEntireUrl()
     {
         return $this->sourceEntireUrl;
+    }
+
+    /**
+     * @return boolean
+     */
+    public function getActive()
+    {
+        return $this->active;
+    }
+
+    /**
+     * @param $active
+     * @return $this
+     */
+    public function setActive($active)
+    {
+        if ($active) {
+            $this->active = (bool) $active;
+        } else {
+            $this->active = null;
+        }
+        return $this;
     }
 
     /**

@@ -41,7 +41,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
     /**
      * @var array
      */
-    public $allowedTypes = array();
+    public $allowedTypes = [];
 
     /**
      * @see Object\ClassDefinition\Data::getDataForEditmode
@@ -50,9 +50,9 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return string
      */
-    public function getDataForEditmode($data, $object = null, $params = array(), $objectFromVersion = null)
+    public function getDataForEditmode($data, $object = null, $params = [], $objectFromVersion = null)
     {
-        $editmodeData = array();
+        $editmodeData = [];
 
         if ($data instanceof Object\Objectbrick) {
             $allowedBrickTypes = $data->getAllowedBrickTypes();
@@ -92,17 +92,12 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
             return null;
         }
 
-        $brickData = array();
-        $brickMetaData = array();
+        $brickData = [];
+        $brickMetaData = [];
 
         $inherited = false;
         foreach ($collectionDef->getFieldDefinitions() as $fd) {
-            if ($fd instanceof CalculatedValue) {
-                $fieldData = new Object\Data\CalculatedValue($fd->getName());
-                $fieldData->setContextualData("objectbrick", $this->getName(), $allowedBrickType, $fd->getName(), null, null, $fd);
-                $fieldData = $fd->getDataForEditmode($fieldData, $data->getObject(), $params);
-                $brickData[$fd->getName()] = $fieldData;
-            } else {
+            if (!$fd instanceof CalculatedValue) {
                 $fieldData = $this->getDataForField($item, $fd->getName(), $fd, $level, $data->getObject(), $getter, $objectFromVersion); //$fd->getDataForEditmode($item->{$fd->getName()});
                 $brickData[$fd->getName()] = $fieldData->objectData;
             }
@@ -113,12 +108,24 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
             }
         }
 
-        $editmodeDataItem = array(
+        $calculatedChilds = [];
+        self::collectCalculatedValueItems($collectionDef->getFieldDefinitions(), $calculatedChilds);
+
+        if ($calculatedChilds) {
+            foreach ($calculatedChilds as $fd) {
+                $fieldData = new Object\Data\CalculatedValue($fd->getName());
+                $fieldData->setContextualData("objectbrick", $this->getName(), $allowedBrickType, $fd->getName(), null, null, $fd);
+                $fieldData = $fd->getDataForEditmode($fieldData, $data->getObject(), $params);
+                $brickData[$fd->getName()] = $fieldData;
+            }
+        }
+
+        $editmodeDataItem = [
             "data" => $brickData,
             "type" => $item->getType(),
             "metaData" => $brickMetaData,
             "inherited" => $inherited
-        );
+        ];
         return $editmodeDataItem;
     }
 
@@ -161,16 +168,16 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
                     }
                 }
             }
-            $data = array();
+            $data = [];
 
             if ($fielddefinition instanceof Object\ClassDefinition\Data\Href) {
                 $data = $relations[0];
             } else {
                 foreach ($relations as $rel) {
                     if ($fielddefinition instanceof Object\ClassDefinition\Data\Objects) {
-                        $data[] = array($rel["id"], $rel["path"], $rel["subtype"]);
+                        $data[] = [$rel["id"], $rel["path"], $rel["subtype"]];
                     } else {
-                        $data[] = array($rel["id"], $rel["path"], $rel["type"], $rel["subtype"]);
+                        $data[] = [$rel["id"], $rel["path"], $rel["type"], $rel["subtype"]];
                     }
                 }
             }
@@ -206,7 +213,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return string
      */
-    public function getDataFromEditmode($data, $object = null, $params = array())
+    public function getDataFromEditmode($data, $object = null, $params = [])
     {
         $container = $this->getDataFromObjectParam($object);
 
@@ -219,7 +226,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
 
         if (is_array($data)) {
             foreach ($data as $collectionRaw) {
-                $collectionData = array();
+                $collectionData = [];
                 $collectionDef = Object\Objectbrick\Definition::getByKey($collectionRaw["type"]);
 
                 $getter = "get" . ucfirst($collectionRaw["type"]);
@@ -257,7 +264,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return string
      */
-    public function getVersionPreview($data, $object = null, $params = array())
+    public function getVersionPreview($data, $object = null, $params = [])
     {
         return "BRICKS";
     }
@@ -269,7 +276,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param array $params
      * @return string
      */
-    public function getForCsvExport($object, $params = array())
+    public function getForCsvExport($object, $params = [])
     {
         return "NOT SUPPORTED";
     }
@@ -280,7 +287,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return null
      */
-    public function getFromCsvImport($importValue, $object = null, $params = array())
+    public function getFromCsvImport($importValue, $object = null, $params = [])
     {
         return;
     }
@@ -290,7 +297,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return string
      */
-    public function getDataForSearchIndex($object, $params = array())
+    public function getDataForSearchIndex($object, $params = [])
     {
         $dataString = "";
         $obData = $this->getDataFromObjectParam($object, $params);
@@ -321,7 +328,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param $object
      * @param array $params
      */
-    public function save($object, $params = array())
+    public function save($object, $params = [])
     {
         $container = $this->getDataFromObjectParam($object);
         if ($container instanceof Object\Objectbrick) {
@@ -334,7 +341,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param array $params
      * @return null
      */
-    public function load($object, $params = array())
+    public function load($object, $params = [])
     {
         $classname = "\\Pimcore\\Model\\Object\\" . ucfirst($object->getClass()->getName()) . "\\" . ucfirst($this->getName());
 
@@ -397,10 +404,10 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return mixed
      */
-    public function getForWebserviceExport($object, $params = array())
+    public function getForWebserviceExport($object, $params = [])
     {
         $data = $this->getDataFromObjectParam($object, $params);
-        $wsData = array();
+        $wsData = [];
 
         if ($data instanceof Object\Objectbrick) {
             foreach ($data as $item) {
@@ -409,7 +416,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
                 }
 
                 $wsDataItem = new Webservice\Data\Object\Element();
-                $wsDataItem->value = array();
+                $wsDataItem->value = [];
                 $wsDataItem->type = $item->getType();
 
                 try {
@@ -445,7 +452,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @return mixed
      * @throws \Exception
      */
-    public function getFromWebserviceImport($data, $relatedObject = null, $params = array(), $idMapper = null)
+    public function getFromWebserviceImport($data, $relatedObject = null, $params = [], $idMapper = null)
     {
         $containerName = "\\Pimcore\\Model\\Object\\" . ucfirst($relatedObject->getClass()->getName()) . "\\" . ucfirst($this->getName());
         $container = new $containerName($relatedObject, $this->getName());
@@ -463,7 +470,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
                     }
 
                     $brick = $collectionRaw->type;
-                    $collectionData = array();
+                    $collectionData = [];
                     $collectionDef = Object\Objectbrick\Definition::getByKey($brick);
 
                     if (!$collectionDef) {
@@ -509,7 +516,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param array $params
      * @return mixed
      */
-    public function preSetData($object, $value, $params = array())
+    public function preSetData($object, $value, $params = [])
     {
         if ($value instanceof Object\Objectbrick) {
             $value->setFieldname($this->getName());
@@ -524,7 +531,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      */
     public function resolveDependencies($data)
     {
-        $dependencies = array();
+        $dependencies = [];
 
         if ($data instanceof Object\Objectbrick) {
             $items = $data->getItems();
@@ -557,9 +564,9 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param array $tags
      * @return array
      */
-    public function getCacheTags($data, $tags = array())
+    public function getCacheTags($data, $tags = [])
     {
-        $tags = is_array($tags) ? $tags : array();
+        $tags = is_array($tags) ? $tags : [];
 
         if ($data instanceof Object\Objectbrick) {
             $items = $data->getItems();
@@ -675,7 +682,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return string
      */
-    public function getDataForGrid($data, $object = null, $params = array())
+    public function getDataForGrid($data, $object = null, $params = [])
     {
         return "NOT SUPPORTED";
     }
@@ -716,12 +723,12 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
             return null;
         }
 
-        $result = array();
+        $result = [];
 
         foreach ($collectionDef->getFieldDefinitions() as $fd) {
             $fieldData = $this->getDiffDataForField($item, $fd->getName(), $fd, $level, $data->getObject(), $getter, $objectFromVersion); //$fd->getDataForEditmode($item->{$fd->getName()});
 
-            $diffdata = array();
+            $diffdata = [];
 
             foreach ($fieldData as $subdata) {
                 $diffdata["field"] = $this->getName();
@@ -735,11 +742,11 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
                 unset($subdata["value"]);
 
                 $diffdata["title"] = $this->getName() . " / " . $subdata["title"];
-                $brickdata = array(
+                $brickdata = [
                     "brick" => substr($getter, 3),
                     "name" => $fd->getName(),
                     "subdata" => $subdata
-                );
+                ];
                 $diffdata["data"] = $brickdata;
             }
 
@@ -755,9 +762,9 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return array|null
      */
-    public function getDiffDataForEditMode($data, $object = null, $params = array(), $objectFromVersion = null)
+    public function getDiffDataForEditMode($data, $object = null, $params = [], $objectFromVersion = null)
     {
-        $editmodeData = array();
+        $editmodeData = [];
 
         if ($data instanceof Object\Objectbrick) {
             $getters = $data->getBrickGetters();
@@ -782,7 +789,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @return null|\Pimcore\Date
      */
 
-    public function getDiffDataFromEditmode($data, $object = null, $params = array())
+    public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
         $valueGetter = "get" . ucfirst($this->getName());
         $valueSetter = "set" . ucfirst($this->getName());
@@ -806,7 +813,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
             }
 
             $fieldname = $subdata["name"];
-            $fielddata = array($subdata["subdata"]);
+            $fielddata = [$subdata["subdata"]];
 
             $collectionDef = Object\Objectbrick\Definition::getByKey($brickname);
 
@@ -828,7 +835,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param mixed $params
      * @return bool
      */
-    public function isDiffChangeAllowed($object, $params = array())
+    public function isDiffChangeAllowed($object, $params = [])
     {
         return true;
     }
@@ -848,7 +855,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * @param array $params
      * @return Model\Element\ElementInterface
      */
-    public function rewriteIds($object, $idMapping, $params = array())
+    public function rewriteIds($object, $idMapping, $params = [])
     {
         $data = $this->getDataFromObjectParam($object, $params);
 
@@ -890,7 +897,7 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
      * This method is called in Object|Class::save() and is used to create the database table for the localized data
      * @return void
      */
-    public function classSaved($class, $params = array())
+    public function classSaved($class, $params = [])
     {
         if (is_array($this->allowedTypes)) {
             foreach ($this->allowedTypes as $allowedType) {
@@ -907,6 +914,22 @@ class Objectbricks extends Model\Object\ClassDefinition\Data
                         if (method_exists($fd, "classSaved")) {
                             $fd->classSaved($class);
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    public static function collectCalculatedValueItems($container, &$list = [])
+    {
+        if (is_array($container)) {
+            /** @var  $childDef Object\ClassDefinition\Data */
+            foreach ($container as $childDef) {
+                if ($childDef instanceof Model\Object\ClassDefinition\Data\CalculatedValue) {
+                    $list[] = $childDef;
+                } else {
+                    if (method_exists($childDef, "getFieldDefinitions")) {
+                        self::collectCalculatedValueItems($childDef->getFieldDefinitions(), $list);
                     }
                 }
             }

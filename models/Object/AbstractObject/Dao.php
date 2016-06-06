@@ -74,7 +74,7 @@ class Dao extends Model\Element\Dao
     {
         $this->db->insert("objects", [
             "o_key" => $this->model->getKey(),
-            "o_path" => $this->model->getPath()
+            "o_path" => $this->model->getRealPath()
         ]);
         $this->model->setId($this->db->lastInsertId());
 
@@ -91,7 +91,7 @@ class Dao extends Model\Element\Dao
     {
         $object = get_object_vars($this->model);
 
-        $data = array();
+        $data = [];
         foreach ($object as $key => $value) {
             if (in_array($key, $this->getValidTableColumns("objects"))) {
                 if (is_bool($value)) {
@@ -105,6 +105,11 @@ class Dao extends Model\Element\Dao
         $checkColumns = ["o_type","o_classId","o_className"];
         $existingData = $this->db->fetchRow("SELECT " . implode(",", $checkColumns) . " FROM objects WHERE o_id = ?", [$this->model->getId()]);
         foreach ($checkColumns as $column) {
+            if ($column == "o_type" && in_array($data[$column], ["variant","object"]) && in_array($existingData[$column], ["variant","object"])) {
+                // type conversion variant <=> object should be possible
+                continue;
+            }
+
             if (!empty($existingData[$column]) && $data[$column] != $existingData[$column]) {
                 throw new \Exception("Unable to save object: type, classId or className mismatch");
             }
@@ -115,11 +120,11 @@ class Dao extends Model\Element\Dao
         // tree_locks
         $this->db->delete("tree_locks", "id = " . $this->model->getId() . " AND type = 'object'");
         if ($this->model->getLocked()) {
-            $this->db->insert("tree_locks", array(
+            $this->db->insert("tree_locks", [
                 "id" => $this->model->getId(),
                 "type" => "object",
                 "locked" => $this->model->getLocked()
-            ));
+            ]);
         }
     }
 
@@ -136,9 +141,9 @@ class Dao extends Model\Element\Dao
 
     public function updateWorkspaces()
     {
-        $this->db->update("users_workspaces_object", array(
-            "cpath" => $this->model->getFullPath()
-        ), "cid = " . $this->model->getId());
+        $this->db->update("users_workspaces_object", [
+            "cpath" => $this->model->getRealFullPath()
+        ], "cid = " . $this->model->getId());
     }
 
     /**
@@ -159,13 +164,13 @@ class Dao extends Model\Element\Dao
             }
 
             //update object child paths
-            $this->db->query("update objects set o_path = replace(o_path," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getFullPath() . "/") . "), o_modificationDate = '" . time() . "', o_userModification = '" . $userId . "' where o_path like " . $this->db->quote($oldPath . "/%") . ";");
+            $this->db->query("update objects set o_path = replace(o_path," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getRealFullPath() . "/") . "), o_modificationDate = '" . time() . "', o_userModification = '" . $userId . "' where o_path like " . $this->db->quote($oldPath . "/%") . ";");
 
             //update object child permission paths
-            $this->db->query("update users_workspaces_object set cpath = replace(cpath," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getFullPath() . "/") . ") where cpath like " . $this->db->quote($oldPath . "/%") . ";");
+            $this->db->query("update users_workspaces_object set cpath = replace(cpath," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getRealFullPath() . "/") . ") where cpath like " . $this->db->quote($oldPath . "/%") . ";");
 
             //update object child properties paths
-            $this->db->query("update properties set cpath = replace(cpath," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getFullPath() . "/") . ") where cpath like " . $this->db->quote($oldPath . "/%") . ";");
+            $this->db->query("update properties set cpath = replace(cpath," . $this->db->quote($oldPath . "/") . "," . $this->db->quote($this->model->getRealFullPath() . "/") . ") where cpath like " . $this->db->quote($oldPath . "/%") . ";");
 
 
             return $objects;
@@ -205,7 +210,7 @@ class Dao extends Model\Element\Dao
      */
     public function getProperties($onlyInherited = false)
     {
-        $properties = array();
+        $properties = [];
 
         // collect properties via parent - ids
         $parentIds = $this->getParentIds();
@@ -239,7 +244,7 @@ class Dao extends Model\Element\Dao
 
                 $properties[$propertyRaw["name"]] = $property;
             } catch (\Exception $e) {
-                \Logger::error("can't add property " . $propertyRaw["name"] . " to object " . $this->model->getFullPath());
+                \Logger::error("can't add property " . $propertyRaw["name"] . " to object " . $this->model->getRealFullPath());
             }
         }
 
@@ -267,7 +272,7 @@ class Dao extends Model\Element\Dao
      *
      * @return boolean
      */
-    public function hasChilds($objectTypes = array(Object::OBJECT_TYPE_OBJECT, Object::OBJECT_TYPE_FOLDER))
+    public function hasChilds($objectTypes = [Object::OBJECT_TYPE_OBJECT, Object::OBJECT_TYPE_FOLDER])
     {
         $c = $this->db->fetchOne("SELECT o_id FROM objects WHERE o_parentId = ? AND o_type IN ('" . implode("','", $objectTypes) . "')", $this->model->getId());
         return (bool)$c;
@@ -279,7 +284,7 @@ class Dao extends Model\Element\Dao
      * @param array $objectTypes
      * @return boolean
      */
-    public function hasSiblings($objectTypes = array(Object::OBJECT_TYPE_OBJECT, Object::OBJECT_TYPE_FOLDER))
+    public function hasSiblings($objectTypes = [Object::OBJECT_TYPE_OBJECT, Object::OBJECT_TYPE_FOLDER])
     {
         $c = $this->db->fetchOne("SELECT o_id FROM objects WHERE o_parentId = ? and o_id != ? AND o_type IN ('" . implode("','", $objectTypes) . "')", [$this->model->getParentId(), $this->model->getId()]);
         return (bool)$c;
@@ -291,7 +296,7 @@ class Dao extends Model\Element\Dao
      * @param User $user
      * @return integer
      */
-    public function getChildAmount($objectTypes = array(Object::OBJECT_TYPE_OBJECT, Object::OBJECT_TYPE_FOLDER), $user = null)
+    public function getChildAmount($objectTypes = [Object::OBJECT_TYPE_OBJECT, Object::OBJECT_TYPE_FOLDER], $user = null)
     {
         if ($user and !$user->isAdmin()) {
             $userIds = $user->getRoles();
@@ -319,7 +324,7 @@ class Dao extends Model\Element\Dao
     {
 
         // check for an locked element below this element
-        $belowLocks = $this->db->fetchOne("SELECT tree_locks.id FROM tree_locks INNER JOIN objects ON tree_locks.id = objects.o_id WHERE objects.o_path LIKE ? AND tree_locks.type = 'object' AND tree_locks.locked IS NOT NULL AND tree_locks.locked != '' LIMIT 1", $this->model->getFullpath() . "/%");
+        $belowLocks = $this->db->fetchOne("SELECT tree_locks.id FROM tree_locks INNER JOIN objects ON tree_locks.id = objects.o_id WHERE objects.o_path LIKE ? AND tree_locks.type = 'object' AND tree_locks.locked IS NOT NULL AND tree_locks.locked != '' LIMIT 1", $this->model->getRealFullPath() . "/%");
 
         if ($belowLocks > 0) {
             return true;
@@ -341,7 +346,7 @@ class Dao extends Model\Element\Dao
      */
     public function unlockPropagate()
     {
-        $lockIds = $this->db->fetchCol("SELECT o_id from objects WHERE o_path LIKE " . $this->db->quote($this->model->getFullPath() . "/%") . " OR o_id = " . $this->model->getId());
+        $lockIds = $this->db->fetchCol("SELECT o_id from objects WHERE o_path LIKE " . $this->db->quote($this->model->getRealFullPath() . "/%") . " OR o_id = " . $this->model->getId());
         $this->db->delete("tree_locks", "type = 'object' AND id IN (" . implode(",", $lockIds) . ")");
         return $lockIds;
     }
@@ -349,27 +354,27 @@ class Dao extends Model\Element\Dao
     public function getClasses()
     {
         if ($this->getChildAmount()) {
-            $path = $this->model->getFullPath();
+            $path = $this->model->getRealFullPath();
             if (!$this->model->getId() || $this->model->getId() == 1) {
                 $path = "";
             }
             $classIds = $this->db->fetchCol("SELECT o_classId FROM objects WHERE o_path LIKE ? AND o_type = 'object' GROUP BY o_classId", $path . "/%");
 
-            $classes = array();
+            $classes = [];
             foreach ($classIds as $classId) {
                 $classes[] = Object\ClassDefinition::getById($classId);
             }
 
             return $classes;
         } else {
-            return array();
+            return [];
         }
     }
 
     protected function collectParentIds()
     {
         // collect properties via parent - ids
-        $parentIds = array(1);
+        $parentIds = [1];
 
         $obj = $this->model->getParent();
         if ($obj) {
@@ -399,7 +404,7 @@ class Dao extends Model\Element\Dao
             // exception for list permission
             if (empty($permissionsParent) && $type == "list") {
                 // check for childs with permissions
-                $path = $this->model->getFullPath() . "/";
+                $path = $this->model->getRealFullPath() . "/";
                 if ($this->model->getId() == 1) {
                     $path = "/";
                 }
@@ -430,7 +435,7 @@ class Dao extends Model\Element\Dao
                 $queryType = "*";
             }
 
-            $commaSeparated = in_array($type, array("lView", "lEdit", "layouts"));
+            $commaSeparated = in_array($type, ["lView", "lEdit", "layouts"]);
 
             if ($commaSeparated) {
                 $allPermissions = $this->db->fetchAll("SELECT " . $queryType . ",cid,cpath FROM users_workspaces_object WHERE cid IN (" . implode(",", $parentIds) . ") AND userId IN (" . implode(",", $userIds) . ") ORDER BY LENGTH(cpath) DESC");
@@ -441,7 +446,7 @@ class Dao extends Model\Element\Dao
                 } else {
                     $firstPermission = $allPermissions[0];
                     $firstPermissionCid = $firstPermission["cid"];
-                    $mergedPermissions = array();
+                    $mergedPermissions = [];
 
                     foreach ($allPermissions as $permission) {
                         $cid = $permission["cid"];
@@ -488,7 +493,7 @@ class Dao extends Model\Element\Dao
             }
 
             $cid = $this->model->getId();
-            $sql = "SELECT " . $type . " FROM users_workspaces_object WHERE cid != " . $cid . " AND cpath LIKE " . $this->db->quote($this->model->getFullPath() . "%") . " AND userId IN (" . implode(",", $userIds) . ") ORDER BY LENGTH(cpath) DESC";
+            $sql = "SELECT " . $type . " FROM users_workspaces_object WHERE cid != " . $cid . " AND cpath LIKE " . $this->db->quote($this->model->getRealFullPath() . "%") . " AND userId IN (" . implode(",", $userIds) . ") ORDER BY LENGTH(cpath) DESC";
             $permissions = $this->db->fetchAll($sql);
         } catch (\Exception $e) {
             \Logger::warn("Unable to get permission " . $type . " for object " . $this->model->getId());

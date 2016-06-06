@@ -25,7 +25,12 @@ class File
     /**
      * @var array
      */
-    private static $isIncludeableCache = array();
+    private static $isIncludeableCache = [];
+
+    /**
+     * @var null|resource
+     */
+    protected static $context = null;
 
     /**
      * @static
@@ -125,7 +130,7 @@ class File
             self::mkdir(dirname($path));
         }
 
-        $return = file_put_contents($path, $data);
+        $return = file_put_contents($path, $data, null, File::getContext());
         @chmod($path, self::$defaultMode);
         return $return;
     }
@@ -155,8 +160,47 @@ class File
             $mode = self::$defaultMode;
         }
 
-        $return = @mkdir($path, 0777, $recursive);
-        @chmod($path, $mode);
+        $return = @mkdir($path, $mode, $recursive, self::getContext());
         return $return;
+    }
+
+    /**
+     * @param $oldPath
+     * @param $newPath
+     * @return bool
+     */
+    public static function rename($oldPath, $newPath)
+    {
+        if (stream_is_local($oldPath) && stream_is_local($newPath)) {
+            // rename is only possible if both stream wrapper are the same
+            // unfortunately it seems that there's no other alternative for stream_is_local() although it isn't
+            // absolutely correct it solves the problem temporary
+            $return = rename($oldPath, $newPath, self::getContext());
+        } else {
+            $return = recursiveCopy($oldPath, $newPath);
+            recursiveDelete($oldPath);
+        }
+
+        return $return;
+    }
+
+    /**
+     * @return null|resource
+     */
+    public static function getContext()
+    {
+        if (!self::$context) {
+            self::$context = stream_context_create([]);
+        }
+
+        return self::$context;
+    }
+
+    /**
+     * @param resource $context
+     */
+    public static function setContext($context)
+    {
+        self::$context = $context;
     }
 }

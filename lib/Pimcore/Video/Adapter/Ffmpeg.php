@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Pimcore
  *
@@ -16,6 +16,7 @@ namespace Pimcore\Video\Adapter;
 
 use Pimcore\Video\Adapter;
 use Pimcore\Tool\Console;
+use Pimcore\File;
 
 class Ffmpeg extends Adapter
 {
@@ -34,7 +35,7 @@ class Ffmpeg extends Adapter
     /**
      * @var string
      */
-    protected $arguments = array();
+    protected $arguments = [];
 
     /**
      * @return bool
@@ -60,29 +61,7 @@ class Ffmpeg extends Adapter
      */
     public static function getFfmpegCli()
     {
-        $ffmpegPath = \Pimcore\Config::getSystemConfig()->assets->ffmpeg;
-        if ($ffmpegPath) {
-            if (@is_executable($ffmpegPath)) {
-                return $ffmpegPath;
-            } else {
-                \Logger::critical("FFMPEG binary: " . $ffmpegPath . " is not executable");
-            }
-        }
-
-        $paths = array(
-            "/usr/local/bin/ffmpeg",
-            "/usr/bin/ffmpeg",
-            "/bin/ffmpeg",
-            realpath(PIMCORE_DOCUMENT_ROOT . "/../ffmpeg/bin/ffmpeg.exe") // for windows sample package (XAMPP)
-        );
-
-        foreach ($paths as $path) {
-            if (@is_executable($path)) {
-                return $path;
-            }
-        }
-
-        throw new \Exception("No ffmpeg executable found, please configure the correct path in the system settings");
+        return \Pimcore\Tool\Console::getExecutable("ffmpeg", true);
     }
 
     /**
@@ -155,8 +134,18 @@ class Ffmpeg extends Adapter
             $timeOffset = 5;
         }
 
+        $realTargetPath = null;
+        if (!stream_is_local($file)) {
+            $realTargetPath = $file;
+            $file = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/ghostscript-tmp-" . uniqid() . "." . File::getFileExtension($file);
+        }
+
         $cmd = self::getFfmpegCli() . " -i " . realpath($this->file) . " -vcodec png -vframes 1 -vf scale=iw*sar:ih -ss " . $timeOffset . " " . str_replace("/", DIRECTORY_SEPARATOR, $file);
         Console::exec($cmd, null, 60);
+
+        if ($realTargetPath) {
+            File::rename($file, $realTargetPath);
+        }
     }
 
     /**

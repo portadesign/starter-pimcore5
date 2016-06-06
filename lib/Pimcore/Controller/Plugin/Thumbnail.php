@@ -28,7 +28,7 @@ class Thumbnail extends \Zend_Controller_Plugin_Abstract
 
         // this is a filter which checks for common used files (by browser, crawlers, ...) and prevent the default
         // error page, because this is more resource-intensive than exiting right here
-        if (preg_match("@^/website/var/tmp/image-thumbnails(.*)?/([0-9]+)/thumb__([a-zA-Z0-9_\-]+)([^\@]+)(\@[0-9.]+x)?\.([a-zA-Z]{2,5})@", $request->getPathInfo(), $matches)) {
+        if (preg_match("@/image-thumbnails(.*)?/([0-9]+)/thumb__([a-zA-Z0-9_\-]+)([^\@]+)(\@[0-9.]+x)?\.([a-zA-Z]{2,5})@", $request->getPathInfo(), $matches)) {
             $assetId = $matches[2];
             $thumbnailName = $matches[3];
             $format = $matches[6];
@@ -38,7 +38,7 @@ class Thumbnail extends \Zend_Controller_Plugin_Abstract
                     $page = 1;
                     $thumbnailFile = null;
                     $thumbnailConfig = null;
-                    $deferredConfigId = "thumb_" . $assetId . "__" . md5($request->getPathInfo());
+                    $deferredConfigId = "thumb_" . $assetId . "__" . md5($matches[0]);
                     if ($thumbnailConfigItem = TmpStore::get($deferredConfigId)) {
                         $thumbnailConfig = $thumbnailConfigItem->getData();
                         TmpStore::delete($deferredConfigId);
@@ -68,11 +68,11 @@ class Thumbnail extends \Zend_Controller_Plugin_Abstract
                         $thumbnailConfig->setName(preg_replace("/\-[\d]+/", "", $thumbnailConfig->getName()));
                         $thumbnailConfig->setName(str_replace("document_", "", $thumbnailConfig->getName()));
 
-                        $thumbnailFile = PIMCORE_DOCUMENT_ROOT . $asset->getImageThumbnail($thumbnailConfig, $page);
+                        $thumbnailFile = $asset->getImageThumbnail($thumbnailConfig, $page)->getFileSystemPath();
                     } elseif ($asset instanceof Asset\Image) {
                         //check if high res image is called
                         if (array_key_exists(5, $matches)) {
-                            $highResFactor = (float) str_replace(array("@", "x"), "", $matches[5]);
+                            $highResFactor = (float) str_replace(["@", "x"], "", $matches[5]);
                             $thumbnailConfig->setHighResolution($highResFactor);
                         }
 
@@ -81,14 +81,13 @@ class Thumbnail extends \Zend_Controller_Plugin_Abstract
 
                     if ($thumbnailFile && file_exists($thumbnailFile)) {
                         $fileExtension = \Pimcore\File::getFileExtension($thumbnailFile);
-                        if (in_array($fileExtension, array("gif", "jpeg", "jpeg", "png", "pjpeg"))) {
+                        if (in_array($fileExtension, ["gif", "jpeg", "jpeg", "png", "pjpeg"])) {
                             header("Content-Type: image/".$fileExtension, true);
                         } else {
                             header("Content-Type: " . $asset->getMimetype(), true);
                         }
 
-                        header("Content-Length: " . filesize($thumbnailFile), true);
-                        while (@ob_end_flush()) ;
+                        header("Content-Length: " . filesize($thumbnailFile), true); while (@ob_end_flush()) ;
                         flush();
 
                         readfile($thumbnailFile);

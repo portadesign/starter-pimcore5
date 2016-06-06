@@ -23,32 +23,30 @@ use Pimcore\Model\Asset;
 
 class Processor
 {
-
-
-    protected static $argumentMapping = array(
-        "resize" => array("width","height"),
-        "scaleByWidth" => array("width"),
-        "scaleByHeight" => array("height"),
-        "contain" => array("width","height"),
-        "cover" => array("width","height","positioning","doNotScaleUp"),
-        "frame" => array("width","height"),
-        "trim" => array("tolerance"),
-        "rotate" => array("angle"),
-        "crop" => array("x","y","width","height"),
-        "setBackgroundColor" => array("color"),
-        "roundCorners" => array("width","height"),
-        "setBackgroundImage" => array("path"),
-        "addOverlay" => array("path", "x", "y", "alpha", "composite", "origin"),
-        "addOverlayFit" => array("path", "composite"),
-        "applyMask" => array("path"),
-        "cropPercent" => array("width","height","x","y"),
-        "grayscale" => array(),
-        "sepia" => array(),
-        "sharpen" => array('radius', 'sigma', 'amount', 'threshold'),
-        "gaussianBlur" => array('radius', 'sigma'),
-        "brightnessSaturation" => array('brightness', 'saturation', "hue"),
-        "mirror" => array("mode")
-    );
+    protected static $argumentMapping = [
+        "resize" => ["width","height"],
+        "scaleByWidth" => ["width"],
+        "scaleByHeight" => ["height"],
+        "contain" => ["width","height"],
+        "cover" => ["width","height","positioning","doNotScaleUp"],
+        "frame" => ["width","height"],
+        "trim" => ["tolerance"],
+        "rotate" => ["angle"],
+        "crop" => ["x","y","width","height"],
+        "setBackgroundColor" => ["color"],
+        "roundCorners" => ["width","height"],
+        "setBackgroundImage" => ["path"],
+        "addOverlay" => ["path", "x", "y", "alpha", "composite", "origin"],
+        "addOverlayFit" => ["path", "composite"],
+        "applyMask" => ["path"],
+        "cropPercent" => ["width","height","x","y"],
+        "grayscale" => [],
+        "sepia" => [],
+        "sharpen" => ['radius', 'sigma', 'amount', 'threshold'],
+        "gaussianBlur" => ['radius', 'sigma'],
+        "brightnessSaturation" => ['brightness', 'saturation', "hue"],
+        "mirror" => ["mode"]
+    ];
 
     /**
      * @param $format
@@ -56,12 +54,12 @@ class Processor
      * @param string $fallback
      * @return string
      */
-    public static function getAllowedFormat($format, $allowed = array(), $fallback = "png")
+    public static function getAllowedFormat($format, $allowed = [], $fallback = "png")
     {
-        $typeMappings = array(
+        $typeMappings = [
             "jpg" => "jpeg",
             "tif" => "tiff"
-        );
+        ];
 
         if (array_key_exists($format, $typeMappings)) {
             $format = $typeMappings[$format];
@@ -81,10 +79,12 @@ class Processor
      * @param Config $config
      * @param null $fileSystemPath
      * @param bool $deferred deferred means that the image will be generated on-the-fly (details see below)
+     * @param bool $returnAbsolutePath
      * @return mixed|string
      */
-    public static function process($asset, Config $config, $fileSystemPath = null, $deferred = false)
+    public static function process($asset, Config $config, $fileSystemPath = null, $deferred = false, $returnAbsolutePath = false)
     {
+        $errorImage = PIMCORE_PATH . "/static6/img/filetype-not-supported.png";
         $format = strtolower($config->getFormat());
         $contentOptimizedFormat = false;
 
@@ -99,7 +99,7 @@ class Processor
         }
 
         if (!file_exists($fileSystemPath)) {
-            return "/pimcore/static/img/filetype-not-supported.png";
+            return self::returnPath($errorImage, $returnAbsolutePath);
         }
 
         $modificationDate = filemtime($fileSystemPath);
@@ -108,12 +108,12 @@ class Processor
 
         // simple detection for source type if SOURCE is selected
         if ($format == "source" || empty($format)) {
-            $format = self::getAllowedFormat($fileExt, array("jpeg", "gif", "png"), "png");
+            $format = self::getAllowedFormat($fileExt, ["jpeg", "gif", "png"], "png");
             $contentOptimizedFormat = true; // format can change depending of the content (alpha-channel, ...)
         }
 
         if ($format == "print") {
-            $format = self::getAllowedFormat($fileExt, array("svg", "jpeg", "png", "tiff"), "png");
+            $format = self::getAllowedFormat($fileExt, ["svg", "jpeg", "png", "tiff"], "png");
 
             if (($format == "tiff" || $format == "svg") && \Pimcore\Tool::isFrontentRequestByAdmin()) {
                 // return a webformat in admin -> tiff cannot be displayed in browser
@@ -124,13 +124,13 @@ class Processor
                     foreach ($transformations as $transformation) {
                         if (!empty($transformation)) {
                             if ($transformation["method"] == "tifforiginal") {
-                                return str_replace(PIMCORE_DOCUMENT_ROOT, "", $fileSystemPath);
+                                return self::returnPath($fileSystemPath, $returnAbsolutePath);
                             }
                         }
                     }
                 }
             } elseif ($format == "svg") {
-                return str_replace(PIMCORE_DOCUMENT_ROOT, "", $fileSystemPath);
+                return self::returnPath($fileSystemPath, $returnAbsolutePath);
             }
         }
 
@@ -153,27 +153,28 @@ class Processor
         if (!is_dir(dirname($fsPath))) {
             File::mkdir(dirname($fsPath));
         }
-        $path = str_replace(PIMCORE_DOCUMENT_ROOT, "", $fsPath);
+
+        $path = self::returnPath($fsPath, false);
 
         // check for existing and still valid thumbnail
         if (is_file($fsPath) and filemtime($fsPath) >= $modificationDate) {
-            return $path;
+            return self::returnPath($fsPath, $returnAbsolutePath);
         }
 
         // deferred means that the image will be generated on-the-fly (when requested by the browser)
         // the configuration is saved for later use in Pimcore\Controller\Plugin\Thumbnail::routeStartup()
         // so that it can be used also with dynamic configurations
         if ($deferred) {
-            $configId = "thumb_" . $id . "__" . md5($path);
+            $configId = "thumb_" . $id . "__" . md5(str_replace(PIMCORE_TEMPORARY_DIRECTORY, "", $fsPath));
             TmpStore::add($configId, $config, "thumbnail_deferred");
 
-            return $path;
+            return self::returnPath($fsPath, $returnAbsolutePath);
         }
 
         // transform image
         $image = Asset\Image::getImageTransformInstance();
         if (!$image->load($fileSystemPath)) {
-            return "/pimcore/static/img/filetype-not-supported.png";
+            return self::returnPath($errorImage, $returnAbsolutePath);
         }
 
         $image->setUseContentOptimizedFormat($contentOptimizedFormat);
@@ -235,7 +236,7 @@ class Processor
         if (is_array($transformations) && count($transformations) > 0) {
             foreach ($transformations as $transformation) {
                 if (!empty($transformation)) {
-                    $arguments = array();
+                    $arguments = [];
                     $mapping = self::$argumentMapping[$transformation["method"]];
 
                     if (is_array($transformation["arguments"])) {
@@ -244,7 +245,7 @@ class Processor
                             if ($position !== false) {
 
                                 // high res calculations if enabled
-                                if (!in_array($transformation["method"], ["cropPercent"]) && in_array($key, array("width", "height", "x", "y"))) {
+                                if (!in_array($transformation["method"], ["cropPercent"]) && in_array($key, ["width", "height", "x", "y"])) {
                                     if ($config->getHighResolution() && $config->getHighResolution() > 1) {
                                         $value *= $config->getHighResolution();
                                     }
@@ -256,7 +257,7 @@ class Processor
                     }
 
                     ksort($arguments);
-                    call_user_func_array(array($image, $transformation["method"]), $arguments);
+                    call_user_func_array([$image, $transformation["method"]], $arguments);
                 }
             }
         }
@@ -280,6 +281,20 @@ class Processor
         // if the file is corrupted the file will be created on the fly when requested by the browser (because it's deleted here)
         if (is_file($fsPath) && filesize($fsPath) < 50) {
             unlink($fsPath);
+        }
+
+        return self::returnPath($fsPath, $returnAbsolutePath);
+    }
+
+    /**
+     * @param $path
+     * @param $absolute
+     * @return mixed
+     */
+    protected static function returnPath($path, $absolute)
+    {
+        if (!$absolute) {
+            $path = str_replace(PIMCORE_DOCUMENT_ROOT, "", $path);
         }
 
         return $path;

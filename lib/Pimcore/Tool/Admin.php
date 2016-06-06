@@ -46,8 +46,8 @@ class Admin
      */
     public static function getLanguages()
     {
-        $languages = array();
-        $languageDirs = array(PIMCORE_PATH . "/config/texts/",PIMCORE_CONFIGURATION_DIRECTORY . "/texts/");
+        $languages = [];
+        $languageDirs = [PIMCORE_PATH . "/config/texts/",PIMCORE_CONFIGURATION_DIRECTORY . "/texts/"];
         foreach ($languageDirs as $filesDir) {
             if (is_dir($filesDir)) {
                 $files = scandir($filesDir);
@@ -76,7 +76,6 @@ class Admin
         $scriptPath = PIMCORE_TEMPORARY_DIRECTORY."/minified_javascript_core_".md5($scriptContent).".js";
 
         if (!is_file($scriptPath)) {
-            //$scriptContent = JSMin::minify($scriptContent); // temp. disabled until we have a better library - just combine for now
             File::put($scriptPath, $scriptContent);
         }
 
@@ -92,9 +91,6 @@ class Admin
         $stylesheetPath = PIMCORE_TEMPORARY_DIRECTORY."/minified_css_core_".md5($stylesheetContent).".css";
 
         if (!is_file($stylesheetPath)) {
-            //$stylesheetContent = Minify_CSS::minify($stylesheetContent); // temp. disabled until we have a better library - just combine for now
-
-            // put minified contents into one single file
             File::put($stylesheetPath, $stylesheetContent);
         }
 
@@ -124,7 +120,7 @@ class Admin
         }
 
         // validity check
-        if (!in_array($dialect->delimiter, array(";", ",", "\t", "|", ":"))) {
+        if (!in_array($dialect->delimiter, [";", ",", "\t", "|", ":"])) {
             $dialect->delimiter = ";";
         }
 

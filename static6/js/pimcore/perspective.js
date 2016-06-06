@@ -15,6 +15,8 @@ pimcore.registerNS("pimcore.perspective");
 
 pimcore.perspective = Class.create({
 
+    cache: {},
+
     initialize: function(perspective) {
         Object.extend(this, perspective);
     },
@@ -23,13 +25,28 @@ pimcore.perspective = Class.create({
         return this.elementTree;
     },
 
-    inToolbar: function(key) {
-        if (!this.toolbar) {
-            return true;
 
+    inToolbar: function(key) {
+        return this.inPerspectiveConfig(key, "toolbar");
+    },
+
+    inTreeContextMenu: function(key) {
+        return this.inPerspectiveConfig(key, "treeContextMenu");
+    },
+
+    inPerspectiveConfig: function(key, configName) {
+        if (!this[configName]) {
+            return true;
         }
+
+        var cacheKey = configName + "." + key;
+
+        if (typeof this.cache[cacheKey] !== "undefined") {
+            return this.cache[cacheKey];
+        }
+
         var parts = key.split(".");
-        var menuItems = this.toolbar;
+        var menuItems = this[configName];
 
         for (var i = 0; i < parts.length; i++) {
             var part = parts[i];
@@ -43,6 +60,7 @@ pimcore.perspective = Class.create({
             if (typeof menuItem == "object") {
 
                 if (menuItem.hidden) {
+                    this.cache[cacheKey] = false;
                     return false;
                 }
 
@@ -51,10 +69,12 @@ pimcore.perspective = Class.create({
                 }
                 menuItems = menuItem.items;
             } else {
+                this.cache[cacheKey] = menuItem;
                 return menuItem;
             }
 
         }
+        this.cache[cacheKey] = true;
         return true;
     }
 

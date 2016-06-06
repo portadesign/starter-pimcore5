@@ -102,17 +102,17 @@ class Item extends Model\AbstractModel
 
         // check for element with the same name
         if ($element instanceof Document) {
-            $indentElement = Document::getByPath($element->getFullpath());
+            $indentElement = Document::getByPath($element->getRealFullPath());
             if ($indentElement) {
                 $element->setKey($element->getKey()."_restore");
             }
         } elseif ($element instanceof Asset) {
-            $indentElement = Asset::getByPath($element->getFullpath());
+            $indentElement = Asset::getByPath($element->getRealFullPath());
             if ($indentElement) {
                 $element->setFilename($element->getFilename()."_restore");
             }
         } elseif ($element instanceof Object\AbstractObject) {
-            $indentElement = Object::getByPath($element->getFullpath());
+            $indentElement = Object::getByPath($element->getRealFullPath());
             if ($indentElement) {
                 $element->setKey($element->getKey()."_restore");
             }
@@ -140,7 +140,7 @@ class Item extends Model\AbstractModel
         }
 
         $this->setSubtype($this->getElement()->getType());
-        $this->setPath($this->getElement()->getFullPath());
+        $this->setPath($this->getElement()->getRealFullPath());
         $this->setDate(time());
 
         $this->loadChilds($this->getElement());
@@ -165,7 +165,7 @@ class Item extends Model\AbstractModel
             // assets are kina special because they can contain massive amount of binary data which isn't serialized, we create separate files for them
             if ($element instanceof Asset) {
                 if ($element->getType() != "folder") {
-                    $handle = fopen($scope->getStorageFileBinary($element), "w+");
+                    $handle = fopen($scope->getStorageFileBinary($element), "w", false, File::getContext());
                     $src = $element->getStream();
                     stream_copy_to_stream($src, $handle);
                     fclose($handle);
@@ -225,7 +225,7 @@ class Item extends Model\AbstractModel
         if (method_exists($element, "getChilds")) {
             if ($element instanceof Object\AbstractObject) {
                 // because we also want variants
-                $childs = $element->getChilds(array(Object::OBJECT_TYPE_FOLDER, Object::OBJECT_TYPE_VARIANT, Object::OBJECT_TYPE_OBJECT));
+                $childs = $element->getChilds([Object::OBJECT_TYPE_FOLDER, Object::OBJECT_TYPE_VARIANT, Object::OBJECT_TYPE_OBJECT]);
             } else {
                 $childs = $element->getChilds();
             }
@@ -246,7 +246,7 @@ class Item extends Model\AbstractModel
             if ($element instanceof Asset) {
                 $binFile = $scope->getStorageFileBinary($element);
                 if (file_exists($binFile)) {
-                    $binaryHandle = fopen($binFile, "r+");
+                    $binaryHandle = fopen($binFile, "r", false, File::getContext());
                     $element->setStream($binaryHandle);
                 }
             }

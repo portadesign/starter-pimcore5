@@ -26,7 +26,7 @@ class Mail extends \Zend_Mail
      * @var array
      * @static
      */
-    protected static $debugEmailAddresses = array();
+    protected static $debugEmailAddresses = [];
 
     /**
      * @var object Pimcore_Placeholder
@@ -38,7 +38,7 @@ class Mail extends \Zend_Mail
      *
      * @var array
      */
-    protected $temporaryStorage = array();
+    protected $temporaryStorage = [];
 
     /**
      * If true - emails are logged in the database and on the file-system
@@ -59,7 +59,7 @@ class Mail extends \Zend_Mail
      *
      * @var array
      */
-    protected $params = array();
+    protected $params = [];
 
 
     /**
@@ -198,7 +198,7 @@ class Mail extends \Zend_Mail
         }
 
         if ($emailSettings['method'] == "smtp") {
-            $config = array();
+            $config = [];
             if ($emailSettings['smtp']['name']) {
                 $config['name'] = $emailSettings['smtp']['name'];
             }
@@ -275,19 +275,11 @@ class Mail extends \Zend_Mail
      * and uses it to automatically create a text version of the html email
      *
      * @static
-     * @return void
+     * @return bool
      */
     public static function determineHtml2TextIsInstalled()
     {
-        self::$html2textInstalled = false;
-        $paths = array("/usr/bin/html2text","/usr/local/bin/html2text", "/bin/html2text");
-
-        foreach ($paths as $path) {
-            if (@is_executable($path)) {
-                self::$html2textInstalled = true;
-                return true;
-            }
-        }
+        return (bool) \Pimcore\Tool\Console::getExecutable("html2text");
     }
 
     /**
@@ -387,10 +379,10 @@ class Mail extends \Zend_Mail
     protected function addToTemporaryStorage($key, $email, $name)
     {
         if (!is_array($email)) {
-            $email = array($name => $email);
+            $email = [$name => $email];
         }
         foreach ($email as $n => $recipient) {
-            $this->temporaryStorage[$key][] = array('email' => $recipient, 'name' => is_int($n) ? '' : $n);
+            $this->temporaryStorage[$key][] = ['email' => $recipient, 'name' => is_int($n) ? '' : $n];
         }
     }
 
@@ -613,7 +605,7 @@ class Mail extends \Zend_Mail
     public function send($transport = null)
     {
         // filter email addresses
-        $blockedAddresses = array();
+        $blockedAddresses = [];
         foreach ($this->getRecipients() as $recipient) {
             if (Model\Tool\Email\Blacklist::getByAddress($recipient)) {
                 $blockedAddresses[] = $recipient;
@@ -905,7 +897,7 @@ class Mail extends \Zend_Mail
                 $htmlContent = utf8_decode($htmlContent);
             }
             //using temporary file so we don't have problems with special characters
-            $tmpFileName = PIMCORE_TEMPORARY_DIRECTORY . "/" . uniqid('email_', true) . ".tmp";
+            $tmpFileName = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/" . uniqid('email_', true) . ".tmp";
             if (\Pimcore\File::put($tmpFileName, $htmlContent)) {
                 $content = @shell_exec("html2text $tmpFileName " . $this->getHtml2TextOptions());
                 @unlink($tmpFileName);

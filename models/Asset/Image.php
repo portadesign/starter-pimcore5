@@ -37,7 +37,7 @@ class Image extends Model\Asset
             try {
                 // save the current data into a tmp file to calculate the dimensions, otherwise updates wouldn't be updated
                 // because the file is written in parent::update();
-                $tmpFile = $this->getTemporaryFile(true);
+                $tmpFile = $this->getTemporaryFile();
                 $dimensions = $this->getDimensions($tmpFile, true);
                 unlink($tmpFile);
 
@@ -68,7 +68,7 @@ class Image extends Model\Asset
                 // so that the thumbnail check doesn't fail in Asset\Image\Thumbnail\Processor::process();
                 touch($path, $this->getModificationDate());
             } catch (\Exception $e) {
-                \Logger::error("Problem while creating system-thumbnails for image " . $this->getFullPath());
+                \Logger::error("Problem while creating system-thumbnails for image " . $this->getRealFullPath());
                 \Logger::error($e);
             }
         }
@@ -188,10 +188,10 @@ class Image extends Model\Asset
             return;
         }
 
-        $dimensions = array(
+        $dimensions = [
             "width" => $image->getWidth(),
             "height" => $image->getHeight()
-        );
+        ];
 
         return $dimensions;
     }
