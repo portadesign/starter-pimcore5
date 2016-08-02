@@ -117,11 +117,12 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
 
     /**
      * @param boolean $objectsAllowed
-     * @return void
+     * @return $this
      */
     public function setObjectsAllowed($objectsAllowed)
     {
         $this->objectsAllowed = $objectsAllowed;
+
         return $this;
     }
 
@@ -135,11 +136,12 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
 
     /**
      * @param boolean $documentsAllowed
-     * @return void
+     * @return $this
      */
     public function setDocumentsAllowed($documentsAllowed)
     {
         $this->documentsAllowed = $documentsAllowed;
+
         return $this;
     }
 
@@ -153,12 +155,13 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
     }
 
     /**
-     * @param array
-     * @return void $documentTypes
+     * @param array $documentTypes
+     * @return $this
      */
     public function setDocumentTypes($documentTypes)
     {
         $this->documentTypes = Element\Service::fixAllowedTypes($documentTypes, "documentTypes");
+
         return $this;
     }
 
@@ -174,11 +177,12 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
     /**
      *
      * @param boolean $assetsAllowed
-     * @return void
+     * @return $this
      */
     public function setAssetsAllowed($assetsAllowed)
     {
         $this->assetsAllowed = $assetsAllowed;
+
         return $this;
     }
 
@@ -191,12 +195,13 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
     }
 
     /**
-     * @param array
-     * @return void $assetTypes
+     * @param array $assetTypes
+     * @return $this
      */
     public function setAssetTypes($assetTypes)
     {
         $this->assetTypes = Element\Service::fixAllowedTypes($assetTypes, "assetTypes");
+
         return $this;
     }
 
@@ -226,6 +231,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                 }
                 $counter++;
             }
+
             return $return;
         } elseif (is_array($data) and count($data) === 0) {
             //give empty array if data was not null
@@ -288,6 +294,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                     $d[] = $elementType . "|" . $element->getId();
                 }
             }
+
             return "," . implode(",", $d) . ",";
         } elseif (is_array($data) && count($data) === 0) {
             return "";
@@ -322,6 +329,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
             if (empty($return)) {
                 $return = false;
             }
+
             return $return;
         }
 
@@ -372,6 +380,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                     $pathes[] = $eo->getRealFullPath();
                 }
             }
+
             return $pathes;
         }
     }
@@ -391,6 +400,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                     $pathes[] = get_class($e) . $e->getRealFullPath();
                 }
             }
+
             return implode("<br />", $pathes);
         }
     }
@@ -405,11 +415,12 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
 
     /**
      * @param integer $width
-     * @return void
+     * @return $this
      */
     public function setWidth($width)
     {
         $this->width = $this->getAsIntegerCast($width);
+
         return $this;
     }
 
@@ -423,11 +434,12 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
 
     /**
      * @param integer $height
-     * @return void
+     * @return $this
      */
     public function setHeight($height)
     {
         $this->height = $this->getAsIntegerCast($height);
+
         return $this;
     }
 
@@ -483,6 +495,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                     $paths[] = Element\Service::getType($eo) . ":" . $eo->getRealFullPath();
                 }
             }
+
             return implode(",", $paths);
         } else {
             return null;
@@ -519,6 +532,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                 }
             }
         }
+
         return $value;
     }
 
@@ -541,6 +555,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                 }
             }
         }
+
         return $tags;
     }
 
@@ -563,6 +578,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                 }
             }
         }
+
         return $dependencies;
     }
 
@@ -586,6 +602,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                     ];
                 }
             }
+
             return $items;
         } else {
             return null;
@@ -632,6 +649,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                     }
                 }
             }
+
             return $hrefs;
         } else {
             throw new \Exception("cannot get values from web service import - invalid data");
@@ -667,6 +685,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
                     $publishedList[] = $listElement;
                 }
             }
+
             return $publishedList;
         }
 
@@ -695,6 +714,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
     public function setMaxItems($maxItems)
     {
         $this->maxItems = $this->getAsIntegerCast($maxItems);
+
         return $this;
     }
 
@@ -713,6 +733,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
     public function setAssetUploadPath($assetUploadPath)
     {
         $this->assetUploadPath = $assetUploadPath;
+
         return $this;
     }
 
@@ -752,6 +773,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
             $html = $this->getVersionPreview($data, $object, $params);
             $value["html"] = $html;
         }
+
         return $value;
     }
 
@@ -780,6 +802,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
 
             return $this->getDataFromEditmode($result, $object, $params);
         }
+
         return;
     }
 
@@ -802,6 +825,7 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
     {
         $data = $this->getDataFromObjectParam($object, $params);
         $data = $this->rewriteIdsService($data, $idMapping);
+
         return $data;
     }
 
@@ -827,5 +851,53 @@ class Multihref extends Model\Object\ClassDefinition\Data\Relations\AbstractRela
     public function getPhpdocType()
     {
         return implode(' | ', $this->getPhpDocClassString(true));
+    }
+
+    /** Encode value for packing it into a single column.
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function marshal($value, $object = null, $params = [])
+    {
+        if (is_array($value)) {
+            $result = [];
+            foreach ($value as $element) {
+                $type = Element\Service::getType($element);
+                $id = $element->getId();
+                $result[] =  [
+                    "type" => $type,
+                    "id" => $id
+                ];
+            }
+
+            return $result;
+        }
+
+        return null;
+    }
+
+    /** See marshal
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function unmarshal($value, $object = null, $params = [])
+    {
+        if (is_array($value)) {
+            $result = [];
+            foreach ($value as $elementData) {
+                $type = $elementData["type"];
+                $id = $elementData["id"];
+                $element = Element\Service::getElementById($type, $id);
+                if ($element) {
+                    $result[] = $element;
+                }
+            }
+
+            return $result;
+        }
     }
 }

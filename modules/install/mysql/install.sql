@@ -89,6 +89,7 @@ CREATE TABLE `classes` (
   `previewUrl` varchar(255) DEFAULT NULL,
   `propertyVisibility` text,
   `showVariants` tinyint(1) DEFAULT NULL,
+  `group` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) DEFAULT CHARSET=utf8;
@@ -125,7 +126,7 @@ DROP TABLE IF EXISTS `documents` ;
 CREATE TABLE `documents` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `parentId` int(11) unsigned DEFAULT NULL,
-  `type` enum('page','link','snippet','folder','hardlink','email','printpage','printcontainer') DEFAULT NULL,
+  `type` enum('page','link','snippet','folder','hardlink','email','newsletter','printpage','printcontainer') DEFAULT NULL,
   `key` varchar(255) DEFAULT '',
   `path` varchar(765) CHARACTER SET ascii DEFAULT NULL, /* path in ascii using the full key length of 765 bytes (PIMCORE-2654) */
   `index` int(11) unsigned DEFAULT '0',
@@ -167,6 +168,23 @@ CREATE TABLE `documents_email` (
   `subject` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `documents_newsletter`;
+CREATE TABLE `documents_newsletter` (
+  `id` int(11) unsigned NOT NULL DEFAULT '0',
+  `module` varchar(255) DEFAULT NULL,
+  `controller` varchar(255) DEFAULT NULL,
+  `action` varchar(255) DEFAULT NULL,
+  `template` varchar(255) DEFAULT NULL,
+  `from` varchar(255) DEFAULT NULL,
+  `subject` varchar(255) DEFAULT NULL,
+  `trackingParameterSource` varchar(255) DEFAULT NULL,
+  `trackingParameterMedium` varchar(255) DEFAULT NULL,
+  `trackingParameterName` varchar(255) DEFAULT NULL,
+  `enableTrackingParameters` tinyint(1) unsigned DEFAULT NULL,
+  `sendingMode` varchar(20) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 DROP TABLE IF EXISTS `documents_hardlink`;
 CREATE TABLE `documents_hardlink` (
@@ -235,6 +253,7 @@ CREATE TABLE `documents_printpage` (
   `template` varchar(255) DEFAULT NULL,
   `lastGenerated` int(11) DEFAULT NULL,
   `lastGenerateMessage` text CHARACTER SET utf8,
+  `contentMasterDocumentId` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8;
 
@@ -658,11 +677,12 @@ CREATE TABLE `users` (
   `contentLanguages` LONGTEXT NULL,
   `admin` tinyint(1) unsigned DEFAULT '0',
   `active` tinyint(1) unsigned DEFAULT '1',
-  `permissions` varchar(1000) DEFAULT NULL,
+  `permissions` text,
   `roles` varchar(1000) DEFAULT NULL,
   `welcomescreen` tinyint(1) DEFAULT NULL,
   `closeWarning` tinyint(1) DEFAULT NULL,
   `memorizeTabs` tinyint(1) DEFAULT NULL,
+  `allowDirtyClose` tinyint(1) unsigned DEFAULT '1',
   `docTypes` varchar(255) DEFAULT NULL,
   `classes` varchar(255) DEFAULT NULL,
   `apiKey` varchar(255) DEFAULT NULL,
@@ -790,8 +810,7 @@ CREATE TABLE `classificationstore_stores` (
 	`description` LONGTEXT NULL,
 	PRIMARY KEY (`id`),
 	INDEX `name` (`name`)
-)
-ENGINE=InnoDB;
+) DEFAULT CHARSET=utf8;
 
 DROP TABLE IF EXISTS `classificationstore_groups`;
 CREATE TABLE `classificationstore_groups` (
@@ -865,13 +884,23 @@ CREATE TABLE `classificationstore_collectionrelations` (
 
 DROP TABLE IF EXISTS `quantityvalue_units`;
 CREATE TABLE `quantityvalue_units` (
-              `id` bigint(20) NOT NULL AUTO_INCREMENT,
-              `group` varchar(50) COLLATE utf8_bin DEFAULT NULL,
-              `abbreviation` varchar(10) COLLATE utf8_bin NOT NULL,
-              `longname` varchar(250) COLLATE utf8_bin DEFAULT NULL,
-              `baseunit` varchar(10) COLLATE utf8_bin DEFAULT NULL,
-              `factor` double DEFAULT NULL,
-              `conversionOffset` DOUBLE NULL DEFAULT NULL,
-              `reference` varchar(50) COLLATE utf8_bin DEFAULT NULL,
-              PRIMARY KEY (`id`)
-            ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `group` varchar(50) COLLATE utf8_bin DEFAULT NULL,
+  `abbreviation` varchar(10) COLLATE utf8_bin NOT NULL,
+  `longname` varchar(250) COLLATE utf8_bin DEFAULT NULL,
+  `baseunit` varchar(10) COLLATE utf8_bin DEFAULT NULL,
+  `factor` double DEFAULT NULL,
+  `conversionOffset` DOUBLE NULL DEFAULT NULL,
+  `reference` varchar(50) COLLATE utf8_bin DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `element_workflow_state`;
+CREATE TABLE `element_workflow_state` (
+  `cid` int(10) NOT NULL DEFAULT '0',
+  `ctype` enum('document','asset','object') NOT NULL,
+  `workflowId` int(11) NOT NULL,
+  `state` varchar(255) DEFAULT NULL,
+  `status` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`cid`,`ctype`,`workflowId`)
+) DEFAULT CHARSET=utf8;

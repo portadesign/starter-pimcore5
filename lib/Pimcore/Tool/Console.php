@@ -48,6 +48,7 @@ class Console
                 self::$systemEnvironment = 'unix';
             }
         }
+
         return self::$systemEnvironment;
     }
 
@@ -78,6 +79,12 @@ class Console
             self::$customSetupMethod();
         }
 
+        // allow custom check routines for certain programs
+        $customCheckMethod = "check" . ucfirst($name);
+        if (!method_exists(__CLASS__, $customCheckMethod)) {
+            $customCheckMethod = "checkDummy";
+        }
+
         foreach ($paths as $path) {
             foreach (["--help", "-h", "-help"] as $option) {
                 try {
@@ -89,21 +96,23 @@ class Console
                     }
 
                     $process = new Process($executablePath . " " . $option);
-                    $process->mustRun();
+                    $process->run();
 
-                    if (empty($path) && self::getSystemEnvironment() == "unix") {
-                        // get the full qualified path, seems to solve a lot of problems :)
-                        // if not using the full path, timeout, nohup and nice will fail
-                        $fullQualifiedPath = shell_exec("which " . $executablePath);
-                        $fullQualifiedPath = trim($fullQualifiedPath);
-                        if ($fullQualifiedPath) {
-                            $executablePath = $fullQualifiedPath;
+                    if ($process->isSuccessful() || self::$customCheckMethod($process)) {
+                        if (empty($path) && self::getSystemEnvironment() == "unix") {
+                            // get the full qualified path, seems to solve a lot of problems :)
+                            // if not using the full path, timeout, nohup and nice will fail
+                            $fullQualifiedPath = shell_exec("which " . $executablePath);
+                            $fullQualifiedPath = trim($fullQualifiedPath);
+                            if ($fullQualifiedPath) {
+                                $executablePath = $fullQualifiedPath;
+                            }
                         }
+
+                        self::$executableCache[$name] = $executablePath;
+
+                        return $executablePath;
                     }
-
-                    self::$executableCache[$name] = $executablePath;
-
-                    return $executablePath;
                 } catch (\Exception $e) {
                 }
             }
@@ -133,6 +142,41 @@ class Console
         }
 
         putenv("COMPOSER_DISABLE_XDEBUG_WARN=true");
+    }
+
+    /**
+     * @param $process
+     * @return bool
+     */
+    protected static function checkPngout($process)
+    {
+        if (strpos($process->getOutput() . $process->getErrorOutput(), "bitdepth") !== false) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param $process
+     * @return bool
+     */
+    protected static function checkCjpeg($process)
+    {
+        if (strpos($process->getOutput() . $process->getErrorOutput(), "-optimize") !== false) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param $process
+     * @return bool
+     */
+    protected static function checkDummy($process)
+    {
+        return false;
     }
 
     /**
@@ -185,6 +229,7 @@ class Console
     {
         $cmd = self::buildPhpScriptCmd($script, $arguments);
         $return = Console::exec($cmd, $outputFile, $timeout);
+
         return $return;
     }
 
@@ -198,6 +243,7 @@ class Console
     {
         $cmd = self::buildPhpScriptCmd($script, $arguments);
         $return = Console::execInBackground($cmd, $outputFile);
+
         return $return;
     }
 

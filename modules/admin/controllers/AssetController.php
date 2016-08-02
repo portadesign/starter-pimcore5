@@ -82,7 +82,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
             if (function_exists("exif_read_data") && is_file($asset->getFileSystemPath())) {
                 $supportedTypes = [IMAGETYPE_JPEG, IMAGETYPE_TIFF_II, IMAGETYPE_TIFF_MM];
 
-                if (in_array(exif_imagetype($asset->getFileSystemPath()), $supportedTypes)) {
+                if (in_array(@exif_imagetype($asset->getFileSystemPath()), $supportedTypes)) {
                     $exif = @exif_read_data($asset->getFileSystemPath());
                     if (is_array($exif)) {
                         $imageInfo["exif"] = [];
@@ -102,8 +102,18 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
         }
 
         $asset->setStream(null);
+
+        //Hook for modifying return value - e.g. for changing permissions based on object data
+        //data need to wrapped into a container in order to pass parameter to event listeners by reference so that they can change the values
+        $returnValueContainer = new Model\Tool\Admin\EventDataContainer(object2array($asset));
+        \Pimcore::getEventManager()->trigger("admin.asset.get.preSendData", $this, [
+            "asset" => $asset,
+            "returnValueContainer" => $returnValueContainer
+        ]);
+
+
         if ($asset->isAllowed("view")) {
-            $this->_helper->json($asset);
+            $this->_helper->json($returnValueContainer->getData());
         }
 
         $this->_helper->json(["success" => false, "message" => "missing_permission"]);
@@ -112,6 +122,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
     public function treeGetChildsByIdAction()
     {
         $assets = [];
+        $cv = false;
         $asset = Asset::getById($this->getParam("node"));
 
         if ($asset->hasChilds()) {
@@ -592,6 +603,7 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
         } elseif ($asset instanceof Asset\Document && \Pimcore\Document::isAvailable()) {
             return "/admin/asset/get-document-thumbnail/id/" . $asset->getId() . "/treepreview/true";
         }
+
         return null;
     }
 
@@ -873,7 +885,6 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
         $format = strtolower($thumbnail->getFormat());
         if ($format == "source" || $format == "print") {
             $thumbnail->setFormat("PNG");
-            $format = "png";
         }
 
         if ($this->getParam("treepreview")) {
@@ -913,6 +924,8 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
         } else {
             header("Content-Type: " . $image->getMimetype(), true);
         }
+
+        header("Access-Control-Allow-Origin: *"); // for Aviary.Feather (Adobe Creative SDK)
 
         header("Content-Length: " . filesize($thumbnailFile), true);
         $this->sendThumbnailCacheHeaders(); while (@ob_end_flush());
@@ -1047,15 +1060,20 @@ class Admin_AssetController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
-
-    public function saveImagePixlrAction()
+    public function imageEditorAction()
     {
         $asset = Asset::getById($this->getParam("id"));
-        $asset->setData(Tool::getHttpData($this->getParam("image")));
+        $this->view->asset = $asset;
+    }
+
+    public function imageEditorSaveAction()
+    {
+        $asset = Asset::getById($this->getParam("id"));
+        $asset->setData(Tool::getHttpData($this->getParam("url")));
         $asset->setUserModification($this->getUser()->getId());
         $asset->save();
 
-        $this->view->asset = $asset;
+        $this->_helper->json(["success" => true]);
     }
 
     public function getFolderContentPreviewAction()

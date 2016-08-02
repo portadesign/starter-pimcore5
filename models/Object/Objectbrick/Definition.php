@@ -36,11 +36,12 @@ class Definition extends Model\Object\Fieldcollection\Definition
 
     /**
      * @param $classDefinitions
-     * @return void
+     * @return $this
      */
     public function setClassDefinitions($classDefinitions)
     {
         $this->classDefinitions = $classDefinitions;
+
         return $this;
     }
 

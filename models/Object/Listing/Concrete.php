@@ -87,6 +87,7 @@ abstract class Concrete extends Model\Object\Listing
     public function setClassId($classId)
     {
         $this->classId = $classId;
+
         return $this;
     }
 
@@ -97,6 +98,7 @@ abstract class Concrete extends Model\Object\Listing
     public function setClassName($className)
     {
         $this->className = $className;
+
         return $this;
     }
 
@@ -106,16 +108,18 @@ abstract class Concrete extends Model\Object\Listing
     public function getClass()
     {
         $class = Object\ClassDefinition::getById($this->getClassId());
+
         return $class;
     }
 
     /**
      * @param mixed $locale
-     * @return void
+     * @return $this
      */
     public function setLocale($locale)
     {
         $this->locale = $locale;
+
         return $this;
     }
 
@@ -129,11 +133,12 @@ abstract class Concrete extends Model\Object\Listing
 
     /**
      * @param bool $ignoreLocalizedFields
-     * @return void
+     * @return $this
      */
     public function setIgnoreLocalizedFields($ignoreLocalizedFields)
     {
         $this->ignoreLocalizedFields = $ignoreLocalizedFields;
+
         return $this;
     }
 
@@ -178,6 +183,7 @@ abstract class Concrete extends Model\Object\Listing
         foreach ($fieldCollections as $fc) {
             $this->addFieldCollection($fc['type'], $fc['fieldname']);
         }
+
         return $this;
     }
 
@@ -224,6 +230,7 @@ abstract class Concrete extends Model\Object\Listing
                 $this->addObjectbrick($ob);
             }
         }
+
         return $this;
     }
 

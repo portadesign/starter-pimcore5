@@ -32,7 +32,8 @@ class Admin_SnippetController extends \Pimcore\Controller\Action\Admin\Document
         $snippet = clone $snippet;
         $snippet = $this->getLatestVersion($snippet);
 
-        $snippet->setVersions(array_splice($snippet->getVersions(), 0, 1));
+        $versions = $snippet->getVersions();
+        $snippet->setVersions(array_splice($versions, 0, 1));
         $snippet->getScheduledTasks();
         $snippet->idPath = Element\Service::getIdPath($snippet);
         $snippet->userPermissions = $snippet->getUserPermissions();
@@ -49,8 +50,16 @@ class Admin_SnippetController extends \Pimcore\Controller\Action\Admin\Document
         // unset useless data
         $snippet->setElements(null);
 
+        //Hook for modifying return value - e.g. for changing permissions based on object data
+        //data need to wrapped into a container in order to pass parameter to event listeners by reference so that they can change the values
+        $returnValueContainer = new \Pimcore\Model\Tool\Admin\EventDataContainer(object2array($snippet));
+        \Pimcore::getEventManager()->trigger("admin.document.get.preSendData", $this, [
+            "document" => $snippet,
+            "returnValueContainer" => $returnValueContainer
+        ]);
+
         if ($snippet->isAllowed("view")) {
-            $this->_helper->json($snippet);
+            $this->_helper->json($returnValueContainer->getData());
         }
 
         $this->_helper->json(false);

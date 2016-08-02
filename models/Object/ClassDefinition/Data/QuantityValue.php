@@ -14,7 +14,6 @@
  * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
-
 namespace Pimcore\Model\Object\ClassDefinition\Data;
 
 use Pimcore\Model;
@@ -165,6 +164,7 @@ class QuantityValue extends Model\Object\ClassDefinition\Data
                 $this->getName() . "__unit" => $data->getUnitId()
             ];
         }
+
         return [
             $this->getName() . "__value" => null,
             $this->getName() . "__unit" => null
@@ -180,9 +180,10 @@ class QuantityValue extends Model\Object\ClassDefinition\Data
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
-        if ($data[$this->getName() . "__value"] && $data[$this->getName() . "__unit"]) {
+        if ($data[$this->getName() . "__value"] || $data[$this->getName() . "__unit"]) {
             return new  \Pimcore\Model\Object\Data\QuantityValue($data[$this->getName() . "__value"], $data[$this->getName() . "__unit"]);
         }
+
         return;
     }
 
@@ -229,21 +230,31 @@ class QuantityValue extends Model\Object\ClassDefinition\Data
         if ($data["value"] || $data["unit"]) {
             return new \Pimcore\Model\Object\Data\QuantityValue($data["value"], $data["unit"]);
         }
+
         return;
     }
 
     /**
      * @see Object_Class_Data::getVersionPreview
      * @param float $data
-     * @param null|Object\AbstractObject $object
+     * @param null|Model\Object\AbstractObject $object
      * @param mixed $params
      * @return float
      */
     public function getVersionPreview($data, $object = null, $params = [])
     {
         if ($data instanceof \Pimcore\Model\Object\Data\QuantityValue) {
-            return $data->getValue() . " " . $data->getUnit()->getAbbreviation();
+            $unit = "";
+            if ($data->getUnitId()) {
+                $unitDefinition = Model\Object\QuantityValue\Unit::getById($data->getUnitId());
+                if ($unitDefinition) {
+                    $unit = " " . $unitDefinition->getAbbreviation();
+                }
+            }
+
+            return $data->getValue() . $unit;
         }
+
         return "";
     }
 
@@ -304,11 +315,11 @@ class QuantityValue extends Model\Object\ClassDefinition\Data
             $number = (double) str_replace(",", ".", $values[0]);
             $value = new  \Pimcore\Model\Object\Data\QuantityValue($number, $values[1]);
         }
+
         return $value;
     }
 
-
-       /**
+    /**
      * converts data to be exposed via webservices
      * @param string $object
      * @param mixed $params
@@ -316,21 +327,20 @@ class QuantityValue extends Model\Object\ClassDefinition\Data
      */
     public function getForWebserviceExport($object, $params = [])
     {
-        $key = $this->getName();
-        $getter = "get".ucfirst($key);
+        $data = $this->getDataFromObjectParam($object, $params);
 
-        if ($object->$getter() instanceof \Pimcore\Model\Object\Data\QuantityValue) {
+        if ($data instanceof \Pimcore\Model\Object\Data\QuantityValue) {
             return [
-                "value" => $object->$getter()->getValue(),
-                "unit" => $object->$getter()->getUnitId(),
-                "unitAbbreviation" => is_object($object->$getter()->getUnit()) ? $object->$getter()->getUnit()->getAbbreviation() : ""
+                "value" => $data->getValue(),
+                "unit" => $data->getUnitId(),
+                "unitAbbreviation" => is_object($data->getUnit()) ? $data->getUnit() : ""
             ];
         } else {
             return null;
         }
     }
 
-     /**
+    /**
      * converts data to be imported via webservices
      * @param mixed $value
      * @param null|Model\Object\AbstractObject $object
@@ -341,15 +351,24 @@ class QuantityValue extends Model\Object\ClassDefinition\Data
     {
         if (empty($value)) {
             return null;
-        } elseif ($value["value"] !== null && $value["unit"] !== null && $value["unitAbbreviation"] !== null) {
-            $unit = Model\Object\QuantityValue\Unit::getById($value["unit"]);
-            if ($unit && $unit->getAbbreviation() == $value["unitAbbreviation"]) {
-                return new \Pimcore\Model\Object\Data\QuantityValue($value["value"], $value["unit"]);
-            } else {
-                throw new \Exception(get_class($this).": cannot get values from web service import - unit id and unit abbreviation do not match with local database");
-            }
         } else {
-            throw new \Exception(get_class($this).": cannot get values from web service import - invalid data");
+            $value = (array) $value;
+            if ($value["value"] !== null && $value["unit"] !== null && $value["unitAbbreviation"] !== null) {
+                $unitId = $value["unit"];
+
+                if ($idMapper) {
+                    $unitId = $idMapper->getMappedId("unit", $unitId);
+                }
+
+                $unit = Model\Object\QuantityValue\Unit::getById($unitId);
+                if ($unit && $unit->getAbbreviation() == $value["unitAbbreviation"]) {
+                    return new \Pimcore\Model\Object\Data\QuantityValue($value["value"], $unitId);
+                } else {
+                    throw new \Exception(get_class($this).": cannot get values from web service import - unit id and unit abbreviation do not match with local database");
+                }
+            } else {
+                throw new \Exception(get_class($this).": cannot get values from web service import - invalid data");
+            }
         }
     }
 
@@ -362,16 +381,24 @@ class QuantityValue extends Model\Object\ClassDefinition\Data
      */
     public function marshal($value, $object = null, $params = [])
     {
-        if (is_array($value)) {
-            return [
-                "value" => $value[$this->getName() . "__value"],
-                "value2" => $value[$this->getName() . "__unit"]
-            ];
+        if ($params["simple"]) {
+            if (is_array($value)) {
+                return [$value[$this->getName() . "__value"], $value[$this->getName() . "__unit"]];
+            } else {
+                return null;
+            }
         } else {
-            return [
-                "value" => null,
-                "value2" => null
-            ];
+            if (is_array($value)) {
+                return [
+                    "value" => $value[$this->getName() . "__value"],
+                    "value2" => $value[$this->getName() . "__unit"]
+                ];
+            } else {
+                return [
+                    "value" => null,
+                    "value2" => null
+                ];
+            }
         }
     }
 
@@ -383,6 +410,9 @@ class QuantityValue extends Model\Object\ClassDefinition\Data
      */
     public function unmarshal($value, $object = null, $params = [])
     {
+        if ($params["simple"]) {
+            return $value;
+        }
         if (is_array($value)) {
             return [
                 $this->getName() . "__value" => $value["value"],

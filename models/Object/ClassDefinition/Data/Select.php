@@ -77,11 +77,12 @@ class Select extends Model\Object\ClassDefinition\Data
 
     /**
      * @param array $options
-     * @return void
+     * @return $this
      */
     public function setOptions($options)
     {
         $this->options = $options;
+
         return $this;
     }
     
@@ -100,6 +101,7 @@ class Select extends Model\Object\ClassDefinition\Data
     public function setWidth($width)
     {
         $this->width = $this->getAsIntegerCast($width);
+
         return $this;
     }
 
@@ -205,8 +207,8 @@ class Select extends Model\Object\ClassDefinition\Data
 
         $value = "";
         foreach ($this->options as $option) {
-            if ($option["value"] == $data) {
-                $value = $option["key"];
+            if ($option->value == $data) {
+                $value = $option->key;
                 break;
             }
         }

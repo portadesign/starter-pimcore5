@@ -58,6 +58,7 @@ class Video extends Model\Document\Tag
     public function setTitle($title)
     {
         $this->title = $title;
+
         return $this;
     }
 
@@ -70,6 +71,7 @@ class Video extends Model\Document\Tag
             // default title for microformats
             return $this->getVideoAsset()->getFilename();
         }
+
         return $this->title;
     }
 
@@ -80,6 +82,7 @@ class Video extends Model\Document\Tag
     public function setDescription($description)
     {
         $this->description = $description;
+
         return $this;
     }
 
@@ -92,6 +95,7 @@ class Video extends Model\Document\Tag
             // default description for microformats
             return $this->getTitle();
         }
+
         return $this->description;
     }
 
@@ -242,7 +246,7 @@ class Video extends Model\Document\Tag
     /**
      * @see Document\Tag\TagInterface::setDataFromResource
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromResource($data)
     {
@@ -255,6 +259,7 @@ class Video extends Model\Document\Tag
         $this->poster = $data["poster"];
         $this->title = $data["title"];
         $this->description = $data["description"];
+
         return $this;
     }
 
@@ -294,6 +299,7 @@ class Video extends Model\Document\Tag
         if ($poster instanceof Asset\Image) {
             $this->poster = $poster->getId();
         }
+
         return $this;
     }
 
@@ -301,18 +307,20 @@ class Video extends Model\Document\Tag
     public function getWidth()
     {
         $options = $this->getOptions();
-        if ($options["width"]) {
+        if (isset($options["width"]) && $options["width"]) {
             return $options["width"];
         }
+
         return "100%";
     }
 
     public function getHeight()
     {
         $options = $this->getOptions();
-        if ($options["height"]) {
+        if (isset($options["height"]) && $options["height"]) {
             return $options["height"];
         }
+
         return 300;
     }
 
@@ -361,6 +369,7 @@ class Video extends Model\Document\Tag
                     $code = '<div id="pimcore_video_' . $this->getName() . '" class="pimcore_tag_video">';
                     $code .= '<img width="' . $this->getWidth() . '" src="' . $image . '" />';
                     $code .= '</div>';
+
                     return $code;
                 }
 
@@ -371,8 +380,7 @@ class Video extends Model\Document\Tag
                     $front = \Zend_Controller_Front::getInstance();
                     $front->unregisterPlugin("Pimcore\\Controller\\Plugin\\Cache");
 
-                    $progress = Asset\Video\Thumbnail\Processor::getProgress($thumbnail["processId"]);
-                    return $this->getProgressCode($progress, $image);
+                    return $this->getProgressCode($image);
                 } else {
                     return $this->getErrorCode("The video conversion failed, please see the debug.log for more details.");
                 }
@@ -668,8 +676,6 @@ class Video extends Model\Document\Tag
 
             $code .= '<video' . $attributesString . '>' . "\n";
 
-            $urls = array_reverse($urls); // use webm as the preferred format
-
             foreach ($urls as $type => $url) {
                 $code .= '<source type="video/' . $type . '" src="' . $url . '" />' . "\n";
             }
@@ -681,7 +687,7 @@ class Video extends Model\Document\Tag
         return $code;
     }
 
-    public function getProgressCode($progress, $thumbnail = null)
+    public function getProgressCode($thumbnail = null)
     {
         $uid = "video_" . uniqid();
         $code = '
@@ -726,6 +732,7 @@ class Video extends Model\Document\Tag
     public function getEmptyCode()
     {
         $uid = "video_" . uniqid();
+
         return '<div id="pimcore_video_' . $this->getName() . '" class="pimcore_tag_video"><div class="pimcore_tag_video_empty" id="' . $uid . '" style="width: ' . $this->getWidth() . 'px; height: ' . $this->getHeight() . 'px;"></div></div>';
     }
 
@@ -737,6 +744,7 @@ class Video extends Model\Document\Tag
         if ($this->id) {
             return false;
         }
+
         return true;
     }
 
@@ -806,6 +814,7 @@ class Video extends Model\Document\Tag
         if ($this->getVideoAsset()) {
             return $this->getVideoAsset()->getImageThumbnail($config);
         }
+
         return "";
     }
 
@@ -818,6 +827,7 @@ class Video extends Model\Document\Tag
         if ($this->getVideoAsset()) {
             return $this->getVideoAsset()->getThumbnail($config);
         }
+
         return [];
     }
 
@@ -828,6 +838,7 @@ class Video extends Model\Document\Tag
     public function setId($id)
     {
         $this->id = $id;
+
         return $this;
     }
 

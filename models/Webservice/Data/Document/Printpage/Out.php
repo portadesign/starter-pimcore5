@@ -14,11 +14,29 @@
  * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
-
 namespace Pimcore\Model\Webservice\Data\Document\Printpage;
 
 use \Pimcore\Model\Webservice\Data\Document;
 
 class Out extends Document\Printpage
 {
+    /**
+     * @var string
+     */
+    public $path;
+
+    /**
+     * @var integer
+     */
+    public $creationDate;
+
+    /**
+     * @var integer
+     */
+    public $modificationDate;
+
+    /**
+     * @var integer
+     */
+    public $userModification;
 }

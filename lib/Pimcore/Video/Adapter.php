@@ -56,6 +56,7 @@ abstract class Adapter
     public function setAudioBitrate($audioBitrate)
     {
         $this->audioBitrate = $audioBitrate;
+
         return $this;
     }
 
@@ -74,6 +75,7 @@ abstract class Adapter
     public function setVideoBitrate($videoBitrate)
     {
         $this->videoBitrate = $videoBitrate;
+
         return $this;
     }
 
@@ -105,18 +107,7 @@ abstract class Adapter
     /**
      * @abstract
      */
-    abstract public function getConversionStatus();
-
-    /**
-     * @abstract
-     */
     abstract public function destroy();
-
-    /**
-     * @abstract
-     * @return bool
-     */
-    abstract public function isFinished();
 
     /**
      * @param $format
@@ -125,6 +116,7 @@ abstract class Adapter
     public function setFormat($format)
     {
         $this->format = $format;
+
         return $this;
     }
 
@@ -143,6 +135,7 @@ abstract class Adapter
     public function setDestinationFile($destinationFile)
     {
         $this->destinationFile = $destinationFile;
+
         return $this;
     }
 
@@ -161,6 +154,7 @@ abstract class Adapter
     public function setLength($length)
     {
         $this->length = $length;
+
         return $this;
     }
 

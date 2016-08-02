@@ -27,12 +27,12 @@ class Concrete extends AbstractObject
      * @var boolean
      */
     public $o_published;
-    
+
     /**
      * @var Object|Class
      */
     public $o_class;
-    
+
     /**
      * @var integer
      */
@@ -78,6 +78,7 @@ class Concrete extends AbstractObject
     public static function classId()
     {
         $v = get_class_vars(get_called_class());
+
         return $v["o_classId"];
     }
 
@@ -108,11 +109,12 @@ class Concrete extends AbstractObject
 
     /**
      * @param array $o___loadedLazyFields
-     * @return void
+     * @return $this
      */
     public function setO__loadedLazyFields(array $o___loadedLazyFields)
     {
         $this->o___loadedLazyFields = $o___loadedLazyFields;
+
         return $this;
     }
 
@@ -159,7 +161,7 @@ class Concrete extends AbstractObject
 
                 $value = $this->$getter();
                 $omitMandatoryCheck = $this->getOmitMandatoryCheck();
-                
+
                 //check throws Exception
                 try {
                     $fd->checkValidity($value, $omitMandatoryCheck);
@@ -243,11 +245,11 @@ class Concrete extends AbstractObject
     }
 
     /**
-     * $directCall is true when the method is called from outside (eg. directly in the controller "save only version")
+     * $callPluginHook is true when the method is called from outside (eg. directly in the controller "save only version")
      * it is false when the method is called by $this->update()
      * @param bool $setModificationDate
-     * @param bool $directCall
-     * @return Version
+     * @param bool $callPluginHook
+     * @return Model\Version
      */
     public function saveVersion($setModificationDate = true, $callPluginHook = true)
     {
@@ -268,8 +270,10 @@ class Concrete extends AbstractObject
         $version = null;
 
         // only create a new version if there is at least 1 allowed
+        // or if saveVersion() was called directly (it's a newer version of the object)
         if (Config::getSystemConfig()->objects->versions->steps
-            || Config::getSystemConfig()->objects->versions->days) {
+            || Config::getSystemConfig()->objects->versions->days
+            || $setModificationDate) {
             // create version
             $version = new Model\Version();
             $version->setCid($this->getId());
@@ -298,16 +302,18 @@ class Concrete extends AbstractObject
         if ($this->o_versions === null) {
             $this->setVersions($this->getDao()->getVersions());
         }
+
         return $this->o_versions;
     }
 
     /**
      * @param array $o_versions
-     * @return void
+     * @return $this
      */
     public function setVersions($o_versions)
     {
         $this->o_versions = $o_versions;
+
         return $this;
     }
 
@@ -322,8 +328,10 @@ class Concrete extends AbstractObject
         } elseif ($this->getClass()->getFieldDefinition($key) instanceof Model\Object\ClassDefinition\Data\CalculatedValue) {
             $value = new Model\Object\Data\CalculatedValue($key);
             $value = Service::getCalculatedFieldValue($this, $value);
+
             return $value;
         }
+
         return false;
     }
 
@@ -343,6 +351,7 @@ class Concrete extends AbstractObject
                 $tags = $def->getCacheTags($this->getValueForFieldName($name), $tags);
             }
         }
+
         return $tags;
     }
 
@@ -360,6 +369,7 @@ class Concrete extends AbstractObject
                 $dependencies = array_merge($dependencies, $field->resolveDependencies($this->$key));
             }
         }
+
         return $dependencies;
     }
 
@@ -369,6 +379,7 @@ class Concrete extends AbstractObject
     public function setClass($o_class)
     {
         $this->o_class = $o_class;
+
         return $this;
     }
 
@@ -380,6 +391,7 @@ class Concrete extends AbstractObject
         if (!$this->o_class) {
             $this->setClass(ClassDefinition::getById($this->getClassId()));
         }
+
         return $this->o_class;
     }
 
@@ -393,11 +405,12 @@ class Concrete extends AbstractObject
 
     /**
      * @param int $o_classId
-     * @return void
+     * @return $this
      */
     public function setClassId($o_classId)
     {
         $this->o_classId = (int) $o_classId;
+
         return $this;
     }
 
@@ -411,11 +424,12 @@ class Concrete extends AbstractObject
 
     /**
      * @param string $o_className
-     * @return void
+     * @return $this
      */
     public function setClassName($o_className)
     {
         $this->o_className = $o_className;
+
         return $this;
     }
 
@@ -442,6 +456,7 @@ class Concrete extends AbstractObject
     public function setPublished($o_published)
     {
         $this->o_published = (bool) $o_published;
+
         return $this;
     }
 
@@ -451,6 +466,7 @@ class Concrete extends AbstractObject
     public function setOmitMandatoryCheck($omitMandatoryCheck)
     {
         $this->omitMandatoryCheck = $omitMandatoryCheck;
+
         return $this;
     }
 
@@ -472,6 +488,7 @@ class Concrete extends AbstractObject
             $taskList->setCondition("cid = ? AND ctype='object'", $this->getId());
             $this->scheduledTasks = $taskList->load();
         }
+
         return $this->scheduledTasks;
     }
 
@@ -481,6 +498,7 @@ class Concrete extends AbstractObject
     public function setScheduledTasks($scheduledTasks)
     {
         $this->scheduledTasks = $scheduledTasks;
+
         return $this;
     }
 
@@ -544,6 +562,7 @@ class Concrete extends AbstractObject
     public function getRelationData($fieldName, $forOwner, $remoteClassId)
     {
         $relationData = $this->getDao()->getRelationData($fieldName, $forOwner, $remoteClassId);
+
         return $relationData;
     }
 
@@ -569,7 +588,7 @@ class Concrete extends AbstractObject
 
         if (property_exists($tmpObj, $propertyName)) {
             // check if the given fieldtype is valid for this shorthand
-            $allowedDataTypes = ["input","numeric","checkbox","country","date","datetime","image","language","multihref","multiselect","select","slider","time","user","email","firstname","lastname","localizedfields"];
+            $allowedDataTypes = ["input", "numeric", "checkbox", "country", "date", "datetime", "image", "language", "multihref", "multiselect", "select", "slider", "time", "user", "email", "firstname", "lastname", "localizedfields"];
 
             $field = $tmpObj->getClass()->getFieldDefinition($propertyName);
             if (!in_array($field->getFieldType(), $allowedDataTypes)) {
@@ -626,6 +645,7 @@ class Concrete extends AbstractObject
 
             if (isset($listConfig['limit']) && $listConfig['limit'] == 1) {
                 $elements = $list->getObjects();
+
                 return isset($elements[0]) ? $elements[0] : null;
             }
 

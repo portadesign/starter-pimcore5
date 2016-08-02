@@ -76,7 +76,10 @@ class Admin_IndexController extends \Pimcore\Controller\Action\Admin
                     $tmpData["allowedClasses"] = $tmpData["classes"] ? explode(",", $tmpData["classes"]) : null;
                     $tmpData["showroot"] = (bool)$tmpData["showroot"];
 
-                    $cvData[] = $tmpData;
+                    // Check if a user has privileges to that node
+                    if ($rootNode->isAllowed("list")) {
+                        $cvData[] = $tmpData;
+                    }
                 }
             }
         }
@@ -103,6 +106,7 @@ class Admin_IndexController extends \Pimcore\Controller\Action\Admin
             if (!isset($adminSession->csrfToken) && !$adminSession->csrfToken) {
                 $adminSession->csrfToken = sha1(microtime() . $user->getName() . uniqid());
             }
+
             return $adminSession->csrfToken;
         });
 

@@ -39,6 +39,7 @@ abstract class AbstractModel
         if (!$this->dao) {
             $this->initDao();
         }
+
         return $this->dao;
     }
 
@@ -49,6 +50,7 @@ abstract class AbstractModel
     public function setDao($dao)
     {
         $this->dao = $dao;
+
         return $this;
     }
 
@@ -63,70 +65,63 @@ abstract class AbstractModel
 
     /**
      * @param null $key
+     * @param bool $forceDetection
      * @throws \Exception
      */
-    public function initDao($key = null)
+    public function initDao($key = null, $forceDetection = false)
     {
         $myClass = get_class($this);
+        $cacheKey = $myClass . ($key ? ("-" . $key) : "");
         $dao = null;
 
-        if (!$key) {
-            // check for a resource in the cache
-            if (array_key_exists($myClass, self::$daoClassCache)) {
-                $dao = self::$daoClassCache[$myClass];
-            } else {
-                $classes = $this->getParentClasses($myClass);
+        if (!$forceDetection && array_key_exists($cacheKey, self::$daoClassCache)) {
+            $dao = self::$daoClassCache[$cacheKey];
+        } elseif (!$key || $forceDetection) {
+            $classes = $this->getParentClasses($key ? $key : $myClass);
 
-                foreach ($classes as $class) {
-                    $delimiter = "_"; // old prefixed class style
-                    if (strpos($class, "\\")) {
-                        $delimiter = "\\"; // that's the new with namespaces
-                    }
-
-                    $classParts = explode($delimiter, $class);
-                    $length = count($classParts);
-                    $className = null;
-
-                    for ($i = 0; $i < $length; $i++) {
-
-                        // check for a general dao adapter
-                        $tmpClassName = implode($delimiter, $classParts) . $delimiter . "Dao";
-                        if ($className = $this->determineResourceClass($tmpClassName)) {
-                            break;
-                        }
-
-                        // check for the old style resource adapter
-                        $tmpClassName = implode($delimiter, $classParts) . $delimiter . "Resource";
-                        if ($className = $this->determineResourceClass($tmpClassName)) {
-                            break;
-                        }
-
-                        array_pop($classParts);
-                    }
-
-                    if ($className) {
-                        $dao = $className;
-                        self::$daoClassCache[$myClass] = $dao;
-
-                        break;
-                    }
-                }
-            }
-        } else {
-            // check in cache
-            $cacheKey = $myClass . "-" . $key;
-            if (array_key_exists($cacheKey, self::$daoClassCache)) {
-                $dao = self::$daoClassCache[$cacheKey];
-            } else {
+            foreach ($classes as $class) {
                 $delimiter = "_"; // old prefixed class style
-                if (strpos($key, "\\") !== false) {
+                if (strpos($class, "\\")) {
                     $delimiter = "\\"; // that's the new with namespaces
                 }
 
-                $dao = $key . $delimiter . "Dao";
+                $classParts = explode($delimiter, $class);
+                $length = count($classParts);
+                $className = null;
 
-                self::$daoClassCache[$cacheKey] = $dao;
+                for ($i = 0; $i < $length; $i++) {
+
+                    // check for a general dao adapter
+                    $tmpClassName = implode($delimiter, $classParts) . $delimiter . "Dao";
+                    if ($className = $this->determineResourceClass($tmpClassName)) {
+                        break;
+                    }
+
+                    // check for the old style resource adapter
+                    $tmpClassName = implode($delimiter, $classParts) . $delimiter . "Resource";
+                    if ($className = $this->determineResourceClass($tmpClassName)) {
+                        break;
+                    }
+
+                    array_pop($classParts);
+                }
+
+                if ($className) {
+                    $dao = $className;
+                    self::$daoClassCache[$cacheKey] = $dao;
+
+                    break;
+                }
             }
+        } elseif ($key) {
+            $delimiter = "_"; // old prefixed class style
+            if (strpos($key, "\\") !== false) {
+                $delimiter = "\\"; // that's the new with namespaces
+            }
+
+            $dao = $key . $delimiter . "Dao";
+
+            self::$daoClassCache[$cacheKey] = $dao;
         }
 
         if (!$dao) {
@@ -202,6 +197,7 @@ abstract class AbstractModel
                 $this->setValue($key, $value);
             }
         }
+
         return $this;
     }
 
@@ -219,6 +215,7 @@ abstract class AbstractModel
             // compatibility mode for objects (they do not have any set_oXyz() methods anymore)
             $this->$method($value);
         }
+
         return $this;
     }
 
@@ -228,13 +225,14 @@ abstract class AbstractModel
     public function __sleep()
     {
         $finalVars = [];
-        $blockedVars = ["dao","_fulldump"]; // _fulldump is a temp var which is used to trigger a full serialized dump in __sleep eg. in Document, \Object_Abstract
+        $blockedVars = ["dao", "_fulldump"]; // _fulldump is a temp var which is used to trigger a full serialized dump in __sleep eg. in Document, \Object_Abstract
         $vars = get_object_vars($this);
         foreach ($vars as $key => $value) {
             if (!in_array($key, $blockedVars)) {
                 $finalVars[] = $key;
             }
         }
+
         return $finalVars;
     }
 
@@ -256,6 +254,7 @@ abstract class AbstractModel
         if (method_exists($this->getDao(), $method)) {
             try {
                 $r = call_user_func_array([$this->getDao(), $method], $args);
+
                 return $r;
             } catch (\Exception $e) {
                 \Logger::emergency($e);
@@ -284,6 +283,7 @@ abstract class AbstractModel
     {
         $data = get_object_vars($this);
         unset($data['dao']);
+
         return $data;
     }
 }

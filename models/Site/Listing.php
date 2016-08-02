@@ -49,11 +49,12 @@ class Listing extends Model\Listing\AbstractListing
 
     /**
      * @param array $sites
-     * @return void
+     * @return $this
      */
     public function setSites($sites)
     {
         $this->sites = $sites;
+
         return $this;
     }
 }

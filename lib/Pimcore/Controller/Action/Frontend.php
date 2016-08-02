@@ -58,6 +58,11 @@ abstract class Frontend extends Action
     public static $isInitial = true;
 
     /**
+     * @var string
+     */
+    private static $locale;
+
+    /**
      * @throws \Zend_Controller_Router_Exception
      */
     public function init()
@@ -258,9 +263,22 @@ abstract class Frontend extends Action
                 // get the cononical (source) document
                 $hardlinkCanonicalSourceDocument = Document::getById($this->getDocument()->getId());
                 $request = $this->getRequest();
+                $canonical = null;
 
                 if (\Pimcore\Tool\Frontend::isDocumentInCurrentSite($hardlinkCanonicalSourceDocument)) {
-                    $this->getResponse()->setHeader("Link", '<' . $request->getScheme() . "://" . $request->getHttpHost() . $hardlinkCanonicalSourceDocument->getFullPath() . '>; rel="canonical"');
+                    $canonical = $request->getScheme() . "://" . $request->getHttpHost() . $hardlinkCanonicalSourceDocument->getFullPath();
+                } elseif (Model\Site::isSiteRequest()) {
+                    $sourceSite = \Pimcore\Tool\Frontend::getSiteForDocument($hardlinkCanonicalSourceDocument);
+                    if ($sourceSite) {
+                        if ($sourceSite->getMainDomain()) {
+                            $sourceSiteRelPath = preg_replace("@^" . preg_quote($sourceSite->getRootPath(), "@") . "@", "", $hardlinkCanonicalSourceDocument->getRealFullPath());
+                            $canonical = $request->getScheme() . "://" . $sourceSite->getMainDomain() . $sourceSiteRelPath;
+                        }
+                    }
+                }
+
+                if ($canonical) {
+                    $this->getResponse()->setHeader("Link", '<' . $canonical . '>; rel="canonical"');
                 }
             }
 
@@ -307,17 +325,42 @@ abstract class Frontend extends Action
      */
     public function setLocale($locale)
     {
-        if (\Zend_Locale::isLocale($locale)) {
+        if ((string) $locale != self::$locale && \Zend_Locale::isLocale($locale)) {
             $locale = new \Zend_Locale($locale);
             \Zend_Registry::set('Zend_Locale', $locale);
             $this->getResponse()->setHeader("Content-Language", strtolower(str_replace("_", "-", (string) $locale)), true);
 
+            // now we prepare everything for setlocale()
+            $localeList = [(string) $locale . ".utf8"];
+
+            if ($locale->getRegion()) {
+                // add only the language to the list as a fallback
+                $localeList[] = $locale->getLanguage() . ".utf8";
+            } else {
+                // try to get a list of territories for this language
+                // usually OS have no "language only" locale, only the combination language-territory (eg. Debian)
+                $languageRegionMapping = include PIMCORE_PATH . "/config/data/cldr-language-territory-mapping.php";
+                if (isset($languageRegionMapping[$locale->getLanguage()])) {
+                    foreach ($languageRegionMapping[$locale->getLanguage()] as $territory) {
+                        $localeList[] = $locale->getLanguage() . "_" . $territory . ".utf8";
+                    }
+                }
+            }
+
+            // currently we have to exclude LC_MONETARY from being set, because of issues in combination with
+            // Zend_Currency -> see also https://github.com/zendframework/zf1/issues/706
+            // once this is resolved we can safely set the locale for LC_MONETARY as well.
+            setlocale(LC_ALL & ~LC_MONETARY, $localeList);
+
+            // reconfigure translation management
             if (\Zend_Registry::isRegistered("Zend_Translate")) {
                 $translator = \Zend_Registry::get("Zend_Translate");
                 if ($translator instanceof Translate) {
                     $translator->setLocale($locale);
                 }
             }
+
+            self::$locale = (string) $locale;
         }
     }
 
@@ -331,6 +374,7 @@ abstract class Frontend extends Action
             $this->document = $document;
             $this->view->document = $document;
         }
+
         return $this;
     }
 

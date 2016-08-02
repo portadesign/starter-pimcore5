@@ -117,6 +117,7 @@ class Mail
 
 </style>
 CSS;
+
         return $style;
     }
 
@@ -139,6 +140,7 @@ CSS;
             }
         }
         $tmpString = substr($tmpString, 0, strrpos($tmpString, ','));
+
         return $tmpString;
     }
 
@@ -211,23 +213,33 @@ CSS;
             throw new \Exception('$document has to be an instance of Document');
         }
 
-        if (is_null($hostUrl)) {
-            $hostUrl = \Pimcore\Tool::getHostUrl();
+        $replacePrefix = "";
+
+        if (!$hostUrl && $document) {
+            // try to determine if the newsletter is within a site
+            $site = \Pimcore\Tool\Frontend::getSiteForDocument($document);
+            if ($site) {
+                $hostUrl = "http://" . $site->getMainDomain();
+                $replacePrefix = $site->getRootPath();
+            }
+
+            // fallback
+            if (!$hostUrl) {
+                $hostUrl = \Pimcore\Tool::getHostUrl();
+            }
         }
 
         //matches all links
         preg_match_all("@(href|src)\s*=[\"']([^(http|mailto|javascript|data:|#)].*?(css|jpe?g|gif|png)?)[\"']@is", $string, $matches);
         if (!empty($matches[0])) {
             foreach ($matches[0] as $key => $value) {
-                $fullMatch = $matches[0][$key];
-                $linkType = $matches[1][$key];
                 $path = $matches[2][$key];
-                $fileType = $matches[3][$key];
 
                 if (strpos($path, '//') === 0) {
                     $absolutePath = "http:" . $path;
                 } elseif (strpos($path, '/') === 0) {
-                    $absolutePath = $hostUrl . $path;
+                    $absolutePath = preg_replace("@^" . $replacePrefix . "/@", "/", $path);
+                    $absolutePath = $hostUrl . $absolutePath;
                 } else {
                     $absolutePath = $hostUrl . "/$path";
                     $netUrl = new \Net_URL2($absolutePath);
@@ -238,6 +250,19 @@ CSS;
                 $string = preg_replace("!([\"'])$path([\"'])!is", "\\1" . $absolutePath . "\\2", $string);
             }
         }
+
+        preg_match_all("@srcset\s*=[\"'](.*?)[\"']@is", $string, $matches);
+        foreach ((array)$matches[1] as $i => $value) {
+            $parts = explode(',', $value);
+            foreach ($parts as $key => $v) {
+                $parts[$key] = $hostUrl.trim($v);
+            }
+            $s = ' srcset="'.implode(', ', $parts).'" ';
+            if ($matches[0][$i]) {
+                $string = str_replace($matches[0][$i], $s, $string);
+            }
+        }
+
         return $string;
     }
 

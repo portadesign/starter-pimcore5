@@ -38,14 +38,14 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
      *
      * @var string
      */
-    public $queryColumnType = ["image" => "int(11)","hotspots" => "text"];
+    public $queryColumnType = ["image" => "int(11)", "hotspots" => "text"];
 
     /**
      * Type for the column
      *
      * @var string
      */
-    public $columnType = ["image" => "int(11)","hotspots" => "text"];
+    public $columnType = ["image" => "int(11)", "hotspots" => "text"];
 
     /**
      * Type for the generated phpdoc
@@ -125,6 +125,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
                 $this->getName() . "__hotspots" => $metaData
             ];
         }
+
         return [
             $this->getName() . "__image" => null,
             $this->getName() . "__hotspots" => null
@@ -174,6 +175,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
                         }
                     }
                 }
+
                 return $data;
             };
 
@@ -181,8 +183,10 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
             $marker = $rewritePath($marker);
 
             $value = new Object\Data\Hotspotimage($imageId, $hotspots, $marker, $crop);
+
             return $value;
         }
+
         return null;
     }
 
@@ -227,6 +231,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
                         }
                     }
                 }
+
                 return $data;
             };
 
@@ -243,6 +248,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
                 "crop" => $data->getCrop()
             ];
         }
+
         return null;
     }
 
@@ -271,6 +277,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
                     }
                 }
             }
+
             return $data;
         };
 
@@ -367,6 +374,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
                         }
                     }
                 }
+
                 return $tags;
             };
 
@@ -411,6 +419,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
                         }
                     }
                 }
+
                 return $dependencies;
             };
 
@@ -469,6 +478,7 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
             return null;
         } elseif (is_numeric($id) and $asset instanceof Asset) {
             $hotspotImage->setImage($asset);
+
             return $hotspotImage;
         } else {
             if (!$idMapper || !$idMapper->ignoreMappingFailures()) {
@@ -576,6 +586,61 @@ class Hotspotimage extends Model\Object\ClassDefinition\Data\Image
                 $newDataArray[] = $dataArrayEntry;
             }
         }
+
         return $newDataArray;
+    }
+
+    /** Encode value for packing it into a single column.
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function marshal($value, $object = null, $params = [])
+    {
+        if ($value instanceof Object\Data\Hotspotimage) {
+            $result = [];
+            $result["hotspots"] = $value->getHotspots();
+            $result["marker"] = $value->getMarker();
+            $result["crop"] = $value->getCrop();
+
+            $image = $value->getImage();
+            if ($image) {
+                $type = Element\Service::getType($image);
+                $id = $image->getId();
+                $result["image"] = [
+                    "type" => $type,
+                    "id" => $id
+                ];
+            }
+
+            return $result;
+        }
+
+        return null;
+    }
+
+    /** See marshal
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function unmarshal($value, $object = null, $params = [])
+    {
+        if (is_array($value)) {
+            $image = new Object\Data\Hotspotimage();
+            $image->setHotspots($value["hotspots"]);
+            $image->setMarker($value["marker"]);
+            $image->setCrop($value["crop"]);
+            if ($value["image"]) {
+                $type = $value["image"]["type"];
+                $id = $value["image"]["id"];
+                $asset = Element\Service::getElementById($type, $id);
+                $image->setImage($asset);
+            }
+
+            return $image;
+        }
     }
 }

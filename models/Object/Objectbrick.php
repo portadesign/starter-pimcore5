@@ -77,17 +77,19 @@ class Objectbrick extends Model\AbstractModel
                     }
                 }
             }
+
             return $this->items;
         }
     }
 
     /**
      * @param $items
-     * @return void
+     * @return $this
      */
     public function setItems($items)
     {
         $this->items = $items;
+
         return $this;
     }
 
@@ -106,6 +108,7 @@ class Objectbrick extends Model\AbstractModel
     public function setFieldname($fieldname)
     {
         $this->fieldname = $fieldname;
+
         return $this;
     }
 
@@ -118,6 +121,7 @@ class Objectbrick extends Model\AbstractModel
         foreach ($this->brickGetters as $bg) {
             $getters[] = "get" . ucfirst($bg);
         }
+
         return $getters;
     }
 

@@ -86,21 +86,23 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
 
     /**
      * @param integer $width
-     * @return void
+     * @return $this
      */
     public function setWidth($width)
     {
         $this->width = $this->getAsIntegerCast($width);
+
         return $this;
     }
 
     /**
      * @param integer $height
-     * @return void
+     * @return $this
      */
     public function setHeight($height)
     {
         $this->height = $this->getAsIntegerCast($height);
+
         return $this;
     }
 
@@ -271,6 +273,7 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
             $value = [];
             $value["html"] = $data;
             $value["type"] = "html";
+
             return $value;
         } else {
             return "";

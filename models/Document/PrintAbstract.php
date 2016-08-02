@@ -17,6 +17,7 @@
 namespace Pimcore\Model\Document;
 
 use \Pimcore\Model\Document;
+use Pimcore\Model\Tool\TmpStore;
 use Pimcore\Web2Print\Processor;
 
 abstract class PrintAbstract extends Document\PageSnippet
@@ -39,12 +40,13 @@ abstract class PrintAbstract extends Document\PageSnippet
         if ($this->lastGenerated) {
             return new \Zend_Date($this->lastGenerated, \Zend_Date::TIMESTAMP);
         }
+
         return null;
     }
 
     public function getInProgress()
     {
-        return \Pimcore\Model\Tool\Lock::isLocked($this->getLockKey(), 0);
+        return TmpStore::get($this->getLockKey());
     }
 
     public function setLastGenerated($lastGenerated)
@@ -79,6 +81,7 @@ abstract class PrintAbstract extends Document\PageSnippet
     public function renderDocument($params)
     {
         $html = Document\Service::render($this, $params, true);
+
         return $html;
     }
 

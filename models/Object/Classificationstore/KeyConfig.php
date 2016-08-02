@@ -157,11 +157,12 @@ class KeyConfig extends Model\AbstractModel
 
     /**
      * @param integer $id
-     * @return void
+     * @return $this
      */
     public function setId($id)
     {
         $this->id = (int) $id;
+
         return $this;
     }
 
@@ -174,12 +175,13 @@ class KeyConfig extends Model\AbstractModel
     }
 
     /**
-     * @param string name
-     * @return void
+     * @param string $name
+     * @return $this
      */
     public function setName($name)
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -206,6 +208,7 @@ class KeyConfig extends Model\AbstractModel
     public function setDescription($description)
     {
         $this->description = $description;
+
         return $this;
     }
 
@@ -257,6 +260,7 @@ class KeyConfig extends Model\AbstractModel
         } else {
             \Pimcore::getEventManager()->trigger("object.Classificationstore.keyConfig.postAdd", $this);
         }
+
         return $model;
     }
 

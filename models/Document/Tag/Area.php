@@ -148,8 +148,9 @@ class Area extends Model\Document\Tag
 
                 $actionClass = preg_replace_callback("/[\-_][a-z]/", function ($matches) {
                     $replacement = str_replace(["-", "_"], "", $matches[0]);
+
                     return strtoupper($replacement);
-                }, ucfirst($this->currentIndex["type"]));
+                }, ucfirst($options["type"]));
 
                 $actionClassname = "\\Pimcore\\Model\\Document\\Tag\\Area\\" . $actionClass;
 
@@ -241,7 +242,7 @@ class Area extends Model\Document\Tag
     /**
      * @see Model\Document\Tag\TagInterface::setDataFromResource
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromResource($data)
     {
@@ -251,7 +252,7 @@ class Area extends Model\Document\Tag
     /**
      * @see Model\Document\Tag\TagInterface::setDataFromEditmode
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromEditmode($data)
     {

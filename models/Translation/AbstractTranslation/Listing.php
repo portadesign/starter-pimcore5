@@ -49,11 +49,12 @@ class Listing extends Model\Listing\AbstractListing
 
     /**
      * @param array $translations
-     * @return void
+     * @return $this
      */
     public function setTranslations($translations)
     {
         $this->translations = $translations;
+
         return $this;
     }
 }

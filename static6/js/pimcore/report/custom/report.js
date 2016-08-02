@@ -33,22 +33,27 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
         return "pimcore_icon_sql";
     },
 
-    initGrid: function (data) {
+    prepareGridConfig: function(data) {
         this.drillDownFilters = {};
         this.drillDownStores = [];
 
-        var storeFields = [];
-        var gridColumns = [];
-        var colConfig;
-        var gridColConfig = {};
-        var filters = [];
-        var drillDownFilterDefinitions = [];
+        this.storeFields = [];
+        this.gridColumns = [];
+
+        this.drillDownFilterDefinitions = [];
         this.columnLabels = {};
         this.gridfilters = {};
 
+        var gridColConfig = {};
+
         for(var f=0; f<data.columnConfiguration.length; f++) {
+
             var colConfig = data.columnConfiguration[f];
-            storeFields.push(colConfig["name"]);
+            this.storeFields.push(colConfig["name"]);
+
+            if (colConfig["displayType"] == "hide") {
+                continue;
+            }
 
             this.columnLabels[colConfig["name"]] = colConfig["label"] ? ts(colConfig["label"]) : ts(colConfig["name"]);
 
@@ -68,21 +73,33 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
                 this.gridfilters[colConfig["name"]] = colConfig["filter"];
             }
 
+            if (colConfig["displayType"] == "date") {
+                gridColConfig["renderer"] = function (key, value, metaData, record) {
+                    if (value) {
+                        var timestamp = intval(value) * 1000;
+                        var date = new Date(timestamp);
+
+                        return Ext.Date.format(date, "Y-m-d H:i");
+                    }
+                    return "";
+                }.bind(this, colConfig["name"]);
+            };
+
 
             if(colConfig["filter_drilldown"] == 'only_filter' || colConfig["filter_drilldown"] == 'filter_and_show') {
-                drillDownFilterDefinitions.push(colConfig);
+                this.drillDownFilterDefinitions.push(colConfig);
             }
 
             if(colConfig["filter_drilldown"] != 'only_filter') {
-                gridColumns.push(gridColConfig);
+                this.gridColumns.push(gridColConfig);
             }
 
             if (colConfig["columnAction"]) {
-                gridColumns.push({
-                        header: t("open"),
-                        xtype: 'actioncolumn',
-                        width: 40,
-                        items: [
+                this.gridColumns.push({
+                    header: t("open"),
+                    xtype: 'actioncolumn',
+                    width: 40,
+                    items: [
                         {
                             tooltip: t("open") + " " + (colConfig["label"] ? ts(colConfig["label"]) : ts(colConfig["name"])),
                             icon: "/pimcore/static6/img/flat-color-icons/cursor.svg",
@@ -103,13 +120,15 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
                     ]
                 });
             }
-
         }
 
+    },
+
+    createGrid: function() {
         var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize();
         var url = '/admin/reports/custom-report/data?';
         this.store = pimcore.helpers.grid.buildDefaultStore(
-            url, storeFields, itemsPerPage
+            url, this.storeFields, itemsPerPage
         );
         this.pagingtoolbar = pimcore.helpers.grid.buildDefaultPagingToolbar(this.store);
 
@@ -143,7 +162,7 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
 
         }.bind(this));
 
-        var topBar = this.buildTopBar(drillDownFilterDefinitions);
+        var topBar = this.buildTopBar(this.drillDownFilterDefinitions);
 
         topBar.push("->");
         topBar.push({
@@ -177,14 +196,13 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
             }.bind(this)
         });
 
-
         this.grid = new Ext.grid.GridPanel({
             region: "center",
             store: this.store,
             bbar: this.pagingtoolbar,
-            columns: gridColumns,
+            columns: this.gridColumns,
             columnLines: true,
-            plugins: ['gridfilters'],
+            plugins: ['pimcore.gridfilters'],
             stripeRows: true,
             trackMouseOver: true,
             viewConfig: {
@@ -196,14 +214,19 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
         return this.grid;
     },
 
+    initGrid: function (data) {
+        this.prepareGridConfig(data);
+        return this.createGrid();
+    },
+
     buildTopBar: function(drillDownFilterDefinitions) {
         var drillDownFilterComboboxes = [];
 
-        for(var i = 0; i < drillDownFilterDefinitions.length; i++) {
+        for(var i = 0; i < this.drillDownFilterDefinitions.length; i++) {
             drillDownFilterComboboxes.push({
                 xtype: 'label',
-                text: drillDownFilterDefinitions[i]["label"] ? ts(drillDownFilterDefinitions[i]["label"])
-                                                    : ts(drillDownFilterDefinitions[i]["name"]),
+                text: this.drillDownFilterDefinitions[i]["label"] ? ts(this.drillDownFilterDefinitions[i]["label"])
+                                                    : ts(this.drillDownFilterDefinitions[i]["name"]),
                 style: 'padding-right: 5px'
             });
 
@@ -214,7 +237,7 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
             );
             var proxy = drillDownStore.getProxy();
             proxy.extraParams.name = this.config["name"];
-            proxy.extraParams.field = drillDownFilterDefinitions[i]["name"];
+            proxy.extraParams.field = this.drillDownFilterDefinitions[i]["name"];
 
             this.drillDownStores.push(drillDownStore);
 
@@ -244,12 +267,12 @@ pimcore.report.custom.report = Class.create(pimcore.report.abstract, {
                         }
 
                         this.store.reload();
-                    }.bind(this, drillDownFilterDefinitions[i]["name"])
+                    }.bind(this, this.drillDownFilterDefinitions[i]["name"])
                 },
                 valueField: 'value',
                 displayField: 'value'
             });
-            if(i < drillDownFilterDefinitions.length-1) {
+            if(i < this.drillDownFilterDefinitions.length-1) {
                 drillDownFilterComboboxes.push('-');
             }
         }
@@ -534,8 +557,9 @@ pimcore.report.custom.reportplugin = Class.create(pimcore.plugin.admin, {
                                 report["groupIconClass"] = "pimcore_icon_sql";
                             }
 
+                            var reportClass = report.reportClass ? report.reportClass : "pimcore.report.custom.report";
                             pimcore.report.broker.addGroup(report["group"], report["group"], report["groupIconClass"]);
-                            pimcore.report.broker.addReport(pimcore.report.custom.report, report["group"], {
+                            pimcore.report.broker.addReport(reportClass, report["group"], {
                                 name: report["name"],
                                 text: report["niceName"],
                                 niceName: report["niceName"],
@@ -551,7 +575,7 @@ pimcore.report.custom.reportplugin = Class.create(pimcore.plugin.admin, {
                                             text: report["niceName"],
                                             iconCls: report["iconClass"],
                                             handler: function (report) {
-                                                toolbar.showReports(pimcore.report.custom.report, {
+                                                toolbar.showReports(reportClass, {
                                                     name: report["name"],
                                                     text: report["niceName"],
                                                     niceName: report["niceName"],

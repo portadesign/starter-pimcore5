@@ -58,6 +58,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
     public function setKey($key)
     {
         $this->key = self::getValidTranslationKey($key);
+
         return $this;
     }
 
@@ -76,6 +77,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
     public function setTranslations($translations)
     {
         $this->translations = $translations;
+
         return $this;
     }
 
@@ -95,6 +97,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
     public function setDate($date)
     {
         $this->setModificationDate($date);
+
         return $this;
     }
 
@@ -110,6 +113,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
     public function setCreationDate($date)
     {
         $this->creationDate = (int) $date;
+
         return $this;
     }
 
@@ -125,6 +129,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
     public function setModificationDate($date)
     {
         $this->modificationDate = (int) $date;
+
         return $this;
     }
 
@@ -313,6 +318,10 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
             //process translations
             if (is_array($data) and count($data) > 1) {
                 $keys = $data[0];
+                // remove wrong quotes in some export/import constellations
+                $keys = array_map(function ($value) {
+                    return trim($value, '﻿""');
+                }, $keys);
                 $data = array_slice($data, 1);
                 foreach ($data as $row) {
                     $keyValueArray = [];
@@ -368,6 +377,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
         } else {
             throw new \Exception("$file is not readable");
         }
+
         return $delta;
     }
 
@@ -390,6 +400,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
     {
         $data = get_object_vars($this);
         unset($data['dao']);
+
         return $data;
     }
 }

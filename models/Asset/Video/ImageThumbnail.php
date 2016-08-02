@@ -108,7 +108,10 @@ class ImageThumbnail
      */
     public function getFileSystemPath()
     {
-        $this->generate();
+        if (!$this->filesystemPath) {
+            $this->generate();
+        }
+
         return $this->filesystemPath;
     }
 
@@ -118,6 +121,8 @@ class ImageThumbnail
     public function generate()
     {
         $errorImage = PIMCORE_PATH . '/static6/img/filetype-not-supported.png';
+        $deferred = false;
+        $generated = false;
 
         if (!$this->asset) {
             $this->filesystemPath = $errorImage;
@@ -160,6 +165,7 @@ class ImageThumbnail
                 // after we got the lock, check again if the image exists in the meantime - if not - generate it
                 if (!is_file($path)) {
                     $converter->saveImage($path, $timeOffset);
+                    $generated = true;
                 }
 
                 Model\Tool\Lock::release($lockKey);
@@ -169,7 +175,7 @@ class ImageThumbnail
                 $this->getConfig()->setFilenameSuffix("time-" . $timeOffset);
 
                 try {
-                    $path = Image\Thumbnail\Processor::process($this->asset, $this->getConfig(), $path, false, true);
+                    $path = Image\Thumbnail\Processor::process($this->asset, $this->getConfig(), $path, $deferred, true, $generated);
                 } catch (\Exception $e) {
                     \Logger::error("Couldn't create image-thumbnail of video " . $this->asset->getRealFullPath());
                     \Logger::error($e);
@@ -178,6 +184,10 @@ class ImageThumbnail
             }
 
             $this->filesystemPath = $path;
+            \Pimcore::getEventManager()->trigger("asset.video.image-thumbnail", $this, [
+                "deferred" => $deferred,
+                "generated" => $generated
+            ]);
         }
     }
 
@@ -212,6 +222,7 @@ class ImageThumbnail
         if (!$this->width) {
             $this->getDimensions();
         }
+
         return $this->width;
     }
 
@@ -224,6 +235,7 @@ class ImageThumbnail
         if (!$this->height) {
             $this->getDimensions();
         }
+
         return $this->height;
     }
 
@@ -235,6 +247,7 @@ class ImageThumbnail
         if (!$this->realWidth) {
             $this->getDimensions();
         }
+
         return $this->realWidth;
     }
 
@@ -247,6 +260,7 @@ class ImageThumbnail
         if (!$this->realHeight) {
             $this->getDimensions();
         }
+
         return $this->realHeight;
     }
 

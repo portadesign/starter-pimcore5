@@ -111,11 +111,10 @@ abstract class PageSnippet extends Model\Document
     /**
      * @param bool $setModificationDate
      * @param bool $callPluginHook
-     * @param bool $force
      * @return null|Model\Version
      * @throws \Exception
      */
-    public function saveVersion($setModificationDate = true, $callPluginHook = true, $force = false)
+    public function saveVersion($setModificationDate = true, $callPluginHook = true)
     {
 
         // hook should be also called if "save only new version" is selected
@@ -137,8 +136,10 @@ abstract class PageSnippet extends Model\Document
         $version = null;
 
         // only create a new version if there is at least 1 allowed
+        // or if saveVersion() was called directly (it's a newer version of the object)
         if (Config::getSystemConfig()->documents->versions->steps
-            || Config::getSystemConfig()->documents->versions->days || $force) {
+            || Config::getSystemConfig()->documents->versions->days
+            || $setModificationDate) {
             $version = new Model\Version();
             $version->setCid($this->getId());
             $version->setCtype("document");
@@ -224,6 +225,7 @@ abstract class PageSnippet extends Model\Document
         if (empty($this->action)) {
             return "default";
         }
+
         return $this->action;
     }
 
@@ -235,6 +237,7 @@ abstract class PageSnippet extends Model\Document
         if (empty($this->controller)) {
             return "default";
         }
+
         return $this->controller;
     }
 
@@ -248,31 +251,34 @@ abstract class PageSnippet extends Model\Document
 
     /**
      * @param string $action
-     * @return void
+     * @return $this
      */
     public function setAction($action)
     {
         $this->action = $action;
+
         return $this;
     }
 
     /**
      * @param string $controller
-     * @return void
+     * @return $this
      */
     public function setController($controller)
     {
         $this->controller = $controller;
+
         return $this;
     }
 
     /**
      * @param string $template
-     * @return void
+     * @return $this
      */
     public function setTemplate($template)
     {
         $this->template = $template;
+
         return $this;
     }
 
@@ -283,6 +289,7 @@ abstract class PageSnippet extends Model\Document
     public function setModule($module)
     {
         $this->module = $module;
+
         return $this;
     }
 
@@ -300,7 +307,7 @@ abstract class PageSnippet extends Model\Document
      * @param string $name
      * @param string $type
      * @param string $data
-     * @return void
+     * @return $this
      */
     public function setRawElement($name, $type, $data)
     {
@@ -325,6 +332,7 @@ abstract class PageSnippet extends Model\Document
         } catch (\Exception $e) {
             \Logger::warning("can't set element " . $name . " with the type " . $type . " to the document: " . $this->getRealFullPath());
         }
+
         return $this;
     }
 
@@ -333,11 +341,12 @@ abstract class PageSnippet extends Model\Document
      *
      * @param string $name
      * @param string $data
-     * @return void
+     * @return $this
      */
     public function setElement($name, $data)
     {
         $this->elements[$name] = $data;
+
         return $this;
     }
 
@@ -379,11 +388,13 @@ abstract class PageSnippet extends Model\Document
                         $inheritedElement = clone $inheritedElement;
                         $inheritedElement->setInherited(true);
                         $this->inheritedElements[$name] = $inheritedElement;
+
                         return $inheritedElement;
                     }
                 }
             }
         }
+
         return null;
     }
 
@@ -409,6 +420,7 @@ abstract class PageSnippet extends Model\Document
         }
 
         $this->contentMasterDocumentId = $contentMasterDocumentId;
+
         return $this;
     }
 
@@ -439,6 +451,7 @@ abstract class PageSnippet extends Model\Document
         } else {
             $this->setContentMasterDocumentId(null);
         }
+
         return $this;
     }
 
@@ -449,6 +462,7 @@ abstract class PageSnippet extends Model\Document
     public function hasElement($name)
     {
         $elements = $this->getElements();
+
         return array_key_exists($name, $elements);
     }
 
@@ -460,16 +474,18 @@ abstract class PageSnippet extends Model\Document
         if ($this->elements === null) {
             $this->setElements($this->getDao()->getElements());
         }
+
         return $this->elements;
     }
 
     /**
      * @param array $elements
-     * @return void
+     * @return $this
      */
     public function setElements($elements)
     {
         $this->elements = $elements;
+
         return $this;
     }
 
@@ -481,16 +497,18 @@ abstract class PageSnippet extends Model\Document
         if ($this->versions === null) {
             $this->setVersions($this->getDao()->getVersions());
         }
+
         return $this->versions;
     }
 
     /**
      * @param array $versions
-     * @return void
+     * @return $this
      */
     public function setVersions($versions)
     {
         $this->versions = $versions;
+
         return $this;
     }
 
@@ -513,6 +531,7 @@ abstract class PageSnippet extends Model\Document
             $taskList->setCondition("cid = ? AND ctype='document'", $this->getId());
             $this->setScheduledTasks($taskList->load());
         }
+
         return $this->scheduledTasks;
     }
 
@@ -523,6 +542,7 @@ abstract class PageSnippet extends Model\Document
     public function setScheduledTasks($scheduledTasks)
     {
         $this->scheduledTasks = $scheduledTasks;
+
         return $this;
     }
 

@@ -102,11 +102,11 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
         $tag->setView($view);
         $tag->setEditmode($editmode);
         $tag->setOptions($config);
+
         return $tag;
     }
 
     /**
-     * @see Document\Tag\DocumentInterface::admin
      * @return string
      */
     public function admin()
@@ -138,7 +138,6 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
     }
 
     /**
-     * @see Document\Tag\DocumentInterface::getData
      * @return mixed
      */
     public function getValue()
@@ -156,21 +155,23 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
 
     /**
      * @param string $name
-     * @return void
+     * @return $this
      */
     public function setName($name)
     {
         $this->name = $name;
+
         return $this;
     }
 
     /**
      * @param integer $id
-     * @return void
+     * @return $this
      */
     public function setDocumentId($id)
     {
         $this->documentId = (int) $id;
+
         return $this;
     }
 
@@ -192,21 +193,23 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
 
     /**
      * @param array $options
-     * @return void
+     * @return $this
      */
     public function setOptions($options)
     {
         $this->options = $options;
+
         return $this;
     }
 
     /**
      * @param \Pimcore\Controller\Action $controller
-     * @return void
+     * @return $this
      */
     public function setController($controller)
     {
         $this->controller = $controller;
+
         return $this;
     }
 
@@ -220,11 +223,12 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
 
     /**
      * @param \Pimcore\View $view
-     * @return void
+     * @return $this
      */
     public function setView($view)
     {
         $this->view = $view;
+
         return $this;
     }
 
@@ -268,6 +272,7 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
                 $finalVars[] = $key;
             }
         }
+
         return $finalVars;
     }
 
@@ -278,6 +283,8 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
      */
     public function __toString()
     {
+        $return = "";
+
         try {
             if ($this->editmode) {
                 $return = $this->admin();
@@ -292,9 +299,11 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
             \Logger::error("to string not possible - " . $e->getMessage());
         }
 
-        if (is_string($return)) {
-            return $return;
+        if (is_string($return) || is_numeric($return)) {
+            // we have to cast to string, because int/float is not auto-converted and throws an exception
+            return (string) $return;
         }
+
         return '';
     }
 
@@ -308,22 +317,22 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
 
     /**
      * @param boolean $editmode
-     * @return void
+     * @return $this
      */
     public function setEditmode($editmode)
     {
         $this->editmode = (bool) $editmode;
+
         return $this;
     }
 
-
     /**
-     * @see Document\Tag\DocumentInterface::getDataForResource
-     * @return void
+     * @return $this
      */
     public function getDataForResource()
     {
         $this->checkValidity();
+
         return $this->getData();
     }
 
@@ -352,7 +361,7 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
      * @abstract
      * @param  Webservice\Data\Document\Element $wsElement
      * @param mixed $params
-     * @return void
+     * @return Webservice\Data\Document\Element
      */
     public function getFromWebserviceImport($wsElement, $document = null, $params = [], $idMapper = null)
     {
@@ -386,6 +395,7 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
         unset($el["editmode"]);
 
         $el = Webservice\Data\Mapper::toObject($el);
+
         return $el;
     }
 
@@ -406,6 +416,7 @@ abstract class Tag extends Model\AbstractModel implements Model\Document\Tag\Tag
     public function setInherited($inherited)
     {
         $this->inherited = $inherited;
+
         return $this;
     }
 

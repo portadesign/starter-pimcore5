@@ -292,47 +292,51 @@ abstract class Data
 
     /**
      * @param string $name
-     * @return void
+     * @return $this
      */
     public function setName($name)
     {
         $this->name = $name;
+
         return $this;
     }
 
     /**
      * @param string $title
-     * @return void
+     * @return $this
      */
     public function setTitle($title)
     {
         $this->title = $title;
+
         return $this;
     }
 
     /**
      * @param boolean $mandatory
-     * @return void
+     * @return $this
      */
     public function setMandatory($mandatory)
     {
         $this->mandatory = (bool)$mandatory;
+
         return $this;
     }
 
     /**
      * @param array $permissions
-     * @return void
+     * @return $this
      */
     public function setPermissions($permissions)
     {
         $this->permissions = $permissions;
+
         return $this;
     }
 
     /**
      * @param array $data
-     * @return void
+     * @return $this
      */
     public function setValues($data = [])
     {
@@ -342,6 +346,7 @@ abstract class Data
                 $this->$method($value);
             }
         }
+
         return $this;
     }
 
@@ -356,11 +361,12 @@ abstract class Data
 
     /**
      * @param string $datatype
-     * @return void
+     * @return $this
      */
     public function setDatatype($datatype)
     {
         $this->datatype = $datatype;
+
         return $this;
     }
 
@@ -374,11 +380,12 @@ abstract class Data
 
     /**
      * @param string $fieldtype
-     * @return void
+     * @return $this
      */
     public function setFieldtype($fieldtype)
     {
         $this->fieldtype = $fieldtype;
+
         return $this;
     }
 
@@ -392,11 +399,12 @@ abstract class Data
 
     /**
      * @param string | array $columnType
-     * @return void
+     * @return $this
      */
     public function setColumnType($columnType)
     {
         $this->columnType = $columnType;
+
         return $this;
     }
 
@@ -410,11 +418,12 @@ abstract class Data
 
     /**
      * @param string | array $queryColumnType
-     * @return void
+     * @return $this
      */
     public function setQueryColumnType($queryColumnType)
     {
         $this->queryColumnType = $queryColumnType;
+
         return $this;
     }
 
@@ -428,11 +437,12 @@ abstract class Data
 
     /**
      * @param boolean $noteditable
-     * @return void
+     * @return $this
      */
     public function setNoteditable($noteditable)
     {
         $this->noteditable = (bool)$noteditable;
+
         return $this;
     }
 
@@ -446,11 +456,12 @@ abstract class Data
 
     /**
      * @param integer $index
-     * @return void
+     * @return $this
      */
     public function setIndex($index)
     {
         $this->index = $index;
+
         return $this;
     }
 
@@ -478,6 +489,7 @@ abstract class Data
     public function setStyle($style)
     {
         $this->style = (string)$style;
+
         return $this;
     }
 
@@ -497,6 +509,7 @@ abstract class Data
     public function setLocked($locked)
     {
         $this->locked = (bool)$locked;
+
         return $this;
     }
 
@@ -516,6 +529,7 @@ abstract class Data
     public function setTooltip($tooltip)
     {
         $this->tooltip = (string)$tooltip;
+
         return $this;
     }
 
@@ -543,6 +557,7 @@ abstract class Data
     public function setInvisible($invisible)
     {
         $this->invisible = (bool)$invisible;
+
         return $this;
     }
 
@@ -561,6 +576,7 @@ abstract class Data
     public function setVisibleGridView($visibleGridView)
     {
         $this->visibleGridView = (bool)$visibleGridView;
+
         return $this;
     }
 
@@ -579,6 +595,7 @@ abstract class Data
     public function setVisibleSearch($visibleSearch)
     {
         $this->visibleSearch = (bool)$visibleSearch;
+
         return $this;
     }
 
@@ -944,6 +961,7 @@ abstract class Data
         if (empty($data)) {
             return true;
         }
+
         return false;
     }
 
@@ -970,6 +988,7 @@ abstract class Data
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
         $thedata = $this->getDataFromEditmode($data[0]["data"], $object, $params);
+
         return $thedata;
     }
 
@@ -997,7 +1016,7 @@ abstract class Data
     {
         $diffdata = [];
         $diffdata["data"] = $this->getDataForEditmode($data, $object, $params);
-        $diffdata["disabled"] = !($this->isDiffChangeAllowed());
+        $diffdata["disabled"] = !($this->isDiffChangeAllowed($object));
         $diffdata["field"] = $this->getName();
         $diffdata["key"] = $this->getName();
         $diffdata["type"] = $this->fieldtype;
@@ -1013,6 +1032,7 @@ abstract class Data
 
         $result = [];
         $result[] = $diffdata;
+
         return $result;
     }
 
@@ -1045,7 +1065,7 @@ abstract class Data
         $context = $params && $params["context"] ? $params["context"] : null;
 
         if ($context) {
-            if ($context["containerType"] == "fieldcollection") {
+            if ($context["containerType"] == "fieldcollection" || $context["containerType"] == "block") {
                 if ($this instanceof Object\ClassDefinition\Data\Localizedfields || $object instanceof Object\Localizedfield) {
                     $fieldname = $context["fieldname"];
                     $index = $context["index"];
@@ -1054,28 +1074,48 @@ abstract class Data
                         $containerGetter = "get" . ucfirst($fieldname);
                         $container = $object->$containerGetter();
                         if ($container) {
-                            $items = $container->getItems();
-                            $originalndex = $context["oIndex"];
+                            $originalIndex = $context["oIndex"];
 
-                            // field collection items
-                            if (!is_null($originalndex)) {
-                                if ($items && count($items) > $originalndex) {
-                                    $item = $items[$originalndex];
-                                    $getter = "get" . ucfirst($this->getName());
-                                    $data = $item->$getter();
+                            // field collection or block items
+                            if (!is_null($originalIndex)) {
+                                if ($context["containerType"] == "block") {
+                                    $items = $container;
+                                } else {
+                                    $items = $container->getItems();
+                                }
 
-                                    if ($object instanceof Object\Localizedfield) {
-                                        $data = $data->getLocalizedValue($this->getName(), $params["language"], true);
+                                if ($items && count($items) > $originalIndex) {
+                                    $item = $items[$originalIndex];
+
+                                    if ($context["containerType"] == "block") {
+                                        $data = $item[$this->getName()];
+                                        if ($data instanceof  Object\Data\BlockElement) {
+                                            $data = $data->getData();
+
+                                            return $data;
+                                        }
+                                    } else {
+                                        $getter = "get" . ucfirst($this->getName());
+                                        $data = $item->$getter();
+
+                                        if ($object instanceof Object\Localizedfield) {
+                                            $data = $data->getLocalizedValue($this->getName(), $params["language"], true);
+                                        }
                                     }
 
                                     return $data;
                                 } else {
-                                    throw new \Exception("object seems to be modified, item with orginal index " . $originalndex . " not found, new index: " . $index);
+                                    throw new \Exception("object seems to be modified, item with orginal index " . $originalIndex . " not found, new index: " . $index);
                                 }
+                            } else {
+                                return null;
                             }
+                        } else {
+                            return null;
                         }
                     } elseif ($object instanceof Object\Localizedfield) {
                         $data = $object->getLocalizedValue($this->getName(), $params["language"], true);
+
                         return $data;
                     }
                 }
@@ -1090,6 +1130,7 @@ abstract class Data
                     /** @var  $classificationStoreData Object\Classificationstore */
                     $classificationStoreData = $object->$getter();
                     $data = $classificationStoreData->getLocalizedKeyValue($groupId, $keyId, $language, true, true);
+
                     return $data;
                 }
             }
@@ -1143,7 +1184,11 @@ abstract class Data
      */
     public function marshal($value, $object = null, $params = [])
     {
-        return ["value" => $value];
+        if ($params["raw"]) {
+            return $value;
+        } else {
+            return ["value" => $value];
+        }
     }
 
     /** See marshal
@@ -1153,9 +1198,14 @@ abstract class Data
      */
     public function unmarshal($data, $object = null, $params = [])
     {
-        if (is_array($data)) {
-            return $data["value"];
+        if ($params["raw"]) {
+            return $data;
+        } else {
+            if (is_array($data)) {
+                return $data["value"];
+            }
         };
+
         return null;
     }
 }

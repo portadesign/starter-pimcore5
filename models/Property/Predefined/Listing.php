@@ -38,11 +38,12 @@ class Listing extends Model\Listing\JsonListing
 
     /**
      * @param array $properties
-     * @return void
+     * @return $this
      */
     public function setProperties($properties)
     {
         $this->properties = $properties;
+
         return $this;
     }
 }

@@ -266,6 +266,9 @@
     background: url(/pimcore/static6/img/flat-color-icons/clapperboard.svg) center center no-repeat !important;
 }
 
+.pimcore_icon_mp3, .pimcore_icon_aac, .pimcore_icon_flac, .pimcore_icon_ogg, .pimcore_icon_wav, .pimcore_icon_wma, .pimcore_icon_ogg {
+    background: url(/pimcore/static6/img/flat-color-icons/speaker.svg) center center no-repeat !important;
+}
 
 
 
@@ -1017,5 +1020,12 @@
     background: url(/pimcore/static6/img/flat-color-icons/book.svg) center center no-repeat !important;
 }
 
+.pimcore_icon_workflow_action {
+    background: url(/pimcore/static6/img/flat-color-icons/workflow.svg) center center no-repeat !important
+}
+
+.pimcore_icon_block {
+    background: url(/pimcore/static6/img/flat-color-icons/filing_cabinet.svg) center center no-repeat !important;
+}
 
 

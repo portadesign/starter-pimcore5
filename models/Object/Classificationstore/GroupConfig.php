@@ -57,8 +57,6 @@ class GroupConfig extends Model\AbstractModel
      */
     public $modificationDate;
 
-    public $collId;
-
 
     /**
      * @param integer $id
@@ -111,11 +109,12 @@ class GroupConfig extends Model\AbstractModel
 
     /**
      * @param integer $id
-     * @return void
+     * @return $this
      */
     public function setId($id)
     {
         $this->id = (int) $id;
+
         return $this;
     }
 
@@ -151,6 +150,7 @@ class GroupConfig extends Model\AbstractModel
     public function setName($name)
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -177,6 +177,7 @@ class GroupConfig extends Model\AbstractModel
     public function setDescription($description)
     {
         $this->description = $description;
+
         return $this;
     }
 
@@ -211,6 +212,7 @@ class GroupConfig extends Model\AbstractModel
         } else {
             \Pimcore::getEventManager()->trigger("object.Classificationstore.groupConfig.postAdd", $this);
         }
+
         return $model;
     }
 
@@ -221,6 +223,7 @@ class GroupConfig extends Model\AbstractModel
     public function setModificationDate($modificationDate)
     {
         $this->modificationDate = (int) $modificationDate;
+
         return $this;
     }
 
@@ -239,6 +242,7 @@ class GroupConfig extends Model\AbstractModel
     public function setCreationDate($creationDate)
     {
         $this->creationDate = (int) $creationDate;
+
         return $this;
     }
 
@@ -258,6 +262,7 @@ class GroupConfig extends Model\AbstractModel
         $list = new KeyGroupRelation\Listing();
         $list->setCondition("groupId = " . $this->id);
         $list = $list->load();
+
         return $list;
     }
 

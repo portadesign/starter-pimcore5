@@ -118,24 +118,12 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         foreach ($result["data"] as $language => &$data) {
             foreach ($data as $key => &$value) {
                 $fieldDefinition = $this->getFielddefinition($key);
-                if (!$fieldDefinition instanceof CalculatedValue) {
-                    $value = $fieldDefinition->getDataForEditmode($value, $object, $params);
-                }
-            }
-        }
-
-        $calculatedChilds = [];
-        self::collectCalculatedValueItems($this, $calculatedChilds);
-
-        if ($calculatedChilds) {
-            $validLanguages = Tool::getValidLanguages();
-
-            foreach ($calculatedChilds as $childDef) {
-                foreach ($validLanguages as $language) {
-                    $childData = new Object\Data\CalculatedValue($childDef->getName());
+                if ($fieldDefinition instanceof CalculatedValue) {
+                    $childData = new Object\Data\CalculatedValue($fieldDefinition->getName());
                     $childData->setContextualData("localizedfield", $this->getName(), null, $language);
-                    $childData = $childDef->getDataForEditmode($childData, $object, $params);
-                    $result["data"][$language][$childDef->getName()] = $childData;
+                    $value = $fieldDefinition->getDataForEditmode($childData, $object, $params);
+                } else {
+                    $value = $fieldDefinition->getDataForEditmode($value, $object, $params);
                 }
             }
         }
@@ -160,7 +148,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         foreach ($data->getItems() as $language => $values) {
             foreach ($this->getFieldDefinitions() as $fd) {
                 $key = $fd->getName();
-                $fdata = $values[$fd->getName()];
+                $fdata = isset($values[$fd->getName()]) ? $values[$fd->getName()] : null;
 
                 if (!isset($fieldData[$language][$key]) || $fd->isEmpty($fieldData[$language][$key])) {
                     // never override existing data
@@ -231,7 +219,8 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         if (is_array($data)) {
             foreach ($data as $language => $fields) {
                 foreach ($fields as $name => $fdata) {
-                    $localizedFields->setLocalizedValue($name, $this->getFielddefinition($name)->getDataFromEditmode($fdata), $language);
+                    $fd = $this->getFielddefinition($name);
+                    $localizedFields->setLocalizedValue($name, $fd->getDataFromEditmode($fdata, $object, $params), $language);
                 }
             }
         }
@@ -255,6 +244,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
                 $result->$key = $fd->getDataForGrid($result->$key);
             }
         }
+
         return $result;
     }
 
@@ -477,12 +467,13 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
 
     /**
      * @param array $childs
-     * @return void
+     * @return $this
      */
     public function setChilds($childs)
     {
         $this->childs = $childs;
         $this->fieldDefinitionsCache = null;
+
         return $this;
     }
 
@@ -494,6 +485,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         if (is_array($this->childs) && count($this->childs) > 0) {
             return true;
         }
+
         return false;
     }
 
@@ -546,6 +538,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
                 }
             }
         }
+
         return $this;
     }
 
@@ -651,6 +644,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
 
             $container->localizedfields = $lf;
         }
+
         return $container->localizedfields;
     }
 
@@ -701,9 +695,10 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function getFielddefinition($name)
     {
         $fds = $this->getFieldDefinitions();
-        if ($fds[$name]) {
+        if (isset($fds[$name])) {
             return $fds[$name];
         }
+
         return;
     }
 
@@ -811,6 +806,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function setHeight($height)
     {
         $this->height = $this->getAsIntegerCast($height);
+
         return $this;
     }
 
@@ -829,6 +825,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function setLayout($layout)
     {
         $this->layout = $layout;
+
         return $this;
     }
 
@@ -847,6 +844,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function setName($name)
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -865,6 +863,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function setRegion($region)
     {
         $this->region = $region;
+
         return $this;
     }
 
@@ -883,6 +882,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function setTitle($title)
     {
         $this->title = $title;
+
         return $this;
     }
 
@@ -901,6 +901,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function setWidth($width)
     {
         $this->width = $this->getAsIntegerCast($width);
+
         return $this;
     }
 
@@ -1038,6 +1039,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
 
         $localizedFields = new Object\Localizedfield($localData);
         $localizedFields->setObject($object);
+
         return $localizedFields;
     }
 
@@ -1059,6 +1061,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         $vars = get_object_vars($this);
         unset($vars['fieldDefinitionsCache']);
         unset($vars['referencedFields']);
+
         return array_keys($vars);
     }
 
@@ -1075,7 +1078,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * @param mixed $object
      * @param array $idMapping
      * @param array $params
-     * @return Element\ElementInterface
+     * @return Model\Element\ElementInterface
      */
     public function rewriteIds($object, $idMapping, $params = [])
     {
@@ -1127,21 +1130,75 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         return $this->labelWidth;
     }
 
-
-    public static function collectCalculatedValueItems($owner, &$list = [])
+    /** Encode value for packing it into a single column.
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function marshal($value, $object = null, $params = [])
     {
-        if (method_exists($owner, "hasChilds")) {
-            if ($owner->hasChilds()) {
-                $childs = $owner->getChilds();
+        if ($value instanceof  Object\Localizedfield) {
+            $items = $value->getItems();
+            if (is_array($items)) {
+                $result = [];
+                foreach ($items as $language => $languageData) {
+                    $languageResult = [];
+                    foreach ($languageData as $elementName => $elementData) {
+                        $fd = $this->getFielddefinition($elementName);
+                        if (!$fd) {
+                            // class definition seems to have changed
+                            \Logger::warn("class definition seems to have changed, element name: " . $elementName);
+                            continue;
+                        }
 
-                foreach ($childs as $childDef) {
-                    if ($childDef instanceof Model\Object\ClassDefinition\Data\CalculatedValue) {
-                        $list[] = $childDef;
-                    } else {
-                        self::collectCalculatedValueItems($childDef, $list);
+                        $dataForResource = $fd->marshal($elementData, $object, ["raw" => true]);
+
+                        $languageResult[$elementName] = $dataForResource;
                     }
+
+                    $result[$language] = $languageResult;
                 }
+
+                return $result;
             }
         }
+
+        return null;
+    }
+
+    /** See marshal
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function unmarshal($value, $object = null, $params = [])
+    {
+        $lf = new Object\Localizedfield();
+        if (is_array($value)) {
+            $items = [];
+            foreach ($value as $language => $languageData) {
+                $languageResult = [];
+                foreach ($languageData as $elementName => $elementData) {
+                    $fd = $this->getFielddefinition($elementName);
+                    if (!$fd) {
+                        // class definition seems to have changed
+                        \Logger::warn("class definition seems to have changed, element name: " . $elementName);
+                        continue;
+                    }
+
+                    $dataFromResource = $fd->unmarshal($elementData, $object, ["raw" => true]);
+
+                    $languageResult[$elementName] = $dataFromResource;
+                }
+
+                $items[$language] = $languageResult;
+            }
+
+            $lf->setItems($items);
+        }
+
+        return $lf;
     }
 }

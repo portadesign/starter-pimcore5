@@ -38,11 +38,12 @@ class Listing extends Model\Listing\JsonListing
 
     /**
      * @param array $docTypes
-     * @return void
+     * @return $this
      */
     public function setDocTypes($docTypes)
     {
         $this->docTypes = $docTypes;
+
         return $this;
     }
 }

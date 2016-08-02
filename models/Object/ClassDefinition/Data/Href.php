@@ -108,11 +108,12 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
 
     /**
      * @param boolean $objectsAllowed
-     * @return void
+     * @return $this
      */
     public function setObjectsAllowed($objectsAllowed)
     {
         $this->objectsAllowed = $objectsAllowed;
+
         return $this;
     }
 
@@ -126,11 +127,12 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
 
     /**
      * @param boolean $documentsAllowed
-     * @return void
+     * @return $this
      */
     public function setDocumentsAllowed($documentsAllowed)
     {
         $this->documentsAllowed = $documentsAllowed;
+
         return $this;
     }
 
@@ -144,12 +146,13 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
     }
 
     /**
-     * @param array
-     * @return void $documentTypes
+     * @param array $documentTypes
+     * @return $this
      */
     public function setDocumentTypes($documentTypes)
     {
         $this->documentTypes = Element\Service::fixAllowedTypes($documentTypes, "documentTypes");
+
         return $this;
     }
 
@@ -165,11 +168,12 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
     /**
      *
      * @param boolean $assetsAllowed
-     * @return void
+     * @return $this
      */
     public function setAssetsAllowed($assetsAllowed)
     {
         $this->assetsAllowed = $assetsAllowed;
+
         return $this;
     }
 
@@ -182,12 +186,13 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
     }
 
     /**
-     * @param array
-     * @return void $assetTypes
+     * @param array $assetTypes
+     * @return $this
      */
     public function setAssetTypes($assetTypes)
     {
         $this->assetTypes = Element\Service::fixAllowedTypes($assetTypes, "assetTypes");
+
         return $this;
     }
 
@@ -268,8 +273,10 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
                 "subtype" => $data->getType(),
                 "type" => Element\Service::getElementType($data)
             ];
+
             return $r;
         }
+
         return;
     }
 
@@ -321,11 +328,12 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
 
     /**
      * @param integer $width
-     * @return void
+     * @return $this
      */
     public function setWidth($width)
     {
         $this->width = $this->getAsIntegerCast($width);
+
         return $this;
     }
 
@@ -567,6 +575,7 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
     public function setAssetUploadPath($assetUploadPath)
     {
         $this->assetUploadPath = $assetUploadPath;
+
         return $this;
     }
 
@@ -610,6 +619,7 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
             $data = $this->rewriteIdsService([$data], $idMapping);
             $data = $data[0]; //get the first element
         }
+
         return $data;
     }
 
@@ -629,5 +639,38 @@ class Href extends Model\Object\ClassDefinition\Data\Relations\AbstractRelations
     public function getPhpdocType()
     {
         return implode(' | ', $this->getPhpDocClassString(false));
+    }
+
+    /** Encode value for packing it into a single column.
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function marshal($value, $object = null, $params = [])
+    {
+        if ($value) {
+            $type = Element\Service::getType($value);
+            $id = $value->getId();
+
+            return [
+                "type" => $type,
+                "id" => $id
+            ];
+        }
+    }
+
+    /** See marshal
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function unmarshal($value, $object = null, $params = [])
+    {
+        $type = $value["type"];
+        $id = $value["id"];
+
+        return Element\Service::getElementById($type, $id);
     }
 }

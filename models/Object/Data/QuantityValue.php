@@ -73,6 +73,7 @@ class QuantityValue
         if (empty($this->unit)) {
             $this->unit = Unit::getById($this->unitId);
         }
+
         return $this->unit;
     }
 
@@ -112,6 +113,10 @@ class QuantityValue
             }
         }
 
-        return $value . " " . $this->getUnit()->getAbbreviation();
+        if ($this->getUnit()) {
+            $value .= " " . $this->getUnit()->getAbbreviation();
+        }
+
+        return $value;
     }
 }

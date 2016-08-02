@@ -619,7 +619,7 @@ pimcore.elementservice.addDocumentComplete = function (options, response) {
         if (response && response.success) {
             pimcore.elementservice.refreshNodeAllTrees(options.elementType, options.parentId);
 
-            if(pimcore.globalmanager.get("document_documenttype_store").indexOf(response.type) >= 0) {
+            if(in_array(response["type"], ["page","snippet","email","newsletter","link","hardlink","printpage","printcontainer"])) {
                 pimcore.helpers.openDocument(response.id, response.type);
             }
         }  else {
@@ -754,4 +754,32 @@ pimcore.elementservice.showLocateInTreeButton = function(elementType) {
         return true;
     }
     return false;
+};
+
+pimcore.elementservice.integrateWorkflowManagement = function(elementType, elementId, elementEditor, buttons) {
+
+    if(elementEditor.data.workflowManagement && elementEditor.data.workflowManagement.hasWorkflowManagement === true) {
+
+        buttons.unshift({
+            xtype: 'button',
+            text: t('actions'),
+            scale: "medium",
+            iconCls: 'pimcore_icon_workflow_action',
+            handler: function() {
+                new pimcore.workflowmanagement.actionPanel(elementType, elementId, elementEditor);
+            }
+        });
+
+        buttons.push("-");
+        buttons.push({
+            xtype: 'container',
+            html: [
+                ts(elementEditor.data.workflowManagement.status.label)
+            ].join(''),
+            style: 'color: ' + elementEditor.data.workflowManagement.state.color + ';',
+            cls: 'wf-status-outer'
+        });
+
+    }
+
 };

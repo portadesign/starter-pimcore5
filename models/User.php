@@ -20,7 +20,6 @@ use Pimcore\File;
 
 class User extends User\UserRole
 {
-
     /**
      * @var string
      */
@@ -76,11 +75,15 @@ class User extends User\UserRole
      */
     public $closeWarning = true;
 
-
     /**
      * @var bool
      */
     public $memorizeTabs = true;
+
+    /**
+     * @var bool
+     */
+    public $allowDirtyClose = true;
 
     /**
      * @var string|null
@@ -98,6 +101,11 @@ class User extends User\UserRole
     public $activePerspective;
 
     /**
+     * @var null|array
+     */
+    protected $mergedPerspectives = null;
+
+    /**
      * @return string
      */
     public function getPassword()
@@ -107,13 +115,14 @@ class User extends User\UserRole
 
     /**
      * @param string $password
-     * @return void
+     * @return $this
      */
     public function setPassword($password)
     {
         if (strlen($password) > 4) {
             $this->password = $password;
         }
+
         return $this;
     }
 
@@ -134,6 +143,7 @@ class User extends User\UserRole
     public function setUsername($username)
     {
         $this->setName($username);
+
         return $this;
     }
 
@@ -153,6 +163,7 @@ class User extends User\UserRole
     public function setFirstname($firstname)
     {
         $this->firstname = $firstname;
+
         return $this;
     }
 
@@ -172,6 +183,7 @@ class User extends User\UserRole
     public function setLastname($lastname)
     {
         $this->lastname = $lastname;
+
         return $this;
     }
 
@@ -191,6 +203,7 @@ class User extends User\UserRole
     public function setEmail($email)
     {
         $this->email = $email;
+
         return $this;
     }
 
@@ -211,6 +224,7 @@ class User extends User\UserRole
         if ($language) {
             $this->language = $language;
         }
+
         return $this;
     }
 
@@ -238,6 +252,7 @@ class User extends User\UserRole
     public function setAdmin($admin)
     {
         $this->admin = (bool) $admin;
+
         return $this;
     }
 
@@ -256,6 +271,7 @@ class User extends User\UserRole
     public function setActive($active)
     {
         $this->active = (bool) $active;
+
         return $this;
     }
 
@@ -313,6 +329,9 @@ class User extends User\UserRole
             } else {
                 return true;
             }
+        } elseif ($type == "perspective") {
+            //returns true if required perspective is allowed to use by the user
+            return in_array($key, $this->getMergedPerspectives());
         }
 
         return false;
@@ -345,6 +364,7 @@ class User extends User\UserRole
         } elseif (empty($roles)) {
             $this->roles = [];
         }
+
         return $this;
     }
 
@@ -356,6 +376,7 @@ class User extends User\UserRole
         if (empty($this->roles)) {
             return [];
         }
+
         return $this->roles;
     }
 
@@ -366,6 +387,7 @@ class User extends User\UserRole
     public function setWelcomescreen($welcomescreen)
     {
         $this->welcomescreen = (bool) $welcomescreen;
+
         return $this;
     }
 
@@ -384,6 +406,7 @@ class User extends User\UserRole
     public function setCloseWarning($closeWarning)
     {
         $this->closeWarning = (bool) $closeWarning;
+
         return $this;
     }
 
@@ -402,6 +425,7 @@ class User extends User\UserRole
     public function setMemorizeTabs($memorizeTabs)
     {
         $this->memorizeTabs = (bool) $memorizeTabs;
+
         return $this;
     }
 
@@ -411,6 +435,25 @@ class User extends User\UserRole
     public function getMemorizeTabs()
     {
         return $this->memorizeTabs;
+    }
+
+    /**
+     * @param $allowDirtyClose
+     * @return $this
+     */
+    public function setAllowDirtyClose($allowDirtyClose)
+    {
+        $this->allowDirtyClose = (bool)$allowDirtyClose;
+
+        return $this;
+    }
+
+    /**
+     * @return boolean
+     */
+    public function getAllowDirtyClose()
+    {
+        return $this->allowDirtyClose;
     }
 
     /**
@@ -433,6 +476,7 @@ class User extends User\UserRole
         if (empty($this->apiKey)) {
             return null;
         }
+
         return $this->apiKey;
     }
 
@@ -491,6 +535,7 @@ class User extends User\UserRole
         if (strlen($this->contentLanguages)) {
             return explode(',', $this->contentLanguages);
         }
+
         return [];
     }
 
@@ -519,5 +564,35 @@ class User extends User\UserRole
     public function setActivePerspective($activePerspective)
     {
         $this->activePerspective = $activePerspective;
+    }
+
+    /**
+     * Returns array of perspectives names related to user and all related roles
+     *
+     * @return array|string[]
+     */
+    public function getMergedPerspectives()
+    {
+        if (null === $this->mergedPerspectives) {
+            $this->mergedPerspectives = $this->getPerspectives();
+            foreach ($this->getRoles() as $role) {
+                /** @var User\UserRole $userRole */
+                $userRole = User\UserRole::getById($role);
+                $this->mergedPerspectives = array_merge($this->mergedPerspectives, $userRole->getPerspectives());
+            }
+            $this->mergedPerspectives = array_values($this->mergedPerspectives);
+        }
+
+        return $this->mergedPerspectives;
+    }
+
+    /**
+     * Returns the first perspective name
+     *
+     * @return string
+     */
+    public function getFirstAllowedPerspective()
+    {
+        return $this->getMergedPerspectives()[0];
     }
 }

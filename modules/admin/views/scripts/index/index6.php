@@ -130,7 +130,13 @@ $runtimePerspective = \Pimcore\Config::getRuntimePerspective();
 <?php // define stylesheets ?>
 <?php
 
-$extjsDev = $runtimePerspective["extjsDev"];
+$extjsDev = isset( $runtimePerspective["extjsDev"]) ? $runtimePerspective["extjsDev"] : FALSE;
+
+// SCRIPT LIBRARIES
+$debugSuffix = "";
+if (PIMCORE_DEVMODE || $extjsDev) {
+    $debugSuffix = "-debug";
+}
 
 $styles = array(
     "/admin/misc/admin-css?extjs6=true",
@@ -159,11 +165,6 @@ $styles = array(
 <?php // define scripts ?>
 <?php
 
-// SCRIPT LIBRARIES
-$debugSuffix = "";
-if (PIMCORE_DEVMODE || $extjsDev) {
-    $debugSuffix = "-debug";
-}
 
 $scriptLibs = array(
 
@@ -193,7 +194,7 @@ $scripts = array(
     "pimcore/browserfixes.js",
 
     // fixes for libraries
-//    "pimcore/libfixes.js",
+    //    "pimcore/libfixes.js",
 
     // small libs
     "lib/array_merge.js",
@@ -311,12 +312,17 @@ $scripts = array(
     "pimcore/document/pages/preview.js",
     "pimcore/document/snippets/settings.js",
     "pimcore/document/emails/settings.js",
+    "pimcore/document/newsletters/settings.js",
+    "pimcore/document/newsletters/sendingPanel.js",
+    "pimcore/document/newsletters/addressSourceAdapters/default.js",
+    "pimcore/document/newsletters/addressSourceAdapters/csvList.js",
     "pimcore/document/link.js",
     "pimcore/document/hardlink.js",
     "pimcore/document/folder.js",
     "pimcore/document/tree.js",
     "pimcore/document/snippet.js",
     "pimcore/document/email.js",
+    "pimcore/document/newsletter.js",
     "pimcore/document/page.js",
     "pimcore/document/printpages/pdf_preview.js",
     "pimcore/document/printabstract.js",
@@ -331,6 +337,7 @@ $scripts = array(
     "pimcore/asset/image.js",
     "pimcore/asset/document.js",
     "pimcore/asset/video.js",
+    "pimcore/asset/audio.js",
     "pimcore/asset/text.js",
     "pimcore/asset/folder.js",
     "pimcore/asset/listfolder.js",
@@ -346,6 +353,7 @@ $scripts = array(
     "pimcore/object/bulk-export.js",
     "pimcore/object/bulk-import.js",
     "pimcore/object/classes/data/data.js",          // THIS MUST BE THE FIRST FILE, DO NOT MOVE THIS DOWN !!!
+    "pimcore/object/classes/data/block.js",
     "pimcore/object/classes/data/classificationstore.js",
     "pimcore/object/classes/data/date.js",
     "pimcore/object/classes/data/datetime.js",
@@ -409,6 +417,7 @@ $scripts = array(
     "pimcore/object/objectbrick.js",
     "pimcore/object/objectbricks/field.js",
     "pimcore/object/tags/abstract.js",
+    "pimcore/object/tags/block.js",
     "pimcore/object/tags/date.js",
     "pimcore/object/tags/datetime.js",
     "pimcore/object/tags/time.js",
@@ -545,6 +554,9 @@ $scripts = array(
     "pimcore/object/classificationstore/storeTree.js",
     "pimcore/object/classificationstore/columnConfigDialog.js",
 
+    //workflow
+    "pimcore/workflowmanagement/actionPanel.js",
+
 );
 
 // google maps API key
@@ -575,6 +587,7 @@ $googleMapsApiKey = $this->config->services->google->browserapikey;
         showCloseConfirmation: true,
         debug_admin_translations: <?= \Zend_Json::encode((bool) $this->config->general->debug_admin_translations) ?>,
         document_generatepreviews: <?= \Zend_Json::encode((bool) $this->config->documents->generatepreview) ?>,
+        asset_disable_tree_preview: <?= \Zend_Json::encode((bool) $this->config->assets->disable_tree_preview) ?>,
         htmltoimage: <?= \Zend_Json::encode(\Pimcore\Image\HtmlToImage::isSupported()) ?>,
         videoconverter: <?= \Zend_Json::encode(\Pimcore\Video::isAvailable()) ?>,
         asset_hide_edit: <?= $this->config->assets->hide_edit_image ? "true" : "false" ?>,
@@ -624,7 +637,7 @@ foreach ($scripts as $scriptUrl) {
     }
 }
 ?>
-    <script type="text/javascript" src="<?= \Pimcore\Tool\Admin::getMinimizedScriptPath($scriptContents) ?>?_dc=<?= \Pimcore\Version::$revision ?>"></script>
+    <script type="text/javascript" src="<?= \Pimcore\Tool\Admin::getMinimizedScriptPath($scriptContents) ?>"></script>
 <?php } ?>
 
 
@@ -662,7 +675,7 @@ try {
             if (!empty($cssPath)) {
             ?>
             <link rel="stylesheet" type="text/css" href="<?= $cssPath ?>?_dc=<?= $pluginDcValue; ?>"/>
-                <?php
+            <?php
 
             }
             }

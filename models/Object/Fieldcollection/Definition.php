@@ -49,11 +49,12 @@ class Definition extends Model\AbstractModel
 
     /**
      * @param string $key
-     * @return void
+     * @return $this
      */
     public function setKey($key)
     {
         $this->key = $key;
+
         return $this;
     }
     
@@ -67,11 +68,12 @@ class Definition extends Model\AbstractModel
 
     /**
      * @param string $parentClass
-     * @return void
+     * @return $this
      */
     public function setParentClass($parentClass)
     {
         $this->parentClass = $parentClass;
+
         return $this;
     }
     
@@ -85,7 +87,7 @@ class Definition extends Model\AbstractModel
 
     /**
      * @param array $layoutDefinitions
-     * @return void
+     * @return $this
      */
     public function setLayoutDefinitions($layoutDefinitions)
     {
@@ -93,6 +95,7 @@ class Definition extends Model\AbstractModel
         
         $this->fieldDefinitions = [];
         $this->extractDataDefinitions($this->layoutDefinitions);
+
         return $this;
     }
     
@@ -106,22 +109,24 @@ class Definition extends Model\AbstractModel
 
     /**
      * @param array $fieldDefinitions
-     * @return void
+     * @return $this
      */
     public function setFieldDefinitions($fieldDefinitions)
     {
         $this->fieldDefinitions = $fieldDefinitions;
+
         return $this;
     }
 
     /**
      * @param string $key
      * @param Object\ClassDefinition\Data $data
-     * @return void
+     * @return $this
      */
     public function addFieldDefinition($key, $data)
     {
         $this->fieldDefinitions[$key] = $data;
+
         return $this;
     }
 
@@ -133,6 +138,7 @@ class Definition extends Model\AbstractModel
         if (array_key_exists($key, $this->fieldDefinitions)) {
             return $this->fieldDefinitions[$key];
         }
+
         return false;
     }
     

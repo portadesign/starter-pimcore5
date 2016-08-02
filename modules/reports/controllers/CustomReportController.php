@@ -144,6 +144,7 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
         $list = new CustomReport\Config\Listing();
         $items = $list->load();
 
+        /** @var  $report CustomReport\Config */
         foreach ($items as $report) {
             $reports[] = [
                 "name" => $report->getName(),
@@ -151,7 +152,8 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
                 "iconClass" => $report->getIconClass(),
                 "group" => $report->getGroup(),
                 "groupIconClass" => $report->getGroupIconClass(),
-                "menuShortcut" => $report->getMenuShortcut()
+                "menuShortcut" => $report->getMenuShortcut(),
+                "reportClass" => $report->getReportClass()
             ];
         }
 
@@ -177,7 +179,6 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
 
         $config = CustomReport\Config::getByName($this->getParam("name"));
         $configuration = $config->getDataSourceConfig();
-        $configuration = $configuration[0];
 
         $adapter = CustomReport\Config::getAdapter($configuration, $config);
 
@@ -199,7 +200,6 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
 
         $config = CustomReport\Config::getByName($this->getParam("name"));
         $configuration = $config->getDataSourceConfig();
-        $configuration = $configuration[0];
 
         $adapter = CustomReport\Config::getAdapter($configuration, $config);
         $result = $adapter->getAvailableOptions($filters, $field, $drillDownFilters);
@@ -219,7 +219,7 @@ class Reports_CustomReportController extends \Pimcore\Controller\Action\Admin\Re
         $config = CustomReport\Config::getByName($this->getParam("name"));
 
         $configuration = $config->getDataSourceConfig();
-        $configuration = $configuration[0];
+
         $adapter = CustomReport\Config::getAdapter($configuration, $config);
 
         $result = $adapter->getData($filters, $sort, $dir, null, null, null, $drillDownFilters);

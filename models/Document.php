@@ -27,7 +27,7 @@ class Document extends Element\AbstractElement
      * possible types of a document
      * @var array
      */
-    public static $types = ["folder", "page", "snippet", "link", "hardlink", "email", "printpage", "printcontainer"];
+    public static $types = ["folder", "page", "snippet", "link", "hardlink", "email", "newsletter", "printpage", "printcontainer"];
 
     /**
      * @param $type
@@ -134,14 +134,14 @@ class Document extends Element\AbstractElement
      *
      * @var integer
      */
-    public $userOwner;
+    public $userOwner = 0;
 
     /**
      * User-ID of the user last modified the document
      *
      * @var integer
      */
-    public $userModification;
+    public $userModification = 0;
 
     /**
      * Permissions for the user which requested this document in editmode*
@@ -205,10 +205,9 @@ class Document extends Element\AbstractElement
     }
 
     /**
-     * Static helper to get a Document by it's path, only type Document is returned, not Document\Page, ... (see getConcreteByPath() )
-     *
+     * Static helper to get a Document by it's path
      * @param string $path
-     * @return Document
+     * @return Document|Document\Email|Document\Folder|Document\Hardlink|Document\Link|Document\Page|Document\Printcontainer|Document\Printpage|Document\Snippet
      */
     public static function getByPath($path)
     {
@@ -230,10 +229,9 @@ class Document extends Element\AbstractElement
     }
 
     /**
-     * Static helper to get a Document by it's id, only type Document is returned, not Document\Page, ... (see getConcreteById() )
-     *
+     * Static helper to get a Document by it's ID
      * @param integer $id
-     * @return Document
+     * @return Document|Document\Email|Document\Folder|Document\Hardlink|Document\Link|Document\Page|Document\Printcontainer|Document\Printpage|Document\Snippet|Document\Newsletter
      */
     public static function getById($id)
     {
@@ -256,30 +254,28 @@ class Document extends Element\AbstractElement
                     $document = new Document();
                     $document->getDao()->getById($id);
 
-                    $mappingClass = "\\Pimcore\\Model\\Document\\" . ucfirst($document->getType());
+                    $className = "Pimcore\\Model\\Document\\" . ucfirst($document->getType());
 
                     // this is the fallback for custom document types using prefixes
                     // so we need to check if the class exists first
-                    if (!Tool::classExists($mappingClass)) {
+                    if (!Tool::classExists($className)) {
                         $oldStyleClass = "Document_" . ucfirst($document->getType());
                         if (Tool::classExists($oldStyleClass)) {
-                            $mappingClass = $oldStyleClass;
+                            $className = $oldStyleClass;
                         }
                     }
-                    $typeClass = Tool::getModelClassMapping($mappingClass);
 
-                    if (Tool::classExists($typeClass)) {
-                        $document = new $typeClass();
-                        \Zend_Registry::set($cacheKey, $document);
-                        $document->getDao()->getById($id);
+                    $document = \Pimcore::getDiContainer()->make($className);
+                    \Zend_Registry::set($cacheKey, $document);
+                    $document->getDao()->getById($id);
 
-                        \Pimcore\Cache::save($document, $cacheKey);
-                    }
+                    \Pimcore\Cache::save($document, $cacheKey);
                 } else {
                     \Zend_Registry::set($cacheKey, $document);
                 }
             } catch (\Exception $e) {
                 \Logger::warning($e->getMessage());
+
                 return null;
             }
         }
@@ -289,28 +285,6 @@ class Document extends Element\AbstractElement
         }
 
         return $document;
-    }
-
-    /**
-     * Static helper to get a concrete implementation of a document by it's id, this method returns the concrete object to retrieve only the basic object use getById()
-     *
-     * @param Document|integer $id
-     * @return Document\Page|Document\Snippet|Document\Folder|Document\Link
-     */
-    public static function getConcreteById($id)
-    {
-        return self::getById($id);
-    }
-
-    /**
-     * Static helper to get a concrete implementation of a document by it's path, this method returns the concrete object to retrieve only the basic object use getById()
-     *
-     * @param string|Document $path
-     * @return Document\Page|Document\Snippet|Document\Folder|Document\Link
-     */
-    public static function getConcreteByPath($path)
-    {
-        return self::getByPath($path);
     }
 
     /**
@@ -345,17 +319,12 @@ class Document extends Element\AbstractElement
     public static function getList($config = [])
     {
         if (is_array($config)) {
-            $listClass = "\\Pimcore\\Model\\Document\\Listing";
-            $listClass = Tool::getModelClassMapping($listClass);
+            $listClass = "Pimcore\\Model\\Document\\Listing";
+            $list = \Pimcore::getDiContainer()->make($listClass);
+            $list->setValues($config);
+            $list->load();
 
-            if (Tool::classExists($listClass)) {
-                $list = new $listClass();
-
-                $list->setValues($config);
-                $list->load();
-
-                return $list;
-            }
+            return $list;
         }
 
         throw new \Exception("Unable to initiate list class - class not found or invalid configuration");
@@ -368,10 +337,8 @@ class Document extends Element\AbstractElement
     public static function getTotalCount($config = [])
     {
         if (is_array($config)) {
-            $listClass = "\\Pimcore\\Model\\Document\\Listing";
-            $listClass = Tool::getModelClassMapping($listClass);
-            $list = new $listClass();
-
+            $listClass = "Pimcore\\Model\\Document\\Listing";
+            $list = \Pimcore::getDiContainer()->make($listClass);
             $list->setValues($config);
             $count = $list->getTotalCount();
 
@@ -532,7 +499,7 @@ class Document extends Element\AbstractElement
      */
     protected function update()
     {
-        $disallowedKeysInFirstLevel = ["install","admin","webservice","plugin"];
+        $disallowedKeysInFirstLevel = ["install", "admin", "webservice", "plugin"];
         if ($this->getParentId() == 1 && in_array($this->getKey(), $disallowedKeysInFirstLevel)) {
             throw new \Exception("Key: " . $this->getKey() . " is not allowed in first level (root-level)");
         }
@@ -611,6 +578,7 @@ class Document extends Element\AbstractElement
         if (!$this->dependencies) {
             $this->dependencies = Dependency::getBySourceId($this->getId(), "document");
         }
+
         return $this->dependencies;
     }
 
@@ -629,6 +597,7 @@ class Document extends Element\AbstractElement
         } else {
             $this->hasChilds=false;
         }
+
         return $this;
     }
 
@@ -647,6 +616,7 @@ class Document extends Element\AbstractElement
             $list->setOrder("asc");
             $this->childs = $list->load();
         }
+
         return $this->childs;
     }
 
@@ -665,6 +635,7 @@ class Document extends Element\AbstractElement
                 return $this->hasChilds;
             }
         }
+
         return $this->getDao()->hasChilds();
     }
 
@@ -686,6 +657,7 @@ class Document extends Element\AbstractElement
             $list->setOrder("asc");
             $this->siblings = $list->load();
         }
+
         return $this->siblings;
     }
 
@@ -703,6 +675,7 @@ class Document extends Element\AbstractElement
                 return $this->hasSiblings;
             }
         }
+
         return $this->getDao()->hasSiblings();
     }
 
@@ -715,16 +688,18 @@ class Document extends Element\AbstractElement
         if (empty($this->locked)) {
             return null;
         }
+
         return $this->locked;
     }
 
     /**
      * @param  $locked
-     * @return void
+     * @return $this
      */
     public function setLocked($locked)
     {
         $this->locked = $locked;
+
         return $this;
     }
 
@@ -788,6 +763,7 @@ class Document extends Element\AbstractElement
                 if ($site instanceof Site) {
                     if ($site->getRootDocument()->getId() == $this->getId()) {
                         $link = $this->prepareFrontendPath("/");
+
                         return $link;
                     }
                 }
@@ -818,6 +794,7 @@ class Document extends Element\AbstractElement
 
                         $link = preg_replace("@^" . preg_quote($parent->getRealFullPath()) . "@", $hardlinkPath, $this->getRealFullPath());
                         $link = $this->prepareFrontendPath($link);
+
                         return $link;
                     }
                 }
@@ -833,10 +810,12 @@ class Document extends Element\AbstractElement
                     if ($site->getRootDocument()->getId() == $this->getId()) {
                         $link = $scheme . $site->getMainDomain() . "/";
                         $link = $this->prepareFrontendPath($link);
+
                         return $link;
                     }
                     $link = $scheme . $site->getMainDomain() . preg_replace("@^" . $site->getRootPath() . "/@", "/", $this->getRealFullPath());
                     $link = $this->prepareFrontendPath($link);
+
                     return $link;
                 }
             }
@@ -844,6 +823,7 @@ class Document extends Element\AbstractElement
             if ($config->general->domain) {
                 $link = $scheme . $config->general->domain . $this->getRealFullPath();
                 $link = $this->prepareFrontendPath($link);
+
                 return $link;
             }
         }
@@ -927,6 +907,7 @@ class Document extends Element\AbstractElement
                         $rootPath = $site->getRootPath();
                         $rootPath = preg_quote($rootPath);
                         $link = preg_replace("@^" . $rootPath . "@", "", $this->path);
+
                         return $link;
                     }
                 }
@@ -952,69 +933,76 @@ class Document extends Element\AbstractElement
     public function getRealFullPath()
     {
         $path = $this->getRealPath() . $this->getKey();
+
         return $path;
     }
 
     /**
      * @param integer $creationDate
-     * @return void
+     * @return $this
      */
     public function setCreationDate($creationDate)
     {
         $this->creationDate = (int) $creationDate;
+
         return $this;
     }
 
     /**
      * @param integer $id
-     * @return void
+     * @return $this
      */
     public function setId($id)
     {
         $this->id = (int) $id;
+
         return $this;
     }
 
     /**
      * @param integer $key
-     * @return void
+     * @return $this
      */
     public function setKey($key)
     {
         $this->key = $key;
+
         return $this;
     }
 
 
     /**
      * @param integer $modificationDate
-     * @return void
+     * @return $this
      */
     public function setModificationDate($modificationDate)
     {
         $this->modificationDate = (int) $modificationDate;
+
         return $this;
     }
 
 
     /**
      * @param integer $parentId
-     * @return void
+     * @return $this
      */
     public function setParentId($parentId)
     {
         $this->parentId = (int) $parentId;
         $this->parent = null;
+
         return $this;
     }
 
     /**
      * @param integer $path
-     * @return void
+     * @return $this
      */
     public function setPath($path)
     {
         $this->path = $path;
+
         return $this;
     }
 
@@ -1028,11 +1016,12 @@ class Document extends Element\AbstractElement
 
     /**
      * @param integer $index
-     * @return void
+     * @return $this
      */
     public function setIndex($index)
     {
         $this->index = (int) $index;
+
         return $this;
     }
 
@@ -1046,11 +1035,12 @@ class Document extends Element\AbstractElement
 
     /**
      * @param integer $type
-     * @return void
+     * @return $this
      */
     public function setType($type)
     {
         $this->type = $type;
+
         return $this;
     }
 
@@ -1072,21 +1062,23 @@ class Document extends Element\AbstractElement
 
     /**
      * @param integer $userModification
-     * @return void
+     * @return $this
      */
     public function setUserModification($userModification)
     {
         $this->userModification = (int) $userModification;
+
         return $this;
     }
 
     /**
      * @param integer $userOwner
-     * @return void
+     * @return $this
      */
     public function setUserOwner($userOwner)
     {
         $this->userOwner = (int) $userOwner;
+
         return $this;
     }
 
@@ -1108,11 +1100,12 @@ class Document extends Element\AbstractElement
 
     /**
      * @param integer $published
-     * @return void
+     * @return $this
      */
     public function setPublished($published)
     {
         $this->published = (bool) $published;
+
         return $this;
     }
 
@@ -1136,16 +1129,18 @@ class Document extends Element\AbstractElement
 
             $this->setProperties($properties);
         }
+
         return $this->properties;
     }
 
     /**
      * @param array $properties
-     * @return void
+     * @return $this
      */
     public function setProperties($properties)
     {
         $this->properties = $properties;
+
         return $this;
     }
 
@@ -1155,7 +1150,7 @@ class Document extends Element\AbstractElement
      * @param mixed $data
      * @param bool $inherited
      * @param bool $inheritable
-     * @return void
+     * @return $this
      */
     public function setProperty($name, $type, $data, $inherited = false, $inheritable = true)
     {
@@ -1171,6 +1166,7 @@ class Document extends Element\AbstractElement
         $property->setInheritable($inheritable);
 
         $this->properties[$name] = $property;
+
         return $this;
     }
 
@@ -1188,7 +1184,7 @@ class Document extends Element\AbstractElement
 
     /**
      * @param Document $parent
-     * @return void
+     * @return $this
      */
     public function setParent($parent)
     {
@@ -1196,6 +1192,7 @@ class Document extends Element\AbstractElement
         if ($parent instanceof Document) {
             $this->parentId = $parent->getId();
         }
+
         return $this;
     }
 

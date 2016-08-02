@@ -696,20 +696,20 @@ pimcore.settings.system = Class.create({
                                 hidden: (this.getValue("email.bounce.type") == "Maildir") ? false : true
                             }, {
                                 fieldLabel: t('path'),
-                                name: 'email_bounce_mbox',
-                                value: this.getValue("email_bounce_mbox"),
+                                name: 'email.bounce.mbox',
+                                value: this.getValue("email.bounce.mbox"),
                                 id: "system_settings_email_bounce_mbox",
                                 hidden: (this.getValue("email.bounce.type") == "Mbox") ? false : true
                             }, {
                                 fieldLabel: t('host'),
-                                name: 'email_bounce_imap_host',
-                                value: this.getValue("email_bounce_imap_host"),
+                                name: 'email.bounce.imap.host',
+                                value: this.getValue("email.bounce.imap.host"),
                                 id: "system_settings_email_bounce_imap_host",
                                 hidden: (this.getValue("email.bounce.type") == "IMAP") ? false : true
                             }, {
                                 fieldLabel: t('port'),
-                                name: 'email_bounce_imap_port',
-                                value: this.getValue("email_bounce_imap_port"),
+                                name: 'email.bounce.imap.port',
+                                value: this.getValue("email.bounce.imap.port"),
                                 id: "system_settings_email_bounce_imap_port",
                                 hidden: (this.getValue("email.bounce.type") == "IMAP") ? false : true
                             }, {
@@ -932,18 +932,6 @@ pimcore.settings.system = Class.create({
                                 xtype: "checkbox",
                                 name: "documents.generatepreview",
                                 checked: this.getValue("documents.generatepreview")
-                            },
-                            {
-                                fieldLabel: t('absolute_path_to_wkhtmltoimage_binary'),
-                                name: 'documents.wkhtmltoimage',
-                                value: this.getValue("documents.wkhtmltoimage"),
-                                width: 600
-                            },
-                            {
-                                fieldLabel: t('absolute_path_to_wkhtmltopdf_binary'),
-                                name: 'documents.wkhtmltopdf',
-                                value: this.getValue("documents.wkhtmltopdf"),
-                                width: 600
                             }
                         ]
                     }
@@ -1039,6 +1027,12 @@ pimcore.settings.system = Class.create({
                                 xtype: "checkbox",
                                 name: "assets.hide_edit_image",
                                 checked: this.getValue("assets.hide_edit_image")
+                            },
+                            {
+                                fieldLabel: t("disable_tree_preview"),
+                                xtype: "checkbox",
+                                name: "assets.disable_tree_preview",
+                                checked: this.getValue("assets.disable_tree_preview")
                             }
                         ]
                     }
@@ -1617,7 +1611,7 @@ pimcore.settings.system = Class.create({
                     fieldLabel: t("default_language"),
                     checked: this.getValue("general.defaultLanguage") == language || (!this.getValue("general.defaultLanguage") && container.items.length == 0 ),
                     listeners: {
-                        check: function (el, checked) {
+                        change: function (el, checked) {
                             if (checked) {
                                 var defaultLanguageField = Ext.getCmp("system_settings_general_defaultLanguage");
                                 defaultLanguageField.setValue(language);

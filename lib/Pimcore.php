@@ -41,6 +41,11 @@ class Pimcore
     private static $eventManager;
 
     /**
+     * @var \DI\Container
+     */
+    private static $diContainer;
+
+    /**
      * @var array items to be excluded from garbage collection
      */
     private static $globallyProtectedItems;
@@ -419,11 +424,12 @@ class Pimcore
             $maxExecutionTime = 0;
         }
 
-        error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT);
+        error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT & ~E_DEPRECATED);
         //@ini_set("memory_limit", "1024M");
         @ini_set("max_execution_time", $maxExecutionTime);
         @set_time_limit($maxExecutionTime);
-        mb_internal_encoding("UTF-8");
+        ini_set('default_charset', "UTF-8");
+        mb_internal_encoding("UTF-8"); // only required for PHP 5.5, can be removed after 5.5 is unsupported by pimcore
 
         // this is for simple_dom_html
         ini_set('pcre.recursion-limit', 100000);
@@ -448,20 +454,13 @@ class Pimcore
     }
 
     /**
-     * initialisze system modules and register them with the broker
-     *
      * @static
      * @return void
+     * @deprecated
      */
     public static function initModules()
     {
-        $broker = \Pimcore\API\Plugin\Broker::getInstance();
-        $broker->registerModule("\\Pimcore\\Model\\Search\\Backend\\Module");
-
-        $conf = Config::getSystemConfig();
-        if ($conf->general->instanceIdentifier) {
-            $broker->registerModule("\\Pimcore\\Model\\Tool\\UUID\\Module");
-        }
+        // only for compatibility reasons, will be removed in pimcore 5
     }
 
     /**
@@ -616,13 +615,10 @@ class Pimcore
         $autoloader->registerNamespace('Property');
         $autoloader->registerNamespace('Version');
         $autoloader->registerNamespace('Site');
-
-        Tool::registerClassModelMappingNamespaces();
     }
 
     /**
      * @static
-     * @return bool
      */
     public static function initConfiguration()
     {
@@ -646,26 +642,21 @@ class Pimcore
             if (!defined("PIMCORE_DEVMODE")) {
                 define("PIMCORE_DEVMODE", (bool) $conf->general->devmode);
             }
-
-            return true;
         } catch (\Exception $e) {
             $m = "Couldn't load system configuration";
             \Logger::err($m);
 
-            //@TODO check here for /install otherwise exit here
+            if (!defined("PIMCORE_DEBUG")) {
+                define("PIMCORE_DEBUG", true);
+            }
+            if (!defined("PIMCORE_DEVMODE")) {
+                define("PIMCORE_DEVMODE", false);
+            }
         }
 
-        if (!defined("PIMCORE_DEBUG")) {
-            define("PIMCORE_DEBUG", true);
-        }
-        if (!defined("PIMCORE_DEVMODE")) {
-            define("PIMCORE_DEVMODE", false);
-        }
-
-        // custom error logging in DEVMODE
-        if (PIMCORE_DEVMODE) {
-            error_reporting((E_ALL ^ E_NOTICE) | E_STRICT);
-            ini_set('error_log', PIMCORE_LOG_DIRECTORY . '/php.log');
+        // custom error logging in DEBUG mode & DEVMODE
+        if (PIMCORE_DEVMODE || PIMCORE_DEBUG) {
+            error_reporting(E_ALL & ~E_NOTICE);
         }
     }
 
@@ -754,7 +745,34 @@ class Pimcore
         if (!self::$eventManager) {
             self::$eventManager = new \Zend_EventManager_EventManager();
         }
+
         return self::$eventManager;
+    }
+
+    /**
+     * @return \DI\Container
+     */
+    public static function getDiContainer()
+    {
+        if (!self::$diContainer) {
+            $builder = new \DI\ContainerBuilder();
+            $builder->useAutowiring(false);
+            $builder->useAnnotations(false);
+            $builder->ignorePhpDocErrors(true);
+
+            $builder->addDefinitions(PIMCORE_PATH . "/config/di.php");
+
+            $customFile = \Pimcore\Config::locateConfigFile("di.php");
+            if (file_exists($customFile)) {
+                $builder->addDefinitions($customFile);
+            }
+
+            self::getEventManager()->trigger('system.di.init', $builder);
+
+            self::$diContainer = $builder->build();
+        }
+
+        return self::$diContainer;
     }
 
     /** Add $keepItems to the list of items which are protected from garbage collection.
@@ -975,6 +993,7 @@ class Pimcore
                 // check here if there is actually content, otherwise readfile() and similar functions are not working anymore
                 header("Content-Length: " . mb_strlen($output, "latin1"));
             }
+            header("Vary: Accept-Encoding", true);
             header("X-Powered-By: pimcore", true);
         }
 

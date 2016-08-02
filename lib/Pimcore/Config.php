@@ -142,7 +142,7 @@ class Config
 
             if (!$config = Cache::load($cacheKey)) {
                 $settingsArray = [];
-                $cacheTags = ["website_config","system","config","output"];
+                $cacheTags = ["website_config", "system", "config", "output"];
 
                 $list = new Model\WebsiteSetting\Listing();
                 $list = $list->load();
@@ -227,6 +227,7 @@ class Config
 
             self::setReportConfig($config);
         }
+
         return $config;
     }
 
@@ -264,6 +265,7 @@ class Config
 
             self::setWeb2PrintConfig($config);
         }
+
         return $config;
     }
 
@@ -275,33 +277,6 @@ class Config
     public static function setWeb2PrintConfig(\Zend_Config $config)
     {
         \Zend_Registry::set("pimcore_config_web2print", $config);
-    }
-
-
-    /**
-     * @static
-     * @return \Zend_Config_Xml
-     */
-    public static function getModelClassMappingConfig()
-    {
-        $config = null;
-
-        if (\Zend_Registry::isRegistered("pimcore_config_model_classmapping")) {
-            $config = \Zend_Registry::get("pimcore_config_model_classmapping");
-        } else {
-            $mappingFile = \Pimcore\Config::locateConfigFile("classmap.php");
-
-            if (is_file($mappingFile)) {
-                $config = include($mappingFile);
-
-                if (is_array($config)) {
-                    self::setModelClassMappingConfig($config);
-                } else {
-                    \Logger::error("classmap.php exists but it is not a valid PHP array configuration.");
-                }
-            }
-        }
-        return $config;
     }
 
     /**
@@ -503,6 +478,7 @@ class Config
 
 
         $result["elementTree"] = self::getRuntimeElementTreeConfig($currentConfigName);
+
         return $result;
     }
 
@@ -678,8 +654,8 @@ class Config
         foreach ($config as $configName => $configItem) {
             $item = [
                 "name" => $configName,
-                "icon" => $configItem["icon"],
-                "iconCls" => $configItem["iconCls"]
+                "icon" => isset($configItem["icon"]) ? $configItem["icon"] : null,
+                "iconCls" => isset($configItem["iconCls"]) ? $configItem["iconCls"] : null
             ];
             if ($user) {
                 $item["active"] = $configName == $currentConfigName;
@@ -693,7 +669,7 @@ class Config
 
     public static function inPerspective($runtimeConfig, $key)
     {
-        if (!$runtimeConfig["toolbar"]) {
+        if (!isset($runtimeConfig["toolbar"]) || !$runtimeConfig["toolbar"]) {
             return true;
         }
         $parts = explode(".", $key);
@@ -721,6 +697,7 @@ class Config
                 return $menuItem;
             }
         }
+
         return true;
     }
 

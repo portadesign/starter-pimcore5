@@ -176,15 +176,7 @@ pimcore.asset.tree = Class.create({
                         }
 
                         var node = selection[0];
-                        var dt = e.dataTransfer;
-                        var files = dt.files;
-
-                        // if a folder is dropped (currently only Chrome) pass the dataTransfer object instead of the FileList object
-                        if (dt["items"]) {
-                            files = dt;
-                        }
-
-                        this.uploadFileList(files, node);
+                        this.uploadFileList(e.dataTransfer, node);
 
                     }.bind(this), true);
                 }
@@ -193,8 +185,10 @@ pimcore.asset.tree = Class.create({
             }
         }.bind(this));
 
-        this.tree.on("itemmouseenter", pimcore.helpers.treeNodeThumbnailPreview.bind(this));
-        this.tree.on("itemmouseleave", pimcore.helpers.treeNodeThumbnailPreviewHide.bind(this));
+        if(!pimcore.settings.asset_disable_tree_preview) {
+            this.tree.on("itemmouseenter", pimcore.helpers.treeNodeThumbnailPreview.bind(this));
+            this.tree.on("itemmouseleave", pimcore.helpers.treeNodeThumbnailPreviewHide.bind(this));
+        }
 
         store.on("nodebeforeexpand", function (node) {
             pimcore.helpers.addTreeNodeLoadingIndicator("asset", node.data.id);
@@ -213,13 +207,11 @@ pimcore.asset.tree = Class.create({
         }
     },
 
-    uploadFileList: function (files, parentNode) {
+    uploadFileList: function (dataTransfer, parentNode) {
+
         var file;
         this.activeUploads = 0;
 
-        if(files.length < 1) {
-            return;
-        }
 
         var win = new Ext.Window({
             items: [],
@@ -249,10 +241,8 @@ pimcore.asset.tree = Class.create({
             win.add(pbar);
             win.updateLayout();
 
-            var finishedErrorHandler = function () {
-                // success
+            var finishedErrorHandler = function (e) {
                 this.activeUploads--;
-
                 win.remove(pbar);
 
                 if(this.activeUploads < 1) {
@@ -261,9 +251,13 @@ pimcore.asset.tree = Class.create({
                 }
             }.bind(this);
 
+            var errorHandler = function (e) {
+                pimcore.helpers.showNotification(t("error"), e["responseText"], "error");
+                finishedErrorHandler();
+            }.bind(this);
+
             pimcore.helpers.uploadAssetFromFileObject(file,
-                "/admin/asset/add-asset/?pimcore_admin_sid="
-                + pimcore.settings.sessionId + "&parentId=" + parentNode.id + "&dir=" + path,
+                "/admin/asset/add-asset/?parentId=" + parentNode.id + "&dir=" + path,
                 finishedErrorHandler,
                 function (evt) {
                     //progress
@@ -277,44 +271,41 @@ pimcore.asset.tree = Class.create({
                         pbar.updateProgress(percentComplete, progressText);
                     }
                 },
-                finishedErrorHandler
+                errorHandler
             );
         }.bind(this);
 
-
-
-        // this is for browser that support folders (currently: Chrome)
-        // in this case not a FileList object is given but a dataTransfer object (from DnD Event)
-        if(files["items"]) {
+        if(dataTransfer["items"] && dataTransfer.items[0] && dataTransfer.items[0].webkitGetAsEntry) {
+            // chrome
             var traverseFileTree = function (item, path) {
                 path = path || "";
                 if (item.isFile) {
                     // Get file
-                    item.file(function(file) {
+                    item.file(function (file) {
                         doFileUpload(file, path);
                     }.bind(this));
                 } else if (item.isDirectory) {
                     // Get folder contents
                     var dirReader = item.createReader();
-                    dirReader.readEntries(function(entries) {
-                        for (var i=0; i<entries.length; i++) {
+                    dirReader.readEntries(function (entries) {
+                        for (var i = 0; i < entries.length; i++) {
                             traverseFileTree(entries[i], path + item.name + "/");
                         }
                     });
                 }
             }.bind(this);
 
-            for (var i=0; i<files.items.length; i++) {
+            for (var i = 0; i < dataTransfer.items.length; i++) {
                 // webkitGetAsEntry is where the magic happens
-                var item = files.items[i].webkitGetAsEntry();
+                var item = dataTransfer.items[i].webkitGetAsEntry();
                 if (item) {
                     traverseFileTree(item);
                 }
             }
-        } else {
+        } else if(dataTransfer["files"]) {
             // default filelist upload
-            for (var i=0; i<files.length; i++) {
-                file = files[i];
+            for (var i=0; i<dataTransfer["files"].length; i++) {
+                file = dataTransfer["files"][i];
 
                 if (window.FileList && file.name && file.type) { // check for type (folder has no type)
                     doFileUpload(file);
@@ -890,7 +881,7 @@ pimcore.asset.tree = Class.create({
         jQuery("#multiUploadField").unbind("change");
         jQuery("#multiUploadField").on("change", function (e) {
             if(e.target.files.length) {
-                this.uploadFileList(e.target.files, record);
+                this.uploadFileList(e.target, record);
             }
         }.bind(this));
 
@@ -944,7 +935,6 @@ pimcore.asset.tree = Class.create({
                 jobs: res.jobs
             });
         }.bind(this), function (res) {
-            console.log("failed");
             pimcore.elementservice.refreshNodeAllTrees("asset", record.parentNode.get("id"));
         }.bind(this));
     },
@@ -1166,14 +1156,14 @@ pimcore.asset.tree = Class.create({
             elementSubType: record.data.type,
             id: record.data.id,
             default: record.data.text
-        }
+        };
         pimcore.elementservice.editElementKey(options);
     },
 
 
-    searchAndMove: function(parentId) {
-        pimcore.helpers.searchAndMove(parentId, function() {
-            this.reload();
+    searchAndMove: function(tree, record) {
+        pimcore.helpers.searchAndMove(record.data.id, function() {
+            pimcore.elementservice.refreshNode(record);
         }.bind(this), "asset");
     },
 

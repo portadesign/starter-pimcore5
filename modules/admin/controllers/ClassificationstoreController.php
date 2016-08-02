@@ -315,6 +315,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $rootElement["data"] = $data;
             $rootElement["success"] = true;
             $rootElement["total"] = $list->getTotalCount();
+
             return $this->_helper->json($rootElement);
         }
     }
@@ -450,6 +451,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $rootElement["data"] = $data;
             $rootElement["success"] = true;
             $rootElement["total"] = $list->getTotalCount();
+
             return $this->_helper->json($rootElement);
         }
     }
@@ -460,17 +462,24 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $dataParam = $this->getParam("data");
             $data = \Zend_Json::decode($dataParam);
 
-            $colId = $data["colId"];
-            $groupId = $data["groupId"];
-            $sorter = $data["sorter"];
+            if (count($data) == count($data, 1)) {
+                $data = [$data];
+            }
 
-            $config = new Classificationstore\CollectionGroupRelation();
-            $config->setGroupId($groupId);
-            $config->setColId($colId);
-            $config->setSorter($sorter);
+            foreach ($data as &$row) {
+                $colId = $row["colId"];
+                $groupId = $row["groupId"];
+                $sorter = $row["sorter"];
 
-            $config->save();
-            $data["id"] = $config->getColId() . "-" . $config->getGroupId();
+                $config = new Classificationstore\CollectionGroupRelation();
+                $config->setGroupId($groupId);
+                $config->setColId($colId);
+                $config->setSorter($sorter);
+
+                $config->save();
+
+                $row["id"] = $config->getColId() . "-" . $config->getGroupId();
+            }
 
             $this->_helper->json(["success" => true, "data" => $data]);
         } else {
@@ -557,6 +566,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $rootElement["data"] = $data;
             $rootElement["success"] = true;
             $rootElement["total"] = $list->getTotalCount();
+
             return $this->_helper->json($rootElement);
         }
     }
@@ -565,6 +575,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
     {
         $list = new Pimcore\Model\Object\Classificationstore\StoreConfig\Listing();
         $list = $list->load();
+
         return $this->_helper->json($list);
     }
 
@@ -671,6 +682,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
         $rootElement["data"] = $data;
         $rootElement["success"] = true;
         $rootElement["total"] = $list->getTotalCount();
+
         return $this->_helper->json($rootElement);
     }
 
@@ -800,6 +812,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $rootElement["data"] = $data;
             $rootElement["success"] = true;
             $rootElement["total"] = $list->getTotalCount();
+
             return $this->_helper->json($rootElement);
         }
     }
@@ -1062,6 +1075,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
             $rootElement["data"] = $data;
             $rootElement["success"] = true;
             $rootElement["total"] = $list->getTotalCount();
+
             return $this->_helper->json($rootElement);
         }
     }
@@ -1095,6 +1109,7 @@ class Admin_ClassificationstoreController extends \Pimcore\Controller\Action\Adm
         if ($config->getModificationDate()) {
             $item["modificationDate"] = $config->getModificationDate();
         }
+
         return $item;
     }
 

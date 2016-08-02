@@ -69,24 +69,32 @@ class Admin_MiscController extends \Pimcore\Controller\Action\Admin
 
     public function scriptProxyAction()
     {
-        $this->removeViewRenderer();
+        $this->disableViewAutoRender();
 
+        $allowedFileTypes = ["js", "css"];
         $scripts = explode(",", $this->getParam("scripts"));
         $scriptPath = $this->getParam("scriptPath");
         $scriptsContent = "";
 
         foreach ($scripts as $script) {
             $filePath = PIMCORE_DOCUMENT_ROOT . $scriptPath . $script;
-            if (is_file($filePath) && is_readable($filePath)) {
+            if (is_file($filePath) && is_readable($filePath) && in_array(\Pimcore\File::getFileExtension($script), $allowedFileTypes)) {
                 $scriptsContent .= file_get_contents($filePath);
             }
         }
 
-        header("Cache-Control: max-age=86400");
-        header("Pragma: ");
-        //header("Content-Length: ".strlen($scriptsContent));
-        header("Content-Type: application/x-javascript");
-        header("Expires: " . gmdate("D, d M Y H:i:s", time() + 86400) . " GMT");
+        $fileExtension = \Pimcore\File::getFileExtension($scripts[0]);
+        $contentType = "text/javascript";
+        if ($fileExtension == "css") {
+            $contentType = "text/css";
+        }
+
+        $lifetime = 86400;
+        $this->getResponse()->setHeader("Cache-Control", "max-age=" . $lifetime, true);
+        $this->getResponse()->setHeader("Pragma", "", true);
+        $this->getResponse()->setHeader("Content-Type", $contentType, true);
+        $this->getResponse()->setHeader("Expires", gmdate("D, d M Y H:i:s", time() + $lifetime) . " GMT", true);
+
         echo $scriptsContent;
     }
 
@@ -98,30 +106,6 @@ class Admin_MiscController extends \Pimcore\Controller\Action\Admin
 
 
         $this->getResponse()->setHeader("Content-Type", "text/css; charset=UTF-8", true);
-    }
-
-    public function proxyAction()
-    {
-        if ($this->getParam("url")) {
-            header("Content-Type: application/javascript");
-
-            $client = Tool::getHttpClient();
-            $client->setUri($this->getParam("url"));
-
-            try {
-                $response = $client->request(\Zend_Http_Client::GET);
-
-                if ($response->isSuccessful()) {
-                    echo $this->getParam("callback") . "(" . \Zend_Json::encode("data:" .$response->getHeader("Content-Type") . ";base64," . base64_encode($response->getBody())) . ");";
-                } else {
-                    throw new \Exception("Invalid response");
-                }
-            } catch (\Exception $e) {
-                echo $this->getParam("callback") . "(" . \Zend_Json::encode("error:Application error") . ")";
-            }
-        }
-
-        exit;
     }
 
     public function pingAction()
@@ -315,6 +299,7 @@ class Admin_MiscController extends \Pimcore\Controller\Action\Admin
         if (strpos($path, PIMCORE_DOCUMENT_ROOT) !== 0) {
             throw new \Exception('operation permitted, permission denied');
         }
+
         return $path;
     }
 
@@ -541,7 +526,11 @@ class Admin_MiscController extends \Pimcore\Controller\Action\Admin
     public function getLanguageFlagAction()
     {
         $iconPath = Tool::getLanguageFlagFile($this->getParam("language"));
-        header("Content-Type: image/png");
+        if (Tool\Admin::isExtJS6()) {
+            header("Content-Type: image/svg+xml");
+        } else {
+            header("Content-Type: image/png");
+        }
         echo file_get_contents($iconPath);
 
         exit;
@@ -572,6 +561,7 @@ class Admin_MiscController extends \Pimcore\Controller\Action\Admin
                 }
             }
         }
+
         return $controllerDir;
     }
 }

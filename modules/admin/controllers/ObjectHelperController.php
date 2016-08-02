@@ -253,6 +253,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
             if ($a["position"] == $b["position"]) {
                 return 0;
             }
+
             return ($a["position"] < $b["position"]) ? -1 : 1;
         });
 
@@ -274,11 +275,11 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
             $language = $gridConfig['language'];
         }
         $this->_helper->json([
-            "sortinfo" => $gridConfig['sortinfo'],
+            "sortinfo" => isset($gridConfig['sortinfo']) ? $gridConfig['sortinfo'] : false,
             "language" => $language,
             "availableFields" => $availableFields,
-            "onlyDirectChildren" => $gridConfig['onlyDirectChildren'],
-            "pageSize" => $gridConfig['pageSize']
+            "onlyDirectChildren" => isset($gridConfig['onlyDirectChildren']) ? $gridConfig['onlyDirectChildren'] : false,
+            "pageSize" => isset($gridConfig['pageSize']) ? $gridConfig['pageSize'] : false
         ]);
     }
 
@@ -389,6 +390,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
 
         if (!$field->getInvisible() && ($force || $visible)) {
             Object\Service::enrichLayoutDefinition($field);
+
             return [
                 "key" => $key,
                 "type" => $field->getFieldType(),
@@ -579,9 +581,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         }
 
         // create new object
-        $className = "\\Pimcore\\Model\\Object\\" . ucfirst($this->getParam("className"));
-        $className = Tool::getModelClassMapping($className);
-
+        $className = "Pimcore\\Model\\Object\\" . ucfirst($this->getParam("className"));
         $parent = Object::getById($this->getParam("parentId"));
 
         $objectKey = "object_" . $job;
@@ -603,15 +603,15 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
                 $object = Object::getByPath($intendedPath);
                 if (!$object instanceof Object\Concrete) {
                     //create new object
-                    $object = new $className();
+                    $object = \Pimcore::getDiContainer()->make($className);
                 } elseif ($object instanceof Object\Concrete and !($object instanceof $className)) {
                     //delete the old object it is of a different class
                     $object->delete();
-                    $object = new $className();
+                    $object = \Pimcore::getDiContainer()->make($className);
                 } elseif ($object instanceof Object\Folder) {
                     //delete the folder
                     $object->delete();
-                    $object = new $className();
+                    $object = \Pimcore::getDiContainer()->make($className);
                 } else {
                     //use the existing object
                 }
@@ -693,6 +693,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         } else {
             $requestedLanguage = $this->getLanguage();
         }
+
         return $requestedLanguage;
     }
 
@@ -712,6 +713,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
                 }
             }
         }
+
         return [$fields, $bricks];
     }
 
@@ -853,6 +855,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
                 $field = $fieldname . "~" . $groupConfig->getName() . "~" . $keyConfig->getName();
             }
         }
+
         return $field;
     }
 
@@ -912,6 +915,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
                 $csv .= implode(";", $o) . "\r\n";
             }
         }
+
         return $csv;
     }
 
@@ -991,6 +995,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
                     $fieldDefinition = $locFields->getFieldDefinition($field);
                     if ($fieldDefinition) {
                         $needLocalizedPermissions = true;
+
                         return $fieldDefinition->getForCsvExport($object->getLocalizedFields(), ["language" => $this->getParam("language")]);
                     }
                 }

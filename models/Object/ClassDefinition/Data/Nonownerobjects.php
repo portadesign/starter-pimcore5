@@ -60,8 +60,8 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
 
 
     /**
-     * @param array
-     * @return void $classes
+     * @param array $classes
+     * @return $this
      */
     public function setClasses($classes)
     {
@@ -79,7 +79,7 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
 
     /**
      * @param  $lazyLoading
-     * @return void
+     * @return $this
      */
     public function setLazyLoading($lazyLoading)
     {
@@ -90,11 +90,12 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
 
     /**
      * @param string $ownerClassName
-     * @return void
+     * @return $this
      */
     public function setOwnerClassName($ownerClassName)
     {
         $this->ownerClassName = $ownerClassName;
+
         return $this;
     }
 
@@ -112,6 +113,7 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
                 \Logger::error($e->getMessage());
             }
         }
+
         return $this->ownerClassName;
     }
     
@@ -128,6 +130,7 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
                 \Logger::error($e->getMessage());
             }
         }
+
         return $this->ownerClassId;
     }
 
@@ -141,11 +144,12 @@ class Nonownerobjects extends Model\Object\ClassDefinition\Data\Objects
 
     /**
      * @param  string $fieldName
-     * @return void
+     * @return $this
      */
     public function setOwnerFieldName($fieldName)
     {
         $this->ownerFieldName = $fieldName;
+
         return $this;
     }
 

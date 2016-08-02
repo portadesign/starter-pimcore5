@@ -34,7 +34,8 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
         $email = clone $email;
         $email = $this->getLatestVersion($email);
 
-        $email->setVersions(array_splice($email->getVersions(), 0, 1));
+        $versions = $email->getVersions();
+        $email->setVersions(array_splice($versions, 0, 1));
         $email->idPath = Element\Service::getIdPath($email);
         $email->userPermissions = $email->getUserPermissions();
         $email->setLocked($email->isLocked());
@@ -47,8 +48,17 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
         $this->addTranslationsData($email);
         $this->minimizeProperties($email);
 
+
+        //Hook for modifying return value - e.g. for changing permissions based on object data
+        //data need to wrapped into a container in order to pass parameter to event listeners by reference so that they can change the values
+        $returnValueContainer = new \Pimcore\Model\Tool\Admin\EventDataContainer(object2array($email));
+        \Pimcore::getEventManager()->trigger("admin.document.get.preSendData", $this, [
+            "document" => $email,
+            "returnValueContainer" => $returnValueContainer
+        ]);
+
         if ($email->isAllowed("view")) {
-            $this->_helper->json($email);
+            $this->_helper->json($returnValueContainer->getData());
         }
 
         $this->_helper->json(false);
@@ -222,20 +232,22 @@ class Admin_EmailController extends \Pimcore\Controller\Action\Admin\Document
     protected function enhanceLoggingData(&$data, &$fullEntry = null)
     {
         if ($data['objectId']) {
-            $class = "\\" . ltrim($data['objectClass'], "\\");
-            $obj = $class::getById($data['objectId']);
-            if (is_null($obj)) {
-                $data['objectPath'] = '';
-            } else {
-                $data['objectPath'] = $obj->getRealFullPath();
-            }
-            $niceClassName = str_replace("\\Pimcore\\Model\\", "", $data['objectClass']);
-            $niceClassName = str_replace("_", "\\", $niceClassName);
+            if (is_subclass_of($class, "\\Pimcore\\Model\\Element\\ElementInterface")) {
+                $class = "\\" . ltrim($data['objectClass'], "\\");
+                $obj = $class::getById($data['objectId']);
+                if (is_null($obj)) {
+                    $data['objectPath'] = '';
+                } else {
+                    $data['objectPath'] = $obj->getRealFullPath();
+                }
+                $niceClassName = str_replace("\\Pimcore\\Model\\", "", $data['objectClass']);
+                $niceClassName = str_replace("_", "\\", $niceClassName);
 
-            $tmp = explode("\\", $niceClassName);
-            if (in_array($tmp[0], ['Object', 'Document', 'Asset'])) {
-                $data['objectClassBase'] = $tmp[0];
-                $data['objectClassSubType'] = $tmp[1];
+                $tmp = explode("\\", $niceClassName);
+                if (in_array($tmp[0], ['Object', 'Document', 'Asset'])) {
+                    $data['objectClassBase'] = $tmp[0];
+                    $data['objectClassSubType'] = $tmp[1];
+                }
             }
         }
 

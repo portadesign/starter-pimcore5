@@ -51,15 +51,13 @@ class PimcoreNavigationController
             $navigationRootDocument = Document::getById(1);
         }
 
-        $cacheKeys = [];
+        $cacheKeys = ["root_id__" . $navigationRootDocument->getId(), $htmlMenuIdPrefix];
 
         if (Site::isSiteRequest()) {
             $site = Site::getCurrentSite();
             $cacheKeys[] = "site__" . $site->getId();
         }
 
-
-        $cacheKeys[] = "root_id__" . $navigationRootDocument->getId();
         if (is_string($cache)) {
             $cacheKeys[] = "custom__" . $cache;
         }
@@ -108,6 +106,19 @@ class PimcoreNavigationController
             $activePages = $navigation->findAllBy("uri", $activeDocument->getFullPath());
         }
 
+        // cleanup active pages from links
+        // pages have priority, if we don't find any active page, we use all we found
+        $tmpPages = [];
+        foreach ($activePages as $page) {
+            if ($page instanceof Uri && $page->getDocumentType() != "link") {
+                $tmpPages[] = $page;
+            }
+        }
+        if (count($tmpPages)) {
+            $activePages = $tmpPages;
+        }
+
+
         if (!empty($activePages)) {
             // we found an active document, so we can build the active trail by getting respectively the parent
             foreach ($activePages as $activePage) {
@@ -120,13 +131,13 @@ class PimcoreNavigationController
             foreach ($allPages as $page) {
                 $activeTrail = false;
 
-                if (strpos($activeDocument->getRealFullPath(), $page->getUri() . "/") === 0) {
+                if ($page->getUri() && strpos($activeDocument->getRealFullPath(), $page->getUri() . "/") === 0) {
                     $activeTrail = true;
                 }
 
                 if ($page instanceof Uri) {
                     if ($page->getDocumentType() == "link") {
-                        if (strpos($activeDocument->getFullPath(), $page->getUri() . "/") === 0) {
+                        if ($page->getUri() && strpos($activeDocument->getFullPath(), $page->getUri() . "/") === 0) {
                             $activeTrail = true;
                         }
                     }
@@ -180,6 +191,7 @@ class PimcoreNavigationController
     public function setPageClass($pageClass)
     {
         $this->_pageClass = $pageClass;
+
         return $this;
     }
 

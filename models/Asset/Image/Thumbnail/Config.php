@@ -97,6 +97,7 @@ class Config extends Model\AbstractModel
                 $thumbnail = self::getByName($config);
             } catch (\Exception $e) {
                 \Logger::error("requested thumbnail " . $config . " is not defined");
+
                 return false;
             }
         } elseif (is_array($config)) {
@@ -172,6 +173,7 @@ class Config extends Model\AbstractModel
         $arrayConfig = object2array($this);
         $items = $arrayConfig["items"];
         $arrayConfig["items"] = $items;
+
         return $arrayConfig;
     }
 
@@ -255,8 +257,10 @@ class Config extends Model\AbstractModel
             $suffix = preg_replace("/[\-]+/", "-", $suffix);
 
             $this->setFilenameSuffix($suffix);
+
             return true;
         }
+
         return false;
     }
 
@@ -266,6 +270,7 @@ class Config extends Model\AbstractModel
     public function setDescription($description)
     {
         $this->description = $description;
+
         return $this;
     }
 
@@ -283,6 +288,7 @@ class Config extends Model\AbstractModel
     public function setItems($items)
     {
         $this->items = $items;
+
         return $this;
     }
 
@@ -300,6 +306,7 @@ class Config extends Model\AbstractModel
     public function setName($name)
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -317,6 +324,7 @@ class Config extends Model\AbstractModel
     public function setFormat($format)
     {
         $this->format = $format;
+
         return $this;
     }
 
@@ -336,6 +344,7 @@ class Config extends Model\AbstractModel
         if ($quality) {
             $this->quality = (int) $quality;
         }
+
         return $this;
     }
 
@@ -511,8 +520,23 @@ class Config extends Model\AbstractModel
     }
 
 
-    public function getEstimatedDimensions($originalWidth = null, $originalHeight = null)
+    public function getEstimatedDimensions($asset)
     {
+        $originalWidth = $asset->getWidth();
+        $originalHeight = $asset->getHeight();
+        $isVectorFormatStatus = null;
+
+        $isVectorFormat = function () use ($isVectorFormatStatus, $asset) {
+            if ($isVectorFormatStatus === null) {
+                $imageTransformer = \Pimcore\Image::getInstance();
+                $imageTransformer->load($asset->getFileSystemPath());
+                $isVectorFormatStatus = $imageTransformer->isVectorGraphic();
+            }
+
+            return $isVectorFormatStatus;
+        };
+
+
         $dimensions = [];
         $transformations = $this->getItems();
         if (is_array($transformations) && count($transformations) > 0) {
@@ -528,21 +552,24 @@ class Config extends Model\AbstractModel
                             $dimensions["width"] = $arg["width"];
                             $dimensions["height"] = $arg["height"];
                         } elseif ($transformation["method"] == "scaleByWidth") {
-                            if ($arg["width"] <= $dimensions["width"]) {
+                            if ($arg["width"] <= $dimensions["width"] || $isVectorFormat()) {
                                 $dimensions["height"] = round(($arg["width"] / $dimensions["width"]) * $dimensions["height"], 0);
                                 $dimensions["width"] = $arg["width"];
                             }
                         } elseif ($transformation["method"] == "scaleByHeight") {
-                            if ($arg["height"] < $dimensions["height"]) {
+                            if ($arg["height"] < $dimensions["height"] || $isVectorFormat()) {
                                 $dimensions["width"] = round(($arg["height"] / $dimensions["height"]) * $dimensions["width"], 0);
                                 $dimensions["height"] = $arg["height"];
                             }
                         } elseif ($transformation["method"] == "contain") {
                             $x = $dimensions["width"] / $arg["width"];
                             $y = $dimensions["height"] / $arg["height"];
-                            if ($x <= 1 && $y <= 1) {
+
+                            if ($x <= 1 && $y <= 1 && !$isVectorFormat()) {
                                 continue;
-                            } elseif ($x > $y) {
+                            }
+
+                            if ($x > $y) {
                                 $dimensions["height"] = round(($arg["width"] / $dimensions["width"]) * $dimensions["height"], 0);
                                 $dimensions["width"] = $arg["width"];
                             } else {
@@ -575,6 +602,10 @@ class Config extends Model\AbstractModel
                 }
             }
         }
+
+        // ensure we return int's, sometimes $arg[...] contain strings
+        $dimensions["width"] = (int) $dimensions["width"];
+        $dimensions["height"] = (int) $dimensions["height"];
 
         return $dimensions;
     }

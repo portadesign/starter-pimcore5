@@ -39,6 +39,7 @@ class Dao extends Model\Dao\AbstractDao
             $containerType = $context["containerType"];
             if ($containerType == "fieldcollection") {
                 $containerKey = $context["containerKey"];
+
                 return "object_collection_" .  $containerKey . "_localized_" . $this->model->getClass()->getId();
             }
         }
@@ -253,7 +254,9 @@ class Dao extends Model\Dao\AbstractDao
 
                 $queryTable = $this->getQueryTableName() . "_" . $language;
                 $this->db->insertOrUpdate($queryTable, $data);
-                $this->inheritanceHelper->doUpdate($object->getId(), true);
+                if ($inheritanceEnabled) {
+                    $this->inheritanceHelper->doUpdate($object->getId(), true);
+                }
                 $this->inheritanceHelper->resetFieldsToCheck();
             }
 

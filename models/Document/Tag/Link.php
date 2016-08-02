@@ -98,6 +98,7 @@ class Link extends Model\Document\Tag
 
             return '<a href="' . $url . '" ' . implode(" ", $attribs) . '>' . htmlspecialchars($this->data["text"]) . '</a>';
         }
+
         return "";
     }
 
@@ -126,6 +127,7 @@ class Link extends Model\Document\Tag
                 }
             }
         }
+
         return $sane;
     }
 
@@ -155,7 +157,7 @@ class Link extends Model\Document\Tag
      */
     protected function updatePathFromInternal()
     {
-        if ($this->data["internal"]) {
+        if (isset($this->data["internal"]) && $this->data["internal"]) {
             if ($this->data["internalType"] == "document") {
                 if ($doc = Document::getById($this->data["internalId"])) {
                     if (!Document::doHideUnpublished() || $doc->isPublished()) {
@@ -240,7 +242,7 @@ class Link extends Model\Document\Tag
     /**
      * @see Document\Tag\TagInterface::setDataFromResource
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromResource($data)
     {
@@ -248,6 +250,7 @@ class Link extends Model\Document\Tag
         if (!is_array($this->data)) {
             $this->data = [];
         }
+
         return $this;
     }
 
@@ -281,6 +284,7 @@ class Link extends Model\Document\Tag
         }
 
         $this->data = $data;
+
         return $this;
     }
 
@@ -322,6 +326,7 @@ class Link extends Model\Document\Tag
                 }
             }
         }
+
         return $dependencies;
     }
 
@@ -404,6 +409,7 @@ class Link extends Model\Document\Tag
         }
 
         $el->data = $this->data;
+
         return $el;
     }
 

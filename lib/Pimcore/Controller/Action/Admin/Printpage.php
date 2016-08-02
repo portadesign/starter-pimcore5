@@ -41,6 +41,12 @@ class Printpage extends \Pimcore\Controller\Action\Admin\Document
         $page->userPermissions = $page->getUserPermissions();
         $page->setLocked($page->isLocked());
 
+        if ($page->getContentMasterDocument()) {
+            $page->contentMasterDocumentPath = $page->getContentMasterDocument()->getRealFullPath();
+        }
+
+        $this->addTranslationsData($page);
+
         // unset useless data
         $page->setElements(null);
         $page->childs = null;
@@ -92,7 +98,7 @@ class Printpage extends \Pimcore\Controller\Action\Admin\Document
                     $this->_helper->json(["success" => true]);
                 } catch (\Exception $e) {
                     \Logger::err($e);
-                    $this->_helper->json(["success" => false,"message"=>$e->getMessage()]);
+                    $this->_helper->json(["success" => false, "message"=>$e->getMessage()]);
                 }
             } else {
                 if ($page->isAllowed("save")) {
@@ -104,7 +110,7 @@ class Printpage extends \Pimcore\Controller\Action\Admin\Document
                         $this->_helper->json(["success" => true]);
                     } catch (\Exception $e) {
                         \Logger::err($e);
-                        $this->_helper->json(["success" => false,"message"=>$e->getMessage()]);
+                        $this->_helper->json(["success" => false, "message"=>$e->getMessage()]);
                     }
                 }
             }

@@ -49,11 +49,12 @@ class Listing extends Model\Listing\AbstractListing
 
     /**
      * @param array $tasks
-     * @return void
+     * @return $this
      */
     public function setTasks($tasks)
     {
         $this->tasks = $tasks;
+
         return $this;
     }
 }

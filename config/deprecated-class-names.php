@@ -64,6 +64,7 @@ namespace Pimcore\Log\Writer {
 }
 
 // GLOBAL NAMESPACE
+
 namespace {
 
     /**
@@ -2219,13 +2220,6 @@ namespace {
      * @deprecated
      */
     class Document_Service extends \Pimcore\Model\Document\Service
-    {
-    }
-
-    /**
-     * @deprecated
-     */
-    interface Document_Interface extends \Pimcore\Model\Document\DocumentInterface
     {
     }
 

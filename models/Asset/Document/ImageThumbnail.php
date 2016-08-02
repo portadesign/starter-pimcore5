@@ -108,7 +108,10 @@ class ImageThumbnail
      */
     public function getFileSystemPath()
     {
-        $this->generate();
+        if (!$this->filesystemPath) {
+            $this->generate();
+        }
+
         return $this->filesystemPath;
     }
 
@@ -118,6 +121,7 @@ class ImageThumbnail
     public function generate()
     {
         $errorImage = PIMCORE_PATH . '/static6/img/filetype-not-supported.png';
+        $generated = false;
 
         if (!$this->asset) {
             $this->filesystemPath = $errorImage;
@@ -126,6 +130,7 @@ class ImageThumbnail
             $config->setName("document_" . $config->getName()."-".$this->page);
 
             try {
+                $path = null;
                 if (!$this->deferred) {
                     $converter = \Pimcore\Document::getInstance();
                     $converter->load($this->asset->getFileSystemPath());
@@ -139,6 +144,7 @@ class ImageThumbnail
                     if (!is_file($path) && !Model\Tool\Lock::isLocked($lockKey)) {
                         Model\Tool\Lock::lock($lockKey);
                         $converter->saveImage($path, $this->page);
+                        $generated = true;
                         Model\Tool\Lock::release($lockKey);
                     } elseif (Model\Tool\Lock::isLocked($lockKey)) {
                         return "/pimcore/static6/img/please-wait.png";
@@ -146,7 +152,7 @@ class ImageThumbnail
                 }
 
                 if ($config) {
-                    $path = Image\Thumbnail\Processor::process($this->asset, $config, $path, $this->deferred, true);
+                    $path = Image\Thumbnail\Processor::process($this->asset, $config, $path, $this->deferred, true, $generated);
                 }
 
                 $this->filesystemPath = $path;
@@ -155,6 +161,11 @@ class ImageThumbnail
                 \Logger::error($e);
                 $this->filesystemPath = $errorImage;
             }
+
+            \Pimcore::getEventManager()->trigger("asset.document.image-thumbnail", $this, [
+                "deferred" => $this->deferred,
+                "generated" => $generated
+            ]);
         }
     }
 
@@ -189,6 +200,7 @@ class ImageThumbnail
         if (!$this->width) {
             $this->getDimensions();
         }
+
         return $this->width;
     }
 
@@ -201,6 +213,7 @@ class ImageThumbnail
         if (!$this->height) {
             $this->getDimensions();
         }
+
         return $this->height;
     }
 
@@ -212,6 +225,7 @@ class ImageThumbnail
         if (!$this->realWidth) {
             $this->getDimensions();
         }
+
         return $this->realWidth;
     }
 
@@ -224,6 +238,7 @@ class ImageThumbnail
         if (!$this->realHeight) {
             $this->getDimensions();
         }
+
         return $this->realHeight;
     }
 

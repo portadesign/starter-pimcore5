@@ -318,7 +318,6 @@ Ext.onReady(function () {
     });
 
     pimcore.globalmanager.add("document_types_store", store);
-    pimcore.globalmanager.add("document_documenttype_store", ["page","snippet","email","printpage","printcontainer"]);
 
     //translation admin keys
     pimcore.globalmanager.add("translations_admin_missing", new Array());
@@ -333,6 +332,7 @@ Ext.onReady(function () {
             return ts(rec.data.text);
         }},
         {name:'icon'},
+        {name:'group'},
         {name:"propertyVisibility"}
     ];
 
@@ -562,7 +562,7 @@ Ext.onReady(function () {
                 }
             ],
             listeners:{
-                "afterrender":function () {
+                "afterrender":function (el) {
                     Ext.get("pimcore_navigation").show();
                     Ext.get("pimcore_avatar").show();
                     Ext.get("pimcore_logout").show();
@@ -576,6 +576,16 @@ Ext.onReady(function () {
                         });
                     loadMask.enable();
                     pimcore.globalmanager.add("loadingmask", loadMask);
+
+
+                    // prevent dropping files / folder outside the asset tree
+                    var fn = function (e) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'none';
+                    };
+
+                    el.getEl().dom.addEventListener("dragenter", fn, true);
+                    el.getEl().dom.addEventListener("dragover", fn, true);
                 }
             }
         });

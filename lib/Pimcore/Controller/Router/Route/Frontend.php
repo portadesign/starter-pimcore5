@@ -28,7 +28,7 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract
     /**
      * @var array
      */
-    public static $directRouteTypes = ["page", "snippet", "email", "printpage", "printcontainer"];
+    public static $directRouteTypes = ["page", "snippet", "email", "newsletter", "printpage", "printcontainer"];
 
     /**
      * @param $type
@@ -145,7 +145,7 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract
 
         // test if there is a suitable redirect with override = all (=> priority = 99)
         if (!$matchFound) {
-            $this->checkForRedirect(true);
+            $this->checkForRedirect($originalPath, true);
         }
 
         // do not allow requests including /index.php/ => SEO
@@ -325,6 +325,7 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract
                     if ($a["priority"] == $b["priority"]) {
                         return 0;
                     }
+
                     return ($a["priority"] < $b["priority"]) ? 1 : -1;
                 });
                 $routes = $list->load();
@@ -362,7 +363,7 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract
 
         // test if there is a suitable redirect
         if (!$matchFound) {
-            $this->checkForRedirect(false);
+            $this->checkForRedirect($originalPath, false);
         }
 
         if (!$matchFound) {
@@ -440,6 +441,7 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract
                     }
                 }
             }
+
             return $document;
         }
 
@@ -447,12 +449,10 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract
     }
 
     /**
-     * Checks for a suitable redirect
-     * @throws Exception
+     * @param $matchRequestUri
      * @param bool $override
-     * @return void
      */
-    protected function checkForRedirect($override = false)
+    protected function checkForRedirect($matchRequestUri, $override = false)
     {
 
         // not for admin requests
@@ -481,9 +481,8 @@ class Frontend extends \Zend_Controller_Router_Route_Abstract
                 Cache::save($this->redirects, $cacheKey, ["system", "redirect", "route"], null, 998);
             }
 
-            $requestScheme = ($_SERVER['HTTPS'] == 'on') ? \Zend_Controller_Request_Http::SCHEME_HTTPS : \Zend_Controller_Request_Http::SCHEME_HTTP;
-            $matchRequestUri = $_SERVER["REQUEST_URI"];
-            $matchUrl = $requestScheme . "://" . $_SERVER["HTTP_HOST"] . $matchRequestUri;
+            $requestScheme = Tool::getRequestScheme();
+            $matchUrl = Tool::getHostUrl() . $matchRequestUri;
 
             foreach ($this->redirects as $redirect) {
                 $matchAgainst = $matchRequestUri;

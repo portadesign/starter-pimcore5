@@ -128,6 +128,7 @@ class Maintenance
 
     public function checkErrorLogsDb()
     {
+        $db = \Pimcore\Db::get();
         $conf = Config::getSystemConfig();
         $config = $conf->applicationlog;
 
@@ -139,8 +140,6 @@ class Maintenance
             });
 
             $logLevel = (int)$config->mail_notification->filter_priority;
-            $db = \Pimcore\Db::get()->getResource();
-
 
             $query = "SELECT * FROM ". \Pimcore\Log\Handler\ApplicationLoggerDb::TABLE_NAME . " WHERE maintenanceChecked IS NULL AND priority <= $logLevel order by id desc";
 
@@ -173,9 +172,12 @@ class Maintenance
                     $mail->send();
                 }
             }
-
-            $db->query("UPDATE " . \Pimcore\Log\Handler\ApplicationLoggerDb::TABLE_NAME . " set maintenanceChecked = 1");
         }
+
+        // flag them as checked, regardless if email notifications are enabled or not
+        // otherwise, when activating email notifications, you'll receive all log-messages from the past and not
+        // since the point when you enabled the notifications
+        $db->query("UPDATE " . \Pimcore\Log\Handler\ApplicationLoggerDb::TABLE_NAME . " set maintenanceChecked = 1");
     }
 
 

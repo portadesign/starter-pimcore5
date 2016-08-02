@@ -31,37 +31,37 @@ class Thumbnail extends \Zend_Controller_Plugin_Abstract
         if (preg_match("@/image-thumbnails(.*)?/([0-9]+)/thumb__([a-zA-Z0-9_\-]+)([^\@]+)(\@[0-9.]+x)?\.([a-zA-Z]{2,5})@", $request->getPathInfo(), $matches)) {
             $assetId = $matches[2];
             $thumbnailName = $matches[3];
-            $format = $matches[6];
 
             if ($asset = Asset::getById($assetId)) {
                 try {
-                    $page = 1;
+                    $page = 1; // default
                     $thumbnailFile = null;
                     $thumbnailConfig = null;
-                    $deferredConfigId = "thumb_" . $assetId . "__" . md5($matches[0]);
-                    if ($thumbnailConfigItem = TmpStore::get($deferredConfigId)) {
-                        $thumbnailConfig = $thumbnailConfigItem->getData();
-                        TmpStore::delete($deferredConfigId);
 
-                        if (!$thumbnailConfig instanceof Asset\Image\Thumbnail\Config) {
-                            throw new \Exception("Deferred thumbnail config file doesn't contain a valid \\Asset\\Image\\Thumbnail\\Config object");
-                        }
+                    //get thumbnail for e.g. pdf page thumb__document_pdfPage-5
+                    if (preg_match("|document_(.*)\-(\d+)$|", $thumbnailName, $matchesThumbs)) {
+                        $thumbnailName = $matchesThumbs[1];
+                        $page = (int)$matchesThumbs[2];
+                    }
 
-                        $tmpPage = array_pop(explode("-", $thumbnailName));
-                        if (is_numeric($tmpPage)) {
-                            $page = $tmpPage;
+                    // just check if the thumbnail exists -> throws exception otherwise
+                    $thumbnailConfig = Asset\Image\Thumbnail\Config::getByName($thumbnailName);
+
+                    if (!$thumbnailConfig) {
+                        // check if there's an item in the TmpStore
+                        $deferredConfigId = "thumb_" . $assetId . "__" . md5($matches[0]);
+                        if ($thumbnailConfigItem = TmpStore::get($deferredConfigId)) {
+                            $thumbnailConfig = $thumbnailConfigItem->getData();
+                            TmpStore::delete($deferredConfigId);
+
+                            if (!$thumbnailConfig instanceof Asset\Image\Thumbnail\Config) {
+                                throw new \Exception("Deferred thumbnail config file doesn't contain a valid \\Asset\\Image\\Thumbnail\\Config object");
+                            }
                         }
-                    } else {
-                        //get thumbnail for e.g. pdf page thumb__document_pdfPage-5
-                        if (preg_match("|document_(.*)\-(\d+)$|", $thumbnailName, $matchesThumbs)) {
-                            $thumbnailName = $matchesThumbs[1];
-                            $page = (int)$matchesThumbs[2];
-                        }
-                        // just check if the thumbnail exists -> throws exception otherwise
-                        $thumbnailConfig = Asset\Image\Thumbnail\Config::getByName($thumbnailName);
-                        if (!$thumbnailConfig instanceof Asset\Image\Thumbnail\Config) {
-                            throw new \Exception("Thumbnail '" . $thumbnailName . "' file doesn't exists");
-                        }
+                    }
+
+                    if (!$thumbnailConfig) {
+                        throw new \Exception("Thumbnail '" . $thumbnailName . "' file doesn't exists");
                     }
 
                     if ($asset instanceof Asset\Document) {
@@ -76,10 +76,22 @@ class Thumbnail extends \Zend_Controller_Plugin_Abstract
                             $thumbnailConfig->setHighResolution($highResFactor);
                         }
 
+                        // check if a media query thumbnail was requested
+                        if (preg_match("#~\-~([\d]+w)#", $matches[4], $mediaQueryResult)) {
+                            $thumbnailConfig->selectMedia($mediaQueryResult[1]);
+                        }
+
                         $thumbnailFile = $asset->getThumbnail($thumbnailConfig)->getFileSystemPath();
                     }
 
                     if ($thumbnailFile && file_exists($thumbnailFile)) {
+
+                        // set appropriate caching headers
+                        // see also: https://github.com/pimcore/pimcore/blob/1931860f0aea27de57e79313b2eb212dcf69ef13/.htaccess#L86-L86
+                        $lifetime = 86400 * 7; // 1 week lifetime, same as direct delivery in .htaccess
+                        header("Cache-Control: public, max-age=" . $lifetime);
+                        header("Expires: ". date("D, d M Y H:i:s T", time()+$lifetime));
+
                         $fileExtension = \Pimcore\File::getFileExtension($thumbnailFile);
                         if (in_array($fileExtension, ["gif", "jpeg", "jpeg", "png", "pjpeg"])) {
                             header("Content-Type: image/".$fileExtension, true);

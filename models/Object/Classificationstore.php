@@ -67,11 +67,12 @@ class Classificationstore extends Model\AbstractModel
 
     /**
      * @param  array $items
-     * @return void
+     * @return $this
      */
     public function setItems($items)
     {
         $this->items = $items;
+
         return $this;
     }
 
@@ -85,7 +86,7 @@ class Classificationstore extends Model\AbstractModel
 
     /**
      * @param Concrete $object
-     * @return void
+     * @return $this
      */
     public function setObject(Concrete $object)
     {
@@ -104,11 +105,12 @@ class Classificationstore extends Model\AbstractModel
 
     /**
      * @param Model\Object\ClassDefinition $class
-     * @return void
+     * @return $this
      */
     public function setClass(ClassDefinition $class)
     {
         $this->class = $class;
+
         return $this;
     }
 
@@ -120,6 +122,7 @@ class Classificationstore extends Model\AbstractModel
         if (!$this->class && $this->getObject()) {
             $this->class = $this->getObject()->getClass();
         }
+
         return $this->class;
     }
 
@@ -160,6 +163,7 @@ class Classificationstore extends Model\AbstractModel
                 }
             }
         }
+
         return $this;
     }
 
@@ -254,6 +258,7 @@ class Classificationstore extends Model\AbstractModel
             $childDef = Model\Object\Classificationstore\Service::getFieldDefinitionFromKeyConfig($keyConfig);
             $data->setContextualData("classificationstore", $this->getFieldname(), null, $language, $groupId, $keyId, $childDef);
             $data = Model\Object\Service::getCalculatedFieldValueForEditMode($this->getObject(), [], $data);
+
             return $data;
         }
 

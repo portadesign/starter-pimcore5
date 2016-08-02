@@ -116,6 +116,7 @@ class Pdf extends Model\Document\Tag
                     }
                 }
             }
+
             return $data;
         };
 
@@ -165,6 +166,7 @@ class Pdf extends Model\Document\Tag
                         }
                     }
                 }
+
                 return $tags;
             };
 
@@ -216,6 +218,7 @@ class Pdf extends Model\Document\Tag
                     }
                 }
             }
+
             return $dependencies;
         };
 
@@ -245,7 +248,7 @@ class Pdf extends Model\Document\Tag
     /**
      * @see Document\Tag\TagInterface::setDataFromResource
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromResource($data)
     {
@@ -279,6 +282,7 @@ class Pdf extends Model\Document\Tag
                     }
                 }
             }
+
             return $data;
         };
 
@@ -337,6 +341,7 @@ class Pdf extends Model\Document\Tag
                             }
                         }
                     }
+
                     return $data;
                 };
 
@@ -349,6 +354,7 @@ class Pdf extends Model\Document\Tag
             $this->texts = $data['texts'];
             $this->chapters = $data['chapters'];
         }
+
         return $this;
     }
 
@@ -359,6 +365,7 @@ class Pdf extends Model\Document\Tag
         if ($options["width"]) {
             return $options["width"];
         }
+
         return "100%";
     }
 
@@ -368,6 +375,7 @@ class Pdf extends Model\Document\Tag
         if ($options["height"]) {
             return $options["height"];
         }
+
         return 300;
     }
 
@@ -434,7 +442,7 @@ class Pdf extends Model\Document\Tag
                     ], $i, true)
                 ];
 
-                if (is_array($hotspots) && $hotspots[$i]) {
+                if (is_array($hotspots) && isset($hotspots[$i]) && $hotspots[$i]) {
                     $pageData["hotspots"] = $rewritePath($hotspots[$i]);
                 }
 
@@ -509,6 +517,7 @@ HTML;
         if ($this->id) {
             return false;
         }
+
         return true;
     }
 
@@ -550,6 +559,7 @@ HTML;
     public function getElement()
     {
         $data = $this->getData();
+
         return Asset::getById($data['id']);
     }
 
@@ -579,6 +589,7 @@ HTML;
     public function getChapter($page)
     {
         $chapters = $this->getChapters();
+
         return $chapters[$page];
     }
 
@@ -602,6 +613,7 @@ HTML;
     public function getHotspot($page)
     {
         $hotspots = $this->getHotspots();
+
         return $hotspots[$page];
     }
 

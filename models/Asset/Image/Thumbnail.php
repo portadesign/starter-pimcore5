@@ -113,7 +113,10 @@ class Thumbnail
      */
     public function getFileSystemPath($deferredAllowed = false)
     {
-        $this->generate($deferredAllowed);
+        if (!$this->filesystemPath) {
+            $this->generate($deferredAllowed);
+        }
+
         return $this->filesystemPath;
     }
 
@@ -123,18 +126,19 @@ class Thumbnail
     public function generate($deferredAllowed = true)
     {
         $errorImage = PIMCORE_PATH . '/static6/img/filetype-not-supported.png';
+        $deferred = false;
+        $generated = false;
 
         if (!$this->asset) {
             $this->filesystemPath = $errorImage;
         } elseif (!$this->filesystemPath) {
             // if no correct thumbnail config is given use the original image as thumbnail
             if (!$this->config) {
-                $fsPath = $this->asset->getFileSystemPath();
-                $this->filesystemPath = str_replace(PIMCORE_DOCUMENT_ROOT, "", $fsPath);
+                $this->filesystemPath = $this->asset->getRealFullPath();
             } else {
                 try {
                     $deferred = ($deferredAllowed && $this->deferred) ? true : false;
-                    $this->filesystemPath = Thumbnail\Processor::process($this->asset, $this->config, null, $deferred, true);
+                    $this->filesystemPath = Thumbnail\Processor::process($this->asset, $this->config, null, $deferred, true, $generated);
                 } catch (\Exception $e) {
                     $this->filesystemPath = $errorImage;
                     \Logger::error("Couldn't create thumbnail of image " . $this->asset->getRealFullPath());
@@ -142,6 +146,11 @@ class Thumbnail
                 }
             }
         }
+
+        \Pimcore::getEventManager()->trigger("asset.image.thumbnail", $this, [
+            "deferred" => $deferred,
+            "generated" => $generated
+        ]);
     }
 
     /**
@@ -175,6 +184,7 @@ class Thumbnail
         if (!$this->width) {
             $this->getDimensions();
         }
+
         return $this->width;
     }
 
@@ -187,6 +197,7 @@ class Thumbnail
         if (!$this->height) {
             $this->getDimensions();
         }
+
         return $this->height;
     }
 
@@ -198,6 +209,7 @@ class Thumbnail
         if (!$this->realWidth) {
             $this->getDimensions();
         }
+
         return $this->realWidth;
     }
 
@@ -210,6 +222,7 @@ class Thumbnail
         if (!$this->realHeight) {
             $this->getDimensions();
         }
+
         return $this->realHeight;
     }
 
@@ -225,7 +238,7 @@ class Thumbnail
 
             // first we try to calculate the final dimensions based on the thumbnail configuration
             if ($config) {
-                $dimensions = $config->getEstimatedDimensions($asset->getWidth(), $asset->getHeight());
+                $dimensions = $config->getEstimatedDimensions($asset);
             }
 
             if (empty($dimensions)) {
@@ -307,46 +320,56 @@ class Thumbnail
     * Attributes can be added as a parameter. Attributes containing illigal characters are ignored.
     * Width and Height attribute can be overridden. SRC-attribute not.
     * Values of attributes are escaped.
-    * @param array $attributes Listof key-value pairs of HTML attributes.
+    * @param array $options Custom configurations and HTML attributes.
     * @param array $removeAttributes Listof key-value pairs of HTML attributes that should be removed
     * @return string IMG-element with at least the attributes src, width, height, alt.
     */
-    public function getHTML($attributes = [], $removeAttributes = [])
+    public function getHTML($options = [], $removeAttributes = [])
     {
         $image = $this->getAsset();
-        $attr = [];
+        $attributes = [];
         $pictureAttribs = []; // this is used for the html5 <picture> element
 
         // re-add support for disableWidthHeightAttributes
-        if (isset($attributes['disableWidthHeightAttributes']) && $attributes['disableWidthHeightAttributes']) {
+        if (isset($options['disableWidthHeightAttributes']) && $options['disableWidthHeightAttributes']) {
             // make sure the attributes are removed
             $removeAttributes = array_merge($removeAttributes, ['width', 'height']);
         } else {
             if ($this->getWidth()) {
-                $attr['width'] = 'width="'.$this->getWidth().'"';
+                $attributes['width'] = 'width="'.$this->getWidth().'"';
             }
 
             if ($this->getHeight()) {
-                $attr['height'] = 'height="'.$this->getHeight().'"';
+                $attributes['height'] = 'height="'.$this->getHeight().'"';
             }
+        }
+
+        $w3cImgAttributes = ["alt", "align", "border", "height", "hspace", "ismap", "longdesc", "usemap",
+            "vspace", "width", "class", "dir", "id", "lang", "style", "title", "xml:lang", "onmouseover",
+            "onabort", "onclick", "ondblclick", "onmousedown", "onmousemove", "onmouseout", "onmouseup",
+            "onkeydown", "onkeypress", "onkeyup", "itemprop", "itemscope", "itemtype"];
+
+        $customAttributes = [];
+        if (array_key_exists("attributes", $options) && is_array($options["attributes"])) {
+            $customAttributes = $options["attributes"];
         }
 
         $altText = "";
         $titleText = "";
-        if (isset($attributes["alt"])) {
-            $altText = $attributes["alt"];
+        if (isset($options["alt"])) {
+            $altText = $options["alt"];
         }
-        if (isset($attributes["title"])) {
-            $titleText = $attributes["title"];
+        if (isset($options["title"])) {
+            $titleText = $options["title"];
         }
 
-        if (empty($titleText)) {
+        if (empty($titleText) && (!isset($options["disableAutoTitle"]) || !$options["disableAutoTitle"])) {
             if ($image->getMetadata("title")) {
                 $titleText = $image->getMetadata("title");
             }
         }
 
-        if (empty($altText)) {
+        if (empty($altText) && (!isset($options["disableAutoAlt"]) || !$options["disableAutoAlt"])) {
             if ($image->getMetadata("alt")) {
                 $altText = $image->getMetadata("alt");
             } else {
@@ -355,7 +378,7 @@ class Thumbnail
         }
 
         // get copyright from asset
-        if ($image->getMetadata("copyright")) {
+        if ($image->getMetadata("copyright") && (!isset($options["disableAutoCopyright"]) || !$options["disableAutoCopyright"])) {
             if (!empty($altText)) {
                 $altText .= " | ";
             }
@@ -366,21 +389,25 @@ class Thumbnail
             $titleText .= ("© " . $image->getMetadata("copyright"));
         }
 
-        $attributes["alt"] = $altText;
+        $options["alt"] = $altText;
         if (!empty($titleText)) {
-            $attributes["title"] = $titleText;
+            $options["title"] = $titleText;
         }
 
-        foreach ($attributes as $key => $value) {
+        $attributesRaw = array_merge($options, $customAttributes);
 
-            // ignored attributes
-            if (in_array($key, ["disableWidthHeightAttributes"])) {
+        foreach ($attributesRaw as $key => $value) {
+            if (!(is_string($value) || is_numeric($value) || is_bool($value))) {
+                continue;
+            }
+
+            if (!(in_array($key, $w3cImgAttributes) || array_key_exists($key, $customAttributes) || strpos($key, "data-") === 0)) {
                 continue;
             }
 
             //only include attributes with characters a-z and dashes in their name.
             if (preg_match("/^[a-z-]+$/i", $key)) {
-                $attr[$key] = $key . '="' . htmlspecialchars($value) . '"';
+                $attributes[$key] = $key . '="' . htmlspecialchars($value) . '"';
 
                 // do not include all attributes
                 if (!in_array($key, ["width", "height", "alt"])) {
@@ -395,7 +422,7 @@ class Thumbnail
         }
 
         $path = $this->getPath(true);
-        $attr['src'] = 'src="'. $path .'"';
+        $attributes['src'] = 'src="'. $path .'"';
 
         $thumbConfig = $this->getConfig();
 
@@ -408,16 +435,16 @@ class Thumbnail
                 $srcsetEntry = $image->getThumbnail($thumbConfigRes, true) . " " . $highRes . "x";
                 $srcSetValues[] = $srcsetEntry;
             }
-            $attr['srcset'] = 'srcset="'. implode(", ", $srcSetValues) .'"';
+            $attributes['srcset'] = 'srcset="'. implode(", ", $srcSetValues) .'"';
         }
 
         foreach ($removeAttributes as $attribute) {
-            unset($attr[$attribute]);
+            unset($attributes[$attribute]);
             unset($pictureAttribs[$attribute]);
         }
 
         // build html tag
-        $htmlImgTag = '<img '.implode(' ', $attr).' />';
+        $htmlImgTag = '<img '.implode(' ', $attributes).' />';
 
         // $this->getConfig() can be empty, the original image is returned
         if (!$this->getConfig() || !$this->getConfig()->hasMedias()) {
@@ -465,7 +492,7 @@ class Thumbnail
 
                 //$html .= "\t" . '<noscript>' . "\n\t\t" . $htmlImgTag . "\n\t" . '</noscript>' . "\n";
 
-                $attrCleanedForPicture = $attr;
+                $attrCleanedForPicture = $attributes;
             unset($attrCleanedForPicture["width"]);
             unset($attrCleanedForPicture["height"]);
             $attrCleanedForPicture["src"] = 'src="' . (string) $fallBackImageThumb . '"';

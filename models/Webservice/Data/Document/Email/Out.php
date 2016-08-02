@@ -20,4 +20,58 @@ use Pimcore\Model;
 
 class Out extends Model\Webservice\Data\Document\Snippet\Out
 {
+    /**
+     * @var string
+     */
+    public $path;
+
+    /**
+     * @var integer
+     */
+    public $creationDate;
+
+    /**
+     * @var integer
+     */
+    public $modificationDate;
+
+    /**
+     * @var integer
+     */
+    public $userModification;
+
+    /**
+     * Contains the email subject
+     *
+     * @var string
+     */
+    public $subject = "";
+
+    /**
+     * Contains the from email address
+     *
+     * @var string
+     */
+    public $from = "";
+
+    /**
+     * Contains the email addresses of the recipients
+     *
+     * @var string
+     */
+    public $to = "";
+
+    /**
+     * Contains the carbon copy recipients
+     *
+     * @var string
+     */
+    public $cc = "";
+
+    /**
+     * Contains the blind carbon copy recipients
+     *
+     * @var string
+     */
+    public $bcc = "";
 }

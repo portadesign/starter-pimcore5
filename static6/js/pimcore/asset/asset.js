@@ -245,6 +245,8 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
                 scale: "medium"
             });
 
+            //workflow management
+            pimcore.elementservice.integrateWorkflowManagement('asset', this.data.id, this, buttons);
 
             this.toolbar = new Ext.Toolbar({
                 id: "asset_toolbar_" + this.id,
@@ -377,9 +379,7 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
     },
 
     upload: function () {
-
-        pimcore.helpers.uploadDialog('/admin/asset/replace-asset/?pimcore_admin_sid='
-            + pimcore.settings.sessionId + "&id=" + this.data.id, "Filedata", function() {
+        pimcore.helpers.uploadDialog('/admin/asset/replace-asset/id/' + this.data.id, "Filedata", function() {
             this.reload();
         }.bind(this), function () {
             Ext.MessageBox.alert(t("error"), t("error"));

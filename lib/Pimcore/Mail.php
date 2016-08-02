@@ -16,6 +16,8 @@ namespace Pimcore;
 
 use Pimcore\Helper\Mail as MailHelper;
 use Pimcore\Model;
+use Egulias\EmailValidator\EmailValidator;
+use Egulias\EmailValidator\Validation\RFCValidation;
 
 class Mail extends \Zend_Mail
 {
@@ -126,6 +128,7 @@ class Mail extends \Zend_Mail
     public function setHostUrl($url)
     {
         $this->hostUrl = $url;
+
         return $this;
     }
 
@@ -237,6 +240,7 @@ class Mail extends \Zend_Mail
     public function setIgnoreDebugMode($value)
     {
         $this->ignoreDebugMode = (bool)$value;
+
         return $this;
     }
 
@@ -258,6 +262,7 @@ class Mail extends \Zend_Mail
     public function setEnableLayoutOnPlaceholderRendering($value)
     {
         $this->enableLayoutOnPlaceholderRendering = (bool)$value;
+
         return $this;
     }
 
@@ -295,6 +300,7 @@ class Mail extends \Zend_Mail
         } else {
             \Logger::warn('Html2Text options ignored. You have to pass a string');
         }
+
         return $this;
     }
 
@@ -322,6 +328,7 @@ class Mail extends \Zend_Mail
     public function addTo($email, $name = '')
     {
         $this->addToTemporaryStorage('To', $email, $name);
+
         return parent::addTo($email, $name);
     }
 
@@ -336,6 +343,7 @@ class Mail extends \Zend_Mail
     public function addCc($email, $name = '')
     {
         $this->addToTemporaryStorage('Cc', $email, $name);
+
         return parent::addCc($email, $name);
     }
 
@@ -349,6 +357,7 @@ class Mail extends \Zend_Mail
     public function addBcc($email)
     {
         $this->addToTemporaryStorage('Bcc', $email, '');
+
         return parent::addBcc($email);
     }
 
@@ -364,6 +373,7 @@ class Mail extends \Zend_Mail
         unset($this->temporaryStorage['Cc']);
         unset($this->temporaryStorage['Bcc']);
         $this->recipientsCleared = true;
+
         return parent::clearRecipients();
     }
 
@@ -404,6 +414,7 @@ class Mail extends \Zend_Mail
     public function disableLogging()
     {
         $this->loggingEnable = false;
+
         return $this;
     }
 
@@ -415,6 +426,7 @@ class Mail extends \Zend_Mail
     public function enableLogging()
     {
         $this->loggingEnable = true;
+
         return $this;
     }
 
@@ -604,6 +616,34 @@ class Mail extends \Zend_Mail
      */
     public function send($transport = null)
     {
+        $this->setSubject($this->getSubjectRendered());
+
+        $bodyHtmlRendered = $this->getBodyHtmlRendered();
+        if ($bodyHtmlRendered) {
+            $this->setBodyHtml($bodyHtmlRendered);
+        }
+
+        $bodyTextRendered = $this->getBodyTextRendered();
+        if ($bodyTextRendered) {
+            $this->setBodyText($bodyTextRendered);
+        }
+
+        if ($this->ignoreDebugMode == false) {
+            $this->checkDebugMode();
+        }
+
+        return $this->sendWithoutRendering($transport);
+    }
+
+    /**
+     * sends mail without (re)rendering the content.
+     * see also comments of send() method
+     *
+     * @param null $transport
+     * @return \Zend_Mail
+     */
+    public function sendWithoutRendering($transport = null)
+    {
         // filter email addresses
         $blockedAddresses = [];
         foreach ($this->getRecipients() as $recipient) {
@@ -623,22 +663,6 @@ class Mail extends \Zend_Mail
                     }
                 }
             }
-        }
-
-        $this->setSubject($this->getSubjectRendered());
-
-        $bodyHtmlRendered = $this->getBodyHtmlRendered();
-        if ($bodyHtmlRendered) {
-            $this->setBodyHtml($bodyHtmlRendered);
-        }
-
-        $bodyTextRendered = $this->getBodyTextRendered();
-        if ($bodyTextRendered) {
-            $this->setBodyText($bodyTextRendered);
-        }
-
-        if ($this->ignoreDebugMode == false) {
-            $this->checkDebugMode();
         }
 
         $result = parent::send($transport);
@@ -710,10 +734,10 @@ class Mail extends \Zend_Mail
      */
     public static function isValidEmailAddress($emailAddress)
     {
-        $validator = new \Zend_Validate_EmailAddress();
-        return $validator->isValid($emailAddress);
-    }
+        $validator = new EmailValidator();
 
+        return $validator->isValid($emailAddress, new RFCValidation());
+    }
 
     /**
      * Replaces the placeholders with the content and returns the rendered Subject
@@ -728,9 +752,9 @@ class Mail extends \Zend_Mail
         if (!$subject && $this->getDocument()) {
             $subject = $this->getDocument()->getSubject();
         }
+
         return $this->placeholderObject->replacePlaceholders($subject, $this->getParams(), $this->getDocument(), $this->getEnableLayoutOnPlaceholderRendering());
     }
-
 
     /**
      * Replaces the placeholders with the content and returns the rendered Html
@@ -822,6 +846,7 @@ class Mail extends \Zend_Mail
         } else {
             throw new \Exception("$document is not an instance of \\Document\\Email or at least \\Document");
         }
+
         return $this;
     }
 
@@ -843,6 +868,7 @@ class Mail extends \Zend_Mail
     public function preventDebugInformationAppending()
     {
         $this->preventDebugInformationAppending = true;
+
         return $this;
     }
 
@@ -868,6 +894,7 @@ class Mail extends \Zend_Mail
             throw new \Exception("trying to enable html2text binary,
             but html2text is not installed!");
         }
+
         return $this;
     }
 
@@ -879,8 +906,9 @@ class Mail extends \Zend_Mail
     public static function getHtml2textInstalled()
     {
         if (is_null(self::$html2textInstalled)) {
-            self::determineHtml2TextIsInstalled();
+            self::$html2textInstalled = self::determineHtml2TextIsInstalled();
         }
+
         return self::$html2textInstalled;
     }
 
@@ -902,6 +930,7 @@ class Mail extends \Zend_Mail
                 $content = @shell_exec("html2text $tmpFileName " . $this->getHtml2TextOptions());
                 @unlink($tmpFileName);
             }
+
             return $content;
         }
 
@@ -919,6 +948,7 @@ class Mail extends \Zend_Mail
         $email = $this->_filterEmail($email);
         $this->sender = $email;
         $this->_storeHeader('Sender', $this->_formatAddress($email, null), true);
+
         return $this;
     }
 }

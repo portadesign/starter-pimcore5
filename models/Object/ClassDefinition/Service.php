@@ -38,12 +38,13 @@ class Service
         unset($data->userOwner);
         unset($data->userModification);
         unset($data->fieldDefinitions);
-        
+
         //add propertyVisibility to export data
         $data->propertyVisibility = $class->propertyVisibility;
 
         $json = \Zend_Json::encode($data);
         $json = \Zend_Json::prettyPrint($json);
+
         return $json;
     }
 
@@ -62,12 +63,14 @@ class Service
 
         $importData = \Zend_Json::decode($json);
 
-        // set layout-definition
-        $layout = self::generateLayoutTreeFromArray($importData["layoutDefinitions"], $throwException);
-        if ($layout === false) {
-            return false;
+        if (!is_null($importData["layoutDefinitions"])) {
+            // set layout-definition
+            $layout = self::generateLayoutTreeFromArray($importData["layoutDefinitions"], $throwException);
+            if ($layout === false) {
+                return false;
+            }
+            $class->setLayoutDefinitions($layout);
         }
-        $class->setLayoutDefinitions($layout);
 
         // set properties of class
         $class->setDescription($importData["description"]);
@@ -98,6 +101,7 @@ class Service
 
         $json = \Zend_Json::encode($fieldCollection);
         $json = \Zend_Json::prettyPrint($json);
+
         return $json;
     }
 
@@ -110,8 +114,11 @@ class Service
     {
         $importData = \Zend_Json::decode($json);
 
-        $layout = self::generateLayoutTreeFromArray($importData["layoutDefinitions"], $throwException);
-        $fieldCollection->setLayoutDefinitions($layout);
+        if (!is_null($importData["layoutDefinitions"])) {
+            $layout = self::generateLayoutTreeFromArray($importData["layoutDefinitions"], $throwException);
+            $fieldCollection->setLayoutDefinitions($layout);
+        }
+
         $fieldCollection->setParentClass($importData["parentClass"]);
         $fieldCollection->save();
 
@@ -140,6 +147,7 @@ class Service
 
         $json = \Zend_Json::encode($objectBrick);
         $json = \Zend_Json::prettyPrint($json);
+
         return $json;
     }
 
@@ -171,8 +179,11 @@ class Service
             }
         }
 
-        $layout = self::generateLayoutTreeFromArray($importData["layoutDefinitions"], $throwException);
-        $objectBrick->setLayoutDefinitions($layout);
+        if (!is_null($importData["layoutDefinitions"])) {
+            $layout = self::generateLayoutTreeFromArray($importData["layoutDefinitions"], $throwException);
+            $objectBrick->setLayoutDefinitions($layout);
+        }
+
         $objectBrick->setClassDefinitions($toAssignClassDefinitions);
         $objectBrick->setParentClass($importData["parentClass"]);
         $objectBrick->save();
@@ -216,6 +227,7 @@ class Service
                                 if ($throwException) {
                                     throw new \Exception("Could not add child " . var_export($child, true));
                                 }
+
                                 return false;
                             }
                         }
@@ -230,6 +242,7 @@ class Service
         if ($throwException) {
             throw new \Exception("Could not add child " . var_export($array, true));
         }
+
         return false;
     }
 
@@ -287,6 +300,7 @@ class Service
                 }
             }
         }
+
         return false;
     }
 }

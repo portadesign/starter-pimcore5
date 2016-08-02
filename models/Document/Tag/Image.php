@@ -150,6 +150,7 @@ class Image extends Model\Document\Tag
                         }
                     }
                 }
+
                 return $data;
             };
 
@@ -172,6 +173,7 @@ class Image extends Model\Document\Tag
                 "marker" => $marker
             ];
         }
+
         return null;
     }
 
@@ -198,22 +200,7 @@ class Image extends Model\Document\Tag
                 }
 
                 if ($this->cropPercent) {
-                    $cropConfig = [
-                        "width" => $this->cropWidth,
-                        "height" => $this->cropHeight,
-                        "y" => $this->cropTop,
-                        "x" => $this->cropLeft
-                    ];
-
-                    $thumbConfig->addItemAt(0, "cropPercent", $cropConfig);
-
-                    // also crop media query specific configs
-                    if ($thumbConfig->hasMedias()) {
-                        foreach ($thumbConfig->getMedias() as $mediaName => $mediaItems) {
-                            $thumbConfig->addItemAt(0, "cropPercent", $cropConfig, $mediaName);
-                        }
-                    }
-
+                    $this->applyCustomCropping($thumbConfig);
                     $autoName = true;
                 }
 
@@ -232,98 +219,24 @@ class Image extends Model\Document\Tag
                     $deferred = $this->options["deferred"];
                 }
 
-                $imagePath = $image->getThumbnail($thumbConfig, $deferred);
+                $thumbnail = $image->getThumbnail($thumbConfig, $deferred);
             } else {
-                $imagePath = $image->getFullPath();
+                // we're using the thumbnail class only to generate the HTML
+                $thumbnail = new Asset\Image\Thumbnail($image);
             }
 
-            $altText = $this->alt;
-            $titleText = $this->alt;
-            if (empty($titleText)) {
-                if ($this->getImage()->getMetadata("title")) {
-                    $titleText = $this->getImage()->getMetadata("title");
-                }
-            }
-            if (empty($altText)) {
-                if ($this->getImage()->getMetadata("alt")) {
-                    $altText = $this->getImage()->getMetadata("alt");
-                } else {
-                    $altText = $titleText;
-                }
-            }
+            $attributes = array_merge($this->options, [
+                "alt" => $this->alt,
+                "title" => $this->alt
+            ]);
 
-            // get copyright from asset (except for thumbnails as for them we do it later in getHTML)
-            if (!$imagePath instanceof Asset\Image\Thumbnail) {
-                if ($this->getImage()->getMetadata("copyright")) {
-                    if (!empty($altText)) {
-                        $altText .= " | ";
-                    }
-                    if (!empty($titleText)) {
-                        $titleText .= " | ";
-                    }
-                    $altText .= ("© " . $this->getImage()->getMetadata("copyright"));
-                    $titleText .= ("© " . $this->getImage()->getMetadata("copyright"));
-                }
-            }
-
-            $defaultAttributes = [
-                "alt" => $altText
-            ];
-            if (!empty($titleText)) {
-                $defaultAttributes["title"] = $titleText;
-            }
-
-            // add attributes to image
-            $allowedAttributes = ["alt", "align", "border", "height", "hspace", "ismap", "longdesc", "usemap",
-                "vspace", "width", "class", "dir", "id", "lang", "style", "title", "xml:lang", "onmouseover",
-                "onabort", "onclick", "ondblclick", "onmousedown", "onmousemove", "onmouseout", "onmouseup",
-                "onkeydown", "onkeypress", "onkeyup", "itemprop", "itemscope", "itemtype"];
-
-            $htmlEscapeAttributes = ["alt", "align", "border", "height", "hspace",  "longdesc", "usemap",
-                "vspace", "width", "class", "dir", "id", "lang",  "title"];
-
-
-            $customAttributes = [];
-            if (array_key_exists("attributes", $this->options) && is_array($this->options["attributes"])) {
-                $customAttributes = $this->options["attributes"];
-            }
-
-            $availableAttribs = array_merge($this->options, $defaultAttributes, $customAttributes);
-
-            // remove attributes (standard html attributes)
             $removeAttributes = [];
             if (isset($this->options["removeAttributes"]) && is_array($this->options["removeAttributes"])) {
                 $removeAttributes = $this->options["removeAttributes"];
             }
 
-            if (isset($this->options["disableWidthHeightAttributes"])) {
-                $removeAttributes = array_merge($removeAttributes, ["width", "height"]);
-            }
-
-            foreach ($removeAttributes as $attribute) {
-                unset($availableAttribs[$attribute]);
-            }
-
-
-            $attribs = [];
-            $attribsRaw = [];
-            foreach ($availableAttribs as $key => $value) {
-                if ((is_string($value) || is_numeric($value) || is_bool($value)) && (in_array($key, $allowedAttributes) || array_key_exists($key, $customAttributes))) {
-                    $attribsRaw[$key] = $value;
-
-                    if (in_array($key, $htmlEscapeAttributes)) {
-                        $value = htmlspecialchars($value);
-                    }
-                    $attribs[] = $key . '="' . $value . '"';
-                }
-            }
-
-            if ($imagePath instanceof Asset\Image\Thumbnail) {
-                // thumbnail's HTML is always generated by the thumbnail itself
-                return $imagePath->getHTML($attribsRaw, $removeAttributes);
-            } else {
-                return '<img src="' . $imagePath . '" ' . implode(" ", $attribs) . ' />';
-            }
+            // thumbnail's HTML is always generated by the thumbnail itself
+            return $thumbnail->getHTML($attributes, $removeAttributes);
         }
     }
 
@@ -353,6 +266,7 @@ class Image extends Model\Document\Tag
                     }
                 }
             }
+
             return $data;
         };
 
@@ -399,6 +313,7 @@ class Image extends Model\Document\Tag
                     }
                 }
             }
+
             return $data;
         };
 
@@ -450,6 +365,7 @@ class Image extends Model\Document\Tag
         if ($image instanceof Asset) {
             return $image->getFullPath();
         }
+
         return "";
     }
 
@@ -461,6 +377,7 @@ class Image extends Model\Document\Tag
         if (!$this->image) {
             $this->image = Asset\Image::getById($this->getId());
         }
+
         return $this->image;
     }
 
@@ -486,6 +403,7 @@ class Image extends Model\Document\Tag
     public function setId($id)
     {
         $this->id = $id;
+
         return $this;
     }
 
@@ -508,19 +426,38 @@ class Image extends Model\Document\Tag
         if ($image instanceof Asset) {
             $thumbConfig = $image->getThumbnailConfig($conf);
             if ($thumbConfig && $this->cropPercent) {
-                $thumbConfig->addItemAt(0, "cropPercent", [
-                    "width" => $this->cropWidth,
-                    "height" => $this->cropHeight,
-                    "y" => $this->cropTop,
-                    "x" => $this->cropLeft
-                ]);
+                $this->applyCustomCropping($thumbConfig);
                 $hash = md5(Serialize::serialize($thumbConfig->getItems()));
                 $thumbConfig->setName($thumbConfig->getName() . "_auto_" . $hash);
             }
 
             return $image->getThumbnail($thumbConfig, $deferred);
         }
+
         return "";
+    }
+
+    /**
+     * @param $thumbConfig
+     * @return mixed
+     */
+    protected function applyCustomCropping($thumbConfig)
+    {
+        $cropConfig = [
+            "width" => $this->cropWidth,
+            "height" => $this->cropHeight,
+            "y" => $this->cropTop,
+            "x" => $this->cropLeft
+        ];
+
+        $thumbConfig->addItemAt(0, "cropPercent", $cropConfig);
+
+        // also crop media query specific configs
+        if ($thumbConfig->hasMedias()) {
+            foreach ($thumbConfig->getMedias() as $mediaName => $mediaItems) {
+                $thumbConfig->addItemAt(0, "cropPercent", $cropConfig, $mediaName);
+            }
+        }
     }
 
     /**
@@ -532,6 +469,7 @@ class Image extends Model\Document\Tag
         if ($image instanceof Asset\Image) {
             return false;
         }
+
         return true;
     }
 
@@ -568,6 +506,7 @@ class Image extends Model\Document\Tag
                     }
                 }
             }
+
             return $tags;
         };
 
@@ -611,6 +550,7 @@ class Image extends Model\Document\Tag
                     }
                 }
             }
+
             return $dependencies;
         };
 
@@ -663,6 +603,7 @@ class Image extends Model\Document\Tag
     public function setCropHeight($cropHeight)
     {
         $this->cropHeight = $cropHeight;
+
         return $this;
     }
 
@@ -681,6 +622,7 @@ class Image extends Model\Document\Tag
     public function setCropLeft($cropLeft)
     {
         $this->cropLeft = $cropLeft;
+
         return $this;
     }
 
@@ -699,6 +641,7 @@ class Image extends Model\Document\Tag
     public function setCropPercent($cropPercent)
     {
         $this->cropPercent = $cropPercent;
+
         return $this;
     }
 
@@ -717,6 +660,7 @@ class Image extends Model\Document\Tag
     public function setCropTop($cropTop)
     {
         $this->cropTop = $cropTop;
+
         return $this;
     }
 
@@ -735,6 +679,7 @@ class Image extends Model\Document\Tag
     public function setCropWidth($cropWidth)
     {
         $this->cropWidth = $cropWidth;
+
         return $this;
     }
 

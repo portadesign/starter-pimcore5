@@ -79,6 +79,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                 }
                 $counter++;
             }
+
             return $return;
         } elseif (is_array($data) and count($data)===0) {
             //give empty array if data was not null
@@ -106,8 +107,11 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                 $destination = Object::getById($object["dest_id"]);
 
                 if ($source instanceof Object\Concrete && $destination instanceof Object\Concrete && $destination->getClassId() == $this->getAllowedClassId()) {
-                    $className = Tool::getModelClassMapping('\Pimcore\Model\Object\Data\ObjectMetadata'); // the name for the class mapping is still with underscores
-                    $metaData = new $className($this->getName(), $this->getColumnKeys(), $destination);
+                    $metaData = \Pimcore::getDiContainer()->make('Pimcore\Model\Object\Data\ObjectMetadata', [
+                        "fieldname" => $this->getName(),
+                        "columns" => $this->getColumnKeys(),
+                        "object" => $destination
+                    ]);
 
                     $ownertype = $object["ownertype"] ? $object["ownertype"] : "";
                     $ownername = $object["ownername"] ? $object["ownername"] : "";
@@ -145,6 +149,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                     $ids[] = $object->getId();
                 }
             }
+
             return "," . implode(",", $ids) . ",";
         } elseif (is_array($data) && count($data) === 0) {
             return "";
@@ -206,8 +211,12 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
             foreach ($data as $object) {
                 $o = Object::getById($object["id"]);
                 if ($o && $o->getClassId() == $this->getAllowedClassId()) {
-                    $className = Tool::getModelClassMapping('\Pimcore\Model\Object\Data\ObjectMetadata');
-                    $metaData = new $className($this->getName(), $this->getColumnKeys(), $o);
+                    $metaData = \Pimcore::getDiContainer()->make('Pimcore\Model\Object\Data\ObjectMetadata', [
+                        "fieldname" => $this->getName(),
+                        "columns" => $this->getColumnKeys(),
+                        "object" => $o
+                    ]);
+
                     foreach ($this->getColumns() as $c) {
                         $setter = "set" . ucfirst($c["key"]);
                         $metaData->$setter($object[$c["key"]]);
@@ -236,6 +245,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                     $pathes[] = $eo->getRealFullPath();
                 }
             }
+
             return $pathes;
         }
     }
@@ -254,6 +264,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                 $o = $metaObject->getObject();
                 $pathes[] = $o->getRealFullPath();
             }
+
             return implode("<br />", $pathes);
         }
     }
@@ -308,6 +319,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                     $paths[] = $eo->getRealFullPath();
                 }
             }
+
             return implode(",", $paths);
         } else {
             return null;
@@ -327,12 +339,16 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
         $value = [];
         foreach ($values as $element) {
             if ($el = Object::getByPath($element)) {
-                $className = Tool::getModelClassMapping('\Pimcore\Model\Object\Data\ObjectMetadata');
-                $metaObject = new $className($this->getName(), $this->getColumnKeys(), $el);
+                $metaObject = \Pimcore::getDiContainer()->make('Pimcore\Model\Object\Data\ObjectMetadata', [
+                    "fieldname" => $this->getName(),
+                    "columns" => $this->getColumnKeys(),
+                    "object" => $el
+                ]);
 
                 $value[] = $metaObject;
             }
         }
+
         return $value;
     }
 
@@ -356,6 +372,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                 }
             }
         }
+
         return $tags;
     }
 
@@ -378,6 +395,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                 }
             }
         }
+
         return $dependencies;
     }
 
@@ -405,6 +423,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                     $items[] = $item;
                 }
             }
+
             return $items;
         } else {
             return null;
@@ -440,8 +459,11 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                 }
 
                 if ($dest instanceof Object\AbstractObject) {
-                    $className = Tool::getModelClassMapping('\Pimcore\Model\Object\Data\ObjectMetadata');
-                    $metaObject = new $className($this->getName(), $this->getColumnKeys(), $dest);
+                    $metaObject = \Pimcore::getDiContainer()->make('Pimcore\Model\Object\Data\ObjectMetadata', [
+                        "fieldname" => $this->getName(),
+                        "columns" => $this->getColumnKeys(),
+                        "object" => $dest
+                    ]);
 
                     foreach ($this->getColumns() as $c) {
                         $setter = "set" . ucfirst($c['key']);
@@ -460,6 +482,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
         } else {
             throw new \Exception("cannot get values from web service import - invalid data");
         }
+
         return $objects;
     }
 
@@ -564,6 +587,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                     $publishedList[] = $listElement;
                 }
             }
+
             return $publishedList;
         }
 
@@ -600,6 +624,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     public function setAllowedClassId($allowedClassId)
     {
         $this->allowedClassId = $allowedClassId;
+
         return $this;
     }
 
@@ -625,6 +650,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
         }
 
         $this->visibleFields = $visibleFields;
+
         return $this;
     }
 
@@ -654,6 +680,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
             $this->columns[] = $c;
             $this->columnKeys[] = $c['key'];
         }
+
         return $this;
     }
 
@@ -674,6 +701,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
         foreach ($this->columns as $c) {
             $this->columnKeys[] = $c['key'];
         }
+
         return $this->columnKeys;
     }
 
@@ -687,6 +715,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
         if (is_array($a) && is_array($b)) {
             return $a['position'] - $b['position'];
         }
+
         return strcmp($a, $b);
     }
 
@@ -695,8 +724,9 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
      */
     public function classSaved($class, $params = [])
     {
-        $className = Tool::getModelClassMapping('\Pimcore\Model\Object\Data\ObjectMetadata');
-        $temp = new $className(null);
+        $temp = \Pimcore::getDiContainer()->make('Pimcore\Model\Object\Data\ObjectMetadata', [
+            "fieldname" => null
+        ]);
         $temp->getDao()->createOrUpdateTable($class);
     }
 
@@ -803,6 +833,69 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
                     $this->visibleFieldDefinitions[$field]["options"] = $fd->getOptions();
                 }
             }
+        }
+    }
+
+    /** Encode value for packing it into a single column.
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function marshal($value, $object = null, $params = [])
+    {
+        if (is_array($value)) {
+            $result = [];
+            /** @var  $elementMetadata Object\Data\ObjectMetadata */
+            foreach ($value as $elementMetadata) {
+                $element = $elementMetadata->getElement();
+
+                $type = Element\Service::getType($element);
+                $id = $element->getId();
+                $result[] =  [
+                    "element" => [
+                        "type" => $type,
+                        "id" => $id
+                    ],
+                    "fieldname" => $elementMetadata->getFieldname(),
+                    "columns" => $elementMetadata->getColumns(),
+                    "data" => $elementMetadata->data];
+            }
+
+            return $result;
+        }
+
+        return null;
+    }
+
+    /** See marshal
+     * @param mixed $value
+     * @param Model\Object\AbstractObject $object
+     * @param mixed $params
+     * @return mixed
+     */
+    public function unmarshal($value, $object = null, $params = [])
+    {
+        if (is_array($value)) {
+            $result = [];
+            foreach ($value as $elementMetadata) {
+                $elementData = $elementMetadata["element"];
+
+                $type = $elementData["type"];
+                $id = $elementData["id"];
+                $target = Element\Service::getElementById($type, $id);
+                if ($target) {
+                    $columns = $elementMetadata["columns"];
+                    $fieldname = $elementMetadata["fieldname"];
+                    $data = $elementMetadata["data"];
+
+                    $item = new Object\Data\ObjectMetadata($fieldname, $columns, $target);
+                    $item->data = $data;
+                    $result[] = $item;
+                }
+            }
+
+            return $result;
         }
     }
 }

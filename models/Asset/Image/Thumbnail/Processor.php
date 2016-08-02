@@ -24,22 +24,22 @@ use Pimcore\Model\Asset;
 class Processor
 {
     protected static $argumentMapping = [
-        "resize" => ["width","height"],
+        "resize" => ["width", "height"],
         "scaleByWidth" => ["width"],
         "scaleByHeight" => ["height"],
-        "contain" => ["width","height"],
-        "cover" => ["width","height","positioning","doNotScaleUp"],
-        "frame" => ["width","height"],
+        "contain" => ["width", "height"],
+        "cover" => ["width", "height", "positioning", "doNotScaleUp"],
+        "frame" => ["width", "height"],
         "trim" => ["tolerance"],
         "rotate" => ["angle"],
-        "crop" => ["x","y","width","height"],
+        "crop" => ["x", "y", "width", "height"],
         "setBackgroundColor" => ["color"],
-        "roundCorners" => ["width","height"],
+        "roundCorners" => ["width", "height"],
         "setBackgroundImage" => ["path"],
         "addOverlay" => ["path", "x", "y", "alpha", "composite", "origin"],
         "addOverlayFit" => ["path", "composite"],
         "applyMask" => ["path"],
-        "cropPercent" => ["width","height","x","y"],
+        "cropPercent" => ["width", "height", "x", "y"],
         "grayscale" => [],
         "sepia" => [],
         "sharpen" => ['radius', 'sigma', 'amount', 'threshold'],
@@ -80,10 +80,12 @@ class Processor
      * @param null $fileSystemPath
      * @param bool $deferred deferred means that the image will be generated on-the-fly (details see below)
      * @param bool $returnAbsolutePath
+     * @param bool $generated
      * @return mixed|string
      */
-    public static function process($asset, Config $config, $fileSystemPath = null, $deferred = false, $returnAbsolutePath = false)
+    public static function process($asset, Config $config, $fileSystemPath = null, $deferred = false, $returnAbsolutePath = false, &$generated = false)
     {
+        $generated = false;
         $errorImage = PIMCORE_PATH . "/static6/img/filetype-not-supported.png";
         $format = strtolower($config->getFormat());
         $contentOptimizedFormat = false;
@@ -97,12 +99,6 @@ class Processor
         } else {
             $id = "dyn~" . crc32($fileSystemPath);
         }
-
-        if (!file_exists($fileSystemPath)) {
-            return self::returnPath($errorImage, $returnAbsolutePath);
-        }
-
-        $modificationDate = filemtime($fileSystemPath);
 
         $fileExt = File::getFileExtension(basename($fileSystemPath));
 
@@ -118,6 +114,7 @@ class Processor
             if (($format == "tiff" || $format == "svg") && \Pimcore\Tool::isFrontentRequestByAdmin()) {
                 // return a webformat in admin -> tiff cannot be displayed in browser
                 $format = "png";
+                $deferred = false; // deferred is default, but it's not possible when using isFrontentRequestByAdmin()
             } elseif ($format == "tiff") {
                 $transformations = $config->getItems();
                 if (is_array($transformations) && count($transformations) > 0) {
@@ -134,8 +131,6 @@ class Processor
             }
         }
 
-
-
         $thumbDir = $asset->getImageThumbnailSavePath() . "/thumb__" . $config->getName();
         $filename = preg_replace("/\." . preg_quote(File::getFileExtension($asset->getFilename())) . "/", "", $asset->getFilename());
         // add custom suffix if available
@@ -150,6 +145,25 @@ class Processor
 
         $fsPath = $thumbDir . "/" . $filename;
 
+
+        // deferred means that the image will be generated on-the-fly (when requested by the browser)
+        // the configuration is saved for later use in Pimcore\Controller\Plugin\Thumbnail::routeStartup()
+        // so that it can be used also with dynamic configurations
+        if ($deferred) {
+            // only add the config to the TmpStore if necessary (the config is auto-generated)
+            if (!Config::getByName($config->getName())) {
+                $configId = "thumb_" . $id . "__" . md5(str_replace(PIMCORE_TEMPORARY_DIRECTORY, "", $fsPath));
+                TmpStore::add($configId, $config, "thumbnail_deferred");
+            }
+
+            return self::returnPath($fsPath, $returnAbsolutePath);
+        }
+
+        // all checks on the file system should be below the deferred part for performance reasons (remote file systems)
+        if (!file_exists($fileSystemPath)) {
+            return self::returnPath($errorImage, $returnAbsolutePath);
+        }
+
         if (!is_dir(dirname($fsPath))) {
             File::mkdir(dirname($fsPath));
         }
@@ -157,17 +171,7 @@ class Processor
         $path = self::returnPath($fsPath, false);
 
         // check for existing and still valid thumbnail
-        if (is_file($fsPath) and filemtime($fsPath) >= $modificationDate) {
-            return self::returnPath($fsPath, $returnAbsolutePath);
-        }
-
-        // deferred means that the image will be generated on-the-fly (when requested by the browser)
-        // the configuration is saved for later use in Pimcore\Controller\Plugin\Thumbnail::routeStartup()
-        // so that it can be used also with dynamic configurations
-        if ($deferred) {
-            $configId = "thumb_" . $id . "__" . md5(str_replace(PIMCORE_TEMPORARY_DIRECTORY, "", $fsPath));
-            TmpStore::add($configId, $config, "thumbnail_deferred");
-
+        if (is_file($fsPath) and filemtime($fsPath) >= filemtime($fileSystemPath)) {
             return self::returnPath($fsPath, $returnAbsolutePath);
         }
 
@@ -234,6 +238,28 @@ class Processor
         }
 
         if (is_array($transformations) && count($transformations) > 0) {
+            $sourceImageWidth = PHP_INT_MAX;
+            $sourceImageHeight = PHP_INT_MAX;
+            if ($asset instanceof Asset\Image) {
+                $sourceImageWidth = $asset->getWidth();
+                $sourceImageHeight = $asset->getHeight();
+            }
+
+            $highResFactor = $config->getHighResolution();
+
+            $calculateMaxFactor = function ($factor, $original, $new) {
+                $newFactor = $factor*$original/$new;
+                if ($newFactor < 1) {
+                    // don't go below factor 1
+                    $newFactor = 1;
+                }
+
+                return $newFactor;
+            };
+
+            // sorry for the goto/label - but in this case it makes life really easier and the code more readable
+            prepareTransformations:
+
             foreach ($transformations as $transformation) {
                 if (!empty($transformation)) {
                     $arguments = [];
@@ -246,8 +272,21 @@ class Processor
 
                                 // high res calculations if enabled
                                 if (!in_array($transformation["method"], ["cropPercent"]) && in_array($key, ["width", "height", "x", "y"])) {
-                                    if ($config->getHighResolution() && $config->getHighResolution() > 1) {
-                                        $value *= $config->getHighResolution();
+                                    if ($highResFactor && $highResFactor > 1) {
+                                        $value *= $highResFactor;
+
+                                        // check if source image is big enough otherwise adjust the high-res factor
+                                        if (in_array($key, ["width", "x"])) {
+                                            if ($sourceImageWidth < $value) {
+                                                $highResFactor = $calculateMaxFactor($highResFactor, $sourceImageWidth, $value);
+                                                goto prepareTransformations;
+                                            }
+                                        } elseif (in_array($key, ["height", "y"])) {
+                                            if ($sourceImageHeight < $value) {
+                                                $highResFactor = $calculateMaxFactor($highResFactor, $sourceImageHeight, $value);
+                                                goto prepareTransformations;
+                                            }
+                                        }
                                     }
                                 }
 
@@ -263,6 +302,7 @@ class Processor
         }
 
         $image->save($fsPath, $format, $config->getQuality());
+        $generated = true;
 
         if ($contentOptimizedFormat) {
             $tmpStoreKey = str_replace(PIMCORE_TEMPORARY_DIRECTORY . "/", "", $fsPath);

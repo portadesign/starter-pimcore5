@@ -66,7 +66,8 @@ class Image extends Model\Asset
 
                 // set the modification time of the thumbnail to the same time from the asset
                 // so that the thumbnail check doesn't fail in Asset\Image\Thumbnail\Processor::process();
-                touch($path, $this->getModificationDate());
+                // we need the @ in front of touch because of some stream wrapper (eg. s3) which don't support touch()
+                @touch($path, $this->getModificationDate());
             } catch (\Exception $e) {
                 \Logger::error("Problem while creating system-thumbnails for image " . $this->getRealFullPath());
                 \Logger::error($e);
@@ -103,6 +104,7 @@ class Image extends Model\Asset
     public function getThumbnailConfig($config)
     {
         $thumbnail = $this->getThumbnail($config);
+
         return $thumbnail->getConfig();
     }
 
@@ -149,6 +151,7 @@ class Image extends Model\Asset
         } elseif ($this->getHeight() > $this->getWidth()) {
             return "portrait";
         }
+
         return "unknown";
     }
 
@@ -161,7 +164,10 @@ class Image extends Model\Asset
     }
 
     /**
-     * @return array
+     * @param null $path
+     * @param bool $force
+     * @return array|void
+     * @throws \Exception
      */
     public function getDimensions($path = null, $force = false)
     {
@@ -202,6 +208,7 @@ class Image extends Model\Asset
     public function getWidth()
     {
         $dimensions = $this->getDimensions();
+
         return $dimensions["width"];
     }
 
@@ -211,6 +218,7 @@ class Image extends Model\Asset
     public function getHeight()
     {
         $dimensions = $this->getDimensions();
+
         return $dimensions["height"];
     }
 

@@ -23,7 +23,8 @@ pimcore.object.classes.data.wysiwyg = Class.create(pimcore.object.classes.data.d
         objectbrick: true,
         fieldcollection: true,
         localizedfield: true,
-        classificationstore : true
+        classificationstore : true,
+        block: true
     },
 
     initialize: function (treeNode, initData) {
@@ -69,7 +70,7 @@ pimcore.object.classes.data.wysiwyg = Class.create(pimcore.object.classes.data.d
                 value: this.datax.height
             }, {
                 xtype: "textarea",
-                fieldLabel: t("toolbar_configuration"),
+                fieldLabel: t("editor_configuration"),
                 name: "toolbarConfig",
                 value: this.datax.toolbarConfig,
                 width:400,

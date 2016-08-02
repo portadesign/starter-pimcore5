@@ -48,7 +48,7 @@ class Date extends Model\Object\ClassDefinition\Data
      *
      * @var string
      */
-    public $phpdocType = "\\Pimcore\\Date";
+    public $phpdocType = "\\Carbon\\Carbon";
 
 
     /**
@@ -88,6 +88,7 @@ class Date extends Model\Object\ClassDefinition\Data
         if ($data) {
             return $this->getDateFromTimestamp($data);
         }
+
         return null;
     }
 
@@ -128,7 +129,7 @@ class Date extends Model\Object\ClassDefinition\Data
         if (\Pimcore\Config::getFlag("useZendDate")) {
             $date = new \Pimcore\Date($timestamp);
         } else {
-            $date = new \DateTime();
+            $date = new \Carbon\Carbon();
             $date->setTimestamp($timestamp);
         }
 
@@ -147,6 +148,7 @@ class Date extends Model\Object\ClassDefinition\Data
         if ($data) {
             return $this->getDateFromTimestamp($data / 1000);
         }
+
         return false;
     }
 
@@ -196,7 +198,7 @@ class Date extends Model\Object\ClassDefinition\Data
 
     /**
      * @param mixed $defaultValue
-     * @return void
+     * @return $this
      */
     public function setDefaultValue($defaultValue)
     {
@@ -207,6 +209,7 @@ class Date extends Model\Object\ClassDefinition\Data
                 $this->defaultValue = strtotime($defaultValue);
             }
         }
+
         return $this;
     }
 
@@ -226,6 +229,7 @@ class Date extends Model\Object\ClassDefinition\Data
         } elseif ($data instanceof \DateTime) {
             return $data->format("Y-m-d");
         }
+
         return null;
     }
 
@@ -283,6 +287,7 @@ class Date extends Model\Object\ClassDefinition\Data
     public function setUseCurrentDate($useCurrentDate)
     {
         $this->useCurrentDate = (bool)$useCurrentDate;
+
         return $this;
     }
 

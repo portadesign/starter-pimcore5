@@ -52,12 +52,13 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data
     }
 
     /**
-     * @param array
-     * @return void $classes
+     * @param array $classes
+     * @return $this
      */
     public function setClasses($classes)
     {
         $this->classes = Element\Service::fixAllowedTypes($classes, "classes");
+
         return $this;
     }
 
@@ -72,11 +73,12 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data
 
     /**
      * @param  $lazyLoading
-     * @return void
+     * @return $this
      */
     public function setLazyLoading($lazyLoading)
     {
         $this->lazyLoading = $lazyLoading;
+
         return $this;
     }
 
@@ -123,6 +125,7 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data
             \Logger::debug("checked object relation to target in field [" . $this->getName() . "], not allowed, target ist not an object");
             \Logger::debug($object);
         }
+
         return $allowed;
     }
 
@@ -172,6 +175,7 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data
         }
 
         \Logger::debug("checked object relation to target asset [" . $asset->getId() . "] in field [" . $this->getName() . "], allowed:" . $allowed);
+
         return $allowed;
     }
 
@@ -190,10 +194,14 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data
             $allowed = false;
         } elseif ($this->getDocumentsAllowed() and  is_array($allowedDocumentTypes) and count($allowedDocumentTypes) > 0) {
             //check for allowed asset types
+            $allowedTypes = [];
             foreach ($allowedDocumentTypes as $t) {
-                $allowedTypes[] = $t['documentTypes'];
+                if ($t['documentTypes']) {
+                    $allowedTypes[] = $t['documentTypes'];
+                }
             }
-            if (!in_array($document->getType(), $allowedTypes)) {
+
+            if (!in_array($document->getType(), $allowedTypes) && count($allowedTypes)) {
                 $allowed = false;
             }
         } else {
@@ -201,6 +209,7 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data
         }
 
         \Logger::debug("checked object relation to target document [" . $document->getId() . "] in field [" . $this->getName() . "], allowed:" . $allowed);
+
         return $allowed;
     }
 
@@ -331,6 +340,7 @@ abstract class AbstractRelations extends Model\Object\ClassDefinition\Data
             if ($a["index"] == $b["index"]) {
                 return 0;
             }
+
             return ($a["index"] < $b["index"]) ? -1 : 1;
         });
 

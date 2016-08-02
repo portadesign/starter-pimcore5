@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Pimcore
  *
@@ -104,7 +104,7 @@ class Link extends Model\Document
     public function getCacheTags($tags = [])
     {
         $tags = is_array($tags) ? $tags : [];
-        
+
         $tags = parent::getCacheTags($tags);
 
         if ($this->getLinktype() == "internal") {
@@ -114,6 +114,7 @@ class Link extends Model\Document
                 }
             }
         }
+
         return $tags;
     }
 
@@ -135,6 +136,7 @@ class Link extends Model\Document
         }
 
         $this->href = $path;
+
         return $path;
     }
 
@@ -180,6 +182,7 @@ class Link extends Model\Document
     public function setTarget($target)
     {
         $this->setProperty("navigation_target", "text", $target, false);
+
         return $this;
     }
 
@@ -215,7 +218,7 @@ class Link extends Model\Document
 
     /**
      * @param integer $internal
-     * @return void
+     * @return $this
      */
     public function setInternal($internal)
     {
@@ -225,26 +228,29 @@ class Link extends Model\Document
         } else {
             $this->internal = null;
         }
+
         return $this;
     }
 
     /**
      * @param string $direct
-     * @return void
+     * @return $this
      */
     public function setDirect($direct)
     {
         $this->direct = $direct;
+
         return $this;
     }
 
     /**
      * @param string $linktype
-     * @return void
+     * @return $this
      */
     public function setLinktype($linktype)
     {
         $this->linktype = $linktype;
+
         return $this;
     }
 
@@ -264,11 +270,12 @@ class Link extends Model\Document
      *
      * @deprecated
      * @param string $name
-     * @return void
+     * @return $this
      */
     public function setName($name)
     {
         $this->setProperty("navigation_name", "text", $name, false);
+
         return $this;
     }
 
@@ -283,11 +290,12 @@ class Link extends Model\Document
 
     /**
      * @param string $type
-     * @return void
+     * @return $this
      */
     public function setInternalType($type)
     {
         $this->internalType = $type;
+
         return $this;
     }
 
@@ -303,15 +311,17 @@ class Link extends Model\Document
                 return $this->object;
             }
         }
+
         return false;
     }
 
     /**
-     * @return void
+     * @return $this
      */
     public function setObject($object)
     {
         $this->object = $object;
+
         return $this;
     }
 
@@ -350,6 +360,7 @@ class Link extends Model\Document
     public function setParameters($parameters)
     {
         $this->setProperty("navigation_parameters", "text", $parameters, false);
+
         return $this;
     }
 
@@ -371,6 +382,7 @@ class Link extends Model\Document
     public function setAnchor($anchor)
     {
         $this->setProperty("navigation_anchor", "text", $anchor, false);
+
         return $this;
     }
 
@@ -379,7 +391,7 @@ class Link extends Model\Document
      */
     public function getTitle()
     {
-        return $this->title;
+        return $this->getProperty("navigation_title");
     }
 
     /**
@@ -388,7 +400,8 @@ class Link extends Model\Document
      */
     public function setTitle($title)
     {
-        $this->title = $title;
+        $this->setProperty("navigation_title", "text", $title, false);
+
         return $this;
     }
 
@@ -410,6 +423,7 @@ class Link extends Model\Document
     public function setAccesskey($accesskey)
     {
         $this->setProperty("accesskey", "text", $accesskey, false);
+
         return $this;
     }
 
@@ -431,6 +445,7 @@ class Link extends Model\Document
     public function setRel($rel)
     {
         $this->setProperty("navigation_relation", "text", $rel, false);
+
         return $this;
     }
 
@@ -452,6 +467,7 @@ class Link extends Model\Document
     public function setTabindex($tabindex)
     {
         $this->setProperty("navigation_tabindex", "text", $tabindex, false);
+
         return $this;
     }
 

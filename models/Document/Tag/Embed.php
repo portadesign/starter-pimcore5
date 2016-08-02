@@ -109,7 +109,7 @@ class Embed extends Model\Document\Tag
     /**
      * @see Document\Tag\TagInterface::setDataFromResource
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromResource($data)
     {
@@ -118,13 +118,14 @@ class Embed extends Model\Document\Tag
         }
 
         $this->url = $data["url"];
+
         return $this;
     }
 
     /**
      * @see Document\Tag\TagInterface::setDataFromEditmode
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromEditmode($data)
     {
@@ -143,6 +144,7 @@ class Embed extends Model\Document\Tag
         if ($this->url) {
             return false;
         }
+
         return true;
     }
 

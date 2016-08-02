@@ -35,6 +35,7 @@ class Admin
         if (!is_file($languageFile)) {
             $languageFile =  PIMCORE_PATH . "/config/texts/" . $language . ".json";
         }
+
         return $languageFile;
     }
 
@@ -47,7 +48,7 @@ class Admin
     public static function getLanguages()
     {
         $languages = [];
-        $languageDirs = [PIMCORE_PATH . "/config/texts/",PIMCORE_CONFIGURATION_DIRECTORY . "/texts/"];
+        $languageDirs = [PIMCORE_PATH . "/config/texts/", PIMCORE_CONFIGURATION_DIRECTORY . "/texts/"];
         foreach ($languageDirs as $filesDir) {
             if (is_dir($filesDir)) {
                 $files = scandir($filesDir);
@@ -63,6 +64,7 @@ class Admin
                 }
             }
         }
+
         return $languages;
     }
 
@@ -73,28 +75,19 @@ class Admin
      */
     public static function getMinimizedScriptPath($scriptContent)
     {
-        $scriptPath = PIMCORE_TEMPORARY_DIRECTORY."/minified_javascript_core_".md5($scriptContent).".js";
+        $scriptPath = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/minified_javascript_core_".md5($scriptContent).".js";
 
         if (!is_file($scriptPath)) {
             File::put($scriptPath, $scriptContent);
         }
 
-        return preg_replace("@^" . preg_quote(PIMCORE_DOCUMENT_ROOT, "@") . "@", "", $scriptPath);
-    }
+        $params = [
+            "scriptPath" => "/website/var/system/",
+            "scripts" =>  basename($scriptPath),
+            "_dc" => \Pimcore\Version::getRevision()
+        ];
 
-    /**
-     * @param $stylesheetContent
-     * @return mixed
-     */
-    public static function getMinimizedStylesheetPath($stylesheetContent)
-    {
-        $stylesheetPath = PIMCORE_TEMPORARY_DIRECTORY."/minified_css_core_".md5($stylesheetContent).".css";
-
-        if (!is_file($stylesheetPath)) {
-            File::put($stylesheetPath, $stylesheetContent);
-        }
-
-        return preg_replace("@^" . preg_quote(PIMCORE_DOCUMENT_ROOT, "@") . "@", "", $stylesheetPath);
+        return "/admin/misc/script-proxy?" . array_toquerystring($params);
     }
 
 
@@ -200,6 +193,7 @@ class Admin
     {
         if (\Zend_Registry::isRegistered("pimcore_admin_user")) {
             $user = \Zend_Registry::get("pimcore_admin_user");
+
             return $user;
         }
 
@@ -237,7 +231,7 @@ class Admin
         return false;
     }
 
-    public static function reorderWebsiteLanguages($user, $languages)
+    public static function reorderWebsiteLanguages($user, $languages, $returnLanguageArray = false)
     {
         if (!is_array($languages)) {
             $languages = explode(",", $languages);
@@ -249,6 +243,10 @@ class Admin
             $newLanguages = array_diff($languages, $contentLanguages);
             $languages = array_merge($contentLanguages, $newLanguages);
         }
+        if ($returnLanguageArray) {
+            return $languages;
+        }
+
         return implode(",", $languages);
     }
 }

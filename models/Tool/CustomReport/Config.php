@@ -69,6 +69,11 @@ class Config extends Model\AbstractModel
     /**
      * @var string
      */
+    public $reportClass;
+
+    /**
+     * @var string
+     */
     public $chartType;
 
     /**
@@ -146,6 +151,7 @@ class Config extends Model\AbstractModel
     {
         $type = $configuration->type ? ucfirst($configuration->type) : 'Sql';
         $adapter = "\\Pimcore\\Model\\Tool\\CustomReport\\Adapter\\{$type}";
+
         return new $adapter($configuration, $fullConfig);
     }
 
@@ -291,7 +297,18 @@ class Config extends Model\AbstractModel
      */
     public function getDataSourceConfig()
     {
-        return $this->dataSourceConfig;
+        if (is_array($this->dataSourceConfig) && isset($this->dataSourceConfig[0])) {
+            $dataSourceConfig = new \stdClass();
+            $dataSourceConfigArray = $this->dataSourceConfig[0];
+
+            foreach ($dataSourceConfigArray as $key => $value) {
+                $dataSourceConfig->$key = $value;
+            }
+
+            return $dataSourceConfig;
+        }
+
+        return null;
     }
 
     /**
@@ -404,5 +421,21 @@ class Config extends Model\AbstractModel
     public function setCreationDate($creationDate)
     {
         $this->creationDate = $creationDate;
+    }
+
+    /**
+     * @return string
+     */
+    public function getReportClass()
+    {
+        return $this->reportClass;
+    }
+
+    /**
+     * @param string $reportClass
+     */
+    public function setReportClass($reportClass)
+    {
+        $this->reportClass = $reportClass;
     }
 }

@@ -77,11 +77,12 @@ class Input extends Model\Object\ClassDefinition\Data
 
     /**
      * @param integer $width
-     * @return void
+     * @return $this
      */
     public function setWidth($width)
     {
         $this->width = $width;
+
         return $this;
     }
 
@@ -162,6 +163,7 @@ class Input extends Model\Object\ClassDefinition\Data
         if ($columnLength) {
             $this->columnLength = $columnLength;
         }
+
         return $this;
     }
 

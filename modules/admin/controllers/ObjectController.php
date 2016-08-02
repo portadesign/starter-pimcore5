@@ -43,6 +43,8 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         $object = Object\AbstractObject::getById($this->getParam("node"));
         $objectTypes = null;
         $objects = [];
+        $cv = false;
+        $offset = 0;
 
         if ($object instanceof Object\Concrete) {
             $class = $object->getClass();
@@ -315,15 +317,14 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             $this->getDataForObject($object, $objectFromVersion);
             $objectData["data"] = $this->objectData;
 
-
-
             $objectData["metaData"] = $this->metaData;
 
             $objectData["layout"] = $object->getClass()->getLayoutDefinitions();
 
             $objectData["properties"] = Element\Service::minimizePropertiesForEditmode($object->getProperties());
             $objectData["userPermissions"] = $object->getUserPermissions();
-            $objectData["versions"] = array_splice($object->getVersions(), 0, 1);
+            $objectVersions = $object->getVersions();
+            $objectData["versions"] = array_splice($objectVersions, 0, 1);
             $objectData["scheduledTasks"] = $object->getScheduledTasks();
             $objectData["general"]["allowVariants"] = $object->getClass()->getAllowVariants();
             $objectData["general"]["showVariants"] = $object->getClass()->getShowVariants();
@@ -441,6 +442,8 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         ) {
 
             //lazy loading data is fetched from DB differently, so that not every relation object is instantiated
+            $refId = null;
+
             if ($fielddefinition->isRemoteOwner()) {
                 $refKey = $fielddefinition->getOwnerFieldName();
                 $refClass = Object\ClassDefinition::getByName($fielddefinition->getOwnerClassName());
@@ -526,6 +529,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                 $result = new stdClass();
                 $result->value = $value;
                 $result->id = $parent->getId();
+
                 return $result;
             } else {
                 return $this->getParentValue($parent, $key);
@@ -536,10 +540,11 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
     private function isInheritableField(Object\ClassDefinition\Data $fielddefinition)
     {
         if ($fielddefinition instanceof Object\ClassDefinition\Data\Fieldcollections
-//            || $fielddefinition instanceof Object\ClassDefinition\Data\Localizedfields
+            //            || $fielddefinition instanceof Object\ClassDefinition\Data\Localizedfields
         ) {
             return false;
         }
+
         return true;
     }
 
@@ -557,10 +562,10 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
     {
         if ($layout->{"fieldtype"} == "localizedfields") {
             if (is_array($allowedView) && count($allowedView) > 0) {
-                $layout->{"permissionView"} = array_keys($allowedView);
+                $layout->{"permissionView"} = \Pimcore\Tool\Admin::reorderWebsiteLanguages(\Pimcore\Tool\Admin::getCurrentUser(), array_keys($allowedView), true);
             }
             if (is_array($allowedEdit) && count($allowedEdit) > 0) {
-                $layout->{"permissionEdit"} = array_keys($allowedEdit);
+                $layout->{"permissionEdit"} = \Pimcore\Tool\Admin::reorderWebsiteLanguages(\Pimcore\Tool\Admin::getCurrentUser(), array_keys($allowedEdit), true);
             }
         } else {
             if (method_exists($layout, "getChilds")) {
@@ -644,7 +649,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                     $selectedClassId = $gridConfig["classId"];
 
                     foreach ($objectData["classes"] as $class) {
-                        if ($class->getId() == $selectedClassId) {
+                        if ($class["id"] == $selectedClassId) {
                             $objectData["selectedClass"] = $selectedClassId;
                             break;
                         }
@@ -668,6 +673,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                 "name" => $class->getName()
             ];
         }
+
         return $reduced;
     }
 
@@ -675,10 +681,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
     {
         $success = false;
 
-        $className = "\\Pimcore\\Model\\Object\\" . ucfirst($this->getParam("className"));
-        // check for a mapped class
-        $className = Tool::getModelClassMapping($className);
-
+        $className = "Pimcore\\Model\\Object\\" . ucfirst($this->getParam("className"));
         $parent = Object::getById($this->getParam("parentId"));
 
         $message = "";
@@ -686,7 +689,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             $intendedPath = $parent->getRealFullPath() . "/" . $this->getParam("key");
 
             if (!Object\Service::pathExists($intendedPath) || true) {
-                $object = new $className();
+                $object = \Pimcore::getDiContainer()->make($className);
                 if ($object instanceof Object\Concrete) {
                     $object->setOmitMandatoryCheck(true); // allow to save the object although there are mandatory fields
                 }
@@ -1427,8 +1430,8 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                     $sub = substr($f, 0, 1);
                     if (substr($f, 0, 1) == "~") {
                         $type = $parts[1];
-//                        $field = $parts[2];
-//                        $keyid = $parts[3];
+                        //                        $field = $parts[2];
+                        //                        $keyid = $parts[3];
                         // key value, ignore for now
                         if ($type == "classificationstore") {
                         }
@@ -1448,6 +1451,8 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
             $sortingSettings = \Pimcore\Admin\Helper\QueryParams::extractSortingSettings($this->getAllParams());
 
+            $doNotQuote = false;
+
             if ($sortingSettings['order']) {
                 $order = $sortingSettings['order'];
             }
@@ -1459,6 +1464,11 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                     } elseif ($class->getFieldDefinition($orderKey) instanceof  Object\ClassDefinition\Data\QuantityValue) {
                         $orderKey = "concat(" . $orderKey . "__unit, " . $orderKey . "__value)";
                         $doNotQuote = true;
+                    } elseif (strpos($orderKey, "~") !== false) {
+                        $orderKeyParts = explode("~", $orderKey);
+                        if (count($orderKeyParts) == 2) {
+                            $orderKey = $orderKeyParts[1];
+                        }
                     }
                 }
             }
@@ -1485,6 +1495,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
 
             $featureJoins = [];
+            $featureFilters = false;
 
             // create filter condition
             if ($this->getParam("filter")) {
@@ -1510,7 +1521,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             $list->setOffset($start);
 
 
-            if ($sortingSettings["isFeature"]) {
+            if (isset($sortingSettings["isFeature"]) && $sortingSettings["isFeature"]) {
                 $orderKey = "cskey_" . $sortingSettings["fieldname"] . "_" . $sortingSettings["groupId"]. "_" . $sortingSettings["keyId"];
                 $list->setOrderKey($orderKey);
                 $list->setGroupBy("o_id");
@@ -1814,6 +1825,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             }
         }
         $diff = array_diff($originals, $changed);
+
         return $diff;
     }
 
@@ -1835,6 +1847,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             }
         }
         $diff = array_diff($changed, $originals);
+
         return $diff;
     }
 
@@ -1853,6 +1866,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                 $object->setModificationDate($modificationDate); // set de modification-date from published version to compare it in js-frontend
             }
         }
+
         return $object;
     }
 }

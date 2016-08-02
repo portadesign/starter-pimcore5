@@ -81,11 +81,12 @@ class Password extends Model\Object\ClassDefinition\Data
 
     /**
      * @param integer $width
-     * @return void
+     * @return $this
      */
     public function setWidth($width)
     {
         $this->width = $this->getAsIntegerCast($width);
+
         return $this;
     }
 
@@ -385,6 +386,7 @@ class Password extends Model\Object\ClassDefinition\Data
 
         $result = [];
         $result[] = $diffdata;
+
         return $result;
     }
 

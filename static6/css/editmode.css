@@ -336,10 +336,10 @@
     display: inline-block;
 }
 
-/* support for placeholders as in EXTJS3,4 */
-.pimcore_tag_input[contenteditable=true]:empty:before,
-.pimcore_tag_textarea[contenteditable=true]:empty:before,
-.pimcore_wysiwyg.empty[contenteditable=true]:before {
+/* support for placeholders */
+.pimcore_tag_input[contenteditable=true][data-placeholder]:empty:before,
+.pimcore_tag_textarea[contenteditable=true][data-placeholder]:empty:before,
+.pimcore_wysiwyg.empty[contenteditable=true][data-placeholder]:before {
     cursor: text; /* For chrome */
     content: attr(data-placeholder);
     display: block; /* For firefox */

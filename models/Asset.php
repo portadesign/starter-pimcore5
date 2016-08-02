@@ -103,14 +103,14 @@ class Asset extends Element\AbstractElement
      *
      * @var integer
      */
-    public $userOwner;
+    public $userOwner = 0;
 
     /**
      * ID of the user who make the latest changes
      *
      * @var integer
      */
-    public $userModification;
+    public $userModification = 0;
 
     /**
      * List of properties
@@ -208,10 +208,9 @@ class Asset extends Element\AbstractElement
     }
 
     /**
-     * Static helper to get an asset by the passed path (returned is not the concrete asset like Asset\Folder!)
-     *
+     * Static helper to get an asset by the passed path
      * @param string $path
-     * @return Asset
+     * @return Asset|Asset\Archive|Asset\Audio|Asset\Document|Asset\Folder|Asset\Image|Asset\Text|Asset\Unknown|Asset\Video
      */
     public static function getByPath($path)
     {
@@ -222,6 +221,7 @@ class Asset extends Element\AbstractElement
 
             if (Tool::isValidPath($path)) {
                 $asset->getDao()->getByPath($path);
+
                 return self::getById($asset->getId());
             }
         } catch (\Exception $e) {
@@ -232,10 +232,9 @@ class Asset extends Element\AbstractElement
     }
 
     /**
-     * Static helper to get an asset by the passed id (returned is not the concrete asset like Asset\Folder!)
-     *
+     * Static helper to get an asset by the passed ID
      * @param integer $id
-     * @return Asset
+     * @return Asset|Asset\Archive|Asset\Audio|Asset\Document|Asset\Folder|Asset\Image|Asset\Text|Asset\Unknown|Asset\Video
      */
     public static function getById($id)
     {
@@ -258,21 +257,19 @@ class Asset extends Element\AbstractElement
                     $asset = new Asset();
                     $asset->getDao()->getById($id);
 
-                    $mappingClass = "\\Pimcore\\Model\\Asset\\" . ucfirst($asset->getType());
-                    $typeClass = Tool::getModelClassMapping($mappingClass);
+                    $className = "Pimcore\\Model\\Asset\\" . ucfirst($asset->getType());
 
-                    if (Tool::classExists($typeClass)) {
-                        $asset = new $typeClass();
-                        \Zend_Registry::set($cacheKey, $asset);
-                        $asset->getDao()->getById($id);
+                    $asset = \Pimcore::getDiContainer()->make($className);
+                    \Zend_Registry::set($cacheKey, $asset);
+                    $asset->getDao()->getById($id);
 
-                        \Pimcore\Cache::save($asset, $cacheKey);
-                    }
+                    \Pimcore\Cache::save($asset, $cacheKey);
                 } else {
                     \Zend_Registry::set($cacheKey, $asset);
                 }
             } catch (\Exception $e) {
                 \Logger::warning($e->getMessage());
+
                 return null;
             }
         }
@@ -283,18 +280,7 @@ class Asset extends Element\AbstractElement
 
         return $asset;
     }
-
-    /**
-     *
-     *
-     * @param Asset|integer $id
-     * @return Asset
-     */
-    public static function getConcreteById($id)
-    {
-        return self::getById($id);
-    }
-
+    
     /**
      * Helper to quickly create a new asset
      *
@@ -365,20 +351,13 @@ class Asset extends Element\AbstractElement
     public static function getList($config = [])
     {
         if (is_array($config)) {
-            $listClass = "\\Pimcore\\Model\\Asset\\Listing";
-            $listClass = Tool::getModelClassMapping($listClass);
+            $listClass = "Pimcore\\Model\\Asset\\Listing";
+            $list = \Pimcore::getDiContainer()->make($listClass);
+            $list->setValues($config);
+            $list->load();
 
-            if (Tool::classExists($listClass)) {
-                $list = new $listClass();
-
-                $list->setValues($config);
-                $list->load();
-
-                return $list;
-            }
+            return $list;
         }
-
-        throw new \Exception("Unable to initiate list class - class not found or invalid configuration");
     }
 
     /**
@@ -388,10 +367,8 @@ class Asset extends Element\AbstractElement
     public static function getTotalCount($config = [])
     {
         if (is_array($config)) {
-            $listClass = "\\Pimcore\\Model\\Asset\\Listing";
-            $listClass = Tool::getModelClassMapping($listClass);
-            $list = new $listClass();
-
+            $listClass = "Pimcore\\Model\\Asset\\Listing";
+            $list = \Pimcore::getDiContainer()->make($listClass);
             $list->setValues($config);
             $count = $list->getTotalCount();
 
@@ -416,11 +393,11 @@ class Asset extends Element\AbstractElement
 
         $mappings = [
             "image" => ["/image/", "/\.eps$/", "/\.ai$/", "/\.svgz$/", "/\.pcx$/", "/\.iff$/", "/\.pct$/", "/\.wmf$/"],
-            "text" => ["/text/","/xml$/"],
+            "text" => ["/text/", "/xml$/"],
             "audio" => ["/audio/"],
             "video" => ["/video/"],
-            "document" => ["/msword/","/pdf/","/powerpoint/","/office/","/excel/","/opendocument/"],
-            "archive" => ["/zip/","/tar/"]
+            "document" => ["/msword/", "/pdf/", "/powerpoint/", "/office/", "/excel/", "/opendocument/"],
+            "archive" => ["/zip/", "/tar/"]
         ];
 
         foreach ($mappings as $assetType => $patterns) {
@@ -635,6 +612,16 @@ class Asset extends Element\AbstractElement
         $typeChanged = false;
 
         if ($this->getType() != "folder") {
+
+            // fix for missing parent folders
+            // check if folder of new destination is already created and if not do so
+            $newPath = dirname($this->getFileSystemPath());
+            if (!is_dir($newPath)) {
+                if (!File::mkdir($newPath)) {
+                    throw new \Exception("Unable to create directory: ". $newPath . " for asset :" . $this->getId());
+                }
+            }
+
             if ($this->getDataChanged()) {
                 $src = $this->getStream();
                 $streamMeta = stream_get_meta_data($src);
@@ -674,7 +661,7 @@ class Asset extends Element\AbstractElement
 
             // scheduled tasks are saved in $this->saveVersion();
         } else {
-            if (!is_dir($this->getFileSystemPath())) {
+            if (!is_dir($destinationPath) && !is_dir($this->getFileSystemPath())) {
                 if (!File::mkdir($this->getFileSystemPath())) {
                     throw new \Exception("Unable to create directory: ". $this->getFileSystemPath() . " for asset :" . $this->getId());
                 }
@@ -762,8 +749,10 @@ class Asset extends Element\AbstractElement
         $version = null;
 
         // only create a new version if there is at least 1 allowed
+        // or if saveVersion() was called directly (it's a newer version of the object)
         if (Config::getSystemConfig()->assets->versions->steps
-            || Config::getSystemConfig()->assets->versions->days) {
+            || Config::getSystemConfig()->assets->versions->days
+            || $setModificationDate) {
             $version = new Version();
             $version->setCid($this->getId());
             $version->setCtype("asset");
@@ -816,6 +805,7 @@ class Asset extends Element\AbstractElement
     public function getRealFullPath()
     {
         $path = $this->getRealPath() . $this->getFilename();
+
         return $path;
     }
 
@@ -849,8 +839,10 @@ class Asset extends Element\AbstractElement
                     return $this->hasChilds;
                 }
             }
+
             return $this->getDao()->hasChilds();
         }
+
         return false;
     }
 
@@ -870,6 +862,7 @@ class Asset extends Element\AbstractElement
             $list->setOrder("asc");
             $this->siblings = $list->load();
         }
+
         return $this->siblings;
     }
 
@@ -887,6 +880,7 @@ class Asset extends Element\AbstractElement
                 return $this->hasSiblings;
             }
         }
+
         return $this->getDao()->hasSiblings();
     }
 
@@ -901,11 +895,12 @@ class Asset extends Element\AbstractElement
 
     /**
      * @param  $locked
-     * @return void
+     * @return $this
      */
     public function setLocked($locked)
     {
         $this->locked = $locked;
+
         return $this;
     }
 
@@ -1012,6 +1007,7 @@ class Asset extends Element\AbstractElement
         if (!$this->dependencies) {
             $this->dependencies = Dependency::getBySourceId($this->getId(), "asset");
         }
+
         return $this->dependencies;
     }
 
@@ -1083,72 +1079,79 @@ class Asset extends Element\AbstractElement
 
     /**
      * @param integer $creationDate
-     * @return void
+     * @return $this
      */
     public function setCreationDate($creationDate)
     {
         $this->creationDate = (int) $creationDate;
+
         return $this;
     }
 
     /**
      * @param integer $id
-     * @return void
+     * @return $this
      */
     public function setId($id)
     {
         $this->id = (int) $id;
+
         return $this;
     }
 
     /**
      * @param string $filename
-     * @return void
+     * @return $this
      */
     public function setFilename($filename)
     {
         $this->filename = (string) $filename;
+
         return $this;
     }
 
     /**
      * @param integer $modificationDate
-     * @return void
+     * @return $this
      */
     public function setModificationDate($modificationDate)
     {
         $this->modificationDate = (int) $modificationDate;
+
         return $this;
     }
 
     /**
      * @param integer $parentId
-     * @return void
+     * @return $this
      */
     public function setParentId($parentId)
     {
         $this->parentId = (int) $parentId;
         $this->parent = null;
+
         return $this;
     }
 
     /**
      * @param string $path
-     * @return void
+     * @return $this
      */
     public function setPath($path)
     {
         $this->path = $path;
+
         return $this;
     }
 
     /**
      * @param string $type
-     * @return void
+     * @return $this
      */
     public function setType($type)
     {
         $this->type = $type;
+
         return $this;
     }
 
@@ -1167,7 +1170,7 @@ class Asset extends Element\AbstractElement
 
     /**
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setData($data)
     {
@@ -1269,6 +1272,7 @@ class Asset extends Element\AbstractElement
     public function setDataChanged($changed = true)
     {
         $this->_dataChanged = $changed;
+
         return $this;
     }
 
@@ -1291,16 +1295,18 @@ class Asset extends Element\AbstractElement
 
             $this->setProperties($properties);
         }
+
         return $this->properties;
     }
 
     /**
      * @param array $properties
-     * @return void
+     * @return $this
      */
     public function setProperties($properties)
     {
         $this->properties = $properties;
+
         return $this;
     }
 
@@ -1326,6 +1332,7 @@ class Asset extends Element\AbstractElement
         $property->setInheritable($inheritable);
 
         $this->properties[$name] = $property;
+
         return $this;
     }
 
@@ -1347,21 +1354,23 @@ class Asset extends Element\AbstractElement
 
     /**
      * @param integer $userOwner
-     * @return void
+     * @return $this
      */
     public function setUserOwner($userOwner)
     {
         $this->userOwner = $userOwner;
+
         return $this;
     }
 
     /**
      * @param integer $userModification
-     * @return void
+     * @return $this
      */
     public function setUserModification($userModification)
     {
         $this->userModification = $userModification;
+
         return $this;
     }
 
@@ -1373,16 +1382,18 @@ class Asset extends Element\AbstractElement
         if ($this->versions === null) {
             $this->setVersions($this->getDao()->getVersions());
         }
+
         return $this->versions;
     }
 
     /**
      * @param array $versions
-     * @return void
+     * @return $this
      */
     public function setVersions($versions)
     {
         $this->versions = $versions;
+
         return $this;
     }
 
@@ -1410,11 +1421,12 @@ class Asset extends Element\AbstractElement
     /**
      * @param string $key
      * @param mixed $value
-     * @return void
+     * @return $this
      */
     public function setCustomSetting($key, $value)
     {
         $this->customSettings[$key] = $value;
+
         return $this;
     }
 
@@ -1427,6 +1439,7 @@ class Asset extends Element\AbstractElement
         if (is_array($this->customSettings) && array_key_exists($key, $this->customSettings)) {
             return $this->customSettings[$key];
         }
+
         return null;
     }
 
@@ -1450,7 +1463,7 @@ class Asset extends Element\AbstractElement
 
     /**
      * @param array $customSettings
-     * @return void
+     * @return $this
      */
     public function setCustomSettings($customSettings)
     {
@@ -1467,6 +1480,7 @@ class Asset extends Element\AbstractElement
         }
 
         $this->customSettings = $customSettings;
+
         return $this;
     }
 
@@ -1480,11 +1494,12 @@ class Asset extends Element\AbstractElement
 
     /**
      * @param string $mimetype
-     * @return void
+     * @return $this
      */
     public function setMimetype($mimetype)
     {
         $this->mimetype = $mimetype;
+
         return $this;
     }
 
@@ -1517,8 +1532,8 @@ class Asset extends Element\AbstractElement
     }
 
     /**
-     * @param $name
-     * @param $type can be "folder", "image", "input", "audio", "video", "document", "archive" or "unknown"
+     * @param string $name
+     * @param string $type can be "folder", "image", "input", "audio", "video", "document", "archive" or "unknown"
      * @param null $data
      * @param null $language
      */
@@ -1556,6 +1571,7 @@ class Asset extends Element\AbstractElement
             if (in_array($metaData["type"], ["asset", "document", "object"]) && is_numeric($metaData["data"])) {
                 return Element\Service::getElementById($metaData["type"], $metaData["data"]);
             }
+
             return $metaData["data"];
         };
 
@@ -1582,6 +1598,7 @@ class Asset extends Element\AbstractElement
             if ($data) {
                 return $convert($data);
             }
+
             return null;
         }
 
@@ -1606,6 +1623,7 @@ class Asset extends Element\AbstractElement
             $taskList->setCondition("cid = ? AND ctype='asset'", $this->getId());
             $this->setScheduledTasks($taskList->load());
         }
+
         return $this->scheduledTasks;
     }
 
@@ -1616,6 +1634,7 @@ class Asset extends Element\AbstractElement
     public function setScheduledTasks($scheduledTasks)
     {
         $this->scheduledTasks = $scheduledTasks;
+
         return $this;
     }
 
@@ -1693,7 +1712,7 @@ class Asset extends Element\AbstractElement
 
     /**
      * @param Asset $parent
-     * @return void
+     * @return $this
      */
     public function setParent($parent)
     {
@@ -1701,6 +1720,7 @@ class Asset extends Element\AbstractElement
         if ($parent instanceof Asset) {
             $this->parentId = $parent->getId();
         }
+
         return $this;
     }
 
@@ -1712,6 +1732,7 @@ class Asset extends Element\AbstractElement
         // group the thumbnails because of limitations of some filesystems (eg. ext3 allows only 32k subfolders)
         $group = floor($this->getId() / 10000) * 10000;
         $path = PIMCORE_TEMPORARY_DIRECTORY . "/image-thumbnails/" . $group . "/" . $this->getId();
+
         return $path;
     }
 
@@ -1723,6 +1744,7 @@ class Asset extends Element\AbstractElement
         // group the thumbnails because of limitations of some filesystems (eg. ext3 allows only 32k subfolders)
         $group = floor($this->getId() / 10000) * 10000;
         $path = PIMCORE_TEMPORARY_DIRECTORY . "/video-thumbnails/" . $group . "/" . $this->getId();
+
         return $path;
     }
 

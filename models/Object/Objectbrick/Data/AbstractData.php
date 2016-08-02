@@ -56,11 +56,12 @@ class AbstractData extends Model\AbstractModel
 
     /**
      * @param $fieldname
-     * @return void
+     * @return $this
      */
     public function setFieldname($fieldname)
     {
         $this->fieldname = $fieldname;
+
         return $this;
     }
 
@@ -78,16 +79,18 @@ class AbstractData extends Model\AbstractModel
     public function getDefinition()
     {
         $definition = Object\Objectbrick\Definition::getByKey($this->getType());
+
         return $definition;
     }
 
     /**
      * @param $doDelete
-     * @return void
+     * @return $this
      */
     public function setDoDelete($doDelete)
     {
         $this->doDelete = $doDelete;
+
         return $this;
     }
 
@@ -144,6 +147,7 @@ class AbstractData extends Model\AbstractModel
     public function setObject($object)
     {
         $this->object = $object;
+
         return $this;
     }
 
@@ -164,6 +168,7 @@ class AbstractData extends Model\AbstractModel
         if ($this->$key) {
             return $this->$key;
         }
+
         return false;
     }
 }

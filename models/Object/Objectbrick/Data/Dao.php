@@ -138,7 +138,10 @@ class Dao extends Model\Dao\AbstractDao
 
                 if ($inheritanceEnabled) {
                     //get changed fields for inheritance
-                    if ($fd->isRelationType()) {
+                    if ($fd instanceof Object\ClassDefinition\Data\CalculatedValue) {
+                        // nothing to do, see https://github.com/pimcore/pimcore/issues/727
+                        continue;
+                    } elseif ($fd->isRelationType()) {
                         if (is_array($insertData)) {
                             $doInsert = false;
                             foreach ($insertData as $insertDataKey => $insertDataValue) {
@@ -184,7 +187,9 @@ class Dao extends Model\Dao\AbstractDao
 
         $this->db->insertOrUpdate($querytable, $data);
 
-        $this->inheritanceHelper->doUpdate($object->getId(), true);
+        if ($inheritanceEnabled) {
+            $this->inheritanceHelper->doUpdate($object->getId(), true);
+        }
         $this->inheritanceHelper->resetFieldsToCheck();
 
         // HACK: see a few lines above!

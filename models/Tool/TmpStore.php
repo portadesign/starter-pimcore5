@@ -97,6 +97,7 @@ class TmpStore extends Model\AbstractModel
     public static function delete($id)
     {
         $instance = self::getInstance();
+
         return $instance->getDao()->delete($id);
     }
 
@@ -114,6 +115,7 @@ class TmpStore extends Model\AbstractModel
                 return $item;
             }
         }
+
         return null;
     }
 
@@ -134,6 +136,7 @@ class TmpStore extends Model\AbstractModel
     {
         $instance = self::getInstance();
         $items = $instance->getDao()->getIdsByTag($tag);
+
         return $items;
     }
 
@@ -231,5 +234,18 @@ class TmpStore extends Model\AbstractModel
     public function setExpiryDate($expiryDate)
     {
         $this->expiryDate = $expiryDate;
+    }
+
+    /**
+     * @param null $lifetime
+     * @return mixed
+     */
+    public function update($lifetime = null)
+    {
+        if (!$lifetime) {
+            $lifetime = 86400;
+        }
+
+        return $this->getDao()->add($this->getId(), $this->getData(), $this->getTag(), $lifetime);
     }
 }

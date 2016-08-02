@@ -161,7 +161,7 @@ class Tool
             'kk_KZ' => true, 'ks_IN' => true, 'mn_MN' => true, 'ms_BN' => true, 'ms_MY' => true,
             'ms_SG' => true, 'pa_IN' => true, 'pa_PK' => true, 'shi_MA' => true, 'sr_BA' => true, 'sr_ME' => true,
             'sr_RS' => true, 'sr_XK' => true, 'tg_TJ' => true, 'tzm_MA' => true, 'uz_AF' => true, 'uz_UZ' => true,
-            'vai_LR' => true, 'zh_CN' => true, 'zh_HK' => true, 'zh_MO' => true, 'zh_SG' => true, 'zh_TW' => true,];
+            'vai_LR' => true, 'zh_CN' => true, 'zh_HK' => true, 'zh_MO' => true, 'zh_SG' => true, 'zh_TW' => true, ];
 
         $locale = \Zend_Locale::findLocale();
         $cacheKey = "system_supported_locales_" . strtolower((string) $locale);
@@ -236,13 +236,13 @@ class Tool
             "ka" => "ge", "os" => "ge", "kea" => "cv", "kk" => "kz", "kl" => "gl", "km" => "kh", "ko" => "kr",
             "lg" => "ug", "lo" => "la", "lt" => "lv", "mg" => "mg", "mk" => "mk", "mn" => "mn", "ms" => "my",
             "mt" => "mt", "my" => "mm", "nb" => "no", "ne" => "np", "nl" => "nl", "nn" => "no", "pl" => "pl",
-            "pt" => "pt", "ro" => "ro", "ru" => "ru", "sg" => "cf", "sk" => "sk", "sl" => "sl", "sq" => "al",
+            "pt" => "pt", "ro" => "ro", "ru" => "ru", "sg" => "cf", "sk" => "sk", "sl" => "si", "sq" => "al",
             "sr" => "rs", "sv" => "se", "swc" => "cd", "th" => "th", "to" => "to", "tr" => "tr", "tzm" => "ma",
             "uk" => "ua", "uz" => "uz", "vi" => "vn", "zh" => "cn", "gd" => "gb-sct", "gd-gb" => "gb-sct",
             "cy" => "gb-wls", "cy-gb" => "gb-wls", "fy" => "nl", "xh" => "za", "yo" => "bj", "zu" => "za",
             "ta" => "lk", "te" => "in", "ss" => "za", "sw" => "ke", "so" => "so", "si" => "lk", "ii" => "cn",
             "zh-hans" => "cn", "sn" => "zw", "rm" => "ch", "pa" => "in", "fa" => "ir", "lv" => "lv", "gl" => "es",
-            "fil" => "ph",
+            "fil" => "ph"
         ];
 
         if (array_key_exists($code, $languageCountryMapping)) {
@@ -319,6 +319,7 @@ class Tool
         if (preg_match("@^/install@", $_SERVER["REQUEST_URI"])) {
             return true;
         }
+
         return false;
     }
 
@@ -385,6 +386,18 @@ class Tool
         return $hostname;
     }
 
+    /**
+     * @return string
+     */
+    public static function getRequestScheme()
+    {
+        $requestScheme = \Zend_Controller_Request_Http::SCHEME_HTTP;
+        if (isset($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] == "on") {
+            $requestScheme = \Zend_Controller_Request_Http::SCHEME_HTTPS;
+        }
+
+        return $requestScheme;
+    }
 
     /**
      * Returns the host URL
@@ -395,14 +408,8 @@ class Tool
      */
     public static function getHostUrl($useProtocol = null)
     {
-        $protocol = "http";
+        $protocol = self::getRequestScheme();
         $port = '';
-
-        if (isset($_SERVER["SERVER_PROTOCOL"])) {
-            $protocol = strtolower($_SERVER["SERVER_PROTOCOL"]);
-            $protocol = substr($protocol, 0, strpos($protocol, "/"));
-            $protocol .= (isset($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] == "on") ? "s" : "";
-        }
 
         if (isset($_SERVER["SERVER_PORT"])) {
             if (!in_array((int) $_SERVER["SERVER_PORT"], [443, 80])) {
@@ -418,6 +425,7 @@ class Tool
             $hostname = $systemConfig['general']['domain'];
             if (!$hostname) {
                 \Logger::warn('Couldn\'t determine HTTP Host. No Domain set in "Settings" -> "System" -> "Website" -> "Domain"');
+
                 return "";
             }
         }
@@ -456,6 +464,7 @@ class Tool
                 }
             }
         }
+
         return $cvData;
     }
 
@@ -519,9 +528,9 @@ class Tool
     {
         $config = Config::getSystemConfig();
         $clientConfig = $config->httpclient->toArray();
-        $clientConfig["adapter"] = $clientConfig["adapter"] ? $clientConfig["adapter"] : "Zend_Http_Client_Adapter_Socket";
-        $clientConfig["maxredirects"] = $options["maxredirects"] ? $options["maxredirects"] : 2;
-        $clientConfig["timeout"] = $options["timeout"] ? $options["timeout"] : 3600;
+        $clientConfig["adapter"] =  isset($clientConfig["adapter"]) ? $clientConfig["adapter"] : "Zend_Http_Client_Adapter_Socket";
+        $clientConfig["maxredirects"] =  isset($options["maxredirects"]) ? $options["maxredirects"] : 2;
+        $clientConfig["timeout"] =  isset($options["timeout"]) ? $options["timeout"] : 3600;
         $type = empty($type) ? "Zend_Http_Client" : $type;
 
         $type = "\\" . ltrim($type, "\\");
@@ -581,55 +590,21 @@ class Tool
         return false;
     }
 
-
-    /*
-     * Class Mapping Tools
-     * They are used to map all instances of \Element_Interface to an defined class (type)
-     */
-
     /**
      * @static
      * @param  $sourceClassName
      * @return string
+     *
+     * @deprecated
      */
     public static function getModelClassMapping($sourceClassName)
     {
-        $targetClassName = $sourceClassName;
-        $lookupName = str_replace("\\Pimcore\\Model\\", "", $sourceClassName);
-        $lookupName = ltrim($lookupName, "\\_");
-
-        if ($map = Config::getModelClassMappingConfig()) {
-            if (isset($map[$lookupName])) {
-                $tmpClassName = $map[$lookupName];
-                $tmpClassName = "\\" . ltrim($tmpClassName, "\\");
-                if (self::classExists($tmpClassName)) {
-                    if (is_subclass_of($tmpClassName, $sourceClassName)) {
-                        $targetClassName = "\\" . ltrim($tmpClassName, "\\"); // ensure class is in global namespace
-                    } else {
-                        \Logger::error("Classmapping for " . $sourceClassName . " failed. '" . $tmpClassName . " is not a subclass of '" . $sourceClassName . "'. " . $tmpClassName . " has to extend " . $sourceClassName);
-                    }
-                } else {
-                    \Logger::error("Classmapping for " . $sourceClassName . " failed. Cannot find class '" . $tmpClassName . "'");
-                }
-            }
+        try {
+            return get_class(\Pimcore::getDiContainer()->get($sourceClassName));
+        } catch (\Exception $ex) {
         }
 
-        return $targetClassName;
-    }
-
-    /**
-     * @static
-     * @return void
-     */
-    public static function registerClassModelMappingNamespaces()
-    {
-        $autoloader = \Zend_Loader_Autoloader::getInstance();
-        if ($map = Config::getModelClassMappingConfig()) {
-            foreach ($map as $targetClass) {
-                $classParts = explode("_", $targetClass);
-                $autoloader->registerNamespace($classParts[0]);
-            }
-        }
+        return $sourceClassName;
     }
 
     /**
@@ -660,6 +635,7 @@ class Tool
         $ip = self::getClientIp();
         $aip = substr($ip, 0, strrpos($ip, ".")+1);
         $aip .= "255";
+
         return $aip;
     }
 

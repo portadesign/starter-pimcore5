@@ -1810,6 +1810,7 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
     var form = null;
     var fieldPath = new Ext.form.TextField({
         fieldLabel: t('path'),
+        itemId: "path",
         value: data.path,
         name: "path",
         width: 420,
@@ -1909,7 +1910,7 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
     var updateType = function (type) {
         searchButton.enable();
 
-        var labelEl = form.getComponent("pathContainer").labelEl;
+        var labelEl = form.getComponent("pathContainer").getComponent("path").labelEl;
         labelEl.update(t("path"));
 
         if(type != "asset") {
@@ -1917,8 +1918,14 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
 
             poster.hide();
             poster.setValue("");
+            form.getComponent("title").hide();
+            form.getComponent("title").setValue("");
+            form.getComponent("description").hide();
+            form.getComponent("description").setValue("");
         } else {
             poster.show();
+            form.getComponent("title").show();
+            form.getComponent("description").show();
         }
 
         if(type == "youtube") {
@@ -1959,11 +1966,13 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
         }, poster,{
             xtype: "textfield",
             name: "title",
+            itemId: "title",
             fieldLabel: t('title'),
             width: 420,
             value: data.title
         },{
             xtype: "textarea",
+            itemId: "description",
             name: "description",
             fieldLabel: t('description'),
             width: 420,
@@ -2731,10 +2740,13 @@ pimcore.helpers.hideRedundantSeparators = function(menu) {
             showSeparator = true;
         }
     }
-}
+};
 
 pimcore.helpers.initMenuTooltips = function(){
-    $("[data-menu-tooltip]").mouseenter(function (e) {
+
+    var items = $("[data-menu-tooltip]:not(.initialized)");
+
+    items.mouseenter(function (e) {
         $("#pimcore_menu_tooltip").show();
         $("#pimcore_menu_tooltip").html($(this).data("menu-tooltip"));
 
@@ -2744,7 +2756,10 @@ pimcore.helpers.initMenuTooltips = function(){
 
         $("#pimcore_menu_tooltip").css({top: top});
     });
-    $("[data-menu-tooltip]").mouseleave(function () {
+
+    items.mouseleave(function () {
         $("#pimcore_menu_tooltip").hide();
     });
-}
+
+    items.addClass("initialized", "true");
+};

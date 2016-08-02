@@ -96,6 +96,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                             return true;
                         }
                     }
+
                     return false;
                 });
             }
@@ -181,6 +182,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                             return true;
                         }
                     }
+
                     return false;
                 });
             }
@@ -211,6 +213,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                 }
                 delete($dir, $thumbnail, $matches);
             }
+
             return $matches;
         };
 
@@ -233,7 +236,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
 
         $values = Config::getSystemConfig();
 
-        if (($handle = fopen(PIMCORE_PATH . "/config/timezones.csv", "r")) !== false) {
+        if (($handle = fopen(PIMCORE_PATH . "/config/data/timezones.csv", "r")) !== false) {
             while (($rowData = fgetcsv($handle, 10000, ",", '"')) !== false) {
                 $timezones[] = $rowData[0];
             }
@@ -331,6 +334,10 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
             }
         }
 
+        // check if there's a fallback language endless loop
+        foreach ($fallbackLanguages as $sourceLang => $targetLang) {
+            $this->checkFallbackLanguageLoop($sourceLang, $fallbackLanguages);
+        }
 
         // delete views if fallback languages has changed or the language is no more available
         $fallbackLanguagesChanged = array_diff_assoc($existingValues['general']['fallbackLanguages'], $fallbackLanguages);
@@ -386,9 +393,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                 "createredirectwhenmoved" => $values["documents.createredirectwhenmoved"],
                 "allowtrailingslash" => $values["documents.allowtrailingslash"],
                 "allowcapitals" => $values["documents.allowcapitals"],
-                "generatepreview" => $values["documents.generatepreview"],
-                "wkhtmltoimage" => $values["documents.wkhtmltoimage"],
-                "wkhtmltopdf" => $values["documents.wkhtmltopdf"]
+                "generatepreview" => $values["documents.generatepreview"]
             ],
             "objects" => [
                 "versions" => [
@@ -403,7 +408,8 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                 ],
                 "icc_rgb_profile" => $values["assets.icc_rgb_profile"],
                 "icc_cmyk_profile" => $values["assets.icc_cmyk_profile"],
-                "hide_edit_image" => $values["assets.hide_edit_image"]
+                "hide_edit_image" => $values["assets.hide_edit_image"],
+                "disable_tree_preview" => $values["assets.disable_tree_preview"]
             ],
             "services" => [
                 "google" => [
@@ -501,6 +507,23 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json(["success" => true]);
     }
 
+    protected function checkFallbackLanguageLoop($source, $definitions, $fallbacks = [])
+    {
+        if (isset($definitions[$source])) {
+            $target = $definitions[$source];
+            if ($target) {
+                if (in_array($target, $fallbacks)) {
+                    throw new \Exception("Language `$source` | `$target` causes an infinte loop.");
+                }
+                $fallbacks[] = $target;
+
+                $this->checkFallbackLanguageLoop($target, $definitions, $fallbacks);
+            }
+        } else {
+            throw new \Exception("Language `$source` doesn't exist");
+        }
+    }
+
     public function getWeb2printAction()
     {
         $this->checkPermission("web2print_settings");
@@ -583,7 +606,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
         Cache::removeIgnoredTagOnClear("output");
 
         // empty document cache
-        Cache::clearTag("output");
+        Cache::clearTags(["output", "output_lifetime"]);
 
         \Pimcore::getEventManager()->trigger("system.cache.clearOutputCache", $this);
 
@@ -669,6 +692,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                             return true;
                         }
                     }
+
                     return false;
                 });
             }
@@ -1460,6 +1484,7 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                 $resultItem["data"] = $item->getData("data");
                 break;
         }
+
         return $resultItem;
     }
 

@@ -35,14 +35,16 @@ class Service
                 $destDoc = self::upperCastDocument($sourceDoc);
                 $destDoc->setKey($doc->getKey());
                 $destDoc->setPath($doc->getRealPath());
-                $destDoc->initDao(get_class($sourceDoc));
+                $destDoc->initDao(get_class($sourceDoc), true);
                 $destDoc->setHardLinkSource($doc);
+
                 return $destDoc;
             }
         } else {
             $sourceClass = get_class($doc);
             $doc = self::upperCastDocument($doc);
-            $doc->initDao($sourceClass);
+            $doc->initDao($sourceClass, true);
+
             return $doc;
         }
 
@@ -69,6 +71,7 @@ class Service
         $new_serialized_object .= substr($old_serialized_object, strlen($old_serialized_prefix));
 
         $document = Serialize::unserialize($new_serialized_object);
+
         return $document;
     }
 
@@ -95,9 +98,11 @@ class Service
                 $_path .= $_path != "/" ? "/" : "";
 
                 $hardLinkedDocument->setPath($_path);
+
                 return $hardLinkedDocument;
             }
         }
+
         return null;
     }
 
@@ -138,6 +143,7 @@ class Service
                     $_path = preg_replace("@^" . preg_quote($hardlink->getSourceDocument()->getRealPath()) . "@", $hardlink->getRealPath(), $_path);
 
                     $hardLinkedDocument->setPath($_path);
+
                     return $hardLinkedDocument;
                 }
             }

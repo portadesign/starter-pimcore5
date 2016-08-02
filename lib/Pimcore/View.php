@@ -129,6 +129,7 @@ class View extends \Zend_View
 
         if ($capture) {
             $this->placeholder($captureKey)->captureEnd();
+
             return trim($this->placeholder($captureKey)->getValue());
         }
     }
@@ -182,15 +183,15 @@ class View extends \Zend_View
             $include = (string) $include;
         }
 
-        if (is_string($include)) {
+        if (is_numeric($include)) {
             try {
-                $include = Model\Document::getByPath($include);
+                $include = Model\Document::getById($include);
             } catch (\Exception $e) {
                 $include = $includeBak;
             }
-        } elseif (is_numeric($include)) {
+        } elseif (is_string($include)) {
             try {
-                $include = Model\Document::getById($include);
+                $include = Model\Document::getByPath($include);
             } catch (\Exception $e) {
                 $include = $includeBak;
             }
@@ -298,11 +299,12 @@ class View extends \Zend_View
 
     /**
      * @param \Zend_Controller_Request_Abstract $request
-     * @return void
+     * @return $this
      */
     public function setRequest(\Zend_Controller_Request_Abstract $request)
     {
         $this->request = $request;
+
         return $this;
     }
 
@@ -349,6 +351,7 @@ class View extends \Zend_View
             if (!isset($arguments[1])) {
                 $arguments[1] = [];
             }
+
             return $this->tag($method, $arguments[0], $arguments[1]);
         }
 

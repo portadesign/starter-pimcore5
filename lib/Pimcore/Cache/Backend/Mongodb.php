@@ -105,6 +105,7 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
                 if ($doNotTestCacheValidity || !$doNotTestCacheValidity && ($tmp['created_at'] + $tmp['l']) >= time()) {
                     return $tmp['d'];
                 }
+
                 return false;
             }
         } catch (\Exception $e) {
@@ -233,7 +234,7 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
      *
      * @param  array $directives Assoc of directives
      * @throws \Zend_Cache_Exception
-     * @return void
+     * @return $this
      */
     public function setDirectives($directives)
     {
@@ -243,6 +244,7 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
             // #ZF-4614 : we tranform null to zero to get the maximal lifetime
             parent::setDirectives(['lifetime' => 0]);
         }
+
         return $this;
     }
 
@@ -403,6 +405,7 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
             $data = $tmp['d'];
             $mtime = $tmp['created_at'];
             $lifetime = $tmp['l'];
+
             return [
                 'expire' => $mtime + $lifetime,
                 'tags' => $tmp['t'],
@@ -434,6 +437,7 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
             }
 
             $result = $this->set($id, $data, $newLifetime, $tags);
+
             return $result;
         }
 
