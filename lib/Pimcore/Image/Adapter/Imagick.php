@@ -17,6 +17,7 @@ namespace Pimcore\Image\Adapter;
 use Pimcore\Image\Adapter;
 use Pimcore\File;
 use Pimcore\Config;
+use Pimcore\Logger;
 
 class Imagick extends Adapter
 {
@@ -79,11 +80,11 @@ class Imagick extends Adapter
             $i = new \Imagick();
             $this->imagePath = $imagePath;
 
-            if (method_exists($i, "setcolorspace")) {
+            if (!$this->isPreserveColor() && method_exists($i, "setcolorspace")) {
                 $i->setcolorspace(\Imagick::COLORSPACE_SRGB);
             }
 
-            if ($this->isVectorGraphic($imagePath)) {
+            if (!$this->isPreserveColor() && $this->isVectorGraphic($imagePath)) {
                 // only for vector graphics
                 // the below causes problems with PSDs when target format is PNG32 (nobody knows why ;-))
                 $i->setBackgroundColor(new \ImagickPixel('transparent'));
@@ -120,10 +121,12 @@ class Imagick extends Adapter
                 }
             }
 
-            $this->setColorspaceToRGB();
+            if (!$this->isPreserveColor()) {
+                $this->setColorspaceToRGB();
+            }
         } catch (\Exception $e) {
-            \Logger::error("Unable to load image: " . $imagePath);
-            \Logger::error($e);
+            Logger::error("Unable to load image: " . $imagePath);
+            Logger::error($e);
 
             return false;
         }
@@ -138,11 +141,10 @@ class Imagick extends Adapter
      * @param $path
      * @param null $format
      * @param null $quality
-     * @param null $colorProfile
      * @return $this|mixed
      * @throws \Exception
      */
-    public function save($path, $format = null, $quality = null, $colorProfile = null)
+    public function save($path, $format = null, $quality = null)
     {
         if (!$format) {
             $format = "png32";
@@ -153,6 +155,9 @@ class Imagick extends Adapter
             // we need to force imagick to create png32 images, otherwise this can cause some strange effects
             // when used with gray-scale images
             $format = "png32";
+        }
+        if ($format == "original") {
+            $format = strtolower($this->resource->getImageFormat());
         }
 
         $i = $this->resource; // this is because of HHVM which has problems with $this->resource->writeImage();
@@ -167,11 +172,15 @@ class Imagick extends Adapter
             }
         }
 
-        $i->stripimage();
-        $i->profileImage('*', null);
+        if (!$this->isPreserveMetaData()) {
+            $i->stripImage();
+        }
+        if (!$this->isPreserveColor()) {
+            $i->profileImage('*', null);
+        }
         $i->setImageFormat($format);
 
-        if ($quality) {
+        if ($quality && !$this->isPreserveColor()) {
             $i->setCompressionQuality((int) $quality);
             $i->setImageCompressionQuality((int) $quality);
         }
@@ -184,7 +193,7 @@ class Imagick extends Adapter
         // normally jpeg images are bigger than 10k so we avoid the double compression (baseline => filesize check => if necessary progressive)
         // and check the dimensions here instead to faster generate the image
         // progressive JPEG - better compression, smaller filesize, especially for web optimization
-        if ($format == "jpeg") {
+        if ($format == "jpeg" && !$this->isPreserveColor()) {
             if (($this->getWidth() * $this->getHeight()) > 35000) {
                 $i->setInterlaceScheme(\Imagick::INTERLACE_PLANE);
             }
@@ -286,7 +295,7 @@ class Imagick extends Adapter
                     // if getImageColorspace() says SRGB but the embedded icc profile is CMYK profileImage() will throw an exception
                     $this->resource->profileImage('icc', self::getRGBColorProfile());
                 } catch (\Exception $e) {
-                    \Logger::warn($e);
+                    Logger::warn($e);
                 }
             }
         }
@@ -508,6 +517,7 @@ class Imagick extends Adapter
     {
         $newImage = new \Imagick();
         $newImage->newimage($width, $height, $color);
+        $newImage->setImageFormat($this->resource->getImageFormat());
 
         return $newImage;
     }
@@ -534,15 +544,15 @@ class Imagick extends Adapter
 
 
     /**
-     * @param  $x
-     * @param  $y
-     * @return self
+     * @param $width
+     * @param $height
+     * @return $this
      */
-    public function roundCorners($x, $y)
+    public function roundCorners($width, $height)
     {
         $this->preModify();
 
-        $this->resource->roundCorners($x, $y);
+        $this->resource->roundCorners($width, $height);
 
         $this->postModify();
 
@@ -554,9 +564,10 @@ class Imagick extends Adapter
 
     /**
      * @param $image
-     * @return $this|Adapter
+     * @param null|string $mode
+     * @return $this
      */
-    public function setBackgroundImage($image)
+    public function setBackgroundImage($image, $mode = null)
     {
         $this->preModify();
 
@@ -566,7 +577,14 @@ class Imagick extends Adapter
         if (is_file($image)) {
             $newImage = new \Imagick();
             $newImage->readimage($image);
-            $newImage->resizeimage($this->getWidth(), $this->getHeight(), \Imagick::FILTER_UNDEFINED, 1, false);
+
+            if ($mode == "cropTopLeft") {
+                $newImage->cropImage($this->getWidth(), $this->getHeight(), 0, 0);
+            } else {
+                // default behavior (fit)
+                $newImage->resizeimage($this->getWidth(), $this->getHeight(), \Imagick::FILTER_UNDEFINED, 1, false);
+            }
+
             $newImage->compositeImage($this->resource, \Imagick::COMPOSITE_DEFAULT, 0, 0);
             $this->resource = $newImage;
         }
@@ -779,8 +797,7 @@ class Imagick extends Adapter
 
         // we need to do this check first, because ImageMagick using the inkscape delegate returns "PNG" when calling
         // getimageformat() onto SVG graphics, this is a workaround to avoid problems
-        if (in_array(File::getFileExtension($imagePath), ["svg", "svgz", "eps", "pdf", "ps"])) {
-            // use file-extension if filename is provided
+        if (preg_match("@\.(svgz?|eps|pdf|ps|ai|indd)$@", $imagePath)) {
             return true;
         }
 
@@ -814,7 +831,7 @@ class Imagick extends Adapter
                 }
             }
         } catch (\Exception $e) {
-            \Logger::err($e);
+            Logger::err($e);
         }
 
         return false;
