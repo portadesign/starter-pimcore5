@@ -96,6 +96,7 @@ class Thumbnail
     {
         $fsPath = $this->getFileSystemPath($deferredAllowed);
         $path = str_replace(PIMCORE_DOCUMENT_ROOT, "", $fsPath);
+        $path = urlencode_ignore_slash($path);
 
         $results = \Pimcore::getEventManager()->trigger("frontend.path.asset.image.thumbnail", $this, [
             "filesystemPath" => $fsPath,
@@ -255,8 +256,8 @@ class Thumbnail
                 }
             }
 
-            $this->width = $dimensions["width"];
-            $this->height = $dimensions["height"];
+            $this->width = isset($dimensions["width"]) ? $dimensions["width"] : null;
+            $this->height = isset($dimensions["height"]) ? $dimensions["height"] : null;
 
             // the following is only relevant if using high-res option (retina, ...)
             $this->realHeight = $this->height;

@@ -17,6 +17,7 @@ namespace Pimcore;
 use Pimcore\Model\Element;
 use Pimcore\Model\Document;
 use Pimcore\Logger;
+use DeepCopy\DeepCopy;
 
 class Cache
 {
@@ -109,7 +110,7 @@ class Cache
             self::init();
         }
 
-        if (!empty($_REQUEST["nocache"])) {
+        if (!empty($_REQUEST["nocache"]) && PIMCORE_DEBUG) {
             self::disable();
         }
 
@@ -335,13 +336,25 @@ class Cache
     }
 
     /**
-     * Puts content into the cache
-     * @param mixed $data
-     * @param string $key
-     * @return void
+     * @param $data
+     * @param $key
+     * @param array $tags
+     * @param null $lifetime
+     * @param int $priority
+     * @param bool $force
+     * @return bool|void
      */
     public static function save($data, $key, $tags = [], $lifetime = null, $priority = 0, $force = false)
     {
+        if (!$force && php_sapi_name() == "cli") {
+            return;
+        }
+
+        if (is_object($data)) {
+            $deepCopy = new DeepCopy();
+            $data = $deepCopy->copy($data);
+        }
+
         if (self::getForceImmediateWrite() || $force) {
             if (self::hasWriteLock()) {
                 return;

@@ -22,6 +22,9 @@ use Pimcore\Tool\Serialize;
 use Pimcore\File;
 use Pimcore\Logger;
 
+/**
+ * @property \Pimcore\Model\Object\ClassDefinition $model
+ */
 class Dao extends Model\Dao\AbstractDao
 {
     use Object\ClassDefinition\Helper\Dao;
@@ -104,7 +107,7 @@ class Dao extends Model\Dao\AbstractDao
 			  `oo_classId` int(11) default '" . $this->model->getId() . "',
 			  `oo_className` varchar(255) default '" . $this->model->getName() . "',
 			  PRIMARY KEY  (`oo_id`)
-			) DEFAULT CHARSET=utf8;");
+			) DEFAULT CHARSET=utf8mb4;");
 
         // update default value of classname columns
         $this->db->query('ALTER TABLE `' . $objectTable . "` ALTER COLUMN `oo_className` SET DEFAULT '" . $this->model->getName() . "';");
@@ -112,7 +115,7 @@ class Dao extends Model\Dao\AbstractDao
         $this->db->query("CREATE TABLE IF NOT EXISTS `" . $objectDatastoreTable . "` (
 			  `oo_id` int(11) NOT NULL default '0',
 			  PRIMARY KEY  (`oo_id`)
-			) DEFAULT CHARSET=utf8;");
+			) DEFAULT CHARSET=utf8mb4;");
 
         $this->db->query("CREATE TABLE IF NOT EXISTS `" . $objectDatastoreTableRelation . "` (
           `src_id` int(11) NOT NULL DEFAULT '0',
@@ -132,7 +135,7 @@ class Dao extends Model\Dao\AbstractDao
           KEY `ownertype` (`ownertype`),
           KEY `type` (`type`),
           KEY `ownername` (`ownername`)
-        ) DEFAULT CHARSET=utf8;");
+        ) DEFAULT CHARSET=utf8mb4;");
 
 
 

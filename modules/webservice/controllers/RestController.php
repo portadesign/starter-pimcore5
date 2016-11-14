@@ -18,6 +18,7 @@ use Pimcore\Logger;
 use Pimcore\Model\Asset;
 use Pimcore\Model\Document;
 use Pimcore\Model\Object;
+use Pimcore\Model\Element;
 use Pimcore\Model\Webservice;
 use Pimcore\Tool;
 
@@ -1355,12 +1356,15 @@ class Webservice_RestController extends \Pimcore\Controller\Action\Webservice
             $wsData->$key = $value;
         }
 
-        if ($wsData instanceof Pimcore\Model\Webservice\Data\Object || $wsData instanceof Pimcore\Model\Webservice\Data\Document) {
-            /** @var Pimcore\Model\Webservice\Data\Object|Pimcore\Model\Webservice\Data\Document key */
-            $wsData->key = \Pimcore\File::getValidFilename($wsData->key); //adds key filter to new objects and documents
+        if ($wsData instanceof Pimcore\Model\Webservice\Data\Object) {
+            /** @var Pimcore\Model\Webservice\Data\Object key */
+            $wsData->key = Element\Service::getValidKey($wsData->key, "object");
+        } elseif ($wsData instanceof Pimcore\Model\Webservice\Data\Document) {
+            /** @var Pimcore\Model\Webservice\Data\Document key */
+            $wsData->key = Element\Service::getValidKey($wsData->key, "document");
         } elseif ($wsData instanceof Pimcore\Model\Webservice\Data\Asset) {
             /** @var Pimcore\Model\Webservice\Data\Asset $wsData */
-            $wsData->filename = \Pimcore\File::getValidFilename($wsData->filename);
+            $wsData->filename = Element\Service::getValidKey($wsData->filename, "asset");
         }
 
         return $wsData;
@@ -1483,18 +1487,10 @@ class Webservice_RestController extends \Pimcore\Controller\Action\Webservice
         $pimcore = ["version" => \Pimcore\Version::getVersion(),
             "revision" => \Pimcore\Version::getRevision(),
             "instanceIdentifier" => $systemSettings["general"]["instanceIdentifier"],
-            "modules" => [],
             "constants" => $pimcoreConstants,
         ];
 
-
-
-        foreach ((array) \Pimcore\API\Plugin\Broker::getInstance()->getModules() as $module) {
-            $pimcore["modules"][] = get_class($module);
-        }
-
         $plugins = \Pimcore\ExtensionManager::getPluginConfigs();
-
 
         $this->encoder->encode(["success" => true, "system" => $system,
             "pimcore" => $pimcore,

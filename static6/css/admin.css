@@ -108,7 +108,8 @@
 }
 
 #pimcore_status_update {
-    background-image: url(/pimcore/static6/img/flat-color-icons/refresh.svg);
+    cursor: pointer;
+    background-image: url(/pimcore/static6/img/flat-color-icons/process.svg);
 }
 
 #pimcore_status_maintenance {
@@ -1404,4 +1405,8 @@ span.warning {
     border-style: solid;
     display: inline-block;
     outline: 0;
+}
+
+.grid_nicepath_requested {
+    background-color: lightblue;
 }

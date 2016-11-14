@@ -241,32 +241,31 @@ class Pimcore
         }
 
         // run dispatcher
-        // this is also standard for /admin/ requests -> error handling is done in Pimcore_Controller_Action_Admin
-        if (!PIMCORE_DEBUG && !$throwExceptions && !PIMCORE_DEVMODE) {
-            @ini_set("display_errors", "Off");
-            @ini_set("display_startup_errors", "Off");
+        try {
+            // this is also standard for /admin/ requests -> error handling is done in Pimcore\Controller\Action\Admin
+            if (!PIMCORE_DEBUG && !$throwExceptions && !PIMCORE_DEVMODE) {
+                @ini_set("display_errors", "Off");
+                @ini_set("display_startup_errors", "Off");
 
-            $front->dispatch();
-        } else {
-            @ini_set("display_errors", "On");
-            @ini_set("display_startup_errors", "On");
-
-            $front->throwExceptions(true);
-
-            try {
                 $front->dispatch();
-            } catch (\Zend_Controller_Router_Exception $e) {
-                if (!headers_sent()) {
-                    header("HTTP/1.0 404 Not Found");
-                }
-                Logger::err($e);
-                throw new \Zend_Controller_Router_Exception("No route, document, custom route or redirect is matching the request: " . $_SERVER["REQUEST_URI"] . " | \n" . "Specific ERROR: " . $e->getMessage());
-            } catch (\Exception $e) {
-                if (!headers_sent()) {
-                    header("HTTP/1.0 500 Internal Server Error");
-                }
-                throw $e;
+            } else {
+                @ini_set("display_errors", "On");
+                @ini_set("display_startup_errors", "On");
+
+                $front->throwExceptions(true);
+                $front->dispatch();
             }
+        } catch (\Zend_Controller_Router_Exception $e) {
+            if (!headers_sent()) {
+                header("HTTP/1.0 404 Not Found");
+            }
+            Logger::err($e);
+            throw new \Zend_Controller_Router_Exception("No route, document, custom route or redirect is matching the request: " . $_SERVER["REQUEST_URI"] . " | \n" . "Specific ERROR: " . $e->getMessage());
+        } catch (\Exception $e) {
+            if (!headers_sent()) {
+                header("HTTP/1.0 500 Internal Server Error");
+            }
+            throw $e;
         }
     }
 
@@ -341,13 +340,6 @@ class Pimcore
         }
 
         if (is_writable(PIMCORE_LOG_DEBUG)) {
-
-            // check for big logfile, empty it if it's bigger than about 200M
-            if (filesize(PIMCORE_LOG_DEBUG) > 200000000) {
-                rename(PIMCORE_LOG_DEBUG, PIMCORE_LOG_DEBUG . "-archive-" . date("m-d-Y-H-i")); // archive log (will be cleaned up by maintenance)
-                File::put(PIMCORE_LOG_DEBUG, "");
-            }
-
             // set default core logger (debug.log)
             if (!empty($prios)) {
                 $loggerFile = new \Monolog\Logger('core');
@@ -421,7 +413,6 @@ class Pimcore
         @ini_set("max_execution_time", $maxExecutionTime);
         @set_time_limit($maxExecutionTime);
         ini_set('default_charset', "UTF-8");
-        mb_internal_encoding("UTF-8"); // only required for PHP 5.5, can be removed after 5.5 is unsupported by pimcore
 
         // this is for simple_dom_html
         ini_set('pcre.recursion-limit', 100000);
@@ -439,8 +430,8 @@ class Pimcore
         }
 
         // check some system variables
-        if (version_compare(PHP_VERSION, '5.5', "<")) {
-            $m = "pimcore requires at least PHP version 5.5.0 your PHP version is: " . PHP_VERSION;
+        if (version_compare(PHP_VERSION, '5.6', "<")) {
+            $m = "pimcore requires at least PHP version 5.6.0 your PHP version is: " . PHP_VERSION;
             Tool::exitWithError($m);
         }
     }
@@ -1020,7 +1011,12 @@ class Pimcore
         Cache::clearTagsOnShutdown();
 
         // write collected items to cache backend and remove the write lock
-        Cache::write();
+        if (php_sapi_name() != "cli") {
+            // makes only sense for HTTP(S)
+            // CLI are normally longer running scripts that tend to produce race conditions
+            // so CLI scripts are not writing to the cache at all
+            Cache::write();
+        }
         Cache::removeWriteLock();
 
         // release all open locks from this process

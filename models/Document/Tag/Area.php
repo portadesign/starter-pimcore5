@@ -21,6 +21,9 @@ use Pimcore\Model;
 use Pimcore\ExtensionManager;
 use Pimcore\Model\Document;
 
+/**
+ * @method \Pimcore\Model\Document\Tag\Dao getDao()
+ */
 class Area extends Model\Document\Tag
 {
 
@@ -65,11 +68,16 @@ class Area extends Model\Document\Tag
         $options = @\Zend_Json::encode($options, false, ['enableJsonExprFinder' => true]);
 
         if ($this->editmode) {
+            $class = "pimcore_editable pimcore_tag_" . $this->getType();
+            if (array_key_exists("class", $this->getOptions())) {
+                $class .= (" " . $this->getOptions()["class"]);
+            }
+
             echo '
                 <script type="text/javascript">
                     editableConfigurations.push(' . $options . ');
                 </script>
-                <div id="pimcore_editable_' . $this->getName() . '" class="pimcore_editable pimcore_tag_' . $this->getType() . '">
+                <div id="pimcore_editable_' . $this->getName() . '" class="' . $class . '">
             ';
         }
 

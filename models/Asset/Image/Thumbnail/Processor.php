@@ -130,6 +130,12 @@ class Processor
             } elseif ($format == "svg") {
                 return self::returnPath($fileSystemPath, $returnAbsolutePath);
             }
+        } elseif ($format == "tiff") {
+            if (\Pimcore\Tool::isFrontentRequestByAdmin()) {
+                // return a webformat in admin -> tiff cannot be displayed in browser
+                $format = "png";
+                $deferred = false; // deferred is default, but it's not possible when using isFrontentRequestByAdmin()
+            }
         }
 
         $thumbDir = $asset->getImageThumbnailSavePath() . "/thumb__" . $config->getName();
@@ -281,6 +287,7 @@ class Processor
                                 if (!in_array($transformation["method"], ["cropPercent"]) && in_array($key, ["width", "height", "x", "y"])) {
                                     if ($highResFactor && $highResFactor > 1) {
                                         $value *= $highResFactor;
+                                        $value = (int) ceil($value);
 
                                         // check if source image is big enough otherwise adjust the high-res factor
                                         if (in_array($key, ["width", "x"])) {

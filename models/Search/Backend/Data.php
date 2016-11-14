@@ -21,6 +21,9 @@ use Pimcore\Model\Element;
 use Pimcore\Logger;
 use ForceUTF8\Encoding;
 
+/**
+ * @method \Pimcore\Model\Search\Backend\Data\Dao getDao()
+ */
 class Data extends \Pimcore\Model\AbstractModel
 {
 
@@ -428,6 +431,15 @@ class Data extends \Pimcore\Model\AbstractModel
                     $contentText = $element->getData();
                     $contentText = Encoding::toUTF8($contentText);
                     $this->data .= " " . $contentText;
+                } catch (\Exception $e) {
+                    Logger::error($e);
+                }
+            } elseif ($element instanceof Asset\Image) {
+                try {
+                    $metaData = array_merge($element->getEXIFData(), $element->getIPTCData());
+                    foreach ($metaData as $key => $value) {
+                        $this->data .= " " . $key . " : " . $value;
+                    }
                 } catch (\Exception $e) {
                     Logger::error($e);
                 }

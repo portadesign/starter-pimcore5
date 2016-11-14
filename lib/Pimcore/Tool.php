@@ -31,14 +31,9 @@ class Tool
     protected static $validLanguages = [];
 
     /**
-     * @static
-     * @param string $key
-     * @return bool
+     * @var null
      */
-    public static function isValidKey($key)
-    {
-        return (bool) preg_match("/^[a-z0-9_~\.\-]+$/", $key);
-    }
+    protected static $isFrontend = null;
 
     /**
      * returns a valid cache key/tag string
@@ -58,7 +53,7 @@ class Tool
      */
     public static function isValidPath($path)
     {
-        return (bool) preg_match("/^[a-zA-Z0-9_~\.\-\/]+$/", $path, $matches);
+        return (bool) preg_match("/^[a-zA-Z0-9_~\.\-\/ ]+$/", $path, $matches);
     }
 
     /**
@@ -297,19 +292,39 @@ class Tool
      */
     public static function isFrontend()
     {
-        $excludePatterns = [
-            "/^\/admin.*/",
-            "/^\/install.*/",
-            "/^\/plugin.*/",
-            "/^\/webservice.*/"
-        ];
-        foreach ($excludePatterns as $pattern) {
-            if (preg_match($pattern, $_SERVER["REQUEST_URI"])) {
-                return false;
+        if (self::$isFrontend !== null) {
+            return self::$isFrontend;
+        }
+
+        $isFrontend = true;
+
+        if ($isFrontend && php_sapi_name() == "cli") {
+            $isFrontend = false;
+        }
+
+        if ($isFrontend && \Pimcore::inAdmin()) {
+            $isFrontend = false;
+        }
+
+        if ($isFrontend) {
+            $excludePatterns = [
+                "/^\/admin.*/",
+                "/^\/install.*/",
+                "/^\/plugin.*/",
+                "/^\/webservice.*/"
+            ];
+
+            foreach ($excludePatterns as $pattern) {
+                if (preg_match($pattern, $_SERVER["REQUEST_URI"])) {
+                    $isFrontend = false;
+                    break;
+                }
             }
         }
 
-        return true;
+        self::$isFrontend = $isFrontend;
+
+        return $isFrontend;
     }
 
     /**
@@ -359,7 +374,7 @@ class Tool
         }
 
         // check for manually disabled ?pimcore_outputfilters_disabled=true
-        if ($request->getParam("pimcore_outputfilters_disabled")) {
+        if ($request->getParam("pimcore_outputfilters_disabled") && PIMCORE_DEBUG) {
             return false;
         }
 
@@ -529,7 +544,7 @@ class Tool
     {
         $config = Config::getSystemConfig();
         $clientConfig = $config->httpclient->toArray();
-        $clientConfig["adapter"] =  isset($clientConfig["adapter"]) ? $clientConfig["adapter"] : "Zend_Http_Client_Adapter_Socket";
+        $clientConfig["adapter"] =  (isset($clientConfig["adapter"]) && !empty($clientConfig["adapter"])) ? $clientConfig["adapter"] : "Zend_Http_Client_Adapter_Socket";
         $clientConfig["maxredirects"] =  isset($options["maxredirects"]) ? $options["maxredirects"] : 2;
         $clientConfig["timeout"] =  isset($options["timeout"]) ? $options["timeout"] : 3600;
         $type = empty($type) ? "Zend_Http_Client" : $type;

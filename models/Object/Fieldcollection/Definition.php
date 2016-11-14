@@ -20,6 +20,9 @@ use Pimcore\Model;
 use Pimcore\Model\Object;
 use Pimcore\File;
 
+/**
+ * @method \Pimcore\Model\Object\Fieldcollection\Definition\Dao getDao()
+ */
 class Definition extends Model\AbstractModel
 {
     use Model\Object\ClassDefinition\Helper\VarExport;
@@ -373,8 +376,10 @@ class Definition extends Model\AbstractModel
         $cd .= "\n\n";
         $cd .= "Fields Summary: \n";
 
-        foreach ($this->getFieldDefinitions() as $fd) {
-            $cd .= " - " . $fd->getName() . " [" . $fd->getFieldtype() . "]\n";
+        if (is_array($this->getFieldDefinitions())) {
+            foreach ($this->getFieldDefinitions() as $fd) {
+                $cd .= " - " . $fd->getName() . " [" . $fd->getFieldtype() . "]\n";
+            }
         }
 
         $cd .= "*/ ";
