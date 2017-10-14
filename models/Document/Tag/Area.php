@@ -102,7 +102,10 @@ class Area extends Model\Document\Tag
         }
 
         $this->setupStaticEnvironment();
-        $suffixes = \Zend_Registry::get("pimcore_tag_block_current");
+        $suffixes = [];
+        if (\Zend_Registry::isRegistered('pimcore_tag_block_current')) {
+            $suffixes = \Zend_Registry::get("pimcore_tag_block_current");
+        }
         $suffixes[] = $this->getName();
         \Zend_Registry::set("pimcore_tag_block_current", $suffixes);
 
@@ -238,12 +241,18 @@ class Area extends Model\Document\Tag
         }
 
 
-        $suffixes = \Zend_Registry::get("pimcore_tag_block_numeration");
-        array_pop($suffixes);
+        $suffixes = [];
+        if (\Zend_Registry::isRegistered('pimcore_tag_block_numeration')) {
+            $suffixes = \Zend_Registry::get("pimcore_tag_block_numeration");
+            array_pop($suffixes);
+        }
         \Zend_Registry::set("pimcore_tag_block_numeration", $suffixes);
 
-        $suffixes = \Zend_Registry::get("pimcore_tag_block_current");
-        array_pop($suffixes);
+        $suffixes = [];
+        if (\Zend_Registry::isRegistered('pimcore_tag_block_current')) {
+            $suffixes = \Zend_Registry::get("pimcore_tag_block_current");
+            array_pop($suffixes);
+        }
         \Zend_Registry::set("pimcore_tag_block_current", $suffixes);
     }
 
@@ -269,8 +278,6 @@ class Area extends Model\Document\Tag
 
     /**
      * Setup some settings that are needed for blocks
-     *
-     * @return void
      */
     public function setupStaticEnvironment()
     {
@@ -314,6 +321,9 @@ class Area extends Model\Document\Tag
         return ExtensionManager::getBrickDirectories();
     }
 
+    /**
+     * @return array|mixed
+     */
     public function getBrickConfigs()
     {
         return ExtensionManager::getBrickConfigs();
@@ -330,7 +340,9 @@ class Area extends Model\Document\Tag
         $doc = Model\Document\Page::getById($this->getDocumentId());
         $id = sprintf('%s%s%d', $name, $this->getName(), 1);
         $element = $doc->getElement($id);
-        $element->suffixes = [ $this->getName() ];
+        if ($element) {
+            $element->suffixes = [ $this->getName() ];
+        }
 
         return $element;
     }

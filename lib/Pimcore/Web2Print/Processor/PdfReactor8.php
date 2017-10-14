@@ -28,6 +28,7 @@ class PdfReactor8 extends Processor
         $params = [];
         $params['printermarks'] = $config->printermarks == "true";
         $params['screenResolutionImages'] = $config->screenResolutionImages == "true";
+        $params['colorspace'] = $config->colorspace;
 
         $this->updateStatus($document->getId(), 10, "start_html_rendering");
         $html = $document->renderDocument($params);
@@ -47,8 +48,9 @@ class PdfReactor8 extends Processor
 
 
         $port = ((string) $web2PrintConfig->pdfreactorServerPort) ? (string) $web2PrintConfig->pdfreactorServerPort : "9423";
+        $protocol = ((string) $web2PrintConfig->pdfreactorProtocol) ? (string) $web2PrintConfig->pdfreactorProtocol : "http";
 
-        $pdfreactor = new \PDFreactor("http://" . $web2PrintConfig->pdfreactorServer . ":" . $port . "/service/rest");
+        $pdfreactor = new \PDFreactor($protocol . "://" . $web2PrintConfig->pdfreactorServer . ":" . $port . "/service/rest");
 
         $filePath = str_replace(PIMCORE_DOCUMENT_ROOT, "", $filePath);
 
@@ -64,13 +66,20 @@ class PdfReactor8 extends Processor
             "defaultColorSpace" => $config->colorspace,
             "encryption" => $config->encryption,
             "addTags" => $config->tags == "true",
-            "logLevel" => $config->loglevel
+            "logLevel" => $config->loglevel,
+            "addOverprint" => $config->addOverprint == "true"
 
         ];
 
         if (trim($web2PrintConfig->pdfreactorLicence)) {
             $reactorConfig["licenseKey"] = trim($web2PrintConfig->pdfreactorLicence);
         }
+
+        $returnValueContainer = new \Pimcore\Model\Tool\Admin\EventDataContainer($reactorConfig);
+        \Pimcore::getEventManager()->trigger("document.print.processor.modifyConfig", $this, [
+            "returnValueContainer" => $returnValueContainer,
+            "document" => $document
+        ]);
 
         try {
             $progress = new \stdClass();
@@ -109,6 +118,7 @@ class PdfReactor8 extends Processor
         $options[] = ["name" => "author", "type" => "text", "default" => ""];
         $options[] = ["name" => "title", "type" => "text", "default" => ""];
         $options[] = ["name" => "printermarks", "type" => "bool", "default" => ""];
+        $options[] = ["name" => "addOverprint", "type" => "bool", "default" => ""];
         $options[] = ["name" => "links", "type" => "bool", "default" => true];
         $options[] = ["name" => "bookmarks", "type" => "bool", "default" => true];
         $options[] = ["name" => "tags", "type" => "bool", "default" => true];
@@ -147,6 +157,12 @@ class PdfReactor8 extends Processor
             "default" => \LogLevel::FATAL
         ];
 
-        return $options;
+        $returnValueContainer = new \Pimcore\Model\Tool\Admin\EventDataContainer($options);
+
+        \Pimcore::getEventManager()->trigger("document.print.processor.modifyProcessingOptions", $this, [
+            "returnValueContainer" => $returnValueContainer
+        ]);
+
+        return $returnValueContainer->getData();
     }
 }

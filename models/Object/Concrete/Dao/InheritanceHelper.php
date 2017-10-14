@@ -83,6 +83,22 @@ class InheritanceHelper
     protected $classId;
 
     /**
+     * @var bool
+     */
+    protected static $useRuntimeCache = false;
+
+    /**
+     * @var array
+     */
+    protected $treeIds = [];
+
+    /**
+     * @var array
+     */
+    protected static $runtimeCache = [];
+
+
+    /**
      * @param $classId
      * @param null $idField
      * @param null $storetable
@@ -119,6 +135,26 @@ class InheritanceHelper
         }
     }
 
+
+    /**
+     * Enable or disable the runtime cache
+     *
+     * @param bool $value
+     */
+    public static function setUseRuntimeCache($value)
+    {
+        self::$useRuntimeCache = $value;
+    }
+
+    /**
+     * clear the runtime cache
+     */
+    public static function clearRuntimeCache()
+    {
+        self::$runtimeCache = [];
+    }
+
+
     /**
      *
      */
@@ -133,6 +169,7 @@ class InheritanceHelper
 
     /**
      * @param $fieldname
+     * @param $fieldDefinition
      */
     public function addFieldToCheck($fieldname, $fieldDefinition)
     {
@@ -143,6 +180,7 @@ class InheritanceHelper
 
     /**
      * @param $fieldname
+     * @param $fieldDefinition
      * @param null $queryfields
      */
     public function addRelationToCheck($fieldname, $fieldDefinition, $queryfields = null)
@@ -168,7 +206,6 @@ class InheritanceHelper
             return;
         }
 
-        $this->idTree = [];
 
 
         $fields = implode("`,`", $this->fields);
@@ -180,6 +217,8 @@ class InheritanceHelper
         $o = new \stdClass();
         $o->id = $result['id'];
         $o->values = $result;
+
+        $this->treeIds = [];
         $o->childs = $this->buildTree($result['id'], $fields);
 
         if (!empty($this->fields)) {
@@ -213,11 +252,10 @@ class InheritanceHelper
         // parent object has no brick, add child to parent, add brick to parent & click save
         // without this code there will not be an entry in the query table for the child object
         if ($createMissingChildrenRows) {
-            $idsToUpdate = $this->extractObjectIdsFromTreeChildren($o->childs);
-            if (!empty($idsToUpdate)) {
-                $idsInTable = $this->db->fetchCol("SELECT " . $this->idField . " FROM " . $this->querytable . " WHERE " . $this->idField . " IN (" . implode(",", $idsToUpdate) . ")");
+            if (!empty($this->treeIds)) {
+                $idsInTable = $this->db->fetchCol("SELECT " . $this->idField . " FROM " . $this->querytable . " WHERE " . $this->idField . " IN (" . implode(",", $this->treeIds) . ")");
 
-                $diff = array_diff($idsToUpdate, $idsInTable);
+                $diff = array_diff($this->treeIds, $idsInTable);
 
                 // create entries for children that don't have an entry yet
                 $originalEntry = $this->db->fetchRow("SELECT * FROM " . $this->querytable . " WHERE " . $this->idField . " = ?", $oo_id);
@@ -318,25 +356,38 @@ class InheritanceHelper
     /**
      * @param $currentParentId
      * @param string $fields
+     * @param null $parentIdGroups
      * @return array
      */
     protected function buildTree($currentParentId, $fields = "", $parentIdGroups = null)
     {
         if (!$parentIdGroups) {
             $object = Object::getById($currentParentId);
+            $query = "SELECT b.o_id AS id $fields, b.o_type AS type, b.o_classId AS classId, b.o_parentId AS parentId, o_path, o_key FROM objects b LEFT JOIN " . $this->storetable . " a ON b.o_id = a." . $this->idField . " WHERE o_path LIKE ".\Pimcore\Db::get()->quote($object->getRealFullPath().'/%') . " GROUP BY b.o_id ORDER BY LENGTH(o_path) ASC";
 
-            $result = $this->db->fetchAll("SELECT b.o_id AS id $fields, b.o_type AS type, b.o_classId AS classId, b.o_parentId AS parentId, CONCAT(o_path,o_key) as fullpath FROM objects b LEFT JOIN " . $this->storetable . " a ON b.o_id = a." . $this->idField . " WHERE o_path LIKE ? GROUP BY b.o_id ORDER BY LENGTH(o_path) ASC", $object->getRealFullPath() . "/%");
+            if (self::$useRuntimeCache) {
+                $queryCacheKey = 'tree_'.md5($query);
+                $parentIdGroups = self::$runtimeCache[$queryCacheKey];
+            }
 
-            $objects = [];
+            if (!$parentIdGroups) {
+                $result = $this->db->fetchAll($query);
 
-            // group the results together based on the parent id's
-            $parentIdGroups = [];
-            foreach ($result as $r) {
-                if (!isset($parentIdGroups[$r["parentId"]])) {
-                    $parentIdGroups[$r["parentId"]] = [];
+                $objects = [];
+
+                // group the results together based on the parent id's
+                $parentIdGroups = [];
+                foreach ($result as $r) {
+                    $r['fullpath'] = $r['o_path'].$r['o_key'];
+                    if (!isset($parentIdGroups[$r["parentId"]])) {
+                        $parentIdGroups[$r["parentId"]] = [];
+                    }
+
+                    $parentIdGroups[$r["parentId"]][] = $r;
                 }
-
-                $parentIdGroups[$r["parentId"]][] = $r;
+                if (self::$useRuntimeCache) {
+                    self::$runtimeCache[$queryCacheKey] = $parentIdGroups;
+                }
             }
         }
 
@@ -348,6 +399,10 @@ class InheritanceHelper
                 $o->type = $r["type"];
                 $o->classId = $r["classId"];
                 $o->childs = $this->buildTree($r['id'], $fields, $parentIdGroups);
+
+                if ($o->classId == $this->classId) {
+                    $this->treeIds[] = $o->id;
+                }
 
                 $objects[] = $o;
             }
@@ -381,26 +436,6 @@ class InheritanceHelper
         }
 
         return $node;
-    }
-
-    /**
-     * @param $treeChildren
-     * @return array
-     */
-    protected function extractObjectIdsFromTreeChildren($treeChildren)
-    {
-        $ids = [];
-
-        if (is_array($treeChildren)) {
-            foreach ($treeChildren as $child) {
-                if ($child->classId == $this->classId) {
-                    $ids[] = $child->id;
-                }
-                $ids = array_merge($ids, $this->extractObjectIdsFromTreeChildren($child->childs));
-            }
-        }
-
-        return $ids;
     }
 
     /**
@@ -494,7 +529,11 @@ class InheritanceHelper
         }
     }
 
-
+    /**
+     * @param $oo_id
+     * @param $ids
+     * @param $fieldname
+     */
     protected function updateQueryTableOnDelete($oo_id, $ids, $fieldname)
     {
         if (!empty($ids)) {

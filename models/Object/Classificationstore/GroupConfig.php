@@ -16,6 +16,7 @@
 
 namespace Pimcore\Model\Object\Classificationstore;
 
+use Pimcore\Cache;
 use Pimcore\Model;
 
 /**
@@ -69,9 +70,22 @@ class GroupConfig extends Model\AbstractModel
     public static function getById($id)
     {
         try {
-            $config = new self();
-            $config->setId(intval($id));
-            $config->getDao()->getById();
+            $cacheKey = "cs_groupconfig_" . $id;
+            if (\Zend_Registry::isRegistered($cacheKey)) {
+                $config = \Zend_Registry::get($cacheKey);
+                if ($config) {
+                    return $config;
+                }
+            }
+
+            if (!$config = Cache::load($cacheKey)) {
+                $config = new self();
+                $config->setId(intval($id));
+                $config->getDao()->getById();
+                Cache::save($config, $cacheKey, [], null, 0, true);
+            } else {
+                \Zend_Registry::set($cacheKey, $config);
+            }
 
             return $config;
         } catch (\Exception $e) {
@@ -80,6 +94,7 @@ class GroupConfig extends Model\AbstractModel
 
     /**
      * @param $name
+     * @param int $storeId
      * @return GroupConfig
      */
     public static function getByName($name, $storeId = 1)
@@ -93,11 +108,16 @@ class GroupConfig extends Model\AbstractModel
             return $config;
         } catch (\Exception $e) {
         }
+
+        return null;
     }
 
+    /**
+     * @return int
+     */
     public function hasChildren()
     {
-        return $this->getDao()->hasChilds();
+        return $this->getDao()->hasChildren();
     }
 
     /**
@@ -148,8 +168,7 @@ class GroupConfig extends Model\AbstractModel
 
 
     /**
-     * @param string name
-     * @return void
+     * @param string $name
      */
     public function setName($name)
     {
@@ -190,9 +209,13 @@ class GroupConfig extends Model\AbstractModel
      */
     public function delete()
     {
-        \Pimcore::getEventManager()->trigger("object.Classificationstore.groupConfig.preDelete", $this);
+        \Pimcore::getEventManager()->trigger("object.classificationstore.groupConfig.preDelete", $this);
+        $cacheKey = "cs_groupconfig_" . $this->getId();
+        \Zend_Registry::set($cacheKey, null);
+        Cache::remove($cacheKey);
+
         parent::delete();
-        \Pimcore::getEventManager()->trigger("object.Classificationstore.groupConfig.postDelete", $this);
+        \Pimcore::getEventManager()->trigger("object.classificationstore.groupConfig.postDelete", $this);
     }
 
     /**
@@ -202,19 +225,24 @@ class GroupConfig extends Model\AbstractModel
     {
         $isUpdate = false;
 
+
         if ($this->getId()) {
+            $cacheKey = "cs_groupconfig_" . $this->getId();
+            \Zend_Registry::set($cacheKey, null);
+            Cache::remove($cacheKey);
+
             $isUpdate = true;
-            \Pimcore::getEventManager()->trigger("object.Classificationstore.groupConfig.preUpdate", $this);
+            \Pimcore::getEventManager()->trigger("object.classificationstore.groupConfig.preUpdate", $this);
         } else {
-            \Pimcore::getEventManager()->trigger("object.Classificationstore.groupConfig.preAdd", $this);
+            \Pimcore::getEventManager()->trigger("object.classificationstore.groupConfig.preAdd", $this);
         }
 
         $model = parent::save();
 
         if ($isUpdate) {
-            \Pimcore::getEventManager()->trigger("object.Classificationstore.groupConfig.postUpdate", $this);
+            \Pimcore::getEventManager()->trigger("object.classificationstore.groupConfig.postUpdate", $this);
         } else {
-            \Pimcore::getEventManager()->trigger("object.Classificationstore.groupConfig.postAdd", $this);
+            \Pimcore::getEventManager()->trigger("object.classificationstore.groupConfig.postAdd", $this);
         }
 
         return $model;

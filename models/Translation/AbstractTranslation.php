@@ -104,6 +104,9 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
         return $this;
     }
 
+    /**
+     * @return int
+     */
     public function getCreationDate()
     {
         return $this->creationDate;
@@ -120,6 +123,9 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
         return $this;
     }
 
+    /**
+     * @return int
+     */
     public function getModificationDate()
     {
         return $this->modificationDate;
@@ -155,9 +161,6 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
         return $this->translations[$language];
     }
 
-    /**
-     * @return void
-     */
     public static function clearDependentCache()
     {
         \Pimcore\Cache::clearTags(["translator", "translate"]);
@@ -193,11 +196,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
         $idOriginal = $id;
         $id = mb_strtolower($id);
 
-        if ($translation instanceof Model\Translation\Admin) {
-            $languages = Tool\Admin::getLanguages();
-        } else {
-            $languages = Tool::getValidLanguages();
-        }
+        $languages = static::getLanguages();
 
         try {
             $translation->getDao()->getByKey(self::getValidTranslationKey($id));
@@ -241,6 +240,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
      * @param $id - translation key
      * @param bool $create - creates an empty translation entry if the key doesn't exists
      * @param bool $returnIdIfEmpty - returns $id if no translation is available
+     * @param string $language
      * @return string
      * @throws \Exception
      */
@@ -281,6 +281,8 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
      * @static
      * @param $file - path to the csv file
      * @param bool $replaceExistingTranslations
+     * @param array $languages
+     * @return mixed
      * @throws \Exception
      */
     public static function importTranslationsFromFile($file, $replaceExistingTranslations = true, $languages = null)
@@ -289,7 +291,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
 
         if (is_readable($file)) {
             if (!$languages || empty($languages) || !is_array($languages)) {
-                $languages = Tool::getValidLanguages();
+                $languages = static::getLanguages();
             }
 
             //read import data

@@ -322,6 +322,23 @@ class Video extends Model\Object\ClassDefinition\Data
     }
 
     /**
+     * @param $object
+     * @param mixed $params
+     * @return string
+     */
+    public function getDataForSearchIndex($object, $params = [])
+    {
+        $data = $this->getDataFromObjectParam($object, $params);
+        if ($data instanceof Object\Data\Video) {
+            $value = $data->getTitle() . " " . $data->getDescription();
+
+            return $value;
+        }
+
+        return "";
+    }
+
+    /**
      * This is a dummy and is mostly implemented by relation types
      *
      * @param mixed $data
@@ -393,6 +410,7 @@ class Video extends Model\Object\ClassDefinition\Data
      * @param mixed $value
      * @param mixed $relatedObject
      * @param mixed $params
+     * @param $idMapper
      * @return mixed
      */
     public function getFromWebserviceImport($value, $relatedObject = null, $params = [], $idMapper = null)
@@ -526,9 +544,12 @@ class Video extends Model\Object\ClassDefinition\Data
             }
 
             if ($value["data"]) {
-                $video->setData(Model\Element\Service::getElementById($value["data"]["type"], $value["data"]["id"]));
+                if (is_array($value["data"])) {
+                    $video->setData(Model\Element\Service::getElementById($value["data"]["type"], $value["data"]["id"]));
+                } else {
+                    $video->setData($value["data"]);
+                }
             }
-
 
             return $video;
         }

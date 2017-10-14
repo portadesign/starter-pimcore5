@@ -19,6 +19,7 @@ namespace Pimcore\Model\Object\KeyValue\KeyConfig;
 use Pimcore\Model;
 
 /**
+ * @deprecated will be removed entirely in Pimcore 5
  * @method \Pimcore\Model\Object\KeyValue\KeyConfig\Listing\Dao getDao()
  */
 class Listing extends Model\Listing\AbstractListing
@@ -35,7 +36,8 @@ class Listing extends Model\Listing\AbstractListing
      * Tests if the given key is an valid order key to sort the results
      *
      * @todo remove the dummy-always-true rule
-     * @return boolean
+     * @param $key
+     * @return bool
      */
     public function isValidOrderKey($key)
     {

@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Pimcore
  *
@@ -28,6 +28,9 @@ class Localizedfield extends Model\AbstractModel
 
     const STRICT_ENABLED = 1;
 
+    /**
+     * @var bool
+     */
     private static $getFallbackValues = false;
 
     /**
@@ -47,6 +50,10 @@ class Localizedfield extends Model\AbstractModel
 
     /** @var mixed  */
     public $context;
+
+    /** @var int */
+    protected $objectId;
+
 
     /**
      * @var bool
@@ -106,7 +113,6 @@ class Localizedfield extends Model\AbstractModel
 
     /**
      * @param  $item
-     * @return void
      */
     public function addItem($item)
     {
@@ -134,7 +140,7 @@ class Localizedfield extends Model\AbstractModel
 
     /**
      * @param Concrete $object
-     * @return void
+     * @return $this
      */
     public function setObject($object)
     {
@@ -142,7 +148,8 @@ class Localizedfield extends Model\AbstractModel
             throw new \Exception("must be instance of object concrete");
         }
         $this->object = $object;
-        //$this->setClass($this->getObject()->getClass());
+        $this->objectId = $object ? $object->getId() : null;
+
         return $this;
     }
 
@@ -151,12 +158,16 @@ class Localizedfield extends Model\AbstractModel
      */
     public function getObject()
     {
+        if ($this->objectId && !$this->object) {
+            $this->setObject(Concrete::getById($this->objectId));
+        }
+
         return $this->object;
     }
 
     /**
      * @param Model\Object\ClassDefinition $class
-     * @return void
+     * @return $this
      */
     public function setClass(ClassDefinition $class)
     {
@@ -212,7 +223,8 @@ class Localizedfield extends Model\AbstractModel
     /**
      * @param $name
      * @param null $language
-     * @return
+     * @param bool $ignoreFallbackLanguage
+     * @return mixed
      */
     public function getLocalizedValue($name, $language = null, $ignoreFallbackLanguage = false)
     {
@@ -223,8 +235,14 @@ class Localizedfield extends Model\AbstractModel
         if ($context && $context["containerType"] == "fieldcollection") {
             $containerKey = $context["containerKey"];
             $container = Model\Object\Fieldcollection\Definition::getByKey($containerKey);
+        } elseif ($context && $context['containerType'] == 'block') {
+            $containerKey = $context['containerKey'];
+            $object = $this->getObject();
+            $blockDefinition = $object->getClass()->getFieldDefinition($containerKey);
+            $container = $blockDefinition;
         } else {
-            $container = $this->getObject()->getClass();
+            $object = $this->getObject();
+            $container = $object->getClass();
         }
         $fieldDefinition = $container->getFieldDefinition("localizedfields")->getFieldDefinition($name);
 
@@ -245,7 +263,13 @@ class Localizedfield extends Model\AbstractModel
 
         // check for inherited value
         $doGetInheritedValues = AbstractObject::doGetInheritedValues();
-        if ($fieldDefinition->isEmpty($data) && $doGetInheritedValues) {
+
+        $allowInheritance = true;
+        if ($context && $context['containerType'] == 'block') {
+            $allowInheritance = false;
+        }
+
+        if ($fieldDefinition->isEmpty($data) && $doGetInheritedValues && $allowInheritance) {
             $object = $this->getObject();
             $class = $object->getClass();
             $allowInherit = $class->getAllowInherit();
@@ -302,7 +326,7 @@ class Localizedfield extends Model\AbstractModel
      * @param $name
      * @param $value
      * @param null $language
-     * @return void
+     * @return $this
      */
     public function setLocalizedValue($name, $value, $language = null)
     {
@@ -356,7 +380,7 @@ class Localizedfield extends Model\AbstractModel
      */
     public function __sleep()
     {
-        return ["items"];
+        return ['items', 'context', 'objectId'];
     }
 
         /**

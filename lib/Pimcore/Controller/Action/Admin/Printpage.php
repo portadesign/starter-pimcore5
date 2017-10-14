@@ -54,9 +54,17 @@ class Printpage extends \Pimcore\Controller\Action\Admin\Document
 
         // cleanup properties
         $this->minimizeProperties($page);
+        
+        //Hook for modifying return value - e.g. for changing permissions based on object data
+        //data need to wrapped into a container in order to pass parameter to event listeners by reference so that they can change the values
+        $returnValueContainer = new \Pimcore\Model\Tool\Admin\EventDataContainer(object2array($page));
+        \Pimcore::getEventManager()->trigger("admin.document.get.preSendData", $this, [
+            "document" => $page,
+            "returnValueContainer" => $returnValueContainer
+        ]);
 
         if ($page->isAllowed("view")) {
-            $this->_helper->json($page);
+            $this->_helper->json($returnValueContainer->getData());
         }
 
         $this->_helper->json(false);
@@ -119,6 +127,9 @@ class Printpage extends \Pimcore\Controller\Action\Admin\Document
         $this->_helper->json(false);
     }
 
+    /**
+     * @param Document\PrintAbstract $page
+     */
     protected function setValuesToDocument(Document\PrintAbstract $page)
     {
         $this->addSettingsToDocument($page);
@@ -238,6 +249,10 @@ class Printpage extends \Pimcore\Controller\Action\Admin\Document
         $this->_helper->json(["options" => $returnValue]);
     }
 
+    /**
+     * @param $documentId
+     * @return array|mixed
+     */
     private function getStoredProcessingOptions($documentId)
     {
         $filename = PIMCORE_TEMPORARY_DIRECTORY . DIRECTORY_SEPARATOR . "web2print-processingoptions-" . $documentId . "_" . $this->getUser()->getId() . ".psf";
@@ -248,10 +263,15 @@ class Printpage extends \Pimcore\Controller\Action\Admin\Document
         }
     }
 
+    /**
+     * @param $documentId
+     * @param $options
+     */
     private function saveProcessingOptions($documentId, $options)
     {
         file_put_contents(PIMCORE_TEMPORARY_DIRECTORY . DIRECTORY_SEPARATOR . "web2print-processingoptions-" . $documentId . "_" . $this->getUser()->getId() . ".psf", \Pimcore\Tool\Serialize::serialize($options));
     }
+
 
     public function cancelGenerationAction()
     {

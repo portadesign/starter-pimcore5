@@ -25,7 +25,6 @@ use Pimcore\Cache;
 abstract class Dao extends Model\Listing\Dao\AbstractDao implements Dao\DaoInterface
 {
 
-
     /** @var  Callback function */
     protected $onCreateQueryCallback;
 
@@ -198,7 +197,8 @@ abstract class Dao extends Model\Listing\Dao\AbstractDao implements Dao\DaoInter
     public function isCacheable()
     {
         $count = $this->db->fetchOne("SELECT COUNT(*) FROM " . static::getTableName());
-        if ($count > 5000) {
+        $cacheLimit = Model\Translation\AbstractTranslation\Listing::getCacheLimit();
+        if ($count > $cacheLimit) {
             return false;
         }
 
@@ -228,6 +228,9 @@ abstract class Dao extends Model\Listing\Dao\AbstractDao implements Dao\DaoInter
         }
     }
 
+    /**
+     * @param callable $callback
+     */
     public function onCreateQuery(callable $callback)
     {
         $this->onCreateQueryCallback = $callback;

@@ -109,6 +109,9 @@ if (!defined("PIMCORE_SYSTEM_TEMP_DIRECTORY")) {
 if (!defined("PIMCORE_LOG_MAIL_PERMANENT")) {
     define("PIMCORE_LOG_MAIL_PERMANENT", PIMCORE_WEBSITE_VAR . "/email");
 }
+if (!defined("PIMCORE_USERIMAGE_DIRECTORY")) {
+    define("PIMCORE_USERIMAGE_DIRECTORY", PIMCORE_WEBSITE_VAR . "/user-image");
+}
 
 
 // setup include paths
@@ -116,10 +119,8 @@ if (!defined("PIMCORE_LOG_MAIL_PERMANENT")) {
 // it also improves the performance when reducing the amount of include paths, you can of course add additional paths anywhere in your code (/website)
 $includePaths = [
     PIMCORE_PATH . "/lib",
-    PIMCORE_PATH . "/models",
     PIMCORE_WEBSITE_PATH . "/lib",
     PIMCORE_WEBSITE_PATH . "/models",
-    PIMCORE_CLASS_DIRECTORY,
     // we need to include the path to the ZF1, because we cannot remove all require_once() out of the source
     // see also: Pimcore\Composer::zendFrameworkOptimization()
     // actually the problem is 'require_once 'Zend/Loader.php';' in Zend/Loader/Autoloader.php
@@ -128,8 +129,11 @@ $includePaths = [
 set_include_path(implode(PATH_SEPARATOR, $includePaths) . PATH_SEPARATOR);
 
 // composer autoloader
-include_once(PIMCORE_DOCUMENT_ROOT . "/vendor/autoload.php");
-
+/** @var $loader \Composer\Autoload\ClassLoader */
+$loader = require PIMCORE_DOCUMENT_ROOT . "/vendor/autoload.php";
+// tell the autoloader where to find Pimcore's generated class stubs
+// this is primarily necessary for tests and custom class directories, which are not covered in composer.json
+$loader->addPsr4('Pimcore\\Model\\Object\\', PIMCORE_CLASS_DIRECTORY . '/Object');
 
 // helper functions
 include(dirname(__FILE__) . "/helper.php");
@@ -138,25 +142,35 @@ include(dirname(__FILE__) . "/helper.php");
 require_once PIMCORE_PATH . "/lib/Pimcore.php";
 require_once PIMCORE_PATH . "/lib/Pimcore/Logger.php";
 
-$autoloader = Zend_Loader_Autoloader::getInstance();
-$autoloader->suppressNotFoundWarnings(false);
-$autoloader->setFallbackAutoloader(false);
-$autoloader->registerNamespace('Pimcore');
-
 // register class map loader => speed
 $autoloaderClassMapFiles = [
-    PIMCORE_CONFIGURATION_DIRECTORY . "/autoload-classmap.php",
     PIMCORE_CUSTOM_CONFIGURATION_DIRECTORY . "/autoload-classmap.php",
-    PIMCORE_PATH . "/config/autoload-classmap.php",
+    PIMCORE_CONFIGURATION_DIRECTORY . "/autoload-classmap.php",
 ];
 
 foreach ($autoloaderClassMapFiles as $autoloaderClassMapFile) {
     if (file_exists($autoloaderClassMapFile)) {
-        $classMapAutoLoader = new \Pimcore\Loader\ClassMapAutoloader([$autoloaderClassMapFile]);
-        $classMapAutoLoader->register();
+        $classMapAutoLoader = new \Zend_Loader_ClassMapAutoloader([$autoloaderClassMapFile]);
+        spl_autoload_register([$classMapAutoLoader, 'autoload'], true, false);
         break;
     }
 }
+
+
+$autoloader = Zend_Loader_Autoloader::getInstance();
+$autoloader->suppressNotFoundWarnings(true);
+$autoloader->setFallbackAutoloader(false);
+$autoloader->registerNamespace('Pimcore');
+
+
+// re-register Composer's autoloader to put him on top of the stack, especially before the ZF Autoloader
+$loader->unregister();
+$loader->register(true);
+
+// compatibility loader must have the top priority
+$compatibilityClassLoader = new \Pimcore\Loader\CompatibilityAutoloader($loader);
+$compatibilityClassLoader->register(true);
+
 
 // generic pimcore startup
 \Pimcore::setSystemRequirements();

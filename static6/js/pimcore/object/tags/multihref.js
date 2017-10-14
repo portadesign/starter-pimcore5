@@ -90,38 +90,7 @@ pimcore.object.tags.multihref = Class.create(pimcore.object.tags.abstract, {
         }
         var cls = 'object_field';
 
-        var toolbarItems = [
-            {
-                xtype: "tbspacer",
-                width: 20,
-                height: 16,
-                cls: "pimcore_icon_droptarget"
-            },
-            {
-                xtype: "tbtext",
-                text: "<b>" + this.fieldConfig.title + "</b>"
-            },
-            "->",
-            {
-                xtype: "button",
-                iconCls: "pimcore_icon_delete",
-                handler: this.empty.bind(this)
-            },
-            {
-                xtype: "button",
-                iconCls: "pimcore_icon_search",
-                handler: this.openSearchEditor.bind(this)
-            }
-        ];
-
-        if (this.fieldConfig.assetsAllowed) {
-            toolbarItems.push({
-                xtype: "button",
-                cls: "pimcore_inline_upload",
-                iconCls: "pimcore_icon_upload",
-                handler: this.uploadDialog.bind(this)
-            });
-        }
+        var toolbarItems = this.getEditToolbarItems();
 
         this.component = new Ext.grid.GridPanel({
             store: this.store,
@@ -311,6 +280,44 @@ pimcore.object.tags.multihref = Class.create(pimcore.object.tags.abstract, {
         return this.component;
     },
 
+    getEditToolbarItems: function() {
+
+        var toolbarItems = [
+            {
+                xtype: "tbspacer",
+                width: 20,
+                height: 16,
+                cls: "pimcore_icon_droptarget"
+            },
+            {
+                xtype: "tbtext",
+                text: "<b>" + this.fieldConfig.title + "</b>"
+            },
+            "->",
+            {
+                xtype: "button",
+                iconCls: "pimcore_icon_delete",
+                handler: this.empty.bind(this)
+            },
+            {
+                xtype: "button",
+                iconCls: "pimcore_icon_search",
+                handler: this.openSearchEditor.bind(this)
+            }
+        ];
+
+        if (this.fieldConfig.assetsAllowed) {
+            toolbarItems.push({
+                xtype: "button",
+                cls: "pimcore_inline_upload",
+                iconCls: "pimcore_icon_upload",
+                handler: this.uploadDialog.bind(this)
+            });
+        }
+
+        return toolbarItems;
+    },
+
     isFromTree: function(ddSource) {
         var klass = Ext.getClass(ddSource);
         var className = klass.getName();
@@ -464,7 +471,10 @@ pimcore.object.tags.multihref = Class.create(pimcore.object.tags.abstract, {
             type: allowedTypes,
             subtype: allowedSubtypes,
             specific: allowedSpecific
-        });
+        },
+            {
+                context: Ext.apply({scope: "objectEditor"}, this.getContext())
+            });
 
     },
 

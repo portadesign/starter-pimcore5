@@ -249,7 +249,9 @@ class Dao extends Model\Element\Dao
     /**
      * Returns properties for the object from the database and assigns these.
      *
-     * @return []
+     * @param boolean $onlyInherited
+     * @param boolean $onlyDirect
+     * @return array
      */
     public function getProperties($onlyInherited = false, $onlyDirect = false)
     {
@@ -306,8 +308,6 @@ class Dao extends Model\Element\Dao
 
     /**
      * Deletes all object properties from the database.
-     *
-     * @return void
      */
     public function deleteAllProperties()
     {
@@ -316,8 +316,6 @@ class Dao extends Model\Element\Dao
 
     /**
      * Deletes all user permissions based on the document id.
-     *
-     * @return void
      */
     public function deleteAllPermissions()
     {
@@ -326,8 +324,6 @@ class Dao extends Model\Element\Dao
 
     /**
      * Deletes all scheduled tasks assigned to the document.
-     *
-     * @return void
      */
     public function deleteAllTasks()
     {
@@ -511,5 +507,18 @@ class Dao extends Model\Element\Dao
         $index++;
 
         return $index;
+    }
+
+    /**
+     * @return bool
+     */
+    public function __isBasedOnLatestData()
+    {
+        $currentDataTimestamp = $this->db->fetchOne("SELECT modificationDate from documents WHERE id = ?", $this->model->getId());
+        if ($currentDataTimestamp == $this->model->__getDataVersionTimestamp()) {
+            return true;
+        }
+
+        return false;
     }
 }

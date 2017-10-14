@@ -44,7 +44,10 @@ class Dao extends Model\Dao\AbstractDao
     /**
      * Save object to database
      *
-     * @return void
+     * @return boolean|null
+     * @throws \Exception
+     *
+     * @todo: not all save methods return a boolean, why this one?
      */
     public function save()
     {
@@ -52,7 +55,10 @@ class Dao extends Model\Dao\AbstractDao
         try {
             $dataAttributes = get_object_vars($this->model);
 
-            $originalIdPath = $this->db->fetchOne("SELECT idPath FROM tags WHERE id = ?", $this->model->getId());
+            $originalIdPath = null;
+            if ($this->model->getId()) {
+                $originalIdPath = $this->db->fetchOne('SELECT idPath FROM tags WHERE id = ?', $this->model->getId());
+            }
 
             $data = [];
             foreach ($dataAttributes as $key => $value) {
@@ -86,7 +92,7 @@ class Dao extends Model\Dao\AbstractDao
     /**
      * Deletes object from database
      *
-     * @return void
+     * @throws \Exception
      */
     public function delete()
     {
@@ -120,7 +126,7 @@ class Dao extends Model\Dao\AbstractDao
             $tags[] = Model\Element\Tag::getById($tagId);
         }
 
-        array_filter($tags);
+        $tags = array_filter($tags);
         @usort($tags, function ($left, $right) {
             return strcmp($left->getNamePath(), $right->getNamePath());
         });
@@ -137,6 +143,11 @@ class Dao extends Model\Dao\AbstractDao
         $this->doAddTagToElement($this->model->getId(), $cType, $cId);
     }
 
+    /**
+     * @param $tagId
+     * @param $cType
+     * @param $cId
+     */
     protected function doAddTagToElement($tagId, $cType, $cId)
     {
         $data = [
@@ -147,12 +158,22 @@ class Dao extends Model\Dao\AbstractDao
         $this->db->insertOrUpdate("tags_assignment", $data);
     }
 
+    /**
+     * @param $cType
+     * @param $cId
+     */
     public function removeTagFromElement($cType, $cId)
     {
         $this->db->delete("tags_assignment",
             "tagid = " . $this->db->quote($this->model->getId()) . " AND ctype = " . $this->db->quote($cType) . " AND cid = " . $this->db->quote($cId));
     }
 
+    /**
+     * @param $cType
+     * @param $cId
+     * @param array $tags
+     * @throws \Exception
+     */
     public function setTagsForElement($cType, $cId, array $tags)
     {
         $this->db->beginTransaction();
@@ -170,6 +191,12 @@ class Dao extends Model\Dao\AbstractDao
         }
     }
 
+    /**
+     * @param $cType
+     * @param array $cIds
+     * @param array $tagIds
+     * @param $replace
+     */
     public function batchAssignTagsToElement($cType, array $cIds, array $tagIds, $replace)
     {
         if ($replace) {

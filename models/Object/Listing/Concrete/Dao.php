@@ -62,8 +62,7 @@ class Dao extends Model\Object\Listing\Dao
         $field = $this->getTableName() . ".o_id";
         $select->from(
             [ $this->getTableName() ], [
-                new \Zend_Db_Expr(
-                    sprintf('SQL_CALC_FOUND_ROWS %s as o_id', $this->getSelectPart($field, $field))), 'o_type'
+                new \Zend_Db_Expr(sprintf('%s as o_id', $this->getSelectPart($field, $field))), 'o_type'
             ]
         );
 
@@ -257,7 +256,9 @@ CONDITION
         return $this;
     }
 
-
+    /**
+     * @param callable $callback
+     */
     public function onCreateQuery(callable $callback)
     {
         $this->onCreateQueryCallback = $callback;

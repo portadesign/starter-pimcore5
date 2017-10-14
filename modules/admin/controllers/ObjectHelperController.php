@@ -291,7 +291,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         $object = Object::getById($this->getParam("id"));
 
 
-        if ($object->isAllowed("publish")) {
+        if ($object->isAllowed("list")) {
             try {
                 $classId = $this->getParam("class_id");
 
@@ -326,7 +326,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         $object = Object::getById($this->getParam("id"));
 
 
-        if ($object->isAllowed("publish")) {
+        if ($object->isAllowed("list")) {
             try {
                 $classId = $this->getParam("class_id");
 
@@ -356,7 +356,14 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json(["success" => false, "message" => "missing_permission"]);
     }
 
-
+    /**
+     * @param $field
+     * @param $gridType
+     * @param $position
+     * @param bool $force
+     * @param null $keyPrefix
+     * @return array|null
+     */
     protected function getFieldGridConfig($field, $gridType, $position, $force = false, $keyPrefix = null)
     {
         $key = $keyPrefix . $field->getName();
@@ -421,13 +428,14 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         $importFileOriginal = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/import_" . $this->getParam("id") . "_original";
         File::put($importFileOriginal, $data);
 
-        $this->_helper->json([
-            "success" => true
-        ], false);
-
         // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
         // Ext.form.Action.Submit and mark the submission as failed
-        $this->getResponse()->setHeader("Content-Type", "text/html");
+        header("Content-Type: text/html", true);
+        $result = json_encode([
+            "success" => true
+        ]);
+        echo($result);
+        die();
     }
 
     public function importGetFileInfoAction()
@@ -624,7 +632,7 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
                     $intendedPath = $parent->getRealFullPath() . "/" . $objectKey;
                     $counter++;
                 }
-                $object = new $className();
+                $object = \Pimcore::getDiContainer()->make($className);
             }
             $object->setClassId($this->getParam("classId"));
             $object->setClassName($this->getParam("className"));
@@ -685,6 +693,9 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         exit;
     }
 
+    /**
+     * @return mixed|string
+     */
     protected function extractLanguage()
     {
         $requestedLanguage = $this->getParam("language");
@@ -699,6 +710,9 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         return $requestedLanguage;
     }
 
+    /**
+     * @return array
+     */
     protected function extractFieldsAndBricks()
     {
         $fields = [];
@@ -719,6 +733,9 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         return [$fields, $bricks];
     }
 
+    /**
+     * @return array
+     */
     protected function prepareExportList()
     {
         $requestedLanguage = $this->extractLanguage();
@@ -751,13 +768,14 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
 
         /** @var Object\Listing\Concrete $list */
         $list = new $listClass();
+        $objectTableName = $list->getDao()->getTableName();
         $list->setCondition(implode(" AND ", $conditionFilters));
 
         //parameters specified in the objects grid
         $ids = $this->getParam('ids', []);
         if (! empty($ids)) {
             //add a condition if id numbers are specified
-            $list->addConditionParam('o_id IN (' . implode(',', $ids) . ')');
+            $list->addConditionParam("{$objectTableName}.o_id IN (" . implode(',', $ids) . ')');
         }
 
         $list->setOrder("ASC");
@@ -786,6 +804,10 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         return [$list, $fields, $requestedLanguage];
     }
 
+    /**
+     * @param $fileHandle
+     * @return string
+     */
     protected function getCsvFile($fileHandle)
     {
         return PIMCORE_SYSTEM_TEMP_DIRECTORY . "/" . $fileHandle . ".csv";
@@ -843,11 +865,14 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
 
             readfile($csvFile);
             unlink($csvFile);
-        } else {
-            exit();
         }
+        exit;
     }
 
+    /**
+     * @param $field
+     * @return string
+     */
     protected function mapFieldname($field)
     {
         if (substr($field, 0, 1) == "~") {
@@ -870,7 +895,12 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         return $field;
     }
 
-
+    /**
+     * @param $list
+     * @param $fields
+     * @param bool $addTitles
+     * @return string
+     */
     protected function getCsvData($list, $fields, $addTitles = true)
     {
         $requestedLanguage = $this->extractLanguage();
@@ -932,6 +962,12 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
         return $csv;
     }
 
+    /**
+     * @param $field
+     * @param $object
+     * @param $requestedLanguage
+     * @return mixed
+     */
     protected function getCsvFieldData($field, $object, $requestedLanguage)
     {
 
@@ -1104,18 +1140,45 @@ class Admin_ObjectHelperController extends \Pimcore\Controller\Action\Admin
                     $field = $parts[2];
                     $keyid = $parts[3];
 
-                    $getter = "get" . ucfirst($field);
-                    $setter = "set" . ucfirst($field);
-                    $keyValuePairs = $object->$getter();
+                    if ($type == "classificationstore") {
+                        $requestedLanguage = $this->getParam("language");
+                        if ($requestedLanguage) {
+                            if ($requestedLanguage != "default") {
+                                $this->setLanguage($requestedLanguage, true);
+                            }
+                        } else {
+                            $requestedLanguage = $this->getLanguage();
+                        }
 
-                    if (!$keyValuePairs) {
-                        $keyValuePairs = new Object\Data\KeyValue();
-                        $keyValuePairs->setObjectId($object->getId());
-                        $keyValuePairs->setClass($object->getClass());
+                        $groupKeyId = explode("-", $keyid);
+                        $groupId = $groupKeyId[0];
+                        $keyid = $groupKeyId[1];
+
+                        $getter = "get".ucfirst($field);
+                        if (method_exists($object, $getter)) {
+                            /** @var  $classificationStoreData Object\Classificationstore */
+                            $classificationStoreData = $object->$getter();
+                            $classificationStoreData->setLocalizedKeyValue(
+                                $groupId,
+                                $keyid,
+                                $value,
+                                $requestedLanguage
+                            );
+                        }
+                    } else {
+                        $getter = "get".ucfirst($field);
+                        $setter = "set".ucfirst($field);
+                        $keyValuePairs = $object->$getter();
+
+                        if (!$keyValuePairs) {
+                            $keyValuePairs = new Object\Data\KeyValue();
+                            $keyValuePairs->setObjectId($object->getId());
+                            $keyValuePairs->setClass($object->getClass());
+                        }
+
+                        $keyValuePairs->setPropertyWithId($keyid, $value, true);
+                        $object->$setter($keyValuePairs);
                     }
-
-                    $keyValuePairs->setPropertyWithId($keyid, $value, true);
-                    $object->$setter($keyValuePairs);
                 } elseif (count($parts) > 1) {
                     // check for bricks
                     $brickType = $parts[0];

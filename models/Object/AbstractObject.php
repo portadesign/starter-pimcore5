@@ -24,6 +24,7 @@ use Pimcore\Model\Element;
 
 /**
  * @method \Pimcore\Model\Object\AbstractObject\Dao getDao()
+ * @method bool __isBasedOnLatestData()
  */
 class AbstractObject extends Model\Element\AbstractElement
 {
@@ -33,6 +34,9 @@ class AbstractObject extends Model\Element\AbstractElement
     const OBJECT_TYPE_OBJECT = "object";
     const OBJECT_TYPE_VARIANT = "variant";
 
+    /**
+     * @var bool
+     */
     public static $doNotRestoreKeyAndPath = false;
 
     /**
@@ -63,7 +67,6 @@ class AbstractObject extends Model\Element\AbstractElement
     /**
      * @static
      * @param  $hidePublished
-     * @return void
      */
     public static function setHideUnpublished($hidePublished)
     {
@@ -82,7 +85,6 @@ class AbstractObject extends Model\Element\AbstractElement
     /**
      * @static
      * @param  $getInheritedValues
-     * @return void
      */
     public static function setGetInheritedValues($getInheritedValues)
     {
@@ -100,6 +102,7 @@ class AbstractObject extends Model\Element\AbstractElement
 
     /**
      * @static
+     * @param Concrete $object
      * @return bool
      */
     public static function doGetInheritedValues(Concrete $object = null)
@@ -170,7 +173,6 @@ class AbstractObject extends Model\Element\AbstractElement
      */
     public $o_userModification = 0;
 
-
     /**
      * @var array
      */
@@ -196,7 +198,6 @@ class AbstractObject extends Model\Element\AbstractElement
      */
     public $o_hasSiblings;
 
-
     /**
      * @var Model\Dependency[]
      */
@@ -212,12 +213,20 @@ class AbstractObject extends Model\Element\AbstractElement
      */
     public $o_locked;
 
-
     /**
      * @var Model\Element\AdminStyle
      */
     public $o_elementAdminStyle;
 
+    /**
+     * @var array
+     */
+    private $lastGetChildsObjectTypes = [];
+
+    /**
+     * @var array
+     */
+    private $lastGetSiblingObjectTypes = [];
 
     /**
      * get possible types
@@ -229,10 +238,12 @@ class AbstractObject extends Model\Element\AbstractElement
     }
 
     /**
+     * Static helper to get an object by the passed ID
      * @param integer $id
+     * @param bool $force
      * @return static
      */
-    public static function getById($id)
+    public static function getById($id, $force = false)
     {
         $id = intval($id);
 
@@ -242,51 +253,45 @@ class AbstractObject extends Model\Element\AbstractElement
 
         $cacheKey = "object_" . $id;
 
-        try {
+        if (!$force && \Zend_Registry::isRegistered($cacheKey)) {
             $object = \Zend_Registry::get($cacheKey);
-            if (!$object) {
-                throw new \Exception("Object\\AbstractObject: object in registry is null");
+            if ($object && static::typeMatch($object)) {
+                return $object;
+            }
+        }
+
+        try {
+            if ($force || !($object = Cache::load($cacheKey))) {
+                $object = new Model\Object();
+                $typeInfo = $object->getDao()->getTypeById($id);
+
+                if ($typeInfo["o_type"] == "object" || $typeInfo["o_type"] == "variant" || $typeInfo["o_type"] == "folder") {
+                    if ($typeInfo["o_type"] == "folder") {
+                        $className = "Pimcore\\Model\\Object\\Folder";
+                    } else {
+                        $className = "Pimcore\\Model\\Object\\" . ucfirst($typeInfo["o_className"]);
+                    }
+
+                    $object = \Pimcore::getDiContainer()->make($className);
+                    \Zend_Registry::set($cacheKey, $object);
+                    $object->getDao()->getById($id);
+                    $object->__setDataVersionTimestamp($object->getModificationDate());
+
+                    Cache::save($object, $cacheKey);
+                } else {
+                    throw new \Exception("No entry for object id " . $id);
+                }
+            } else {
+                \Zend_Registry::set($cacheKey, $object);
             }
         } catch (\Exception $e) {
-            try {
-                if (!$object = Cache::load($cacheKey)) {
-                    $object = new Model\Object();
-                    $typeInfo = $object->getDao()->getTypeById($id);
+            Logger::warning($e->getMessage());
 
-                    if ($typeInfo["o_type"] == "object" || $typeInfo["o_type"] == "variant" || $typeInfo["o_type"] == "folder") {
-                        if ($typeInfo["o_type"] == "folder") {
-                            $className = "Pimcore\\Model\\Object\\Folder";
-                        } else {
-                            $className = "Pimcore\\Model\\Object\\" . ucfirst($typeInfo["o_className"]);
-                        }
-
-                        $object = \Pimcore::getDiContainer()->make($className);
-                        \Zend_Registry::set($cacheKey, $object);
-                        $object->getDao()->getById($id);
-
-                        Cache::save($object, $cacheKey);
-                    } else {
-                        throw new \Exception("No entry for object id " . $id);
-                    }
-                } else {
-                    \Zend_Registry::set($cacheKey, $object);
-                }
-            } catch (\Exception $e) {
-                Logger::warning($e->getMessage());
-
-                return null;
-            }
+            return null;
         }
 
-        // check for type
-        $staticType = get_called_class();
-        if ($staticType != 'Pimcore\Model\Object\Concrete' && $staticType != 'Pimcore\Model\Object\AbstractObject') {
-            if (!$object instanceof $staticType) {
-                return null;
-            }
-        }
 
-        if (!$object) {
+        if (!$object || !static::typeMatch($object)) {
             return null;
         }
 
@@ -339,7 +344,6 @@ class AbstractObject extends Model\Element\AbstractElement
                 $listClass = $className . "\\Listing";
                 $list = \Pimcore::getDiContainer()->make($listClass);
                 $list->setValues($config);
-                $list->load();
 
                 return $list;
             }
@@ -379,7 +383,21 @@ class AbstractObject extends Model\Element\AbstractElement
         }
     }
 
-    private $lastGetChildsObjectTypes = [];
+    /**
+     * @param AbstractObject $object
+     * @return bool
+     */
+    protected static function typeMatch(AbstractObject $object)
+    {
+        $staticType = get_called_class();
+        if ($staticType != 'Pimcore\Model\Object\Concrete' && $staticType != 'Pimcore\Model\Object\AbstractObject') {
+            if (!$object instanceof $staticType) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     /**
      * @param array $objectTypes
@@ -404,6 +422,7 @@ class AbstractObject extends Model\Element\AbstractElement
     }
 
     /**
+     * @param array $objectTypes
      * @return boolean
      */
     public function hasChildren($objectTypes = [self::OBJECT_TYPE_OBJECT, self::OBJECT_TYPE_FOLDER])
@@ -418,9 +437,6 @@ class AbstractObject extends Model\Element\AbstractElement
 
         return $this->getDao()->hasChilds($objectTypes);
     }
-
-
-    private $lastGetSiblingObjectTypes = [];
 
     /**
      * Get a list of the sibling documents
@@ -477,7 +493,7 @@ class AbstractObject extends Model\Element\AbstractElement
 
     /**
      * @param bool $o_locked
-     * @return $this|void
+     * @return $this
      */
     public function setLocked($o_locked)
     {
@@ -486,9 +502,6 @@ class AbstractObject extends Model\Element\AbstractElement
         return $this;
     }
 
-    /**
-     * @return void
-     */
     public function delete()
     {
         \Pimcore::getEventManager()->trigger("object.preDelete", $this);
@@ -800,6 +813,11 @@ class AbstractObject extends Model\Element\AbstractElement
      */
     public function getParentId()
     {
+        // fall back to parent if no ID is set but we have a parent object
+        if (!$this->o_parentId && $this->o_parent) {
+            return $this->o_parent->getId();
+        }
+
         return $this->o_parentId;
     }
 

@@ -346,6 +346,9 @@ class Areablock extends Model\Document\Tag
         \Zend_Registry::set("pimcore_tag_block_numeration", $suffixes);
     }
 
+    /**
+     * @return array
+     */
     protected function getToolBarDefaultConfig()
     {
         $buttonWidth = 168;
@@ -371,7 +374,7 @@ class Areablock extends Model\Document\Tag
     /**
      * Is executed at the beginning of the loop and setup some general settings
      *
-     * @return void
+     * @return $this
      */
     public function start()
     {
@@ -405,7 +408,10 @@ class Areablock extends Model\Document\Tag
         ');
 
         // set name suffix for the whole block element, this will be addet to all child elements of the block
-        $suffixes = \Zend_Registry::get("pimcore_tag_block_current");
+        $suffixes = [];
+        if (\Zend_Registry::isRegistered('pimcore_tag_block_current')) {
+            $suffixes = \Zend_Registry::get("pimcore_tag_block_current");
+        }
         $suffixes[] = $this->getName();
         \Zend_Registry::set("pimcore_tag_block_current", $suffixes);
 
@@ -421,16 +427,17 @@ class Areablock extends Model\Document\Tag
 
     /**
      * Is executed at the end of the loop and removes the settings set in start()
-     *
-     * @return void
      */
     public function end()
     {
         $this->current = 0;
 
         // remove the suffix which was set by self::start()
-        $suffixes = \Zend_Registry::get("pimcore_tag_block_current");
-        array_pop($suffixes);
+        $suffixes = [];
+        if (\Zend_Registry::isRegistered('pimcore_tag_block_current')) {
+            $suffixes = \Zend_Registry::get("pimcore_tag_block_current");
+            array_pop($suffixes);
+        }
         \Zend_Registry::set("pimcore_tag_block_current", $suffixes);
 
         $this->outputEditmode("</div>");
@@ -438,8 +445,6 @@ class Areablock extends Model\Document\Tag
 
     /**
      * Is called evertime a new iteration starts (new entry of the block while looping)
-     *
-     * @return void
      */
     public function blockStart()
     {
@@ -457,8 +462,6 @@ class Areablock extends Model\Document\Tag
 
     /**
      * Is called evertime a new iteration ends (new entry of the block while looping)
-     *
-     * @return void
      */
     public function blockEnd()
     {
@@ -469,7 +472,6 @@ class Areablock extends Model\Document\Tag
      * Sends data to the output stream
      *
      * @param string $v
-     * @return void
      */
     public function outputEditmode($v)
     {
@@ -480,8 +482,6 @@ class Areablock extends Model\Document\Tag
 
     /**
      * Setup some settings that are needed for blocks
-     *
-     * @return void
      */
     public function setupStaticEnvironment()
     {
@@ -511,7 +511,7 @@ class Areablock extends Model\Document\Tag
 
     /**
      * @param array $options
-     * @return void
+     * @return $this
      */
     public function setOptions($options)
     {
@@ -681,8 +681,6 @@ class Areablock extends Model\Document\Tag
 
     /**
      * If object was serialized, set the counter back to 0
-     *
-     * @return void
      */
     public function __wakeup()
     {
@@ -701,16 +699,19 @@ class Areablock extends Model\Document\Tag
 
     /**
      * @param Model\Webservice\Data\Document\Element $wsElement
+     * @param $document
      * @param mixed $params
      * @param null $idMapper
      * @throws \Exception
+     *
+     * @todo replace and with &&
      */
     public function getFromWebserviceImport($wsElement, $document = null, $params = [], $idMapper = null)
     {
         $data = $wsElement->value;
         if (($data->indices === null or is_array($data->indices)) and ($data->current==null or is_numeric($data->current))
             and ($data->currentIndex==null or is_numeric($data->currentIndex))) {
-            $indices = $data["indices"];
+            $indices = $data->indices;
             if ($indices instanceof \stdclass) {
                 $indices = (array) $indices;
             }

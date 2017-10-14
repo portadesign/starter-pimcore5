@@ -12,6 +12,8 @@
 
 namespace Pimcore\Admin\Helper;
 
+use Carbon\Carbon;
+
 class QueryParams
 {
 
@@ -62,6 +64,10 @@ class QueryParams
         return ['orderKey' => $orderKey, "order" => $order];
     }
 
+    /**
+     * @param $param
+     * @return int
+     */
     public static function getRecordIdForGridRequest($param)
     {
         if (!\Pimcore\Tool\Admin::isExtJS6() && is_numeric($param)) {

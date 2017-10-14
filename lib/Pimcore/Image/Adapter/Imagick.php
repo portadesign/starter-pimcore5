@@ -50,6 +50,12 @@ class Imagick extends Adapter
      */
     public function load($imagePath, $options = [])
     {
+        if (isset($options["preserveColor"])) {
+            // set this option to TRUE to skip all color transformations during the loading process
+            // this can massively improve performance if the color information doesn't matter, ...
+            // eg. when using this function to obtain dimensions from an image
+            $this->setPreserveColor($options["preserveColor"]);
+        }
 
         // support image URLs
         if (preg_match("@^https?://@", $imagePath)) {
@@ -176,19 +182,27 @@ class Imagick extends Adapter
             // set white background for transparent pixels
             $i->setImageBackgroundColor("#ffffff");
 
-            // Imagick version compatibility
-            $alphaChannel = 11; // This works at least as far back as version 3.1.0~rc1-1
-            if (defined("Imagick::ALPHACHANNEL_REMOVE")) {
-                // Imagick::ALPHACHANNEL_REMOVE has been added in 3.2.0b2
-                $alphaChannel = \Imagick::ALPHACHANNEL_REMOVE;
+            if ($i->getImageAlphaChannel() !== 0) { // Note: returns (int) 0 if there's no AlphaChannel, PHP Docs are wrong. See: https://www.imagemagick.org/api/channel.php
+                // Imagick version compatibility
+                $alphaChannel = 11; // This works at least as far back as version 3.1.0~rc1-1
+                if (defined("Imagick::ALPHACHANNEL_REMOVE")) {
+                    // Imagick::ALPHACHANNEL_REMOVE has been added in 3.2.0b2
+                    $alphaChannel = \Imagick::ALPHACHANNEL_REMOVE;
+                }
+                $i->setImageAlphaChannel($alphaChannel);
             }
 
-            $i->setImageAlphaChannel($alphaChannel);
             $i->mergeImageLayers(\Imagick::LAYERMETHOD_FLATTEN);
         }
 
         if (!$this->isPreserveMetaData()) {
             $i->stripImage();
+            if ($format == "png32") {
+                // do not include any meta-data
+                // this is due a bug in -strip, therefore we have to use this custom option
+                // see also: https://github.com/ImageMagick/ImageMagick/issues/156
+                $i->setOption("png:include-chunk", "none");
+            }
         }
         if (!$this->isPreserveColor()) {
             $i->profileImage('*', null);
@@ -459,13 +473,14 @@ class Imagick extends Adapter
     /**
      * @param $width
      * @param $height
+     * @param  bool $forceResize
      * @return $this
      */
-    public function frame($width, $height)
+    public function frame($width, $height, $forceResize = false)
     {
         $this->preModify();
 
-        $this->contain($width, $height);
+        $this->contain($width, $height, $forceResize);
 
         $x = ($width - $this->getWidth()) / 2;
         $y = ($height - $this->getHeight()) / 2;
@@ -526,6 +541,7 @@ class Imagick extends Adapter
     /**
      * @param $width
      * @param $height
+     * @param string $color
      * @return Imagick
      */
     protected function createImage($width, $height, $color = "transparent")
@@ -614,8 +630,9 @@ class Imagick extends Adapter
      * @param int $x Amount of horizontal pixels the overlay should be offset from the origin
      * @param int $y Amount of vertical pixels the overlay should be offset from the origin
      * @param int $alpha Opacity in a scale of 0 (transparent) to 100 (opaque)
+     * @param string $composite
      * @param string $origin Origin of the X and Y coordinates (top-left, top-right, bottom-left, bottom-right or center)
-     * @return self
+     * @return Imagick
      */
     public function addOverlay($image, $x = 0, $y = 0, $alpha = 100, $composite = "COMPOSITE_DEFAULT", $origin = 'top-left')
     {

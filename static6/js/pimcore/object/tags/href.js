@@ -326,6 +326,8 @@ pimcore.object.tags.href = Class.create(pimcore.object.tags.abstract, {
             type: allowedTypes,
             subtype: allowedSubtypes,
             specific: allowedSpecific
+        }, {
+            context: Ext.apply({scope: "objectEditor"}, this.getContext())
         });
     },
 

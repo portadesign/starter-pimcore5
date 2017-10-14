@@ -50,6 +50,10 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json($users);
     }
 
+    /**
+     * @param $user
+     * @return array
+     */
     protected function getTreeNodeConfig($user)
     {
         $tmpUser = [
@@ -166,7 +170,13 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json(false);
     }
 
-
+    /**
+     * @param $node
+     * @param $currentList
+     * @param $roleMode
+     * @return array
+     * @throws Exception
+     */
     protected function populateChildNodes($node, &$currentList, $roleMode)
     {
         $currentUser = \Pimcore\Tool\Admin::getCurrentUser();
@@ -212,7 +222,30 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
                     $user->delete();
                 }
             } else {
-                $user->delete();
+                if ($user->getId()) {
+                    if ($user instanceof Pimcore\Model\User\Role) {
+                        // #1431 remove user-role relations
+                        $userRoleRelationListing = new User\Listing();
+                        $userRoleRelationListing->setCondition("FIND_IN_SET(" . $user->getId() . ",roles)");
+                        $userRoleRelationListing = $userRoleRelationListing->load();
+                        if ($userRoleRelationListing) {
+                            /** @var  $relatedUser User */
+                            foreach ($userRoleRelationListing as $relatedUser) {
+                                $userRoles = $relatedUser->getRoles();
+                                if (is_array($userRoles)) {
+                                    $key = array_search($user->getId(), $userRoles);
+                                    if (false !== $key) {
+                                        unset($userRoles[$key]);
+                                        $relatedUser->setRoles($userRoles);
+                                        $relatedUser->save();
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    $user->delete();
+                }
             }
         }
 
@@ -371,6 +404,7 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
             "permissions" => $user->generatePermissionList(),
             "availablePermissions" => $availableUserPermissions,
             "availablePerspectives" => $availablePerspectives,
+            "validLanguages" => Tool::getValidLanguages(),
             "objectDependencies" => [
                 "hasHidden" => $hasHidden,
                 "dependencies" => $userObjectData
@@ -506,6 +540,10 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json($roles);
     }
 
+    /**
+     * @param $role
+     * @return array
+     */
     protected function getRoleTreeNodeConfig($role)
     {
         $tmpUser = [
@@ -568,7 +606,8 @@ class Admin_UserController extends \Pimcore\Controller\Action\Admin
             "classes" => $role->getClasses(),
             "docTypes" => $role->getDocTypes(),
             "availablePermissions" => $availableUserPermissions,
-            "availablePerspectives" => $availablePerspectives
+            "availablePerspectives" => $availablePerspectives,
+            "validLanguages" => Tool::getValidLanguages()
         ]);
     }
 

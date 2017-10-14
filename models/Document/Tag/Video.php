@@ -272,7 +272,7 @@ class Video extends Model\Document\Tag
     /**
      * @see Document\Tag\TagInterface::setDataFromEditmode
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromEditmode($data)
     {
@@ -309,7 +309,9 @@ class Video extends Model\Document\Tag
         return $this;
     }
 
-
+    /**
+     * @return string
+     */
     public function getWidth()
     {
         $options = $this->getOptions();
@@ -320,6 +322,9 @@ class Video extends Model\Document\Tag
         return "100%";
     }
 
+    /**
+     * @return int
+     */
     public function getHeight()
     {
         $options = $this->getOptions();
@@ -330,7 +335,10 @@ class Video extends Model\Document\Tag
         return 300;
     }
 
-
+    /**
+     * @param bool $inAdmin
+     * @return string
+     */
     public function getAssetCode($inAdmin = false)
     {
         $asset = Asset::getById($this->id);
@@ -398,11 +406,18 @@ class Video extends Model\Document\Tag
         }
     }
 
+    /**
+     * @return string
+     */
     public function getUrlCode()
     {
         return $this->getHtml5Code(["mp4" => (string) $this->id]);
     }
 
+    /**
+     * @param string $message
+     * @return string
+     */
     public function getErrorCode($message = "")
     {
         $width = $this->getWidth();
@@ -425,6 +440,9 @@ class Video extends Model\Document\Tag
         return $code;
     }
 
+    /**
+     * @return string
+     */
     public function getYoutubeCode()
     {
         if (!$this->id) {
@@ -493,13 +511,13 @@ class Video extends Model\Document\Tag
         $additional_params="";
 
         $clipConfig = [];
-        if (is_array($options["config"]["clip"])) {
+        if (isset($options["config"]["clip"]) && is_array($options["config"]["clip"])) {
             $clipConfig = $options["config"]["clip"];
         }
 
         // this is to be backward compatible to <= v 1.4.7
         $configurations = $clipConfig;
-        if (is_array($options["youtube"])) {
+        if (array_key_exists("youtube", $options) && is_array($options["youtube"])) {
             $configurations = array_merge($clipConfig, $options["youtube"]);
         }
 
@@ -526,6 +544,9 @@ class Video extends Model\Document\Tag
         return $code;
     }
 
+    /**
+     * @return string
+     */
     public function getVimeoCode()
     {
         if (!$this->id) {
@@ -599,6 +620,9 @@ class Video extends Model\Document\Tag
         return $this->getEmptyCode();
     }
 
+    /**
+     * @return string
+     */
     public function getDailymotionCode()
     {
         if (!$this->id) {
@@ -672,6 +696,11 @@ class Video extends Model\Document\Tag
         return $this->getEmptyCode();
     }
 
+    /**
+     * @param array $urls
+     * @param null $thumbnail
+     * @return string
+     */
     public function getHtml5Code($urls = [], $thumbnail = null)
     {
         $code = "";
@@ -715,8 +744,12 @@ class Video extends Model\Document\Tag
                 //"interactionCount" => "1234",
             ];
 
-            if ($thumbnail && !preg_match("@https?://@", $thumbnail)) {
-                $jsonLd["thumbnailUrl"] = Tool::getHostUrl() . $thumbnail;
+            if (!preg_match("@https?://@", $thumbnail)) {
+                if ($thumbnail) {
+                    $jsonLd["thumbnailUrl"] = Tool::getHostUrl() . $thumbnail;
+                } else {
+                    $jsonLd["thumbnailUrl"] = Tool::getHostUrl() . $video->getImageThumbnail([]);
+                }
             }
 
             $code .= "\n\n<script type=\"application/ld+json\">\n" . json_encode($jsonLd) . "\n</script>\n\n";
@@ -739,6 +772,11 @@ class Video extends Model\Document\Tag
                 foreach ($this->getOptions()["removeAttributes"] as $attribute) {
                     unset($attributes[$attribute]);
                 }
+            }
+
+            // do not allow an empty controls tag
+            if (isset($attributes["controls"]) && !$attributes["controls"]) {
+                unset($attributes["controls"]);
             }
 
             foreach ($attributes as $key => $value) {
@@ -765,6 +803,10 @@ class Video extends Model\Document\Tag
         return $code;
     }
 
+    /**
+     * @param null $thumbnail
+     * @return string
+     */
     public function getProgressCode($thumbnail = null)
     {
         $uid = "video_" . uniqid();
@@ -807,6 +849,9 @@ class Video extends Model\Document\Tag
         return $code;
     }
 
+    /**
+     * @return string
+     */
     public function getEmptyCode()
     {
         $uid = "video_" . uniqid();
@@ -828,6 +873,7 @@ class Video extends Model\Document\Tag
 
     /**
      * @param Model\Webservice\Data\Document\Element $wsElement
+     * @param $document
      * @param mixed $params
      * @param null $idMapper
      * @throws \Exception
@@ -939,7 +985,6 @@ class Video extends Model\Document\Tag
      *  "asset" => array(...)
      * )
      * @param array $idMapping
-     * @return void
      */
     public function rewriteIds($idMapping)
     {

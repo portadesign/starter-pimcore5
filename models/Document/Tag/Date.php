@@ -76,7 +76,7 @@ class Date extends Model\Document\Tag
 
         if ($this->date instanceof \Zend_Date) {
             return $this->date->toString($this->options["format"], "php");
-        } elseif ($this->date instanceof \DateTime) {
+        } elseif ($this->date instanceof \DateTimeInterface) {
             return $this->date->formatLocalized($this->options["format"]);
         }
     }
@@ -137,12 +137,13 @@ class Date extends Model\Document\Tag
     }
 
     /**
-    * Receives a Webservice\Data\Document\Element from webservice import and fill the current tag's data
-    *
-    * @param  Model\Webservice\Data\Document\Element $wsElement
-    * @param mixed $params
-    * @param $idMapper
-    * @throws \Exception
+     * Receives a Webservice\Data\Document\Element from webservice import and fill the current tag's data
+     *
+     * @param Model\Webservice\Data\Document\Element $wsElement
+     * @param $document
+     * @param mixed $params
+     * @param $idMapper
+     * @throws \Exception
     */
     public function getFromWebserviceImport($wsElement, $document = null, $params = [], $idMapper = null)
     {
@@ -157,6 +158,7 @@ class Date extends Model\Document\Tag
 
     /**
      * Returns the current tag's data for web service export
+     * @param $document
      * @param mixed $params
      * @abstract
      * @return array

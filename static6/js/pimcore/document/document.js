@@ -153,9 +153,10 @@ pimcore.document.document = Class.create(pimcore.element.abstract, {
     },
 
     saveClose: function(only){
-        this.save();
-        var tabPanel = Ext.getCmp("pimcore_panel_tabs");
-        tabPanel.remove(this.tab);
+        this.save(null, only, function () {
+            var tabPanel = Ext.getCmp("pimcore_panel_tabs");
+            tabPanel.remove(this.tab);
+        });
     },
 
     publishClose: function(){
@@ -184,7 +185,7 @@ pimcore.document.document = Class.create(pimcore.element.abstract, {
         this.save("publish", only, callback);
     },
 
-    unpublish: function () {
+    unpublish: function (only, callback) {
         this.data.published = false;
 
         // toogle buttons
@@ -200,19 +201,23 @@ pimcore.document.document = Class.create(pimcore.element.abstract, {
             published: false
         });
 
-        this.save("unpublish");
+        this.save("unpublish", only, callback);
     },
 
     unpublishClose: function () {
-        this.unpublish();
-        var tabPanel = Ext.getCmp("pimcore_panel_tabs");
-        tabPanel.remove(this.tab);
+        this.unpublish(null, function () {
+            var tabPanel = Ext.getCmp("pimcore_panel_tabs");
+            tabPanel.remove(this.tab);
+        });
     },
 
     reload: function () {
-        window.setTimeout(function (id, type) {
-            pimcore.helpers.openDocument(id, type);
-        }.bind(window, this.id, this.getType()), 500);
+
+        this.tab.on("close", function() {
+            window.setTimeout(function (id, type) {
+                pimcore.helpers.openDocument(id, type);
+            }.bind(window, this.id, this.getType()), 500);
+        }.bind(this));
 
         pimcore.helpers.closeDocument(this.id);
     },

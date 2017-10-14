@@ -70,7 +70,7 @@ class Staticroute extends AbstractModel
     public $defaults;
 
     /**
-     * @var int
+     * @var array
      */
     public $siteId;
 
@@ -113,7 +113,6 @@ class Staticroute extends AbstractModel
     /**
      * @static
      * @param $route
-     * @return void
      */
     public static function setCurrentRoute($route)
     {
@@ -160,6 +159,7 @@ class Staticroute extends AbstractModel
 
     /**
      * @param string $name
+     * @param null $siteId
      * @return Staticroute
      */
     public static function getByName($name, $siteId = null)
@@ -315,7 +315,7 @@ class Staticroute extends AbstractModel
 
     /**
      * @param string $controller
-     * @return void
+     * @return $this
      */
     public function setController($controller)
     {
@@ -326,7 +326,7 @@ class Staticroute extends AbstractModel
 
     /**
      * @param string $action
-     * @return void
+     * @return $this
      */
     public function setAction($action)
     {
@@ -337,7 +337,7 @@ class Staticroute extends AbstractModel
 
     /**
      * @param string $variables
-     * @return void
+     * @return $this
      */
     public function setVariables($variables)
     {
@@ -348,7 +348,7 @@ class Staticroute extends AbstractModel
 
     /**
      * @param string $defaults
-     * @return void
+     * @return $this
      */
     public function setDefaults($defaults)
     {
@@ -359,7 +359,7 @@ class Staticroute extends AbstractModel
 
     /**
      * @param integer $priority
-     * @return void
+     * @return $this
      */
     public function setPriority($priority)
     {
@@ -378,7 +378,7 @@ class Staticroute extends AbstractModel
 
     /**
      * @param string $name
-     * @return void
+     * @return $this
      */
     public function setName($name)
     {
@@ -397,7 +397,7 @@ class Staticroute extends AbstractModel
 
     /**
      * @param string $reverse
-     * @return void
+     * @return $this
      */
     public function setReverse($reverse)
     {
@@ -415,20 +415,50 @@ class Staticroute extends AbstractModel
     }
 
     /**
-     * @param int $siteId
+     * @param int|array $siteId
+     * @return $this
      */
     public function setSiteId($siteId)
     {
-        $this->siteId = $siteId ? (int) $siteId : null;
+        $result = [];
+
+        if (!is_array($siteId)) {
+            // backwards compatibility
+            $siteIds = strlen($siteId) ? explode(",", $siteId) : [];
+        } else {
+            $siteIds = $siteId;
+        }
+
+        foreach ($siteIds as $siteId) {
+            $siteId = (int)$siteId;
+            if ($siteId < 1) {
+                continue;
+            }
+            try {
+                $site = Site::getById($siteId);
+                if ($site) {
+                    $result[] = $siteId;
+                }
+            } catch (\Exception $e) {
+                // cleanup
+            }
+        }
+
+
+        $this->siteId = $result;
 
         return $this;
     }
 
     /**
-     * @return int
+     * @return array
      */
     public function getSiteId()
     {
+        if ($this->siteId && !is_array($this->siteId)) {
+            $this->siteId = explode(",", $this->siteId);
+        }
+
         return $this->siteId;
     }
 
@@ -573,7 +603,19 @@ class Staticroute extends AbstractModel
 
             // check for site
             if ($this->getSiteId()) {
-                if (!Site::isSiteRequest() || $this->getSiteId() != Site::getCurrentSite()->getId()) {
+                if (!Site::isSiteRequest()) {
+                    return false;
+                }
+
+                $siteMatched = false;
+                $siteIds = $this->getSiteId();
+                foreach ($siteIds as $siteId) {
+                    if ($siteId == Site::getCurrentSite()->getId()) {
+                        $siteMatched = true;
+                        break;
+                    }
+                }
+                if (!$siteMatched) {
                     return false;
                 }
             }

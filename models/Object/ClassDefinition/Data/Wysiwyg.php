@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Pimcore
  *
@@ -242,6 +242,7 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
 
     /**
      * @param Object\Concrete $object
+     * @param array $params
      * @return string
      */
     public function preGetData($object, $params = [])
@@ -298,7 +299,7 @@ class Wysiwyg extends Model\Object\ClassDefinition\Data
      */
     public function rewriteIds($object, $idMapping, $params = [])
     {
-        include_once("simple_html_dom.php");
+        include_once(PIMCORE_PATH . "/lib/simple_html_dom.php");
 
         $data = $this->getDataFromObjectParam($object, $params);
         $html = str_get_html($data);

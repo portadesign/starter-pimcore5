@@ -18,8 +18,7 @@ pimcore.object.classes.klass = Class.create({
     disallowedDataTypes: [],
     uploadUrl: '/admin/class/import-class',
     exportUrl: "/admin/class/export-class",
-
-
+    context: "class",
 
     initialize: function (data, parentPanel, reopen, editorPrefix) {
         this.parentPanel = parentPanel;
@@ -201,10 +200,10 @@ pimcore.object.classes.klass = Class.create({
         var newNode = null;
 
         if (con.datatype == "layout") {
-            fn = this.addLayoutChild.bind(scope, con.fieldtype, con);
+            fn = this.addLayoutChild.bind(scope, con.fieldtype, con, this.context);
         }
         else if (con.datatype == "data") {
-            fn = this.addDataChild.bind(scope, con.fieldtype, con);
+            fn = this.addDataChild.bind(scope, con.fieldtype, con, this.context);
         }
 
         newNode = fn();
@@ -313,9 +312,9 @@ pimcore.object.classes.klass = Class.create({
                     }
                     var handler;
                     if (editMode) {
-                        handler = this.changeDataType.bind(this, tree, record, dataComps[i], true);
+                        handler = this.changeDataType.bind(this, tree, record, dataComps[i], true, this.context);
                     } else {
-                        handler = this.addDataChild.bind(record, dataComps[i]);
+                        handler = this.addDataChild.bind(record, dataComps[i], {}, this.context);
                     }
 
                     groups[group].push({
@@ -347,9 +346,7 @@ pimcore.object.classes.klass = Class.create({
 
         var menu = new Ext.menu.Menu();
 
-        //get all allowed layout types for localized fields
-        var lftypes = ["panel","tabpanel","accordion","fieldset", "fieldcontainer", "text","region","button"];
-        var blockTypes = ["panel","tabpanel","accordion","fieldset", "fieldcontainer", "text","region","button"];
+        var allowedTypes = pimcore.object.helpers.layout.getAllowedTypes(this);
 
         var dataComps = Object.keys(pimcore.object.classes.data);
 
@@ -360,30 +357,17 @@ pimcore.object.classes.klass = Class.create({
             }
             var component = pimcore.object.classes.data[dataCompName];
             if(component.prototype.allowIn['localizedfield']) {
-                lftypes.push(dataCompName);
+                allowedTypes.localizedfields.push(dataCompName);
             }
 
             if(component.prototype.allowIn['block']) {
-                blockTypes.push(dataCompName);
+                allowedTypes.block.push(dataCompName);
             }
         }
 
 
-        // specify which childs a layout can have
         // the child-type "data" is a placehoder for all data components
-        var allowedTypes = {
-            accordion: ["panel","region","tabpanel","text"],
-            fieldset: ["data","text"],
-            fieldcontainer: ["data","text"],
-            panel: ["data","region","tabpanel","button","accordion","fieldset", "fieldcontainer","panel","text","html"],
-            region: ["panel","accordion","tabpanel","text","localizedfields"],
-            tabpanel: ["panel", "region", "accordion","text","localizedfields"],
-            button: [],
-            text: [],
-            root: ["panel","region","tabpanel","accordion","text"],
-            localizedfields: lftypes,
-            block: blockTypes
-        };
+
 
         var parentType = "root";
 
@@ -412,7 +396,7 @@ pimcore.object.classes.klass = Class.create({
                         layoutMenu.push({
                             text: pimcore.object.classes.layout[layouts[i]].prototype.getTypeName(),
                             iconCls: pimcore.object.classes.layout[layouts[i]].prototype.getIconClass(),
-                            handler: this.addLayoutChild.bind(record, layouts[i])
+                            handler: this.addLayoutChild.bind(record, layouts[i], this.context)
                         });
                     }
 
@@ -456,7 +440,7 @@ pimcore.object.classes.klass = Class.create({
                     text: t('duplicate'),
                     iconCls: "pimcore_icon_clone",
                     hideOnClick: true,
-                    handler: this.changeDataType.bind(this, tree, record, record.data.editor.type, dataComps, false)
+                    handler: this.changeDataType.bind(this, tree, record, record.data.editor.type, false, this.context)
                 }));
             }
 
@@ -824,7 +808,7 @@ pimcore.object.classes.klass = Class.create({
         return this.rootPanel;
     },
 
-    addLayoutChild: function (type, initData) {
+    addLayoutChild: function (type, initData, context) {
 
         var nodeLabel = t(type);
 
@@ -863,7 +847,7 @@ pimcore.object.classes.klass = Class.create({
         return newNode;
     },
 
-    addDataChild: function (type, initData) {
+    addDataChild: function (type, initData, context) {
 
         var nodeLabel = t(type);
 
@@ -889,6 +873,7 @@ pimcore.object.classes.klass = Class.create({
         newNode = this.appendChild(newNode);
 
         var editor = new pimcore.object.classes.data[type](newNode, initData);
+        editor.setContext(context);
         newNode.set("editor", editor);
 
         this.expand();
@@ -896,7 +881,7 @@ pimcore.object.classes.klass = Class.create({
         return newNode;
     },
 
-    changeDataType: function (tree, record, type, initData, removeExisting) {
+    changeDataType: function (tree, record, type, removeExisting, context) {
         try {
             this.saveCurrentNode();
 
@@ -948,6 +933,7 @@ pimcore.object.classes.klass = Class.create({
             }
 
             var editor = new pimcore.object.classes.data[type](newNode, theData);
+            editor.setContext(context);
             newNode = record.parentNode.insertBefore(newNode, record);
 
             var availableFields = editor.availableSettingsFields;
@@ -1021,10 +1007,24 @@ pimcore.object.classes.klass = Class.create({
                 // check if the name is unique, localizedfields can be used more than once
                 var nodeEl = Ext.fly(view.getNodeByRecord(node));
 
-                if ((fieldValidation && in_arrayi(data.name,this.usedFieldNames) == false) || data.name == "localizedfields") {
+                var containerAwareDataName = data.name;
+                var parentNode = node.parentNode;
+                while (parentNode) {
+                    if (parentNode.data.editor && Ext.isFunction(parentNode.data.editor.getData)) {
+                        var parentData = parentNode.data.editor.getData();
+                        if (parentData.datatype == "data" && parentNode.data.editor.type == "block") {
+                            containerAwareDataName = "block-" + parentData.name + "-" + containerAwareDataName;
+                            break;
+                        }
+                    }
+
+                    parentNode = parentNode.parentNode;
+                }
+
+                if ((fieldValidation && in_arrayi(containerAwareDataName,this.usedFieldNames) == false) || data.name == "localizedfields") {
 
                     if(data.datatype == "data") {
-                        this.usedFieldNames.push(data.name);
+                        this.usedFieldNames.push(containerAwareDataName);
                     }
 
                     if(nodeEl) {
@@ -1036,7 +1036,6 @@ pimcore.object.classes.klass = Class.create({
                         nodeEl.addCls("tree_node_error");
                     }
 
-
                     var invalidFieldsText = t("class_field_name_error") + ": '" + data.name + "'";
 
                     if(node.data.editor.invalidFieldNames){
@@ -1046,8 +1045,6 @@ pimcore.object.classes.klass = Class.create({
 
                     pimcore.helpers.showNotification(t("error"), t("some_fields_cannot_be_saved"), "error",
                         invalidFieldsText);
-
-
 
                     this.getDataSuccess = false;
                     return false;

@@ -178,8 +178,14 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                 $filter = $this->getParam("filter");
                 $list->setFilter(function ($row) use ($filter) {
                     foreach ($row as $value) {
-                        if (strpos($value, $filter) !== false) {
-                            return true;
+                        if ($value) {
+                            $values = is_array($value) ? $value : [$value];
+
+                            foreach ($values as $value) {
+                                if (strpos($value, $filter) !== false) {
+                                    return true;
+                                }
+                            }
                         }
                     }
 
@@ -200,15 +206,29 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
         }
     }
 
-
+    /**
+     * @param $root
+     * @param $thumbnailName
+     */
     private function deleteThumbnailFolders($root, $thumbnailName)
     {
         // delete all thumbnails which are using this config
+        /**
+         * @param $dir
+         * @param $thumbnail
+         * @param array $matches
+         * @return array
+         */
         function delete($dir, $thumbnail, &$matches = [])
         {
             $dirs = glob($dir . '/*', GLOB_ONLYDIR);
             foreach ($dirs as $dir) {
-                if (preg_match('@/thumb__' . $thumbnail . '$@', $dir) || preg_match('@/thumb__' . $thumbnail . '_auto@', $dir)) {
+                if (
+                    preg_match('@/thumb__' . $thumbnail . '$@', $dir) ||
+                    preg_match('@/thumb__' . $thumbnail . '_auto@', $dir) ||
+                    preg_match('@/thumb__document_' . $thumbnail . '\-[\d]+$@', $dir) ||
+                    preg_match('@/thumb__document_' . $thumbnail . '\-[\d]+_auto@', $dir)
+                ) {
                     recursiveDelete($dir);
                 }
                 delete($dir, $thumbnail, $matches);
@@ -220,11 +240,17 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
         delete($root, $thumbnailName);
     }
 
+    /**
+     * @param Asset\Image\Thumbnail\Config $thumbnail
+     */
     private function deleteThumbnailTmpFiles(Asset\Image\Thumbnail\Config $thumbnail)
     {
         $this->deleteThumbnailFolders(PIMCORE_TEMPORARY_DIRECTORY . "/image-thumbnails", $thumbnail->getName());
     }
 
+    /**
+     * @param Asset\Video\Thumbnail\Config $thumbnail
+     */
     private function deleteVideoThumbnailTmpFiles(Asset\Video\Thumbnail\Config $thumbnail)
     {
         $this->deleteThumbnailFolders(PIMCORE_TEMPORARY_DIRECTORY . "/video-thumbnails", $thumbnail->getName());
@@ -510,6 +536,12 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json(["success" => true]);
     }
 
+    /**
+     * @param $source
+     * @param $definitions
+     * @param array $fallbacks
+     * @throws Exception
+     */
     protected function checkFallbackLanguageLoop($source, $definitions, $fallbacks = [])
     {
         if (isset($definitions[$source])) {
@@ -694,7 +726,10 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
                 $filter = $this->getParam("filter");
                 $list->setFilter(function ($row) use ($filter) {
                     foreach ($row as $value) {
-                        if (strpos($value, $filter) !== false) {
+                        if (! is_scalar($value)) {
+                            continue;
+                        }
+                        if (strpos((string)$value, $filter) !== false) {
                             return true;
                         }
                     }
@@ -706,7 +741,13 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
             $list->load();
 
             $routes = [];
+            /** @var  $route Staticroute */
             foreach ($list->getRoutes() as $route) {
+                if (is_array($route->getSiteId())) {
+                    $route = json_encode($route);
+                    $route = json_decode($route, true);
+                    $route["siteId"] = implode(",", $route["siteId"]);
+                }
                 $routes[] = $route;
             }
 
@@ -1464,6 +1505,10 @@ class Admin_SettingsController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json(false);
     }
 
+    /**
+     * @param $item
+     * @return array
+     */
     private function getWebsiteSettingForEditMode($item)
     {
         $resultItem = [

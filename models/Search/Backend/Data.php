@@ -21,9 +21,6 @@ use Pimcore\Model\Element;
 use Pimcore\Logger;
 use ForceUTF8\Encoding;
 
-/**
- * @method \Pimcore\Model\Search\Backend\Data\Dao getDao()
- */
 class Data extends \Pimcore\Model\AbstractModel
 {
 
@@ -230,7 +227,7 @@ class Data extends \Pimcore\Model\AbstractModel
 
     /**
      * @param integer $modificationDate
-     * @return void
+     * @return $this
      */
     public function setModificationDate($modificationDate)
     {
@@ -249,7 +246,7 @@ class Data extends \Pimcore\Model\AbstractModel
 
     /**
      * @param integer $userModification
-     * @return void
+     * @return $this
      */
     public function setUserModification($userModification)
     {
@@ -268,7 +265,7 @@ class Data extends \Pimcore\Model\AbstractModel
 
     /**
      * @param integer $userOwner
-     * @return void
+     * @return $this
      */
     public function setUserOwner($userOwner)
     {
@@ -295,7 +292,7 @@ class Data extends \Pimcore\Model\AbstractModel
 
     /**
      * @param integer $published
-     * @return void
+     * @return $this
      */
     public function setPublished($published)
     {
@@ -314,7 +311,7 @@ class Data extends \Pimcore\Model\AbstractModel
 
     /**
      * @param  string $data
-     * @return void
+     * @return $this
      */
     public function setData($data)
     {
@@ -333,7 +330,7 @@ class Data extends \Pimcore\Model\AbstractModel
 
     /**
      * @param  string $properties
-     * @return void
+     * @return $this
      */
     public function setProperties($properties)
     {
@@ -428,9 +425,12 @@ class Data extends \Pimcore\Model\AbstractModel
                 }
             } elseif ($element instanceof Asset\Text) {
                 try {
-                    $contentText = $element->getData();
-                    $contentText = Encoding::toUTF8($contentText);
-                    $this->data .= " " . $contentText;
+                    if ($element->getFileSize() < 2000000) {
+                        // it doesn't make sense to add text files bigger than 2MB to the full text index (performance)
+                        $contentText = $element->getData();
+                        $contentText = Encoding::toUTF8($contentText);
+                        $this->data .= " " . $contentText;
+                    }
                 } catch (\Exception $e) {
                     Logger::error($e);
                 }
@@ -465,6 +465,9 @@ class Data extends \Pimcore\Model\AbstractModel
             Logger::crit("Search\\Backend\\Data received an unknown element!");
         }
 
+        // replace all occurrences of @ to # because when using InnoDB @ is reserved for the @distance operator
+        $this->data = str_replace("@", "#", $this->data);
+
         if ($element instanceof Element\ElementInterface) {
             $this->data = "ID: " . $element->getId() . "  \nPath: " . $this->getFullPath() . "  \n"  . $this->cleanupData($this->data);
         }
@@ -479,11 +482,21 @@ class Data extends \Pimcore\Model\AbstractModel
     protected function cleanupData($data)
     {
         $data = strip_tags($data);
+
+        $data = html_entity_decode($data, ENT_QUOTES, "UTF-8");
+
+        // we don't remove ".", otherwise it would be impossible to search for email addresses
+        $data = str_replace([",", ":", ";", "'", '"'], " ", $data);
         $data = str_replace("\r\n", " ", $data);
         $data = str_replace("\n", " ", $data);
         $data = str_replace("\r", " ", $data);
         $data = str_replace("\t", "", $data);
         $data = preg_replace('#[ ]+#', ' ', $data);
+
+        // deduplication
+        $arr = explode(" ", $data);
+        $arr = array_unique($arr);
+        $data = implode(" ", $arr);
 
         return $data;
     }

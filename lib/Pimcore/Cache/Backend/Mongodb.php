@@ -13,6 +13,9 @@
 
 namespace Pimcore\Cache\Backend;
 
+/**
+ * @deprecated
+ */
 class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_ExtendedInterface
 {
     const DEFAULT_HOST = '127.0.0.1';
@@ -56,7 +59,7 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
     ];
 
     /**
-     * @return void
+     * @param array $options
      */
     public function __construct($options)
     {
@@ -79,7 +82,6 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
     /**
      * Expires a record (mostly used for testing purposes)
      * @param string $id
-     * @return void
      */
     public function ___expire($id)
     {
@@ -189,7 +191,6 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
      * \Zend_Cache::CLEANING_MODE_MATCHING_ANY_TAG => remove cache entries matching any given tags
      *                                               ($tags can be an array of strings or a single string)
      *
-     * @param  string $dir  Directory to clean
      * @param  string $mode Clean mode
      * @param  array  $tags Array of tags
      * @throws \Zend_Cache_Exception
@@ -304,6 +305,9 @@ class Mongodb extends \Zend_Cache_Backend implements \Zend_Cache_Backend_Extende
         return $res;
     }
 
+    /**
+     * @return array
+     */
     public function drop()
     {
         return $this->_collection->drop();

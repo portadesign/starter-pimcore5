@@ -90,9 +90,9 @@ class Service extends Model\Element\Service
             $list = new $listName();
             $conditionParts = [];
             foreach ($fields as $field) {
-                $conditionParts[] = $field . "='" . $userId . "'";
+                $conditionParts[] = $field . " = ?";
             }
-            $list->setCondition(implode(" AND ", $conditionParts));
+            $list->setCondition(implode(" AND ", $conditionParts), array_fill(0, count($conditionParts), $userId));
             $objects = $list->load();
             $userObjects = array_merge($userObjects, $objects);
         }
@@ -222,8 +222,11 @@ class Service extends Model\Element\Service
     }
 
 
-    /** Language only user for classification store !!!
+    /**
+     * Language only user for classification store !!!
      * @param  AbstractObject $object
+     * @param null $fields
+     * @param null $requestedLanguage
      * @return array
      */
     public static function gridObjectData($object, $fields = null, $requestedLanguage = null)
@@ -506,6 +509,11 @@ class Service extends Model\Element\Service
      * gets value for given object and getter, including inherited values
      *
      * @static
+     * @param $object
+     * @param $key
+     * @param null $brickType
+     * @param null $brickKey
+     * @param null $fieldDefinition
      * @return \stdclass, value and objectid where the value comes from
      */
     private static function getValueForObject($object, $key, $brickType = null, $brickKey = null, $fieldDefinition = null)
@@ -562,7 +570,6 @@ class Service extends Model\Element\Service
      *
      * @static
      * @param  Concrete $object
-     * @return void
      */
     public static function loadAllObjectFields($object)
     {
@@ -811,33 +818,38 @@ class Service extends Model\Element\Service
 
     /**
      * @static
+     *
      * @param $object
-     * @param $fieldname
+     * @param string|ClassDefinition\Data\Select|ClassDefinition\Data\Multiselect $definition
+     *
      * @return array
      */
-    public static function getOptionsForSelectField($object, $fieldname)
+    public static function getOptionsForSelectField($object, $definition)
     {
         $class = null;
         $options = [];
 
-        if (is_object($object) && method_exists($object, "getClass")) {
+        if (is_object($object) && method_exists($object, 'getClass')) {
             $class = $object->getClass();
         } elseif (is_string($object)) {
-            $object = "\\" . ltrim($object, "\\");
+            $object = '\\' . ltrim($object, '\\');
             $object = new $object();
             $class = $object->getClass();
         }
 
         if ($class) {
-            /**
-             * @var ClassDefinition\Data\Select $definition
-             */
-            $definition = $class->getFielddefinition($fieldname);
+            if (is_string($definition)) {
+                /**
+                 * @var ClassDefinition\Data\Select $definition
+                 */
+                $definition = $class->getFielddefinition($definition);
+            }
+
             if ($definition instanceof ClassDefinition\Data\Select || $definition instanceof ClassDefinition\Data\Multiselect) {
                 $_options = $definition->getOptions();
 
                 foreach ($_options as $option) {
-                    $options[$option["value"]] = $option["key"];
+                    $options[$option['value']] = $option['key'];
                 }
             }
         }
@@ -859,6 +871,7 @@ class Service extends Model\Element\Service
     /**
      * @static
      * @param $path
+     * @param null $type
      * @return bool
      */
     public static function pathExists($path, $type = null)
@@ -955,7 +968,7 @@ class Service extends Model\Element\Service
         $list = new ClassDefinition\CustomLayout\Listing();
         $list->setOrderKey("name");
         $condition = "classId = " . $list->quote($classId);
-        if (count($layoutPermissions) && !$isMasterAllowed) {
+        if (count($layoutPermissions)) {
             $layoutIds = array_values($layoutPermissions);
             $condition .= " AND id IN (" . implode(",", $layoutIds) . ")";
         }
@@ -974,23 +987,26 @@ class Service extends Model\Element\Service
     }
 
     /**
+     * Returns the fields of a datatype container (e.g. block or localized fields)
+     *
      * @param $layout
+     * @param $targetClass
      * @param $targetList
-     * @param $insideLocalizedField
+     * @param $insideDataType
      * @return mixed
      */
-    public static function extractLocalizedFieldDefinitions($layout, $targetList, $insideLocalizedField)
+    public static function extractFieldDefinitions($layout, $targetClass, $targetList, $insideDataType)
     {
-        if ($insideLocalizedField && $layout instanceof ClassDefinition\Data and !$layout instanceof ClassDefinition\Data\Localizedfields) {
+        if ($insideDataType && $layout instanceof ClassDefinition\Data and !is_a($layout, $targetClass)) {
             $targetList[$layout->getName()] = $layout;
         }
 
-        if (method_exists($layout, "getChilds")) {
-            $children = $layout->getChilds();
-            $insideLocalizedField |= ($layout instanceof ClassDefinition\Data\Localizedfields);
+        if (method_exists($layout, "getChildren")) {
+            $children = $layout->getChildren();
+            $insideDataType |= is_a($layout, $targetClass);
             if (is_array($children)) {
                 foreach ($children as $child) {
-                    $targetList = self::extractLocalizedFieldDefinitions($child, $targetList, $insideLocalizedField);
+                    $targetList = self::extractFieldDefinitions($child, $targetClass, $targetList, $insideDataType);
                 }
             }
         }
@@ -1013,7 +1029,9 @@ class Service extends Model\Element\Service
         return $superLayout;
     }
 
-
+    /**
+     * @param $layout
+     */
     public static function createSuperLayout(&$layout)
     {
         if ($layout instanceof ClassDefinition\Data) {
@@ -1087,14 +1105,22 @@ class Service extends Model\Element\Service
         if ($class && ($class->getModificationDate() > $customLayout->getModificationDate())) {
             $masterDefinition = $class->getFieldDefinitions();
             $customLayoutDefinition = $customLayout->getLayoutDefinitions();
-            $targetList = self::extractLocalizedFieldDefinitions($class->getLayoutDefinitions(), [], false);
-            $masterDefinition = array_merge($masterDefinition, $targetList);
+
+            foreach (['Localizedfields', 'Block'] as $dataType) {
+                $targetList = self::extractFieldDefinitions($class->getLayoutDefinitions(), '\Pimcore\Model\Object\ClassDefinition\Data\\' . $dataType, [], false);
+                $masterDefinition = array_merge($masterDefinition, $targetList);
+            }
 
             self::synchronizeCustomLayoutFieldWithMaster($masterDefinition, $customLayoutDefinition);
             $customLayout->save();
         }
     }
 
+    /**
+     * @param $classId
+     * @param $objectId
+     * @return mixed|null
+     */
     public static function getCustomGridFieldDefinitions($classId, $objectId)
     {
         $object = AbstractObject::getById($objectId);
@@ -1303,6 +1329,12 @@ class Service extends Model\Element\Service
         return $result;
     }
 
+    /**
+     * @param $item
+     * @param int $nr
+     * @return mixed|string
+     * @throws \Exception
+     */
     public static function getUniqueKey($item, $nr = 0)
     {
         $list = new Listing();
@@ -1334,21 +1366,22 @@ class Service extends Model\Element\Service
         return $key;
     }
 
-
     /** Enriches the layout definition before it is returned to the admin interface.
      * @param $layout
+     * @param $object Concrete
+     * @param array $context additional contextual data
      */
-    public static function enrichLayoutDefinition(&$layout, $object = null)
+    public static function enrichLayoutDefinition(&$layout, $object = null, $context = [])
     {
         if (method_exists($layout, "enrichLayoutDefinition")) {
-            $layout->enrichLayoutDefinition($object);
+            $layout->enrichLayoutDefinition($object, $context);
         }
 
         if (method_exists($layout, "getChilds")) {
             $children = $layout->getChilds();
             if (is_array($children)) {
                 foreach ($children as $child) {
-                    self::enrichLayoutDefinition($child, $object);
+                    self::enrichLayoutDefinition($child, $object, $context);
                 }
             }
         }
@@ -1356,6 +1389,7 @@ class Service extends Model\Element\Service
 
     /**
      * @param $object
+     * @param array $params
      * @param $data Model\Object\Data\CalculatedValue
      * @return mixed|null
      */

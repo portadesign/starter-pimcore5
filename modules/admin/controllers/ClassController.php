@@ -314,7 +314,10 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin
         }
     }
 
-
+    /**
+     * @param $name
+     * @return mixed
+     */
     protected function correctClassname($name)
     {
         $name = preg_replace('/[^a-zA-Z0-9]+/', '', $name);
@@ -623,7 +626,14 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin
 
                     // mainly for objects-meta data-type
                     $layoutDefinitions = $type->getLayoutDefinitions();
-                    Object\Service::enrichLayoutDefinition($layoutDefinitions, null);
+                    $context = [
+                        "containerType" => "fieldcollection",
+                        "containerKey" => $type->getKey()
+                    ];
+
+                    $object = Object\AbstractObject::getById($this->getParam("object_id"));
+
+                    Object\Service::enrichLayoutDefinition($layoutDefinitions, $object, $context);
 
                     if ($currentLayoutId == -1 && $user->isAdmin()) {
                         Object\Service::createSuperLayout($layoutDefinitions);
@@ -835,7 +845,22 @@ class Admin_ClassController extends \Pimcore\Controller\Action\Admin
                 }
 
                 $layout = $type->getLayoutDefinitions();
-                Object\Service::enrichLayoutDefinition($layout);
+                $currentLayoutId = $this->getParam("layoutId", null);
+
+                $user = $this->getUser();
+                if ($currentLayoutId == -1 && $user->isAdmin()) {
+                    Object\Service::createSuperLayout($layout);
+                    $objectData["layout"] = $layout;
+                }
+
+
+                $context = [
+                    "containerType" => "objectbrick",
+                    "containerKey" => $type->getKey()
+                ];
+                $object = Object\AbstractObject::getById($this->getParam("object_id"));
+
+                Object\Service::enrichLayoutDefinition($layout, $object, $context);
                 $type->setLayoutDefinitions($layout);
             }
 

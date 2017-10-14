@@ -1,5 +1,9 @@
 [
     {
+        "term": "original",
+        "definition": "Original"
+    },
+    {
         "term": "no_image_assigned",
         "definition": "No image assigned"
     },
@@ -3873,6 +3877,14 @@
         "definition": "Rows"
     },
     {
+        "term": "rows_fixed",
+        "definition": "Rows fixed"
+    },
+    {
+        "term": "cols_fixed",
+        "definition": "Cols fixed"
+    },
+    {
         "term": "cols",
         "definition": "Columns"
     },
@@ -4175,6 +4187,10 @@
     {
         "term": "export_csv",
         "definition": "CSV Export"
+    },
+    {
+        "term": "export_csv_include_headers",
+        "definition": "CSV Export include Headers"
     },
     {
         "term": "import_csv",
@@ -4522,7 +4538,7 @@
     },
     {
         "term": "grid_current_language",
-        "definition": "Current Language"
+        "definition": "Current language"
     },
     {
         "term": "grid_column_config",
@@ -4879,6 +4895,10 @@
     {
         "term": "maximum_tabs",
         "definition": "Maximum number of tabs"
+    },
+    {
+        "term": "hide_locale_labels_when_tabs_reached",
+        "definition": "Hide locale labels after number of tabs"
     },
     {
         "term": "deeplink",
@@ -5573,6 +5593,10 @@
         "definition": "Tags Search"
     },
     {
+        "term": "tags_configuration",
+        "definition": "Tags Configuration"
+    },
+    {
         "term": "apply_all",
         "definition": "Apply all"
     },
@@ -5893,6 +5917,10 @@
         "definition": "Port"
     },
     {
+        "term": "web2print_protocol",
+        "definition": "Protocol"
+    },
+    {
         "term": "web2print_baseURL",
         "definition": "BaseURL"
     },
@@ -5967,6 +5995,10 @@
     {
         "term": "web2print_printermarks",
         "definition": "Printermarks"
+    },
+    {
+        "term": "web2print_addOverprint",
+        "definition": "Overprinting"
     },
     {
         "term": "web2print_links",
@@ -6235,7 +6267,45 @@
     {
         "term": "clear_filters",
         "definition": "Clear Filters"
+    },
+    {
+        "term": "website_translation_settings",
+        "definition": "Shared Translation Settings"
+    },
+    {
+        "term": "language_permissions",
+        "definition": "Language Permissions (no view permission means all)"
+    },
+    {
+        "term": "rendering_class",
+        "definition": "Custom Renderer class"
+    },
+    {
+        "term": "rendering_data",
+        "definition": "Data passed to renderer"
+    },
+    {
+        "term": "force_resize",
+        "definition": "Force resize"
+    },
+    {
+        "term": "site_id",
+        "definition": "Site ID"
+    },
+    {
+      "term": "site_ids",
+      "definition": "Site IDs"
+    },
+    {
+        "term": "site_ids_tooltip",
+        "definition": "Provide a comma-seperated list of site IDs"
+    },
+    {
+        "term": "predefined_hotspot_data_templates",
+        "definition": "Predefined data templates"
+    },
+    {
+        "term": "asset_type_change_not_allowed",
+        "definition": "<strong>Only assets of same type are allowed here.</strong><br/>[ type of uploaded asset: \"%s\" | type of existing asset: \"%s\" ]"
     }
-
-
 ]

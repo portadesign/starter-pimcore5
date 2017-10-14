@@ -288,6 +288,21 @@ class Multiselect extends Model\Object\ClassDefinition\Data
     }
 
     /**
+     * @param $object
+     * @param mixed $params
+     * @return string
+     */
+    public function getDataForSearchIndex($object, $params = [])
+    {
+        $data = $this->getDataFromObjectParam($object, $params);
+        if (is_array($data)) {
+            return implode(" ", $data);
+        }
+
+        return "";
+    }
+
+    /**
      * returns sql query statement to filter according to this data types value(s)
      * @param  $value
      * @param  $operator
@@ -302,9 +317,9 @@ class Multiselect extends Model\Object\ClassDefinition\Data
 
     /**
      * returns sql query statement to filter according to this data types value(s)
-     * @param  $value
-     * @param  $operator
-     * @param  $params optional params used to change the behavior
+     * @param $value
+     * @param $operator
+     * @param array $params optional params used to change the behavior
      * @return string
      */
     public function getFilterConditionExt($value, $operator, $params = [])

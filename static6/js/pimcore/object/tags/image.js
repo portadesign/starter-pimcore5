@@ -176,7 +176,10 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
             subtype: {
                 asset: ["image"]
             }
-        });
+        },
+            {
+                context: Ext.apply({scope: "objectEditor"}, this.getContext())
+            });
     },
 
     uploadDialog: function () {

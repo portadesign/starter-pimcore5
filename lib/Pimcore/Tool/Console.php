@@ -65,14 +65,24 @@ class Console
             return self::$executableCache[$name];
         }
 
+        // use DI to provide the ability to customize / overwrite paths
+        if (\Pimcore::getDiContainer()->has("pimcore.executable." . $name)) {
+            $value = \Pimcore::getDiContainer()->get("pimcore.executable." . $name);
+            if (!$value && $throwException) {
+                throw new \Exception("'$name' executable was disabled manually in di.php");
+            }
+
+            return $value;
+        }
+
         $pathVariable = Config::getSystemConfig()->general->path_variable;
 
         $paths = [];
         if ($pathVariable) {
-            $paths = explode(":", $pathVariable);
+            $paths = explode(PATH_SEPARATOR, $pathVariable);
         }
 
-        array_unshift($paths, "");
+        array_push($paths, "");
 
         // allow custom setup routines for certain programs
         $customSetupMethod = "setup" . ucfirst($name);
@@ -356,6 +366,17 @@ class Console
             $nohup .= " ";
         }
 
+        /**
+         * mod_php seems to lose the environment variables if we do not set them manually before the child process is started
+         */
+        if (strpos(php_sapi_name(), 'apache') !== false) {
+            foreach (['PIMCORE_ENVIRONMENT', 'REDIRECT_PIMCORE_ENVIRONMENT'] as $envKey) {
+                if ($envValue = getenv($envKey)) {
+                    putenv($envKey . '='.$envValue);
+                }
+            }
+        }
+
         $commandWrapped = $nohup . $nice . $cmd . " > ". $outputFile ." 2>&1 & echo $!";
         Logger::debug("Executing command `" . $commandWrapped . "´ on the current shell in background");
         $pid = shell_exec($commandWrapped);
@@ -390,6 +411,7 @@ class Console
     /**
      * Returns a hash with all options passed to a cli script
      *
+     * @param boolean $onlyFullNotationArgs
      * @return array
      */
     public static function getOptions($onlyFullNotationArgs = false)

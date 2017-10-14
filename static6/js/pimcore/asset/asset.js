@@ -222,7 +222,7 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
             });
 
             // only for videos and images
-            if (this.isAllowed("publish") && in_array(this.data.type,["image","video"])) {
+            if (this.isAllowed("publish") && in_array(this.data.type,["image","video"]) || this.data.mimetype == "application/pdf") {
                 buttons.push({
                     tooltip: t("clear_thumbnails"),
                     iconCls: "pimcore_icon_menu_clear_thumbnails",
@@ -381,8 +381,17 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
     upload: function () {
         pimcore.helpers.uploadDialog('/admin/asset/replace-asset/id/' + this.data.id, "Filedata", function() {
             this.reload();
-        }.bind(this), function () {
-            Ext.MessageBox.alert(t("error"), t("error"));
+        }.bind(this), function (res) {
+            var message = false;
+            try {
+                var response = Ext.util.JSON.decode(res.response.responseText);
+                if(response.message) {
+                    message = response.message;
+                }
+
+            } catch(e) {}
+
+            Ext.MessageBox.alert(t("error"), message || t("error"));
         });
     },
 
@@ -399,9 +408,12 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
     },
 
     reload: function () {
-        window.setTimeout(function (id, type) {
-            pimcore.helpers.openAsset(id, type);
-        }.bind(window, this.id, this.getType()), 500);
+
+        this.tab.on("close", function() {
+            window.setTimeout(function (id, type) {
+                pimcore.helpers.openAsset(id, type);
+            }.bind(window, this.id, this.getType()), 500);
+        }.bind(this));
 
         pimcore.helpers.closeAsset(this.id);
     },

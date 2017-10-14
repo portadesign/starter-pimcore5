@@ -190,11 +190,12 @@ class ImageMagick extends Adapter
      *
      * @param $width
      * @param $height
+     * @param bool $forceResize
      * @return ImageMagick
      */
-    public function frame($width, $height)
+    public function frame($width, $height, $forceResize = false)
     {
-        $this->contain($width, $height);
+        $this->contain($width, $height, $forceResize);
         $this->saveIfRequired('frame');
 
         $frameWidth = $width - $this->getWidth() == 0 ? 0 : ($width - $this->getWidth()) / 2;
@@ -322,6 +323,7 @@ class ImageMagick extends Adapter
      *
      * @param $image
      * @param null $mode
+     * @param bool $relativePath
      * @return ImageMagick
      */
     public function setBackgroundImage($image, $mode = null, $relativePath = false)
@@ -424,6 +426,9 @@ class ImageMagick extends Adapter
     /**
      * @param ImageMagick $overlayImage
      * @param string $composite
+     * @param int $x
+     * @param int $y
+     * @param int $overlayOpacity
      * @return ImageMagick
      */
     protected function processOverlay(ImageMagick $overlayImage, $composite = "COMPOSITE_DEFAULT", $x = 0, $y = 0, $overlayOpacity = 100)
@@ -489,6 +494,7 @@ class ImageMagick extends Adapter
     /**
      * Converts the image into a linear-grayscale image.
      *
+     * @param string $method
      * @return ImageMagick
      */
     public function grayscale($method = "Rec601Luma")
@@ -724,8 +730,9 @@ class ImageMagick extends Adapter
     /**
      * Composite script path, as a default the adapter is just using 'composite'.
      *
-     * @param $convertScriptPath
+     * @param $compositeScriptPath
      * @return ImageMagick
+     * @internal param $convertScriptPath
      */
     public function setCompositeScriptPath($compositeScriptPath)
     {
@@ -753,6 +760,11 @@ class ImageMagick extends Adapter
         return $tmpImage;
     }
 
+    /**
+     * @param ImageMagick $image
+     * @param $suffix
+     * @return $this
+     */
     protected function setTmpPaths(ImageMagick $image, $suffix)
     {
         $tmpFilename = "imagemagick_{$suffix}_" . md5($this->imagePath) . '.png';

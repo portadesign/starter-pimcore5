@@ -107,7 +107,13 @@ class Admin_ElementController extends \Pimcore\Controller\Action\Admin
 
         $conditions = [];
         if ($this->getParam("filter")) {
-            $conditions[] = "(`title` LIKE " . $list->quote("%".$this->getParam("filter")."%") . " OR `description` LIKE " . $list->quote("%".$this->getParam("filter")."%") . " OR `type` LIKE " . $list->quote("%".$this->getParam("filter")."%") . ")";
+            $conditions[] = "("
+                . "`title` LIKE " . $list->quote("%".$this->getParam("filter")."%")
+                . " OR `description` LIKE " . $list->quote("%".$this->getParam("filter")."%")
+                . " OR `type` LIKE " . $list->quote("%".$this->getParam("filter")."%")
+                . " OR `user` IN (SELECT `id` FROM `users` WHERE `name` LIKE " . $list->quote("%".$this->getParam("filter")."%") . ")"
+                . " OR DATE_FORMAT(FROM_UNIXTIME(`date`), '%Y-%m-%d') LIKE " . $list->quote("%".$this->getParam("filter")."%")
+                . ")";
         }
 
         if ($this->getParam("cid") && $this->getParam("ctype")) {
@@ -226,14 +232,19 @@ class Admin_ElementController extends \Pimcore\Controller\Action\Admin
 
         $results = [];
         $success = false;
+        $hasHidden = false;
 
         if ($element) {
             $elements = $element->getDependencies()->getRequiredBy();
             foreach ($elements as $el) {
                 $item = Element\Service::getElementById($el["type"], $el["id"]);
                 if ($item instanceof Element\ElementInterface) {
-                    $el["path"] = $item->getRealFullPath();
-                    $results[] = $el;
+                    if ($item->isAllowed("list")) {
+                        $el["path"] = $item->getRealFullPath();
+                        $results[] = $el;
+                    } else {
+                        $hasHidden = true;
+                    }
                 }
             }
             $success = true;
@@ -241,6 +252,7 @@ class Admin_ElementController extends \Pimcore\Controller\Action\Admin
 
         $this->_helper->json([
             "data" => $results,
+            "hasHidden" => $hasHidden,
             "success" => $success
         ]);
     }

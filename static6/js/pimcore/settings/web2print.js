@@ -87,11 +87,25 @@ pimcore.settings.web2print = Class.create({
                         value: this.getValue("pdfreactorVersion"),
                         store: [
                             ["8.0", "8.0"],
-                            ["8.1", "8.1"]
+                            ["8.1", "8.1"],
+                            ["9.0", "9.0"]
                         ],
                         mode: "local",
                         triggerAction: "all"
-                    }, {
+                    },{
+                        fieldLabel: t("web2print_protocol"),
+                        xtype: "combo",
+                        width: 600,
+                        editable: false,
+                        name: "pdfreactorProtocol",
+                        value: this.getValue("pdfreactorProtocol"),
+                        store: [
+                            ["http", "http"],
+                            ["https", "https"]
+                        ],
+                        mode: "local",
+                        triggerAction: "all"
+                    },{
                         xtype: 'textfield',
                         width: 650,
                         fieldLabel: t("web2print_server"),

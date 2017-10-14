@@ -587,7 +587,7 @@ class Thumbnail
         if (is_file($file)) {
             if ($type == "md5") {
                 return md5_file($file);
-            } elseif ($type = "sha1") {
+            } elseif ($type == "sha1") {
                 return sha1_file($file);
             } else {
                 throw new \Exception("hashing algorithm '" . $type . "' isn't supported");
@@ -618,7 +618,6 @@ class Thumbnail
     /**
      * Enables, when set to true, dispatchLoopShutdown of Pimcore_Controller_Plugin_Thumbnail
      * @param bool $flag
-     * @return void
      */
     public static function setPictureElementInUse($flag)
     {

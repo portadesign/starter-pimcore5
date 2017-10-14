@@ -17,6 +17,7 @@ namespace Pimcore\WorkflowManagement\Workflow;
 use Pimcore\Model\Element\AbstractElement;
 use Pimcore\Model\Element\Service;
 use Pimcore\Model\Element\WorkflowState;
+use Pimcore\Model\Object\AbstractObject;
 use Pimcore\Model\Object\Concrete as ConcreteObject;
 use Pimcore\Model\Document;
 use Pimcore\Model\Asset;
@@ -114,16 +115,21 @@ class Manager
         $this->userIds = array_merge([$this->user->getId()], $this->user->getRoles());
     }
 
+    /**
+     * @return Asset|Document|Concrete
+     */
     public function getElement()
     {
         return $this->element;
     }
 
+    /**
+     * @return null|\Pimcore\Model\User
+     */
     public function getUser()
     {
         return $this->user;
     }
-
 
     /**
      * @return null|WorkflowState
@@ -182,6 +188,10 @@ class Manager
         }
     }
 
+    /**
+     * @param $newState
+     * @throws \Exception
+     */
     public function setElementState($newState)
     {
         try {
@@ -193,6 +203,10 @@ class Manager
         }
     }
 
+    /**
+     * @param $newStatus
+     * @throws \Exception
+     */
     public function setElementStatus($newStatus)
     {
         try {
@@ -213,17 +227,21 @@ class Manager
         return $this->workflow;
     }
 
-
+    /**
+     * @param $data
+     */
     public function setActionData($data)
     {
         $this->actionData = $data;
     }
 
+    /**
+     * @return null
+     */
     public function getActionData()
     {
         return $this->actionData;
     }
-
 
     /**
      * Get the available actions that can be performed on an element
@@ -400,12 +418,14 @@ class Manager
         return false;
     }
 
+    /**
+     * @param $actionConfig
+     * @return bool
+     */
     public function actionHasTransition($actionConfig)
     {
         return isset($actionConfig['transitionTo']) && is_array($actionConfig['transitionTo']);
     }
-
-
 
     /**
      * Validates that a transition between requested states can be done on an element
@@ -456,6 +476,9 @@ class Manager
         return true;
     }
 
+    /**
+     * @return mixed
+     */
     public function getError()
     {
         return $this->error;
@@ -477,7 +500,7 @@ class Manager
         \Pimcore::getEventManager()->trigger("workflowmanagement.preAction", $this, [
             'actionName' => $actionName
         ]);
-        
+
         //refresh the local copy after the event
         $formData = $this->getActionData();
 
@@ -540,7 +563,7 @@ class Manager
         $formData['oldStatus'] = $this->getElementStatus();
 
         if ($this->element instanceof Concrete || $this->element instanceof Document\PageSnippet) {
-            if (!$this->workflow->getAllowUnpublished() || in_array($this->getElementStatus(), $this->workflow->getPublishedStatuses())) {
+            if (!$this->workflow->getAllowUnpublished() || in_array($formData['newStatus'], $this->workflow->getPublishedStatuses())) {
                 $this->element->setPublished(true);
 
                 if ($this->element instanceof Concrete) {
@@ -678,7 +701,7 @@ class Manager
 
     /**
      * Returns whether or not an element has a workflow
-     * @param Asset|ConcreteObject|Document $element
+     * @param AbstractElement|Asset|ConcreteObject|Document $element
      * @return bool
      */
     public static function elementHasWorkflow(AbstractElement $element)
@@ -691,10 +714,9 @@ class Manager
         return false;
     }
 
-
     /**
      * Returns whether or not an element can be actioned
-     * @param $element
+     * @param $element \Pimcore\Model\Element\AbstractElement
      * @return bool
      */
     public static function elementCanAction($element)
@@ -703,8 +725,19 @@ class Manager
             return false;
         }
 
+        $config = Workflow\Config::getElementWorkflowConfig($element);
+        $subject = $config['workflowSubject'];
+
         if ($element instanceof Asset) {
+            if (isset($subject['assetTypes'][0]) && !in_array($element->getType(), $subject['assetTypes'])) {
+                return false;
+            }
+
             return true;
+        } elseif ($element instanceof AbstractObject && isset($subject['objectTypes'][0]) && !in_array($element->getType(), $subject['objectTypes'])) {
+            return false;
+        } elseif ($element instanceof Document && isset($subject['documentTypes'][0]) && !in_array($element->getType(), $subject['documentTypes'])) {
+            return false;
         }
 
         /**

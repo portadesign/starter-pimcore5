@@ -23,6 +23,8 @@ use Pimcore\Logger;
 
 class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
 {
+    const SELFCLOSING_TAGS = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr'];
+
     public function importAction()
     {
         $this->checkPermission("translations");
@@ -37,7 +39,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         if ($admin) {
             $delta = Translation\Admin::importTranslationsFromFile($tmpFile, $overwrite, Tool\Admin::getLanguages());
         } else {
-            $delta = Translation\Website::importTranslationsFromFile($tmpFile, $overwrite);
+            $delta = Translation\Website::importTranslationsFromFile($tmpFile, $overwrite, $this->getUser()->getAllowedLanguagesForEditingWebsiteTranslations());
         }
 
         $result =[
@@ -116,7 +118,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
                 $languages = Tool\Admin::getLanguages();
             } else {
                 $t = new Translation\Website();
-                $languages = Tool::getValidLanguages();
+                $languages = $this->getUser()->getAllowedLanguagesForViewingWebsiteTranslations();
             }
 
             foreach ($languages as $language) {
@@ -140,7 +142,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         if ($admin) {
             $languages = Tool\Admin::getLanguages();
         } else {
-            $languages = Tool::getValidLanguages();
+            $languages = $this->getUser()->getAllowedLanguagesForViewingWebsiteTranslations();
         }
 
         //add language columns which have no translations yet
@@ -311,7 +313,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
                 $list = new Translation\Website\Listing();
             }
 
-            $validLanguages = Tool::getValidLanguages();
+            $validLanguages = $admin ? Tool\Admin::getLanguages() : $this->getUser()->getAllowedLanguagesForViewingWebsiteTranslations();
 
             $list->setOrder("asc");
             $list->setOrderKey($tableName . ".key", false);
@@ -362,6 +364,12 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         }
     }
 
+    /**
+     * @param $joins
+     * @param $list
+     * @param $tableName
+     * @param $filters
+     */
     protected function extendTranslationQuery($joins, $list, $tableName, $filters)
     {
         if ($joins) {
@@ -400,12 +408,17 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         }
     }
 
-
+    /**
+     * @param $tableName
+     * @param bool $languageMode
+     * @return array|null|string
+     */
     protected function getGridFilterCondition($tableName, $languageMode = false)
     {
         $joins = [];
         $conditions = [];
-        $validLanguages = Tool::getValidLanguages();
+        $validLanguages = $this->getUser()->getAllowedLanguagesForViewingWebsiteTranslations();
+        ;
 
         $db = \Pimcore\Db::get();
         $conditionFilters = [];
@@ -443,13 +456,14 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
                     $field = $fieldname;
                     $value = "%" . $filter["value"] . "%";
                 } elseif ($filter["type"] == "date" ||
-                    ($isExtJs6 && in_array($fieldname, ["modificationDate", "creationdate"]))) {
+                    ($isExtJs6 && in_array($fieldname, ["modificationDate", "creationDate"]))) {
                     if ($filter[$operatorField] == "lt") {
                         $operator = "<";
                     } elseif ($filter[$operatorField] == "gt") {
                         $operator = ">";
                     } elseif ($filter[$operatorField] == "eq") {
                         $operator = "=";
+                        $fieldname = "UNIX_TIMESTAMP(DATE(FROM_UNIXTIME({$fieldname})))";
                     }
                     $filter["value"] = strtotime($filter["value"]);
                     $field = $fieldname;
@@ -645,7 +659,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
                 // get also content of inherited document elements
                 while ($doc) {
                     if (method_exists($doc, "getElements")) {
-                        $elements = array_merge($elements, $doc->getElements());
+                        $elements = array_merge($doc->getElements(), $elements);
                     }
 
                     if (method_exists($doc, "getContentMasterDocument")) {
@@ -656,8 +670,8 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
                 }
 
                 foreach ($elements as $tag) {
-                    if (in_array($tag->getType(), ["wysiwyg", "input", "textarea", "image"])) {
-                        if ($tag->getType() == "image") {
+                    if (in_array($tag->getType(), ["wysiwyg", "input", "textarea", "image", "link"])) {
+                        if (in_array($tag->getType(), ["image", "link"])) {
                             $content = $tag->getText();
                         } else {
                             $content = $tag->getData();
@@ -807,7 +821,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
 
     public function xliffImportElementAction()
     {
-        include_once("simple_html_dom.php");
+        include_once(PIMCORE_PATH . "/lib/simple_html_dom.php");
 
         $id = $this->getParam("id");
         $step = $this->getParam("step");
@@ -843,7 +857,12 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
                     if ($fieldType == "tag" && method_exists($element, "getElement")) {
                         $tag = $element->getElement($name);
                         if ($tag) {
-                            $tag->setDataFromEditmode($content);
+                            if (in_array($tag->getType(), ["image", "link"])) {
+                                $tag->setText($content);
+                            } else {
+                                $tag->setDataFromEditmode($content);
+                            }
+
                             $tag->setInherited(false);
                             $element->setElement($tag->getName(), $tag);
                         }
@@ -893,6 +912,12 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         ]);
     }
 
+    /**
+     * @param $xml
+     * @param $name
+     * @param $content
+     * @param $source
+     */
     protected function addTransUnitNode($xml, $name, $content, $source)
     {
         $transUnit = $xml->addChild('trans-unit');
@@ -908,6 +933,10 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         @$node->appendChild($f);
     }
 
+    /**
+     * @param $content
+     * @return mixed|string
+     */
     protected function unescapeXliff($content)
     {
         $content = preg_replace("/<\/?(target|mrk)([^>.]+)?>/i", "", $content);
@@ -917,7 +946,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         if (preg_match("/<\/?(bpt|ept)/", $content)) {
             $xml = str_get_html($content);
             if ($xml) {
-                $els = $xml->find("bpt,ept");
+                $els = $xml->find("bpt,ept,ph");
                 foreach ($els as $el) {
                     $content = html_entity_decode($el->innertext, null, "UTF-8");
                     $el->outertext = $content;
@@ -929,6 +958,10 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         return $content;
     }
 
+    /**
+     * @param $content
+     * @return mixed|string
+     */
     protected function escapeXliff($content)
     {
         $count = 1;
@@ -947,6 +980,10 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
             return '<![CDATA[' . $content . ']]>';
         }
 
+        // Handle text before the first HTML tag
+        $firstTagPosition = strpos($content, '<');
+        $preText = ($firstTagPosition > 0) ? '<![CDATA[' . substr($content, 0, $firstTagPosition) . ']]>' : '';
+
         foreach ($matches[0] as $match) {
             $parts = explode(">", $match);
             $parts[0] .= ">";
@@ -955,7 +992,11 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
                 if (!empty($part)) {
                     if (preg_match("/<([a-z0-9\/]+)/", $part, $tag)) {
                         $tagName = str_replace("/", "", $tag[1]);
-                        if (strpos($tag[1], "/") === false) {
+                        if (in_array($tagName, self::SELFCLOSING_TAGS)) {
+                            $part = '<ph id="' . $count . '"><![CDATA[' . $part . ']]></ph>';
+
+                            $count++;
+                        } elseif (strpos($tag[1], "/") === false) {
                             $openTags[$count] = ["tag" => $tagName, "id" => $count];
                             $part = '<bpt id="' . $count . '"><![CDATA[' . $part . ']]></bpt>';
 
@@ -976,7 +1017,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
             }
         }
 
-        $content = implode("", $final);
+        $content = $preText . implode("", $final);
 
         return $content;
     }
@@ -984,9 +1025,8 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
 
     public function wordExportAction()
     {
-
-        //error_reporting(E_ERROR);
-        //ini_set("display_errors", "off");
+        error_reporting(0);
+        ini_set("display_errors", "off");
 
         $id = $this->getParam("id");
         $data = \Zend_Json::decode($this->getParam("data"));
@@ -994,7 +1034,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
 
         $exportFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/" . $id . ".html";
         if (!is_file($exportFile)) {
-            File::put($exportFile, '<style type="text/css">' . file_get_contents(PIMCORE_PATH . "/static6/css/word-export.css") . '</style>');
+            File::put($exportFile, '');
         }
 
         foreach ($data as $el) {
@@ -1064,7 +1104,7 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
                     $html = preg_replace("@</?(img|meta|div|section|aside|article|body|bdi|bdo|canvas|embed|footer|head|header|html)([^>]+)?>@", "", $html);
                     $html = preg_replace('/<!--(.*)-->/Uis', '', $html);
 
-                    include_once("simple_html_dom.php");
+                    include_once(PIMCORE_PATH . "/lib/simple_html_dom.php");
                     $dom = str_get_html($html);
                     if ($dom) {
 
@@ -1204,39 +1244,33 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
         $id = $this->getParam("id");
         $exportFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/" . $id . ".html";
 
-        // add closing body/html
-        //$f = fopen($exportFile, "a+");
-        //fwrite($f, "</body></html>");
-        //fclose($f);
+        $content = file_get_contents($exportFile);
+        @unlink($exportFile);
 
-        // should be done via Pimcore_Document(_Adapter_LibreOffice) in the future
-        if (\Pimcore\Document::isFileTypeSupported("docx")) {
-            $lockKey = "soffice";
-            Model\Tool\Lock::acquire($lockKey); // avoid parallel conversions of the same document
+        // replace <script> and <link>
+        $content = preg_replace("/<link[^>]+>/im", "$1", $content);
+        $content = preg_replace("/<script[^>]+>(.*)?<\/script>/im", "$1", $content);
 
-            $out = Tool\Console::exec(\Pimcore\Document\Adapter\LibreOffice::getLibreOfficeCli() . ' --headless --convert-to docx:"Office Open XML Text" --outdir ' . PIMCORE_SYSTEM_TEMP_DIRECTORY . " " . $exportFile);
+        $content =
+            "<html>\n" .
+            "<head>\n" .
+                '<style type="text/css">' . "\n" .
+                    file_get_contents(PIMCORE_PATH . "/static6/css/word-export.css") .
+                "</style>\n" .
+            "</head>\n\n" .
+            "<body>\n" .
+                $content .
+            "\n\n</body>\n" .
+            "</html>\n"
+        ;
 
-            Logger::debug("LibreOffice Output was: " . $out);
-
-            $tmpName = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/" . preg_replace("/\." . File::getFileExtension($exportFile) . "$/", ".docx", basename($exportFile));
-
-            Model\Tool\Lock::release($lockKey);
-            // end what should be done in Pimcore_Document
-
-            header("Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-            header('Content-Disposition: attachment; filename="' . basename($tmpName) . '"');
-        } else {
-            // no conversion, output html file
-            $tmpName = $exportFile;
-            header("Content-Type: text/html");
-            header('Content-Disposition: attachment; filename="' . basename($tmpName) . '"');
-        } while (@ob_end_flush());
+        // no conversion, output html file, works fine with MS Word and LibreOffice
+        header("Content-Type: text/html");
+        header('Content-Disposition: attachment; filename="word-export-' . date("Ymd") . '_' . uniqid() . '.htm"'); while (@ob_end_flush());
         flush();
 
-        readfile($tmpName);
+        echo $content;
 
-        @unlink($exportFile);
-        @unlink($tmpName);
         exit;
     }
 
@@ -1257,6 +1291,18 @@ class Admin_TranslationController extends \Pimcore\Controller\Action\Admin
 
         $this->_helper->json([
             "success" => true
+        ]);
+    }
+
+
+    public function getWebsiteTranslationLanguagesAction()
+    {
+        $this->_helper->json([
+            'view' => $this->getUser()->getAllowedLanguagesForViewingWebsiteTranslations(),
+
+            //when no view language is defined, all languages are editable. if one view language is defined, it
+            //may be possible that no edit language is set intentionally
+            'edit' => $this->getUser()->getAllowedLanguagesForEditingWebsiteTranslations()
         ]);
     }
 }

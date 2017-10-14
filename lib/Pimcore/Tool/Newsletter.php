@@ -63,24 +63,28 @@ class Newsletter
         // render the document and rewrite the links (if analytics is enabled)
         if ($newsletterDocument->getEnableTrackingParameters()) {
             if ($contentHTML) {
-                include_once("simple_html_dom.php");
+                include_once(PIMCORE_PATH . "/lib/simple_html_dom.php");
 
                 $html = str_get_html($contentHTML);
                 if ($html) {
                     $links = $html->find("a");
                     foreach ($links as $link) {
-                        if (preg_match("/^(mailto)/", trim(strtolower($link->href)))) {
+                        if (preg_match("/^(mailto|#)/", trim(strtolower($link->href)))) {
+                            // No tracking for mailto and hash only links
                             continue;
                         }
-
+                        $urlParts = parse_url($link->href);
                         $glue = "?";
-                        if (strpos($link->href, "?")) {
+                        $params = "utm_source=" . $newsletterDocument->getTrackingParameterSource() .
+                                    "&utm_medium=" . $newsletterDocument->getTrackingParameterMedium() .
+                                    "&utm_campaign=" . $newsletterDocument->getTrackingParameterName();
+                        if (isset($urlParts['query'])) {
                             $glue = "&";
                         }
-                        $link->href = $link->href . $glue .
-                            "utm_source=" . $newsletterDocument->getTrackingParameterSource() .
-                            "&utm_medium=" . $newsletterDocument->getTrackingParameterMedium() .
-                            "&utm_campaign=" . $newsletterDocument->getTrackingParameterName();
+                        $link->href = preg_replace('/[#].+$/', '', $link->href).$glue.$params;
+                        if (isset($urlParts['fragment'])) {
+                            $link->href .= '#'.$urlParts['fragment'];
+                        }
                     }
 
                     $contentHTML = $html->save();
@@ -117,6 +121,10 @@ class Newsletter
         }
     }
 
+    /**
+     * @param $email
+     * @return mixed
+     */
     protected static function obfuscateEmail($email)
     {
         $email = substr_replace($email, ".xxx", strrpos($email, "."));
@@ -124,10 +132,11 @@ class Newsletter
         return $email;
     }
 
-
     /**
      * @param Model\Tool\Newsletter\Config $newsletter
      * @param Object\Concrete $object
+     * @param null $emailAddress
+     * @param null $hostUrl
      */
     public static function sendMail($newsletter, $object, $emailAddress = null, $hostUrl = null)
     {
@@ -162,7 +171,7 @@ class Newsletter
         // render the document and rewrite the links (if analytics is enabled)
         if ($newsletter->getGoogleAnalytics()) {
             if ($content = $mail->getBodyHtmlRendered()) {
-                include_once("simple_html_dom.php");
+                include_once(PIMCORE_PATH . "/lib/simple_html_dom.php");
 
                 $html = str_get_html($content);
                 if ($html) {

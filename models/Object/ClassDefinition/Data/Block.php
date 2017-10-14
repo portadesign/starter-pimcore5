@@ -124,7 +124,7 @@ class Block extends Model\Object\ClassDefinition\Data
                         continue;
                     }
                     $elementData = $blockElement->getData();
-                    $dataForResource = $fd->marshal($elementData, $object, ["raw" => true]);
+                    $dataForResource = $fd->marshal($elementData, $object, ["raw" => true, "blockmode" => true]);
 //                    $blockElement->setData($fd->unmarshal($dataForResource, $object, ["raw" => true]));
 
                     // do not serialize the block element itself
@@ -172,7 +172,7 @@ class Block extends Model\Object\ClassDefinition\Data
 //                    $elementData = $blockElement->getData();
                     $elementData = $blockElementRaw["data"];
 
-                    $dataFromResource = $fd->unmarshal($elementData, $object, ["raw" => true]);
+                    $dataFromResource = $fd->unmarshal($elementData, $object, ["raw" => true, "blockmode" => true]);
                     $blockElementRaw["data"] = $dataFromResource;
 
                     if ($blockElementRaw["type"] == "localizedfields") {
@@ -180,6 +180,7 @@ class Block extends Model\Object\ClassDefinition\Data
                         $data = $blockElementRaw["data"];
                         if ($data) {
                             $data->setObject($object);
+                            $data->setContext(['containerType' => 'block', 'containerKey' => $this->getName()]);
                             $blockElementRaw["data"] = $data;
                         }
                     }
@@ -236,6 +237,7 @@ class Block extends Model\Object\ClassDefinition\Data
                         continue;
                     }
                     $elementData = $blockElement->getData();
+                    $params['context']['containerType'] = 'block';
                     $dataForEditMode = $fd->getDataForEditmode($elementData, $object, $params);
                     $resultElement[$elementName] = $dataForEditMode;
                 }
@@ -441,7 +443,6 @@ class Block extends Model\Object\ClassDefinition\Data
 
     /**
      * @param mixed $child
-     * @return void
      */
     public function addChild($child)
     {
@@ -471,7 +472,7 @@ class Block extends Model\Object\ClassDefinition\Data
     /**
      * @param mixed $data
      * @param array $blockedKeys
-     * @return void
+     * @return $this
      */
     public function setValues($data = [], $blockedKeys = [])
     {

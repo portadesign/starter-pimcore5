@@ -55,6 +55,7 @@ class ApplicationLogger /*implements LoggerInterface*/
 
     /**
      * @param string $component
+     * @param boolean $initDbHandler
      * @return ApplicationLogger
      */
     public static function getInstance($component = "default", $initDbHandler = false)
@@ -118,7 +119,6 @@ class ApplicationLogger /*implements LoggerInterface*/
 
     /**
      * @param string $component
-     * @return void
      */
     public function setComponent($component)
     {
@@ -127,7 +127,6 @@ class ApplicationLogger /*implements LoggerInterface*/
 
     /**
      * @param \Pimcore\Log\FileObject | string $fileObject
-     * @return void
      */
     public function setFileObject($fileObject)
     {
@@ -136,7 +135,6 @@ class ApplicationLogger /*implements LoggerInterface*/
 
     /**
      * @param \\Pimcore\Model\Object\AbstractObject | \Pimcore\Model\Document | \Pimcore\Model\Asset | int $relatedObject
-     * @return void
      */
     public function setRelatedObject($relatedObject)
     {
@@ -171,9 +169,9 @@ class ApplicationLogger /*implements LoggerInterface*/
 
         if (isset($context["fileObject"])) {
             if (is_string($context["fileObject"])) {
-                $context["fileObject"] = \Pimcore\Tool::getHostUrl() . "/" . str_replace(PIMCORE_DOCUMENT_ROOT, '', $context["fileObject"]);
+                $context["fileObject"] = str_replace(PIMCORE_DOCUMENT_ROOT, '', $context["fileObject"]);
             } else {
-                $context["fileObject"] = \Pimcore\Tool::getHostUrl() . "/" . str_replace(PIMCORE_DOCUMENT_ROOT, '', $context["fileObject"]->getFilename());
+                $context["fileObject"] = str_replace(PIMCORE_DOCUMENT_ROOT, '', $context["fileObject"]->getFilename());
             }
         }
 
@@ -345,7 +343,9 @@ class ApplicationLogger /*implements LoggerInterface*/
     }
 
     /**
-     *
+     * @param $level
+     * @param $message
+     * @param $params
      */
     protected function handleLog($level, $message, $params)
     {

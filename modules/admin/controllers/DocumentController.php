@@ -827,9 +827,12 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
         $fromUrl = $prefix . $this->getParam("from") . "&" . $sessionName . "=" . $_COOKIE[$sessionName];
         $toUrl = $prefix . $this->getParam("to") . "&" . $sessionName . "=" . $_COOKIE[$sessionName];
 
-        $fromFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/version-diff-tmp-" . uniqid() . ".png";
-        $toFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/version-diff-tmp-" . uniqid() . ".png";
-        $diffFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/version-diff-tmp-" . uniqid() . ".png";
+        $toFileId = uniqid();
+        $fromFileId = uniqid();
+        $diffFileId = uniqid();
+        $fromFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/version-diff-tmp-" . $fromFileId . ".png";
+        $toFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/version-diff-tmp-" . $toFileId . ".png";
+        $diffFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/version-diff-tmp-" . $diffFileId . ".png";
 
         if (\Pimcore\Image\HtmlToImage::isSupported() && class_exists("Imagick")) {
             \Pimcore\Image\HtmlToImage::convert($fromUrl, $fromFile);
@@ -846,11 +849,10 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
                 $result[0]->clear();
                 $result[0]->destroy();
 
-                $this->view->image = base64_encode(file_get_contents($diffFile));
-                unlink($diffFile);
+                $this->view->image = $diffFileId;
             } else {
-                $this->view->image1 = base64_encode(file_get_contents($fromFile));
-                $this->view->image2 = base64_encode(file_get_contents($toFile));
+                $this->view->image1 = $fromFileId;
+                $this->view->image2 = $toFileId;
             }
 
             // cleanup
@@ -858,11 +860,23 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
             $image1->destroy();
             $image2->clear();
             $image2->destroy();
-
-            unlink($fromFile);
-            unlink($toFile);
         } else {
             $this->renderScript("document/diff-versions-unsupported.php");
+        }
+    }
+
+    public function diffVersionsImageAction()
+    {
+        $file = PIMCORE_SYSTEM_TEMP_DIRECTORY . "/version-diff-tmp-" . $this->getParam('id') . ".png";
+        if (file_exists($file)) {
+            while (@ob_end_flush()) {
+                ;
+            }
+            flush();
+
+            readfile($file);
+            @unlink($file);
+            exit;
         }
     }
 
@@ -935,6 +949,10 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
             "title" => "ID: " . $childDocument->getId(),
             "text" => "Type: " . $childDocument->getType()
         ];
+
+        if ($site) {
+            $tmpDocument["qtipCfg"]["text"] .= "<br>" . $this->view->translate("site_id") . ": " . $site->getId();
+        }
 
         // PREVIEWS temporary disabled, need's to be optimized some time
         if ($childDocument instanceof Document\Page && Config::getSystemConfig()->documents->generatepreview) {
@@ -1127,6 +1145,10 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
         ]);
     }
 
+    /**
+     * @param $document
+     * @return array
+     */
     private function getSeoNodeConfig($document)
     {
         $nodeConfig = $this->getTreeNodeConfig($document);
@@ -1156,7 +1178,7 @@ class Admin_DocumentController extends \Pimcore\Controller\Action\Admin\Element
                 $content    = Tool::getHttpData($contentUrl, ["pimcore_preview" => true, "pimcore_admin" => true, "_dc" => time()]);
 
                 if ($content) {
-                    include_once("simple_html_dom.php");
+                    include_once(PIMCORE_PATH . "/lib/simple_html_dom.php");
                     $html = str_get_html($content);
                     if ($html) {
                         $nodeConfig["links"]         = count($html->find("a"));

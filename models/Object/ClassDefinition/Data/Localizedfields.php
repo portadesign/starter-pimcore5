@@ -88,6 +88,11 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public $labelWidth;
 
     /**
+     * @var
+     */
+    public $hideLabelsWhenTabsReached;
+
+    /**
      * contains further localized field definitions if there are more than one localized fields in on class
      * @var array
      */
@@ -115,7 +120,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
             return [];
         }
 
-        $result = $this->doGetDataForEditMode($data, $object, $fieldData, $metaData, 1);
+        $result = $this->doGetDataForEditMode($data, $object, $fieldData, $metaData, 1, $params);
 
         // replace the real data with the data for the editmode
         foreach ($result["data"] as $language => &$data) {
@@ -140,9 +145,10 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
      * @param $fieldData
      * @param $metaData
      * @param int $level
+     * @param array $params
      * @return array
      */
-    private function doGetDataForEditMode($data, $object, &$fieldData, &$metaData, $level = 1)
+    private function doGetDataForEditMode($data, $object, &$fieldData, &$metaData, $level = 1, $params)
     {
         $class = $object->getClass();
         $inheritanceAllowed = $class->getAllowInherit();
@@ -157,12 +163,20 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
                     // never override existing data
                     $fieldData[$language][$key] = $fdata;
                     if (!$fd->isEmpty($fdata)) {
-                        $metaData[$language][$key] = ["inherited" => $level > 1, "objectid" => $object->getId()];
+                        $inherited = $level > 1;
+                        if ($params['context'] && $params['context']['containerType'] == 'block') {
+                            $inherited = false;
+                        }
+
+                        $metaData[$language][$key] = ["inherited" => $inherited, "objectid" => $object->getId()];
                     }
                 }
             }
         }
 
+        if ($params['context'] && $params['context']['containerType'] == 'block') {
+            $inheritanceAllowed = false;
+        }
 
         if ($inheritanceAllowed) {
             // check if there is a parent with the same type
@@ -187,7 +201,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
                 if ($foundEmptyValue) {
                     // still some values are passing, ask the parent
                     $parentData = $parent->getLocalizedFields();
-                    $parentResult = $this->doGetDataForEditMode($parentData, $parent, $fieldData, $metaData, $level + 1);
+                    $parentResult = $this->doGetDataForEditMode($parentData, $parent, $fieldData, $metaData, $level + 1, $params);
                 }
             }
         }
@@ -494,7 +508,6 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
 
     /**
      * @param mixed $child
-     * @return void
      */
     public function addChild($child)
     {
@@ -529,7 +542,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     /**
      * @param mixed $data
      * @param array $blockedKeys
-     * @return void
+     * @return $this
      */
     public function setValues($data = [], $blockedKeys = [])
     {
@@ -585,6 +598,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
 
     /**
      * @param $object
+     * @param array $params
      */
     public function delete($object, $params = [])
     {
@@ -600,7 +614,8 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
 
     /**
      * This method is called in Object|Class::save() and is used to create the database table for the localized data
-     * @return void
+     * @param $class
+     * @param array $params
      */
     public function classSaved($class, $params = [])
     {
@@ -618,7 +633,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     }
 
     /**
-     * @param $object
+     * @param $container
      * @param array $params
      * @return Object\Localizedfield
      * @throws \Exception
@@ -934,7 +949,11 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
         if (!$omitMandatoryCheck) {
             foreach ($languages as $language) {
                 foreach ($this->getFieldDefinitions() as $fd) {
-                    $fd->checkValidity($data[$language][$fd->getName()]);
+                    if (isset($data[$language]) && isset($data[$language][$fd->getName()])) {
+                        $fd->checkValidity($data[$language][$fd->getName()]);
+                    } else {
+                        $fd->checkValidity(null);
+                    }
                 }
             }
         }
@@ -1128,6 +1147,25 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     }
 
     /**
+     * @return mixed
+     */
+    public function getHideLabelsWhenTabsReached()
+    {
+        return $this->hideLabelsWhenTabsReached;
+    }
+
+    /**
+     * @param mixed $hideLabelsWhenTabsReached
+     * @return $this
+     */
+    public function setHideLabelsWhenTabsReached($hideLabelsWhenTabsReached)
+    {
+        $this->hideLabelsWhenTabsReached = $hideLabelsWhenTabsReached;
+
+        return $this;
+    }
+
+    /**
      * @param int $maxTabs
      */
     public function setMaxTabs($maxTabs)
@@ -1205,6 +1243,7 @@ class Localizedfields extends Model\Object\ClassDefinition\Data
     public function unmarshal($value, $object = null, $params = [])
     {
         $lf = new Object\Localizedfield();
+        $lf->setObject($object);
         if (is_array($value)) {
             $items = [];
             foreach ($value as $language => $languageData) {

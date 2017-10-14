@@ -130,7 +130,7 @@ class AbstractUser extends Model\AbstractModel
 
     /**
      * @param integer $parentId
-     * @return void
+     * @return $this
      */
     public function setParentId($parentId)
     {
@@ -149,7 +149,7 @@ class AbstractUser extends Model\AbstractModel
 
     /**
      * @param string $name
-     * @return void
+     * @return $this
      */
     public function setName($name)
     {
@@ -172,6 +172,14 @@ class AbstractUser extends Model\AbstractModel
      */
     public function save()
     {
+        $isUpdate = false;
+        if ($this->getId()) {
+            $isUpdate = true;
+            \Pimcore::getEventManager()->trigger("user.preUpdate", $this);
+        } else {
+            \Pimcore::getEventManager()->trigger("user.preAdd", $this);
+        }
+
         $this->beginTransaction();
         try {
             if (!$this->getId()) {
@@ -186,6 +194,12 @@ class AbstractUser extends Model\AbstractModel
             throw $e;
         }
 
+        if ($isUpdate) {
+            \Pimcore::getEventManager()->trigger("user.postUpdate", $this);
+        } else {
+            \Pimcore::getEventManager()->trigger("user.postAdd", $this);
+        }
+
         return $this;
     }
 
@@ -194,6 +208,11 @@ class AbstractUser extends Model\AbstractModel
      */
     public function delete()
     {
+        if ($this->getId() < 1) {
+            throw new \Exception("Deleting the system user is not allowed!");
+        }
+
+        \Pimcore::getEventManager()->trigger("user.preDelete", $this);
 
         // delete all childs
         $list = new Listing();
@@ -209,6 +228,8 @@ class AbstractUser extends Model\AbstractModel
         // now delete the current user
         $this->getDao()->delete();
         \Pimcore\Cache::clearAll();
+
+        \Pimcore::getEventManager()->trigger("user.postDelete", $this);
     }
 
     /**

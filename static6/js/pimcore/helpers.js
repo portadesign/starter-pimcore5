@@ -75,7 +75,7 @@ pimcore.helpers.openClassEditor = function() {
         var toolbar = pimcore.globalmanager.get("layout_toolbar");
         toolbar.editClasses();
     }
-}
+};
 
 pimcore.helpers.openWelcomePage = function(keyCode, e) {
 
@@ -89,7 +89,7 @@ pimcore.helpers.openWelcomePage = function(keyCode, e) {
     catch (e) {
         pimcore.globalmanager.add("layout_portal_welcome", new pimcore.layout.portal());
     }
-}
+};
 
 pimcore.helpers.openAsset = function (id, type, options) {
 
@@ -566,7 +566,9 @@ pimcore.helpers.showPrettyError = function (type, title, text, errorText, stack,
     });
     errWin.show();
 
-}
+};
+
+
 pimcore.helpers.showNotification = function (title, text, type, errorText, hideDelay) {
     // icon types: info,error,success
     if(type == "error"){
@@ -752,7 +754,7 @@ pimcore.helpers.closeAllUnmodified = function () {
     };
 
     pimcore.helpers.closeAllElements(unmodifiedElements);
-}
+};
 
 pimcore.helpers.closeAllElements = function (except, tabPanel) {
 
@@ -891,7 +893,7 @@ pimcore.helpers.forceOpenMemorizedTabsOnce = function() {
         return true;
     }
     return false;
-}
+};
 
 pimcore.helpers.openMemorizedTabs = function () {
     var openTabs = pimcore.helpers.getOpenTab();
@@ -1090,7 +1092,7 @@ pimcore.helpers.sanitizeAllowedTypes = function(data, name) {
         }
         data[name] = newList;
     }
-}
+};
 
 
 
@@ -1102,6 +1104,7 @@ pimcore.helpers.generatePagePreview = function (id, path, callback) {
     if(pimcore.settings.htmltoimage) {
         Ext.Ajax.request({
             url: '/admin/page/generate-screenshot',
+            ignoreErrors: true,
             params: {
                 id: id
             },
@@ -2045,8 +2048,6 @@ pimcore.helpers.editmode.openVideoEditPanel = function (data, callback) {
 pimcore.helpers.editmode.openPdfEditPanel = function () {
 
 
-    // FUNCTIONS
-
     var editMarkerHotspotData = function (id) {
 
         var hotspotMetaDataWin = new Ext.Window({
@@ -2320,11 +2321,10 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
                 xtype: 'panel',
                 layout: 'fit',
                 itemId: id,
+                bodyStyle: "padding-top:10px",
                 items: [
                     {
                         xtype: "fieldcontainer",
-                        style: "padding: 0;",
-                        bodyStyle: "padding: 5px;",
                         items: [{
                             xtype: "hidden",
                             name: "type",
@@ -2353,35 +2353,71 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
         hotspotMetaDataWin.show();
     }.bind(this);
 
+    var updateHotspotStyle = function(hotspotEl, config) {
+        var imgEl = Ext.get(this.metaDataWindow.getComponent("pageContainer").body.query("img")[0]);
+        var originalWidth = imgEl.getWidth();
+        var originalHeight = imgEl.getHeight();
+
+        var absoluteImgX = imgEl.dom.x;
+        var absoluteImgY = imgEl.dom.y;
+
+        var newStyle = {
+            top: (absoluteImgY + originalHeight * (config["top"]/100)) + "px",
+            left: (absoluteImgX + originalWidth * (config["left"]/100)) + "px",
+            width: (originalWidth * (config["width"]/100)) + "px",
+            height: (originalHeight * (config["height"]/100)) + "px"
+        };
+        hotspotEl.applyStyles(newStyle);
+    }.bind(this);
+
     var addHotspot = function (config) {
         var hotspotId = "pdf-hotspot-" + uniqid();
 
-        var pageContainerDiv = Ext.get(this.metaDataWindow.getComponent("pageContainer").body.query(".page")[0]);
-        pageContainerDiv.insertHtml("beforeEnd", '<div id="' + hotspotId + '" class="pimcore_pdf_hotspot"></div>');
+        var pageContainer = this.metaDataWindow.getComponent("pageContainer");
+        var constrainTo = this.pageCmp.getEl();
+        constrainTo = constrainTo.query(".page");
+        constrainTo = constrainTo[0];
+
+        var hotspotComponent = new Ext.Component(
+            {
+                xtype: 'component',
+                cls: 'pimcore_pdf_hotspot',
+                id: hotspotId,
+                floating: true,
+                constrain: true,
+                constrainTo: constrainTo,
+                shadow: false,
+                resizable: {
+                    target: hotspotId,
+                    pinned: true,
+                    minWidth: 20,
+                    minHeight: 20,
+                    preserveRatio: false,
+                    dynamic: true,
+                    handles: 'all'
+                },
+                style: "cursor:move; position:absolute; width: 50px; height: 50px; top: 0px; left: 0px;",
+                draggable: true,
+                cls: 'pimcore_image_hotspot',
+                hotspotConfig: config
+            }
+        );
+
+        var result = pageContainer.add(hotspotComponent);
+
+        hotspotComponent.show();
+        this.hotspotCmps[hotspotId] = hotspotComponent;
 
         var hotspotEl = Ext.get(hotspotId);
 
         // default dimensions
         hotspotEl.applyStyles({
-            position: "absolute",
-            cursor: "pointer",
-            top: 0,
-            left: 0,
             width: "50px",
             height: "50px"
         });
 
         if(typeof config == "object") {
-            var imgEl = Ext.get(this.metaDataWindow.getComponent("pageContainer").body.query("img")[0]);
-            var originalWidth = imgEl.getWidth();
-            var originalHeight = imgEl.getHeight();
-
-            hotspotEl.applyStyles({
-                top: (originalHeight * (config["top"]/100)) + "px",
-                left: (originalWidth * (config["left"]/100)) + "px",
-                width: (originalWidth * (config["width"]/100)) + "px",
-                height: (originalHeight * (config["height"]/100)) + "px"
-            });
+            updateHotspotStyle(hotspotEl, config);
 
             if(config["data"]) {
                 this.hotspotMetaData[hotspotId] = config["data"];
@@ -2406,7 +2442,9 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
                 iconCls: "pimcore_icon_delete",
                 handler: function (id, item) {
                     item.parentMenu.destroy();
-                    Ext.get(id).remove();
+                    delete this.hotspotCmps[id];
+                    var hotspotComponent = Ext.getCmp(id);
+                    hotspotComponent.destroy();
                 }.bind(this, id)
             }));
 
@@ -2414,22 +2452,8 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
             e.stopEvent();
         }.bind(this, hotspotId));
 
-
-        var resizer = new Ext.Resizable(hotspotId, {
-            pinned:true,
-            minWidth:20,
-            minHeight: 20,
-            preserveRatio: false,
-            dynamic:true,
-            handles: 'all',
-            draggable:true
-        });
-
-
         return hotspotId;
     }.bind(this);
-
-
 
     var editTextVersion = function(config){
 
@@ -2444,19 +2468,17 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
             {
                 fieldLabel: t("pimcore_lable_text"),
                 name : "text",
-                width : 670,
-                height: 305,
                 value: text
             });
 
         var panel = new Ext.form.FormPanel({
             labelWidth: 80,
             bodyStyle: "padding: 10px;",
+            layout: 'fit',
             items: [
                 this.textArea
             ]
         });
-
 
         this.editTextVersionWindow = new Ext.Window({
             width: 800,
@@ -2493,6 +2515,8 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
 
     var hotspotEditPage = function (page) {
         this.saveCurrentPage();
+
+        this.hotspotCmps = {};
         this.currentPage = page;
 
         var pageContainer = this.metaDataWindow.getComponent("pageContainer");
@@ -2505,7 +2529,7 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
             border: false,
             bodyStyle: "background: #e5e5e5; ",
             html: '<div style="margin:0 auto; position:relative; overflow: hidden;" ' +
-            'class="page"><img src="' + thumbUrl + '" /></div>',
+            'class="page"><img id="' + Ext.id() + '" src="' + thumbUrl + '" /></div>',
             tbar: [{
                 xtype: "button",
                 text: t("add_hotspot"),
@@ -2527,7 +2551,7 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
                 {
                     xtype: "textfield",
                     name: "chapter",
-                    width: 200,
+                    width: 150,
                     style: "margin: 0 10px 0 0;",
                     value: this.chapterStore[page]
                 }
@@ -2556,12 +2580,22 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
                                     "margin-left": ((el.getWidth()-img.getWidth())/2) + "px",
                                     "margin-top": ((el.getHeight()-img.getHeight())/2) + "px"
                                 });
+
+
+                                for (var id in this.hotspotCmps) {
+                                    if (this.hotspotCmps.hasOwnProperty(id)) {
+                                        var hotspotCmp = this.hotspotCmps[id];
+                                        var hotspotEl = hotspotCmp.getEl();
+                                        updateHotspotStyle(hotspotEl, hotspotCmp.hotspotConfig);
+                                    }
+                                }
+
                             }
                         } catch (e) {
                             // stop the timer when an error occours
                             window.clearInterval(detailInterval);
                         }
-                    }, 200);
+                    }.bind(this), 200);
 
                     // add hotspots
                     var hotspots = this.hotspotStore[this.currentPage];
@@ -2574,6 +2608,7 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
             }
         });
 
+        this.pageCmp = page;
         pageContainer.add(page);
 
         pageContainer.updateLayout();
@@ -2583,6 +2618,7 @@ pimcore.helpers.editmode.openPdfEditPanel = function () {
     var thumbUrl = "";
     var pages = [];
 
+    this.hotspotCmps = {};
     this.hotspotStore = {};
     this.hotspotMetaData = {};
     this.textStore = {};
@@ -2775,18 +2811,18 @@ pimcore.helpers.initMenuTooltips = function(){
     var items = $("[data-menu-tooltip]:not(.initialized)");
 
     items.mouseenter(function (e) {
-        $("#pimcore_menu_tooltip").show();
-        $("#pimcore_menu_tooltip").html($(this).data("menu-tooltip"));
+        $("#pimcore_tooltip").show();
+        $("#pimcore_tooltip").html($(this).data("menu-tooltip"));
 
         var offset = $(e.target).offset();
         var top = offset.top;
         top = top + ($(e.target).height() / 2);
 
-        $("#pimcore_menu_tooltip").css({top: top});
+        $("#pimcore_tooltip").css({top: top, left: 60});
     });
 
     items.mouseleave(function () {
-        $("#pimcore_menu_tooltip").hide();
+        $("#pimcore_tooltip").hide();
     });
 
     items.addClass("initialized", "true");
@@ -2846,6 +2882,8 @@ pimcore.helpers.requestNicePathData = function(source, targets, config, fieldCon
 
                     var responseData = rdata.data;
                     responseHandler(responseData);
+
+                    pimcore.layout.refresh();
                 }
             } catch (e) {
                 console.log(e);
@@ -2862,6 +2900,7 @@ pimcore.helpers.getNicePathHandlerStore = function(store, config, gridView, resp
         pathProperty: "path"
     });
 
+    store.ignoreDataChanged = true;
     store.each(function (record, id) {
         var recordId = record.data[config.idProperty];
         if (typeof responseData[recordId] != "undefined") {
@@ -2874,7 +2913,9 @@ pimcore.helpers.getNicePathHandlerStore = function(store, config, gridView, resp
             }
         }
     }, this);
+    store.ignoreDataChanged = false;
 
+    gridView.updateLayout();
 };
 
 pimcore.helpers.isValidPassword = function (pass) {

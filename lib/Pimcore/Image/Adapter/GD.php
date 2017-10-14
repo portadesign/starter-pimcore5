@@ -131,9 +131,6 @@ class GD extends Adapter
         return false;
     }
 
-    /**
-     * @return void
-     */
     protected function destroy()
     {
         imagedestroy($this->resource);
@@ -210,13 +207,14 @@ class GD extends Adapter
     /**
      * @param  $width
      * @param  $height
+     * @param  bool $forceResize
      * @return self
      */
-    public function frame($width, $height)
+    public function frame($width, $height, $forceResize = false)
     {
         $this->preModify();
 
-        $this->contain($width, $height);
+        $this->contain($width, $height, $forceResize);
 
         $x = ($width - $this->getWidth()) / 2;
         $y = ($height - $this->getHeight()) / 2;
@@ -326,6 +324,15 @@ class GD extends Adapter
         return $this;
     }
 
+    /**
+     * @param string $image
+     * @param int $x
+     * @param int $y
+     * @param int $alpha
+     * @param string $composite
+     * @param string $origin
+     * @return $this
+     */
     public function addOverlay($image, $x = 0, $y = 0, $alpha = 100, $composite = "COMPOSITE_DEFAULT", $origin = 'top-left')
     {
         $this->preModify();

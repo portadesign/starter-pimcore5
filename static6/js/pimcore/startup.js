@@ -181,7 +181,7 @@ Ext.onReady(function () {
     Ext.Ajax.on('requestexception', function (conn, response, options) {
         console.log("xhr request failed");
 
-        if (!response.aborted) {
+        if (!response.aborted && options["ignoreErrors"] !== true) {
             if (response.status == 503) {
                 //show wait info
                 if (!pimcore.maintenanceWindow) {
@@ -199,10 +199,11 @@ Ext.onReady(function () {
             } else {
                 //do not remove notification, otherwise user is never informed about server exception (e.g. element cannot
                 // be saved due to HTTP 500 Response)
-                var errorMessage = "";
+                var date = new Date();
+                var errorMessage = "Timestamp: " + date.toString() + "\n";
 
                 try {
-                    errorMessage = "Status: " + response.status + " | " + response.statusText + "\n";
+                    errorMessage += "Status: " + response.status + " | " + response.statusText + "\n";
                     errorMessage += "URL: " + options.url + "\n";
                     if (options["params"]) {
                         errorMessage += "Params:\n";
@@ -238,35 +239,6 @@ Ext.onReady(function () {
         xhrActive--;
         if (xhrActive < 1) {
             Ext.get("pimcore_loading").hide();
-        }
-
-        // redirect to login-page if session is expired
-        if (typeof response.getResponseHeader == "function") {
-            if (response.getResponseHeader("X-Pimcore-Auth") == "required") {
-                //pimcore.settings.showCloseConfirmation = false;
-                //window.location.href = "/admin/login/?session_expired=true";
-
-                var errorMessage = "";
-
-                try {
-                    errorMessage = "Status: " + response.status + " | " + response.statusText + "\n";
-                    errorMessage += "URL: " + options.url + "\n";
-                    if(options["params"]) {
-                        errorMessage += "Params:\n";
-                        Ext.iterate(options.params, function (key, value) {
-                            errorMessage += ( "-> " + key + ": " + value + "\n");
-                        });
-                    }
-                    if(options["method"]) {
-                        errorMessage += "Method: " + options.method + "\n";
-                    }
-                    errorMessage += "Message: \n" + response.responseText;
-                } catch (e) {
-                    errorMessage = response.responseText;
-                }
-
-                pimcore.helpers.showNotification(t("session_error"), t("session_error_text"), "error", errorMessage);
-            }
         }
     });
 
@@ -709,7 +681,7 @@ pimcore["intervals"]["translations_admin_missing"] = window.setInterval(function
     var addedTranslations = pimcore.globalmanager.get("translations_admin_added");
     if (missingTranslations.length > 0) {
         var params = Ext.encode(missingTranslations);
-        for (i = 0; i < missingTranslations.length; i++) {
+        for (var i = 0; i < missingTranslations.length; i++) {
             addedTranslations.push(missingTranslations[i]);
         }
         pimcore.globalmanager.add("translations_admin_missing", new Array());

@@ -36,7 +36,6 @@ class Db
     protected static $_logCaptureActive = false;
 
     /**
-     * @static
      * @return string
      */
     public static function getType()
@@ -174,7 +173,6 @@ class Db
 
     /**
      * @static
-     * @return void
      */
     public static function close()
     {
@@ -214,6 +212,7 @@ class Db
 
     /**
      * @static
+     * @param $connection
      * @param string $method
      * @param array $args
      */
@@ -236,7 +235,7 @@ class Db
 
     /**
      * @static
-     *
+     * @param $connection
      */
     public static function stopCapturingDefinitionModifications($connection)
     {

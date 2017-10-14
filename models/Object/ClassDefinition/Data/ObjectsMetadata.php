@@ -233,6 +233,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     /**
      * @param $data
      * @param null $object
+     * @param array $params
      * @return array
      */
     public function getDataForGrid($data, $object = null, $params = [])
@@ -364,6 +365,10 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     {
         $tags = is_array($tags) ? $tags : [];
 
+        if ($this->getLazyLoading()) {
+            return $tags;
+        }
+
         if (is_array($data) && count($data) > 0) {
             foreach ($data as $metaObject) {
                 $object = $metaObject->getObject();
@@ -487,10 +492,9 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     }
 
 
-
     /**
      * @param Element\AbstractElement $object
-     * @return void
+     * @param array $params
      */
     public function save($object, $params = [])
     {
@@ -558,6 +562,11 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
         parent::save($object, $params);
     }
 
+    /**
+     * @param $object
+     * @param array $params
+     * @return array|mixed|null
+     */
     public function preGetData($object, $params = [])
     {
         $data = null;
@@ -596,7 +605,7 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
 
     /**
      * @param Element\AbstractElement $object
-     * @return void
+     * @param array $params
      */
     public function delete($object, $params = [])
     {
@@ -720,7 +729,8 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
     }
 
     /**
-     * @return void
+     * @param $class
+     * @param array $params
      */
     public function classSaved($class, $params = [])
     {
@@ -777,10 +787,11 @@ class ObjectsMetadata extends Model\Object\ClassDefinition\Data\Objects
         $this->columns = $masterDefinition->columns;
     }
 
-    /**
-     *
+    /** Override point for Enriching the layout definition before the layout is returned to the admin interface.
+     * @param $object Object\Concrete
+     * @param array $context additional contextual data
      */
-    public function enrichLayoutDefinition($object)
+    public function enrichLayoutDefinition($object, $context = [])
     {
         $classId = $this->allowedClassId;
 

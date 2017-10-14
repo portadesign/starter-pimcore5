@@ -44,7 +44,11 @@ pimcore.object.classificationstore.groupsPanel = Class.create({
 
         var readerFields = [];
         for (var i = 0; i < this.relationsFields.length; i++) {
-            readerFields.push({name: this.relationsFields[i], allowBlank: true, type: 'string'});
+            var columnConfig = {name: this.relationsFields[i], allowBlank: true, type: 'string'};
+            if (this.relationsFields[i] == "sorter") {
+                columnConfig["type"] = "int";
+            }
+            readerFields.push(columnConfig);
         }
 
         readerFields.push({name: 'mandatory', allowBlank: true, type: 'bool'});
@@ -389,8 +393,12 @@ pimcore.object.classificationstore.groupsPanel = Class.create({
     },
 
     onAddKey: function() {
-        var window = new pimcore.object.classificationstore.keySelectionWindow(this, false, true, false, this.storeConfig.id);
-        window.show();
+        var keySelectionWindow = new pimcore.object.classificationstore.keySelectionWindow({
+            parent: this,
+            enableKeys: true,
+            storeId: this.storeConfig.id
+        });
+        keySelectionWindow.show();
     },
 
     onAdd: function () {

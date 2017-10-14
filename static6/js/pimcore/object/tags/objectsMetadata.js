@@ -26,7 +26,7 @@ pimcore.object.tags.objectsMetadata = Class.create(pimcore.object.tags.objects, 
         var classStore = pimcore.globalmanager.get("object_types_store");
         var className = classStore.getById(fieldConfig.allowedClassId);
 
-        var classNameText = (typeof(className) != 'undefined') ? className.data.text : '';
+        var classNameText = className ? className.data.text : '';
         this.fieldConfig.classes = [{classes: classNameText, id: fieldConfig.allowedClassId}];
 
         if (data) {
@@ -65,6 +65,9 @@ pimcore.object.tags.objectsMetadata = Class.create(pimcore.object.tags.objects, 
                     this.dataChanged = true;
                 }.bind(this),
                 update: function(store) {
+                    if(store.ignoreDataChanged) {
+                        return;
+                    }
                     this.dataChanged = true;
                 }.bind(this)
             },
@@ -72,7 +75,6 @@ pimcore.object.tags.objectsMetadata = Class.create(pimcore.object.tags.objects, 
         });
 
     },
-
 
     createLayout: function(readOnly) {
         var autoHeight = false;
@@ -256,33 +258,7 @@ pimcore.object.tags.objectsMetadata = Class.create(pimcore.object.tags.objects, 
             });
         }
 
-        var tbarItems = [
-            {
-                xtype: "tbspacer",
-                width: 20,
-                height: 16,
-                cls: "pimcore_icon_droptarget"
-            },
-            {
-                xtype: "tbtext",
-                text: "<b>" + this.fieldConfig.title + "</b>"
-            }];
-
-        if (!readOnly) {
-            tbarItems = tbarItems.concat([
-                "->",
-                {
-                    xtype: "button",
-                    iconCls: "pimcore_icon_delete",
-                    handler: this.empty.bind(this)
-                },
-                {
-                    xtype: "button",
-                    iconCls: "pimcore_icon_search",
-                    handler: this.openSearchEditor.bind(this)
-                },
-                this.getCreateControl()]);
-        }
+        var toolbarItems = this.getEditToolbarItems(readOnly);
 
 
         this.cellEditing = Ext.create('Ext.grid.plugin.CellEditing', {
@@ -306,20 +282,37 @@ pimcore.object.tags.objectsMetadata = Class.create(pimcore.object.tags.objects, 
             viewConfig: {
                 plugins: {
                     ptype: 'gridviewdragdrop',
-                    dragroup: 'element'
+                    draggroup: 'element'
                 },
                 markDirty: false,
                 listeners: {
                     refresh: function (gridview) {
                         this.requestNicePathData(this.store.data);
-                    }.bind(this)
+                    }.bind(this),
+                    drop: function () {
+                        // this is necessary to avoid endless recursion when long lists are sorted via d&d
+                        // TODO: investigate if there this is already fixed 6.2
+                        if(this.object.toolbar && this.object.toolbar.items && this.object.toolbar.items.items) {
+                            this.object.toolbar.items.items[0].focus();
+                        }
+                    }.bind(this),
+                    // see https://github.com/pimcore/pimcore/issues/979
+                    // probably a ExtJS 6.0 bug. withou this, dropdowns not working anymore if plugin is enabled
+                    // TODO: investigate if there this is already fixed 6.2
+                    cellmousedown: function( element , td , cellIndex , record , tr , rowIndex , e , eOpts ) {
+                        if(cellIndex > visibleFields.length) {
+                            return false;
+                        } else {
+                            return true;
+                        }
+                    }
                 }
             },
             componentCls: cls,
             width: this.fieldConfig.width,
             height: this.fieldConfig.height,
             tbar: {
-                items: tbarItems,
+                items: toolbarItems,
                 ctCls: "pimcore_force_auto_width",
                 cls: "pimcore_force_auto_width"
             },
@@ -333,7 +326,7 @@ pimcore.object.tags.objectsMetadata = Class.create(pimcore.object.tags.objects, 
         if(!readOnly) {
             this.component.on("rowcontextmenu", this.onRowContextmenu);
         }
-        
+
         this.component.reference = this;
 
         if(!readOnly) {
@@ -405,6 +398,38 @@ pimcore.object.tags.objectsMetadata = Class.create(pimcore.object.tags.objects, 
 
     getLayoutShow: function () {
         return this.createLayout(true);
+    },
+
+    getEditToolbarItems: function(readOnly) {
+        var toolbarItems = [
+            {
+                xtype: "tbspacer",
+                width: 20,
+                height: 16,
+                cls: "pimcore_icon_droptarget"
+            },
+            {
+                xtype: "tbtext",
+                text: "<b>" + this.fieldConfig.title + "</b>"
+            }];
+
+        if (!readOnly) {
+            toolbarItems = toolbarItems.concat([
+                "->",
+                {
+                    xtype: "button",
+                    iconCls: "pimcore_icon_delete",
+                    handler: this.empty.bind(this)
+                },
+                {
+                    xtype: "button",
+                    iconCls: "pimcore_icon_search",
+                    handler: this.openSearchEditor.bind(this)
+                },
+                this.getCreateControl()]);
+        }
+
+        return toolbarItems;
     },
 
     dndAllowed: function(data, fromTree) {

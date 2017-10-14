@@ -40,10 +40,17 @@ class Admin_LoginController extends \Pimcore\Controller\Action\Admin
                         $loginUrl = $uri . "/admin/login/login/?username=" . $username . "&token=" . $token . "&reset=true";
 
                         try {
-                            $mail = Tool::getMail([$user->getEmail()], "Pimcore lost password service");
-                            $mail->setIgnoreDebugMode(true);
-                            $mail->setBodyText("Login to pimcore and change your password using the following link. This temporary login link will expire in 30 minutes: \r\n\r\n" . $loginUrl);
-                            $mail->send();
+                            $results = \Pimcore::getEventManager()->trigger("admin.login.login.lostpassword", $this, [
+                                "user" => $user,
+                                "loginUrl" => $loginUrl
+                            ]);
+                            
+                            if ($results->count() === 0) { // no event has been triggered
+                                $mail = Tool::getMail([$user->getEmail()], "Pimcore lost password service");
+                                $mail->setIgnoreDebugMode(true);
+                                $mail->setBodyText("Login to pimcore and change your password using the following link. This temporary login link will expire in 30 minutes: \r\n\r\n" . $loginUrl);
+                                $mail->send();
+                            }
                             $this->view->success = true;
                         } catch (\Exception $e) {
                             $this->view->error = "could not send email";
@@ -231,7 +238,8 @@ class Admin_LoginController extends \Pimcore\Controller\Action\Admin
             $matchIp = false;
             $matchUser = false;
 
-            if ($login[0] > (time() - 300)) {
+            $time = strtotime($login[0]);
+            if ($time > (time() - 300)) {
                 if ($user && $login[2] == $user) {
                     $matchesUserOnly++;
                     $matchUser = true;
@@ -254,6 +262,9 @@ class Admin_LoginController extends \Pimcore\Controller\Action\Admin
         }
     }
 
+    /**
+     * @return array
+     */
     protected function readLogFile()
     {
         $data = $this->getLogFile();
@@ -269,6 +280,10 @@ class Admin_LoginController extends \Pimcore\Controller\Action\Admin
         return $entries;
     }
 
+    /**
+     * @param $username
+     * @param $error
+     */
     protected function writeLogFile($username, $error)
     {
         $logfile = PIMCORE_LOG_DIRECTORY . "/loginerror.log";
@@ -277,7 +292,7 @@ class Admin_LoginController extends \Pimcore\Controller\Action\Admin
         $remoteHost = Tool::getAnonymizedClientIp();
 
         $data[] = [
-            time(),
+            date(\DateTime::ISO8601),
             $remoteHost,
             $username
         ];

@@ -71,6 +71,9 @@ class ClassDefinition extends Model\AbstractModel
      */
     public $parentClass;
 
+    /**
+     * @var boolean
+     */
     public $useTraits;
 
     /**
@@ -157,7 +160,7 @@ class ClassDefinition extends Model\AbstractModel
                 $class = new self();
                 $name = $class->getDao()->getNameById($id);
                 $definitionFile = $class->getDefinitionFile($name);
-                $class = include $definitionFile;
+                $class = @include $definitionFile;
 
                 if (!$class instanceof self) {
                     throw new \Exception("Class definition with name " . $name . " or ID " . $id . " does not exist");
@@ -211,7 +214,6 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param string $name
-     * @return void
      */
     public function rename($name)
     {
@@ -243,9 +245,11 @@ class ClassDefinition extends Model\AbstractModel
     }
 
     /**
+     * @param bool $saveDefinitionFile
+     *
      * @throws \Exception
      */
-    public function save()
+    public function save($saveDefinitionFile = true)
     {
         $isUpdate = false;
         if ($this->getId()) {
@@ -276,17 +280,18 @@ class ClassDefinition extends Model\AbstractModel
         self::cleanupForExport($clone->layoutDefinitions);
 
 
-        $exportedClass = var_export($clone, true);
+        if ($saveDefinitionFile) {
+            $exportedClass = var_export($clone, true);
 
-        $data = '<?php ';
-        $data .= "\n\n";
-        $data .= $infoDocBlock;
-        $data .= "\n\n";
+            $data = '<?php ';
+            $data .= "\n\n";
+            $data .= $infoDocBlock;
+            $data .= "\n\n";
 
-        $data .= "\nreturn " . $exportedClass . ";\n";
+            $data .= "\nreturn " . $exportedClass . ";\n";
 
-        \Pimcore\File::put($definitionFile, $data);
-
+            \Pimcore\File::putPhpFile($definitionFile, $data);
+        }
 
         // create class for object
         $extendClass = "Concrete";
@@ -312,9 +317,9 @@ class ClassDefinition extends Model\AbstractModel
             foreach ($this->getFieldDefinitions() as $key => $def) {
                 if (!(method_exists($def, "isRemoteOwner") and $def->isRemoteOwner())) {
                     if ($def instanceof Object\ClassDefinition\Data\Localizedfields) {
-                        $cd .= "* @method static \\Pimcore\\Model\\Object\\" . ucfirst($this->getName()) . '\Listing getBy' . ucfirst($def->getName()) . ' ($field, $value, $locale = null, $limit = 0) ' . "\n";
+                        $cd .= "* @method \\Pimcore\\Model\\Object\\" . ucfirst($this->getName()) . '\Listing getBy' . ucfirst($def->getName()) . ' ($field, $value, $locale = null, $limit = 0) ' . "\n";
                     } else {
-                        $cd .= "* @method static \\Pimcore\\Model\\Object\\" . ucfirst($this->getName()) . '\Listing getBy' . ucfirst($def->getName()) . ' ($value, $limit = 0) ' . "\n";
+                        $cd .= "* @method \\Pimcore\\Model\\Object\\" . ucfirst($this->getName()) . '\Listing getBy' . ucfirst($def->getName()) . ' ($value, $limit = 0) ' . "\n";
                     }
                 }
             }
@@ -496,11 +501,9 @@ class ClassDefinition extends Model\AbstractModel
         return $text;
     }
 
-    /**
-     * @return void
-     */
     public function delete()
     {
+        \Pimcore::getEventManager()->trigger("object.class.preDelete", $this);
 
         // delete all objects using this class
         $list = new Listing();
@@ -533,11 +536,34 @@ class ClassDefinition extends Model\AbstractModel
             $customLayout->delete();
         }
 
+        $brickListing = new Object\Objectbrick\Definition\Listing();
+        $brickListing = $brickListing->load();
+        /** @var  $brickDefinition Object\Objectbrick\Definition */
+        foreach ($brickListing as $brickDefinition) {
+            $modified = false;
+
+            $classDefinitions = $brickDefinition->getClassDefinitions();
+            if (is_array($classDefinitions)) {
+                foreach ($classDefinitions as $key => $classDefinition) {
+                    if ($classDefinition["classname"] == $this->getId()) {
+                        unset($classDefinitions[$key]);
+                        $modified = true;
+                    }
+                }
+            }
+            if ($modified) {
+                $brickDefinition->setClassDefinitions($classDefinitions);
+                $brickDefinition->save();
+            }
+        }
+
         $this->getDao()->delete();
+
+        \Pimcore::getEventManager()->trigger("object.class.postDelete", $this);
     }
 
     /**
-     * @return void
+     * Deletes PHP files from Filesystem
      */
     protected function deletePhpClasses()
     {
@@ -636,7 +662,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param int $creationDate
-     * @return void
+     * @return $this
      */
     public function setCreationDate($creationDate)
     {
@@ -647,7 +673,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param int $modificationDate
-     * @return void
+     * @return $this
      */
     public function setModificationDate($modificationDate)
     {
@@ -658,7 +684,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param int $userOwner
-     * @return void
+     * @return $this
      */
     public function setUserOwner($userOwner)
     {
@@ -669,7 +695,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param int $userModification
-     * @return void
+     * @return $this
      */
     public function setUserModification($userModification)
     {
@@ -696,7 +722,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param array $fieldDefinitions
-     * @return void
+     * @return $this
      */
     public function setFieldDefinitions($fieldDefinitions)
     {
@@ -708,7 +734,7 @@ class ClassDefinition extends Model\AbstractModel
     /**
      * @param string $key
      * @param Object\ClassDefinition\Data $data
-     * @return void
+     * @return $this
      */
     public function addFieldDefinition($key, $data)
     {
@@ -718,7 +744,8 @@ class ClassDefinition extends Model\AbstractModel
     }
 
     /**
-     * @return Object\ClassDefinition\Data
+     * @param $key
+     * @return Object\ClassDefinition\Data|boolean
      */
     public function getFieldDefinition($key)
     {
@@ -731,7 +758,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param array $layoutDefinitions
-     * @return void
+     * @return $this
      */
     public function setLayoutDefinitions($layoutDefinitions)
     {
@@ -745,7 +772,6 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param array|Object\ClassDefinition\Layout|Object\ClassDefinition\Data $def
-     * @return void
      */
     public function extractDataDefinitions($def)
     {
@@ -782,7 +808,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param mixed $parent
-     * @return void
+     * @return $this
      */
     public function setParent($parent)
     {
@@ -836,7 +862,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param string $parentClass
-     * @return void
+     * @return $this
      */
     public function setParentClass($parentClass)
     {
@@ -847,7 +873,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param boolean $allowInherit
-     * @return void
+     * @return $this
      */
     public function setAllowInherit($allowInherit)
     {
@@ -858,7 +884,7 @@ class ClassDefinition extends Model\AbstractModel
 
     /**
      * @param boolean $allowVariants
-     * @return void
+     * @return $this
      */
     public function setAllowVariants($allowVariants)
     {

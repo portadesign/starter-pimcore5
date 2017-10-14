@@ -112,6 +112,33 @@ class CustomLayout extends Model\AbstractModel
         return $customLayout;
     }
 
+    /**
+     * @param string $field
+     *
+     * @return \Pimcore\Model\Object\ClassDefinition\Data | null
+     */
+    public function getFieldDefinition($field)
+    {
+        $findElement = function ($key, $definition) use (&$findElement) {
+            if ($definition->getName() == $key) {
+                return $definition;
+            } else {
+                if (method_exists($definition, 'getChilds')) {
+                    foreach ($definition->getChilds() as $definition) {
+                        if ($definition = $findElement($key, $definition)) {
+                            return $definition;
+                        }
+                    }
+                } else {
+                    if ($definition->getName() == $key) {
+                        return $definition;
+                    }
+                }
+            }
+        };
+
+        return $findElement($field, $this->getLayoutDefinitions());
+    }
 
     /**
      * @param array $values
@@ -126,7 +153,7 @@ class CustomLayout extends Model\AbstractModel
     }
 
     /**
-     * @return void
+     * @todo: $isUpdate is not needed
      */
     public function save()
     {
@@ -155,9 +182,6 @@ class CustomLayout extends Model\AbstractModel
         }
     }
 
-    /**
-     * @return void
-     */
     public function delete()
     {
         // empty object cache
@@ -269,7 +293,7 @@ class CustomLayout extends Model\AbstractModel
 
     /**
      * @param int $creationDate
-     * @return void
+     * @return $this
      */
     public function setCreationDate($creationDate)
     {
@@ -280,7 +304,7 @@ class CustomLayout extends Model\AbstractModel
 
     /**
      * @param int $modificationDate
-     * @return void
+     * @return $this
      */
     public function setModificationDate($modificationDate)
     {
@@ -291,7 +315,7 @@ class CustomLayout extends Model\AbstractModel
 
     /**
      * @param int $userOwner
-     * @return void
+     * @return $this
      */
     public function setUserOwner($userOwner)
     {
@@ -302,7 +326,7 @@ class CustomLayout extends Model\AbstractModel
 
     /**
      * @param int $userModification
-     * @return void
+     * @return $this
      */
     public function setUserModification($userModification)
     {
@@ -314,6 +338,7 @@ class CustomLayout extends Model\AbstractModel
 
     /**
      * @param string $description
+     * @return $this
      */
     public function setDescription($description)
     {

@@ -326,6 +326,10 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
                     throw new Element\ValidationException("Invalid object relation to object [".$id."] in field " . $this->getName(), null, null);
                 }
             }
+
+            if ($this->getMaxItems() && count($data) > $this->getMaxItems()) {
+                throw new Element\ValidationException('Number of allowed relations in field `' . $this->getName() . '` exceeded (max. ' . $this->getMaxItems() . ')');
+            }
         }
     }
 
@@ -384,6 +388,10 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     public function getCacheTags($data, $tags = [])
     {
         $tags = is_array($tags) ? $tags : [];
+
+        if ($this->getLazyLoading()) {
+            return $tags;
+        }
 
         if (is_array($data) && count($data) > 0) {
             foreach ($data as $object) {
@@ -487,7 +495,11 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
         return $relatedObjects;
     }
 
-
+    /**
+     * @param $object
+     * @param array $params
+     * @return array|mixed|null
+     */
     public function preGetData($object, $params = [])
     {
         $data = null;
@@ -525,6 +537,12 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
         return is_array($data) ? $data : [];
     }
 
+    /**
+     * @param $object
+     * @param $data
+     * @param array $params
+     * @return array|null
+     */
     public function preSetData($object, $data, $params = [])
     {
         if ($data === null) {
@@ -542,7 +560,7 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
 
     /**
      * @param string $fieldtype
-     * @return $this|void
+     * @return $this
      */
     public function setFieldtype($fieldtype)
     {
@@ -627,9 +645,9 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
             $result = [];
             foreach ($tabledata as $in) {
                 $out = [];
-                $out["id"] = $in["id"];
-                $out["path"] = $in["fullpath"];
-                $out["type"] = $in["type"];
+                $out["id"] = $in[0];
+                $out["path"] = $in[1];
+                $out["type"] = $in[2];
                 $result[] = $out;
             }
 
@@ -672,10 +690,11 @@ class Objects extends Model\Object\ClassDefinition\Data\Relations\AbstractRelati
     }
 
 
-    /**
-     * Override point for Enriching the layout definition before the layout is returned to the admin interface.
+    /** Override point for Enriching the layout definition before the layout is returned to the admin interface.
+     * @param $object Object\Concrete
+     * @param array $context additional contextual data
      */
-    public function enrichLayoutDefinition($object)
+    public function enrichLayoutDefinition($object, $context = [])
     {
     }
 

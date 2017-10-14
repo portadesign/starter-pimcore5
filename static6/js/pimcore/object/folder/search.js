@@ -192,7 +192,6 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
         }
         this.store.getProxy().setExtraParam("only_direct_children", this.onlyDirectChildren);
         this.store.setPageSize(itemsPerPage);
-        this.store.load();
 
         var gridColumns = gridHelper.getGridColumns();
 
@@ -308,6 +307,10 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
                 this.saveColumnConfigButton
             ]
         });
+
+        this.grid.on("columnmove", function() { this.saveColumnConfigButton.show() }.bind(this));
+        this.grid.on("columnresize", function() { this.saveColumnConfigButton.show() }.bind(this));
+
         this.grid.on("rowcontextmenu", this.onRowContextmenu);
 
         this.grid.on("afterrender", function (grid) {
@@ -440,6 +443,8 @@ pimcore.object.search = Class.create(pimcore.object.helpers.gridTabAbstract, {
             }));
         }
 
+        pimcore.plugin.broker.fireEvent("prepareOnRowContextmenu", menu, this, selectedRows);
+		
         e.stopEvent();
         menu.showAt(e.pageX, e.pageY);
     }

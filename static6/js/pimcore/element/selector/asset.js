@@ -259,7 +259,10 @@ pimcore.element.selector.asset = Class.create(pimcore.element.selector.abstract,
         proxy.setExtraParam("type", "asset");
         proxy.setExtraParam("query", formValues.query);
         proxy.setExtraParam("subtype", formValues.subtype);
-        //this.store.load();
+
+        if (this.parent.config && this.parent.config.context) {
+            proxy.setExtraParam("context", Ext.encode(this.parent.config.context));
+        }
 
         this.pagingtoolbar.moveFirst();
     }

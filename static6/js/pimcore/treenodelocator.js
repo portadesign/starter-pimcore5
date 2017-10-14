@@ -2,38 +2,43 @@ pimcore.registerNS("pimcore.treenodelocator.x");
 
 pimcore.treenodelocator.showInTree = function(id, elementType, button) {
 
-        if (button) {
-            button.disable();
-        }
+    if (button) {
+        button.disable();
+    }
 
-        Ext.Ajax.request({
-            url: "/admin/element/type-path",
-            params: {
-                id: id,
-                type: elementType
-            },
-            success: function (response) {
-                try {
-                    var res = Ext.decode(response.responseText);
-                    if (res.success) {
-                        Ext.getCmp("pimcore_panel_tree_" + elementType + "s").expand();
-                        var tree = pimcore.globalmanager.get("layout_" + elementType + "_tree");
-
-
-                        var callback = function() {
-                            if (button) {
-                                button.enable();
-                            }
-                        }
-                        pimcore.treenodelocator.searchInTree(res, elementType, tree.tree, res.idPath, callback);
+    Ext.Ajax.request({
+        url: "/admin/element/type-path",
+        params: {
+            id: id,
+            type: elementType
+        },
+        success: function (response) {
+            try {
+                var res = Ext.decode(response.responseText);
+                if (res.success) {
+                    var accordion = Ext.getCmp("pimcore_panel_tree_left");
+                    if (accordion) {
+                        accordion.expand();
                     }
-                } catch (e) {
-                    console.log(e);
-                    pimcore.treenodelocator.showError(null, null);
-                }
 
-            }.bind(this)
-        });
+                    Ext.getCmp("pimcore_panel_tree_" + elementType + "s").expand();
+                    var tree = pimcore.globalmanager.get("layout_" + elementType + "_tree");
+
+
+                    var callback = function() {
+                        if (button) {
+                            button.enable();
+                        }
+                    }
+                    pimcore.treenodelocator.searchInTree(res, elementType, tree.tree, res.idPath, callback);
+                }
+            } catch (e) {
+                console.log(e);
+                pimcore.treenodelocator.showError(null, null);
+            }
+
+        }.bind(this)
+    });
 }
 
 
@@ -45,7 +50,7 @@ pimcore.treenodelocator.reportDone = function(node, elementType, callback) {
         view.focusRow(node);
     }
     if (typeof callback == "function") {
-            callback();
+        callback();
     }
 }
 
@@ -197,9 +202,9 @@ pimcore.treenodelocator.getDirection = function(node, element, elementType, sear
 
     } else {
         if (eType == "folder") {
-            if (firstFolderChild && elementKey < firstFolderChild.data.text) {
+            if (firstFolderChild && elementKey.toLowerCase() < firstFolderChild.data.text.toLowerCase()) {
                 direction = -1;
-            } else if (lastFolderChild && elementKey > lastFolderChild.data.text) {
+            } else if (lastFolderChild && elementKey.toLowerCase() > lastFolderChild.data.text.toLowerCase()) {
                 direction = 1;
             } else if (firstelementChild) {
                 direction = -1;
@@ -207,9 +212,9 @@ pimcore.treenodelocator.getDirection = function(node, element, elementType, sear
         } else {
             if (lastFolderChild) {
                 direction = 1;
-            } else if (firstelementChild && elementKey < firstelementChild.data.text) {
+            } else if (firstelementChild && elementKey.toLowerCase() < firstelementChild.data.text.toLowerCase()) {
                 direction = -1;
-            } else if (lastelementChild && elementKey > lastelementChild.data.text) {
+            } else if (lastelementChild && elementKey.toLowerCase() > lastelementChild.data.text.toLowerCase()) {
                 direction = 1;
             }
         }
@@ -270,7 +275,7 @@ pimcore.treenodelocator.switchToPage = function(node, pageNumber, element, eleme
 
         pimcore.helpers.addTreeNodeLoadingIndicator(node.data.elementType, node.id);
 
-        store.reload({
+        store.load({
             node: node,
             callback: pimcore.treenodelocator.reloadComplete.bind(this, node, element, elementType, searchData, callback)
         });

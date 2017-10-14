@@ -55,7 +55,6 @@ pimcore.document.tags.wysiwyg = Class.create(pimcore.document.tag, {
             inactiveContainerWidth = options.width;
         }
 
-        Ext.get(this.textarea).addCls("pimcore_wysiwyg_inactive");
         Ext.get(this.textarea).addCls("pimcore_wysiwyg");
         Ext.get(this.textarea).applyStyles("width: " + inactiveContainerWidth  + "; min-height: " + textareaHeight
                                                                                                 + "px;");
@@ -95,27 +94,17 @@ pimcore.document.tags.wysiwyg = Class.create(pimcore.document.tag, {
 
             delete eConfig.width;
 
-            var removePluginsAdd = "";
-            if(eConfig.removePlugins) {
-                removePluginsAdd = "," + eConfig.removePlugins;
-            }
-
             eConfig.language = pimcore.settings["language"];
-            eConfig.removePlugins = removePluginsAdd;
             eConfig.entities = false;
             eConfig.entities_greek = false;
             eConfig.entities_latin = false;
             eConfig.extraAllowedContent = "*[pimcore_type,pimcore_id]";
 
+            if(typeof(pimcore.document.tags.wysiwyg.defaultEditorConfig) == 'object'){
+                eConfig = mergeObject(pimcore.document.tags.wysiwyg.defaultEditorConfig,eConfig);
+            }
+
             this.ckeditor = CKEDITOR.inline(this.textarea, eConfig);
-
-            this.ckeditor.on('focus', function () {
-                Ext.get(this.textarea).removeCls("pimcore_wysiwyg_inactive");
-            }.bind(this));
-
-            this.ckeditor.on('blur', function () {
-                Ext.get(this.textarea).addCls("pimcore_wysiwyg_inactive");
-            }.bind(this));
 
             this.ckeditor.on('change', this.checkValue.bind(this));
 

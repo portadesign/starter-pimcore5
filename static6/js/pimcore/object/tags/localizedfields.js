@@ -148,6 +148,7 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
                         }
 
                         this.availablePanels[oldLanguage].hide();
+                        this.component.updateLayout();
                         this.availablePanels[newLanguage].show();
                         this.currentLanguage = newLanguage;
                         this.component.updateLayout();
@@ -203,7 +204,6 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
             }
         } else {
             var panelConf = {
-                autoScroll: true,
                 monitorResize: true,
                 cls: "object_field",
                 activeTab: 0,
@@ -218,6 +218,12 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
             if(this.fieldConfig.height) {
                 panelConf.height = this.fieldConfig.height;
                 panelConf.autoHeight = false;
+            }
+
+            var hideLabels = false;
+
+            if(typeof this.fieldConfig.hideLabelsWhenTabsReached == 'number' && nrOfLanguages >= this.fieldConfig.hideLabelsWhenTabsReached){
+                hideLabels = true;
             }
 
             for (var i=0; i < nrOfLanguages; i++) {
@@ -238,10 +244,24 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
                     padding: "10px",
                     deferredRender: false,
                     hideMode: "offsets",
-                    iconCls: "pimcore_icon_language_" + this.frontendLanguages[i].toLowerCase(),
-                    title: pimcore.available_languages[this.frontendLanguages[i]],
                     items: items.items
                 };
+
+                if(hideLabels){
+                    item.title = '<div class="pimcore_icon_language_' + this.frontendLanguages[i].toLowerCase() + '" title="' + pimcore.available_languages[this.frontendLanguages[i]] + '" style="width: 20px; height:20px;"></div>';
+                    item.tbar = Ext.create('Ext.toolbar.Toolbar', {
+                        style : 'margin-bottom:10px;',
+                        items: [{
+                            text: t('grid_current_language') + ': ' + pimcore.available_languages[this.frontendLanguages[i]],
+                            xtype: "tbtext",
+                            style : 'font-size: 13px;'
+                        }
+                        ]
+                    });
+                }else{
+                    item.iconCls = "pimcore_icon_language_" + this.frontendLanguages[i].toLowerCase();
+                    item.title = pimcore.available_languages[this.frontendLanguages[i]];
+                }
 
                 if (this.fieldConfig.labelWidth) {
                     item.labelWidth = this.fieldConfig.labelWidth;

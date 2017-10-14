@@ -192,6 +192,14 @@ class Link extends Model\Document\Tag
     }
 
     /**
+     * @param string $text
+     */
+    public function setText($text)
+    {
+        $this->data["text"] = $text;
+    }
+
+    /**
      * @return string
      */
     public function getTarget()
@@ -266,7 +274,7 @@ class Link extends Model\Document\Tag
     /**
      * @see Document\Tag\TagInterface::setDataFromEditmode
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setDataFromEditmode($data)
     {
@@ -341,6 +349,7 @@ class Link extends Model\Document\Tag
 
     /**
      * @param Model\Webservice\Data\Document\Element $wsElement
+     * @param $document
      * @param mixed $params
      * @param null $idMapper
      * @throws \Exception
@@ -392,6 +401,8 @@ class Link extends Model\Document\Tag
 
     /**
      * Returns the current tag's data for web service export
+     *
+     * @param $document
      * @param mixed $params
      * @abstract
      * @return array
@@ -434,7 +445,6 @@ class Link extends Model\Document\Tag
      *  "asset" => array(...)
      * )
      * @param array $idMapping
-     * @return void
      */
     public function rewriteIds($idMapping)
     {

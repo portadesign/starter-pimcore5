@@ -104,9 +104,14 @@ class ClassDefinition extends Model\Webservice\Data
      * @var string
      */
     public $previewUrl;
+     /**
+     * @var string
+     */
+    public $group;
 
     /**
      * @param $class
+     * @param $options
      */
     public function map($class, $options = null)
     {

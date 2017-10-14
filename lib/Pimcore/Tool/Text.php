@@ -157,7 +157,7 @@ class Text
     public static function replaceWysiwygTextRelationIds($idMapping, $text)
     {
         if (!empty($text)) {
-            include_once("simple_html_dom.php");
+            include_once(PIMCORE_PATH . "/lib/simple_html_dom.php");
 
             $html = str_get_html($text);
             if (!$html) {
@@ -212,11 +212,15 @@ class Text
 
     /**
      * @static
-     * @param $text
+     * @param string $text
      * @return array
      */
     public static function getElementsTagsInWysiwyg($text)
     {
+        if (!is_string($text) || strlen($text) < 1) {
+            return [];
+        }
+
         $hash = "elements_raw_wysiwyg_text_" . md5($text);
         if (\Zend_Registry::isRegistered($hash)) {
             return \Zend_Registry::get($hash);
@@ -303,7 +307,7 @@ class Text
     public static function getCacheTagsOfWysiwygText($text, $tags = [])
     {
         $tags = is_array($tags) ? $tags : [];
-        
+
         if (!empty($text)) {
             $elements = self::getElementsInWysiwyg($text);
             foreach ($elements as $element) {

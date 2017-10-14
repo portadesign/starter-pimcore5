@@ -313,13 +313,16 @@ class Password extends Model\Object\ClassDefinition\Data
         return "******";
     }
 
+    /**
+     * @param $data
+     * @param $object
+     * @param array $params
+     * @return string
+     */
     public function getDataForGrid($data, $object, $params = [])
     {
         return "******";
     }
-
-
-
 
     /**
      * fills object field data values from CSV Import String
@@ -332,6 +335,16 @@ class Password extends Model\Object\ClassDefinition\Data
     public function getFromCsvImport($importValue, $object = null, $params = [])
     {
         return $this->getDataFromEditmode($importValue, $object, $params);
+    }
+
+    /**
+     * @param $object
+     * @param mixed $params
+     * @return string
+     */
+    public function getDataForSearchIndex($object, $params = [])
+    {
+        return "";
     }
 
     /**

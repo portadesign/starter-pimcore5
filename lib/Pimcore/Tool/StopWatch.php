@@ -14,9 +14,11 @@
 
 namespace Pimcore\Tool;
 
+/**
+ * @deprecated
+ */
 class StopWatch
 {
-
     /**
      * @var array
      */
@@ -30,11 +32,10 @@ class StopWatch
     /**
      * @param $component string
      * @static
-     * @return void
      */
     public static function start($component = 'default')
     {
-        self::$startTime[$component] = self::microtime_float();
+        self::$startTime[$component] = microtime(true);
         self::$laps[$component] = [];
     }
 
@@ -42,11 +43,10 @@ class StopWatch
      * @static
      * @param $label
      * @param string $component
-     * @return void
      */
     public static function lap($label, $component = 'default')
     {
-        self::$laps[$component][$label] = self::microtime_float();
+        self::$laps[$component][$label] = microtime(true);
     }
 
     /**
@@ -67,7 +67,7 @@ class StopWatch
             $lastLap = $time;
         }
 
-        $text .= "Total Time: " . (self::microtime_float() - self::$startTime[$component]) . "\n";
+        $text .= "Total Time (" . $component . "): " . (microtime(true) - self::$startTime[$component]) . "\n";
 
         if ($html) {
             $text = "<pre>" . $text . "</pre>";
@@ -80,7 +80,6 @@ class StopWatch
      * @static
      * @param string $component
      * @param bool $html
-     * @return void
      */
     public static function display($html = false, $component = 'default')
     {
@@ -88,6 +87,7 @@ class StopWatch
     }
 
     /**
+     * @deprecated
      * @static
      * @return float
      */

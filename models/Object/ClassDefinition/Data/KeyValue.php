@@ -20,6 +20,11 @@ use Pimcore\Model;
 use Pimcore\Model\Object;
 use Pimcore\Logger;
 
+/**
+ * Class KeyValue
+ * @package Pimcore\Model\Object\ClassDefinition\Data
+ * @deprecated will be removed entirely in Pimcore 5
+ */
 class KeyValue extends Model\Object\ClassDefinition\Data
 {
 
@@ -130,7 +135,6 @@ class KeyValue extends Model\Object\ClassDefinition\Data
      * This method is called in Object\\ClassDefinition::save() and is used to create the database table for the localized data
      * @param Object\ClassDefinition $class
      * @param mixed $params
-     * @return void
      */
     public function classSaved($class, $params = [])
     {
@@ -214,7 +218,7 @@ class KeyValue extends Model\Object\ClassDefinition\Data
 
     /**
      * @param integer $width
-     * @return void
+     * @return $this
      */
     public function setGroupDescWidth($width)
     {
@@ -225,7 +229,7 @@ class KeyValue extends Model\Object\ClassDefinition\Data
 
     /** Sets the width of the description column.
      * @param $width
-     * @return Object\ClassDefinition\Data_KeyValue
+     * @return Object\ClassDefinition\Data\KeyValue
      */
     public function setDescWidth($width)
     {
@@ -236,7 +240,7 @@ class KeyValue extends Model\Object\ClassDefinition\Data
 
     /**
      * @param integer $width
-     * @return void
+     * @return $this
      */
     public function setUnitWidth($width)
     {
@@ -290,7 +294,7 @@ class KeyValue extends Model\Object\ClassDefinition\Data
 
     /**
      * @param integer $width
-     * @return void
+     * @return $this
      */
     public function setValueWidth($width)
     {
@@ -372,6 +376,7 @@ class KeyValue extends Model\Object\ClassDefinition\Data
     /**
      * @param mixed $data
      * @param null $object
+     * @param array $params
      * @return mixed|Object\Data\KeyValue
      * @throws \Exception
      */

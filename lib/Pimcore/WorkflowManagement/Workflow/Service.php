@@ -64,7 +64,11 @@ class Service
         return $data;
     }
 
-
+    /**
+     * @param $data
+     * @param $pimcoreTagName
+     * @return mixed|null
+     */
     public static function getDataFromEditmode($data, $pimcoreTagName)
     {
         $tagClass = '\\Pimcore\\Model\\Object\\ClassDefinition\\Data\\' . ucfirst($pimcoreTagName);
@@ -91,6 +95,7 @@ class Service
      * @param string $title
      * @param string $description
      * @param array $noteData
+     * @param null $user
      * @return Element\Note $note
      */
     public static function createActionNote($element, $type, $title, $description, $noteData, $user=null)
@@ -110,7 +115,15 @@ class Service
 
         if (is_array($noteData)) {
             foreach ($noteData as $row) {
-                $note->addData($row['key'], $row['type'], $row['value']);
+                if ($row['key'] === 'noteDate' && $row['type'] === 'date') {
+                    /**
+                     * @var \Pimcore\Date $date
+                     */
+                    $date = $row['value'];
+                    $note->setDate($date->getTimestamp());
+                } else {
+                    $note->addData($row['key'], $row['type'], $row['value']);
+                }
             }
         }
 

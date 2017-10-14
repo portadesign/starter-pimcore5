@@ -44,7 +44,7 @@ class PimcoreNavigationController
      */
     public function getNavigation($activeDocument, $navigationRootDocument = null, $htmlMenuIdPrefix = null, $pageCallback = null, $cache = true)
     {
-        $cacheEnabled = (bool) $cache;
+        $cacheEnabled = $cache !== false;
         $this->_htmlMenuIdPrefix = $htmlMenuIdPrefix;
 
         if (!$navigationRootDocument) {
@@ -155,6 +155,7 @@ class PimcoreNavigationController
 
     /**
      * @param \Pimcore\Navigation\Page\Uri $page
+     * @param bool $isActive
      */
     protected function addActiveCssClasses($page, $isActive = false)
     {

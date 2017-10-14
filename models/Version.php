@@ -79,6 +79,11 @@ class Version extends AbstractModel
     public $serialized = false;
 
     /**
+     * @var string
+     */
+    public $stackTrace = "";
+
+    /**
      * @var bool
      */
     public static $disabled = false;
@@ -101,7 +106,6 @@ class Version extends AbstractModel
      * There are no new versions created, the read continues to operate normally
      *
      * @static
-     * @return void
      */
     public static function disable()
     {
@@ -113,7 +117,6 @@ class Version extends AbstractModel
      * just enabled the creation of versioning in the current process
      *
      * @static
-     * @return void
      */
     public static function enable()
     {
@@ -122,7 +125,7 @@ class Version extends AbstractModel
 
 
     /**
-     * @return void
+     * @throws \Exception
      */
     public function save()
     {
@@ -135,6 +138,13 @@ class Version extends AbstractModel
 
         if (!$this->date) {
             $this->setDate(time());
+        }
+
+        // get stack trace
+        try {
+            throw new \Exception("not a real exception ... ;-)");
+        } catch (\Exception $e) {
+            $this->stackTrace = $e->getTraceAsString();
         }
 
         $data = $this->getData();
@@ -187,7 +197,7 @@ class Version extends AbstractModel
     }
 
     /**
-     * @return void
+     * Delete this Version
      */
     public function delete()
     {
@@ -310,7 +320,6 @@ class Version extends AbstractModel
     /**
      * the cleanup is now done in the maintenance see self::maintenanceCleanUp()
      * @deprecated
-     * @return void
      */
     public function cleanHistory()
     {
@@ -382,6 +391,7 @@ class Version extends AbstractModel
     }
 
     /**
+     * @param $cid
      * @return $this
      */
     public function setCid($cid)
@@ -404,7 +414,7 @@ class Version extends AbstractModel
 
     /**
      * @param integer $id
-     * @return void
+     * @return $this
      */
     public function setId($id)
     {
@@ -415,7 +425,7 @@ class Version extends AbstractModel
 
     /**
      * @param string $note
-     * @return void
+     * @return $this
      */
     public function setNote($note)
     {
@@ -426,7 +436,7 @@ class Version extends AbstractModel
 
     /**
      * @param integer $userId
-     * @return void
+     * @return $this
      */
     public function setUserId($userId)
     {
@@ -454,7 +464,7 @@ class Version extends AbstractModel
 
     /**
      * @param mixed $data
-     * @return void
+     * @return $this
      */
     public function setData($data)
     {
@@ -473,7 +483,7 @@ class Version extends AbstractModel
 
     /**
      * @param boolean $serialized
-     * @return void
+     * @return $this
      */
     public function setSerialized($serialized)
     {
@@ -492,7 +502,7 @@ class Version extends AbstractModel
 
     /**
      * @param string $ctype
-     * @return void
+     * @return $this
      */
     public function setCtype($ctype)
     {
@@ -511,7 +521,7 @@ class Version extends AbstractModel
 
     /**
      * @param User $user
-     * @return void
+     * @return $this
      */
     public function setUser($user)
     {
@@ -538,7 +548,7 @@ class Version extends AbstractModel
 
     /**
      * @param bool $public
-     * @return void
+     * @return $this
      */
     public function setPublic($public)
     {
@@ -580,13 +590,10 @@ class Version extends AbstractModel
                     $alreadyCompressedCounter = 0;
 
                     Logger::debug("version compressed:" . $version->getFilePath());
+                    Logger::debug("Waiting 1 sec to not kill the server...");
+                    sleep(1);
                 } else {
                     $alreadyCompressedCounter++;
-                }
-
-                if ($overallCounter % 10 == 0) {
-                    Logger::debug("Waiting 5 secs to not kill the server...");
-                    sleep(5);
                 }
             }
 
@@ -656,6 +663,12 @@ class Version extends AbstractModel
 
                     // do not delete public versions
                     if ($version->getPublic()) {
+                        $ignoredIds[] = $version->getId();
+                        continue;
+                    }
+
+                    // do not delete versions referenced in the scheduler
+                    if ($this->getDao()->isVersionUsedInScheduler($version)) {
                         $ignoredIds[] = $version->getId();
                         continue;
                     }

@@ -24,6 +24,9 @@ use Pimcore\Model;
 class Listing extends Model\Listing\AbstractListing
 {
 
+    /** @var int maximum number of cacheable items */
+    protected static $cacheLimit = 5000;
+
     /**
      * Contains the results of the list. They are all an instance of Staticroute
      *
@@ -35,7 +38,8 @@ class Listing extends Model\Listing\AbstractListing
      * Tests if the given key is an valid order key to sort the results
      *
      * @todo remove the dummy-always-true rule
-     * @return boolean
+     * @param $key
+     * @return bool
      */
     public function isValidOrderKey($key)
     {
@@ -59,5 +63,21 @@ class Listing extends Model\Listing\AbstractListing
         $this->translations = $translations;
 
         return $this;
+    }
+
+    /**
+     * @return int
+     */
+    public static function getCacheLimit()
+    {
+        return self::$cacheLimit;
+    }
+
+    /**
+     * @param int $cacheLimit
+     */
+    public static function setCacheLimit($cacheLimit)
+    {
+        self::$cacheLimit = $cacheLimit;
     }
 }

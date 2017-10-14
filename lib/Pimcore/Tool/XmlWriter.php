@@ -152,6 +152,12 @@ class XmlWriter extends \Zend_Config_Writer_Xml
         return $this;
     }
 
+    /**
+     * @param $xml
+     * @param $key
+     * @param $data
+     * @return mixed
+     */
     protected function addChildConsiderCdata($xml, $key, $data)
     {
         $sData = (string) $data;
@@ -216,10 +222,10 @@ class XmlWriter extends \Zend_Config_Writer_Xml
     /**
      * Add a branch to an XML object recursively
      *
-     * @param  \Zend_Config      $config
-     * @param  \SimpleXMLElement $xml
-     * @param  \SimpleXMLElement $parent
-     * @return void
+     * @param \Zend_Config $config
+     * @param \SimpleXMLElement $xml
+     * @param \SimpleXMLElement $parent
+     * @throws \Zend_Config_Exception
      */
     protected function _addBranch(\Zend_Config $config, \SimpleXMLElement $xml, \SimpleXMLElement $parent)
     {
@@ -229,7 +235,9 @@ class XmlWriter extends \Zend_Config_Writer_Xml
             $attributes = null;
             if ($value instanceof \Zend_Config) {
                 $attributes = $value->get('@attributes');
-                $value = $value->get('@value') ?: $value;
+                if ($attributes || $value->get('@value')) {
+                    $value = $value->get('@value');
+                }
             }
             if ($branchType === null) {
                 if (is_numeric($key)) {
@@ -267,6 +275,11 @@ class XmlWriter extends \Zend_Config_Writer_Xml
         }
     }
 
+    /**
+     * @param \SimpleXMLElement $element
+     * @param $attributes
+     * @return \SimpleXMLElement
+     */
     protected function applyAttributes(\SimpleXMLElement $element, $attributes)
     {
         if ($attributes) {
@@ -277,8 +290,6 @@ class XmlWriter extends \Zend_Config_Writer_Xml
 
         return $element;
     }
-
-
 
     /**
      *  displays the rendered XML

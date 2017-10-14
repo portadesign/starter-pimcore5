@@ -19,6 +19,7 @@ namespace Pimcore\Model\Object\KeyValue\KeyConfig;
 use Pimcore\Model;
 
 /**
+ * @deprecated will be removed entirely in Pimcore 5
  * @property \Pimcore\Model\Object\KeyValue\KeyConfig $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -29,7 +30,6 @@ class Dao extends Model\Dao\AbstractDao
      * Get the data for the object from database for the given id, or from the ID which is set in the object
      *
      * @param integer $id
-     * @return void
      */
     public function getById($id = null)
     {
@@ -72,7 +72,9 @@ class Dao extends Model\Dao\AbstractDao
     /**
      * Save object to database
      *
-     * @return void
+     * @return boolean
+     *
+     * @todo: update() returns $this->model
      */
     public function save()
     {
@@ -85,8 +87,6 @@ class Dao extends Model\Dao\AbstractDao
 
     /**
      * Deletes object from database
-     *
-     * @return void
      */
     public function delete()
     {

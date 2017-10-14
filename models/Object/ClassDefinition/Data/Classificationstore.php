@@ -347,6 +347,7 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
     /**
      * @see Object\ClassDefinition\Data::getVersionPreview
+     * @param $data
      * @param null|Object\AbstractObject $object
      * @param mixed $params
      * @return string
@@ -573,7 +574,6 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
     /**
      * @param mixed $child
-     * @return void
      */
     public function addChild($child)
     {
@@ -608,7 +608,7 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
     /**
      * @param mixed $data
      * @param array $blockedKeys
-     * @return void
+     * @return $this
      */
     public function setValues($data = [], $blockedKeys = [])
     {
@@ -668,7 +668,8 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
     /**
      * This method is called in Object|Class::save() and is used to create the database table for the classification data
-     * @return void
+     * @param $class
+     * @param array $params
      */
     public function classSaved($class, $params = [])
     {
@@ -1004,12 +1005,19 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
         $this->localized = $localized;
     }
 
-
+    /**
+     * @param $object
+     * @param array $mergedMapping
+     * @return array|null
+     *
+     * @todo: Method returns void/null, should be boolean or null
+     */
     public function recursiveGetActiveGroupCollectionMapping($object, $mergedMapping = [])
     {
         if (!$object) {
             return;
         }
+
         $getter = "get" . ucfirst($this->getName());
         /** @var  $classificationStore Object\Classificationstore */
         $classificationStore = $object->$getter();
@@ -1038,9 +1046,11 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
 
     /**
-     * @param $object \Object_Abstract
+     * @param $object Object\Concrete
      * @param array $activeGroups
-     * @return array
+     * @return array|boolean
+     *
+     * @todo: Method returns void/null, should be boolean or null
      */
     public function recursiveGetActiveGroupsIds($object, $activeGroups = [])
     {
@@ -1074,7 +1084,11 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
         return $activeGroups;
     }
 
-    public function enrichLayoutDefinition($object)
+    /** Override point for Enriching the layout definition before the layout is returned to the admin interface.
+     * @param $object Object\Concrete
+     * @param array $context additional contextual data
+     */
+    public function enrichLayoutDefinition($object, $context = [])
     {
         $groupCollectionMapping = $this->recursiveGetActiveGroupCollectionMapping($object);
 
@@ -1158,7 +1172,7 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
                 $s1 = $sorting[$a["id"]] ? $sorting[$a["id"]] : 0;
                 $s2 = $sorting[$b["id"]] ? $sorting[$b["id"]] : 0;
 
-                if ($s1 < $s2) {
+                if ($s1 > $s2) {
                     return 1;
                 } elseif ($s2 > $s1) {
                     return -1;
@@ -1179,6 +1193,8 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
 
     /**
      * @param array $allowedGroupIds
+     *
+     * @todo: $parts is not definied here, should it be definied as empty array or null
      */
     public function setAllowedGroupIds($allowedGroupIds)
     {
@@ -1206,6 +1222,9 @@ class Classificationstore extends Model\Object\ClassDefinition\Data
         $this->storeId = $storeId ? $storeId : 1;
     }
 
+    /**
+     * @return array|\string[]
+     */
     public function getValidLanguages()
     {
         if ($this->localized) {

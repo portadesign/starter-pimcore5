@@ -18,19 +18,21 @@ namespace Pimcore\Model\Asset\Image\Thumbnail;
 
 use Pimcore\File;
 use Pimcore\Model\Tool\TmpStore;
-use Pimcore\Tool\StopWatch;
 use Pimcore\Model\Asset;
 use Pimcore\Logger;
 
 class Processor
 {
+    /**
+     * @var array
+     */
     protected static $argumentMapping = [
         "resize" => ["width", "height"],
-        "scaleByWidth" => ["width"],
-        "scaleByHeight" => ["height"],
-        "contain" => ["width", "height"],
-        "cover" => ["width", "height", "positioning", "doNotScaleUp"],
-        "frame" => ["width", "height"],
+        "scaleByWidth" => ["width", "forceResize"],
+        "scaleByHeight" => ["height", "forceResize"],
+        "contain" => ["width", "height", "forceResize"],
+        "cover" => ["width", "height", "positioning", "forceResize"],
+        "frame" => ["width", "height", "forceResize"],
         "trim" => ["tolerance"],
         "rotate" => ["angle"],
         "crop" => ["x", "y", "width", "height"],
@@ -197,7 +199,7 @@ class Processor
 
         $image->setUseContentOptimizedFormat($contentOptimizedFormat);
 
-        $startTime = StopWatch::microtime_float();
+        $startTime = microtime(true);
 
         $transformations = $config->getItems();
 
@@ -289,16 +291,20 @@ class Processor
                                         $value *= $highResFactor;
                                         $value = (int) ceil($value);
 
-                                        // check if source image is big enough otherwise adjust the high-res factor
-                                        if (in_array($key, ["width", "x"])) {
-                                            if ($sourceImageWidth < $value) {
-                                                $highResFactor = $calculateMaxFactor($highResFactor, $sourceImageWidth, $value);
-                                                goto prepareTransformations;
-                                            }
-                                        } elseif (in_array($key, ["height", "y"])) {
-                                            if ($sourceImageHeight < $value) {
-                                                $highResFactor = $calculateMaxFactor($highResFactor, $sourceImageHeight, $value);
-                                                goto prepareTransformations;
+                                        if (!isset($transformation["arguments"]["forceResize"]) || !$transformation["arguments"]["forceResize"]) {
+                                            // check if source image is big enough otherwise adjust the high-res factor
+                                            if (in_array($key, ["width", "x"])) {
+                                                if ($sourceImageWidth < $value) {
+                                                    $highResFactor = $calculateMaxFactor($highResFactor,
+                                                        $sourceImageWidth, $value);
+                                                    goto prepareTransformations;
+                                                }
+                                            } elseif (in_array($key, ["height", "y"])) {
+                                                if ($sourceImageHeight < $value) {
+                                                    $highResFactor = $calculateMaxFactor($highResFactor,
+                                                        $sourceImageHeight, $value);
+                                                    goto prepareTransformations;
+                                                }
                                             }
                                         }
                                     }
@@ -327,7 +333,7 @@ class Processor
 
         clearstatcache();
 
-        Logger::debug("Thumbnail " . $path . " generated in " . (StopWatch::microtime_float() - $startTime) . " seconds");
+        Logger::debug("Thumbnail " . $path . " generated in " . (microtime(true) - $startTime) . " seconds");
 
         // set proper permissions
         @chmod($fsPath, File::getDefaultMode());

@@ -16,6 +16,7 @@
 
 namespace Pimcore\Model\Object\Classificationstore;
 
+use Pimcore\Cache;
 use Pimcore\Model;
 
 /**
@@ -84,7 +85,7 @@ class KeyConfig extends Model\AbstractModel
 
     /** @var  boolean */
     public $enabled;
-    
+
 
     /**
      * @param integer $id
@@ -97,12 +98,22 @@ class KeyConfig extends Model\AbstractModel
             if (self::$cacheEnabled && self::$cache[$id]) {
                 return self::$cache[$id];
             }
+
+            $cacheKey = "cs_keyconfig_" . $id;
+            $config = Cache::load($cacheKey);
+            if ($config) {
+                return $config;
+            }
+
             $config = new self();
             $config->setId($id);
+
             $config->getDao()->getById();
             if (self::$cacheEnabled) {
                 self::$cache[$id] = $config;
             }
+
+            Cache::save($config, $cacheKey, [], null, 0, true);
 
             return $config;
         } catch (\Exception $e) {
@@ -130,8 +141,9 @@ class KeyConfig extends Model\AbstractModel
 
     /**
      * @param $name
-     * @param null $groupId
+     * @param int $storeId
      * @return KeyConfig
+     * @internal param null $groupId
      */
     public static function getByName($name, $storeId = 1)
     {
@@ -224,12 +236,14 @@ class KeyConfig extends Model\AbstractModel
     {
         DefinitionCache::clear($this);
 
-        \Pimcore::getEventManager()->trigger("object.Classificationstore.keyConfig.preDelete", $this);
+        \Pimcore::getEventManager()->trigger("object.classificationstore.keyConfig.preDelete", $this);
         if ($this->getId()) {
             unset(self::$cache[$this->getId()]);
+            $cacheKey = "cs_keyconfig_" . $this->getId();
+            Cache::remove($cacheKey);
         }
         parent::delete();
-        \Pimcore::getEventManager()->trigger("object.Classificationstore.keyConfig.postDelete", $this);
+        \Pimcore::getEventManager()->trigger("object.classificationstore.keyConfig.postDelete", $this);
     }
 
     /**
@@ -250,18 +264,21 @@ class KeyConfig extends Model\AbstractModel
 
         if ($this->getId()) {
             unset(self::$cache[$this->getId()]);
+            $cacheKey = "cs_keyconfig_" . $this->getId();
+            Cache::remove($cacheKey);
+
             $isUpdate = true;
-            \Pimcore::getEventManager()->trigger("object.Classificationstore.keyConfig.preUpdate", $this);
+            \Pimcore::getEventManager()->trigger("object.classificationstore.keyConfig.preUpdate", $this);
         } else {
-            \Pimcore::getEventManager()->trigger("object.Classificationstore.keyConfig.preAdd", $this);
+            \Pimcore::getEventManager()->trigger("object.classificationstore.keyConfig.preAdd", $this);
         }
 
         $model = parent::save();
 
         if ($isUpdate) {
-            \Pimcore::getEventManager()->trigger("object.Classificationstore.keyConfig.postUpdate", $this);
+            \Pimcore::getEventManager()->trigger("object.classificationstore.keyConfig.postUpdate", $this);
         } else {
-            \Pimcore::getEventManager()->trigger("object.Classificationstore.keyConfig.postAdd", $this);
+            \Pimcore::getEventManager()->trigger("object.classificationstore.keyConfig.postAdd", $this);
         }
 
         return $model;

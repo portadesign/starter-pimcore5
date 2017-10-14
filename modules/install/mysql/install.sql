@@ -51,12 +51,13 @@ CREATE TABLE `assets_metadata` (
   `language` varchar(190) DEFAULT NULL,
   `type` ENUM('input','textarea','asset','document','object','date','select','checkbox') DEFAULT NULL,
   `data` text,
-  KEY `cid` (`cid`)
+  KEY `cid` (`cid`),
+	INDEX `name` (`name`)
 ) DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `cache`;
 CREATE TABLE `cache` (
-  `id` varchar(165) NOT NULL DEFAULT '',
+  `id` varchar(165) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT '',
   `data` longblob,
   `mtime` bigint(20) DEFAULT NULL,
   `expire` bigint(20) DEFAULT NULL,
@@ -65,8 +66,8 @@ CREATE TABLE `cache` (
 
 DROP TABLE IF EXISTS `cache_tags`;
 CREATE TABLE `cache_tags` (
-  `id` varchar(165) NOT NULL DEFAULT '',
-  `tag` varchar(165) NOT NULL DEFAULT '',
+  `id` varchar(165) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT '',
+  `tag` varchar(165) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT '',
   PRIMARY KEY (`id`,`tag`),
   INDEX `id` (`id`),
   INDEX `tag` (`tag`)
@@ -317,6 +318,8 @@ CREATE TABLE `http_error_log` (
   KEY `count` (`count`)
 ) DEFAULT CHARSET=utf8mb4;
 
+
+DROP TABLE IF EXISTS `keyvalue_keys`;
 DROP TABLE IF EXISTS `keyvalue_groups`;
 CREATE TABLE `keyvalue_groups` (
     `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -327,7 +330,6 @@ CREATE TABLE `keyvalue_groups` (
     PRIMARY KEY  (`id`)
 ) DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `keyvalue_keys`;
 CREATE TABLE `keyvalue_keys` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL DEFAULT '',
@@ -478,7 +480,8 @@ CREATE TABLE `schedule_tasks` (
   PRIMARY KEY (`id`),
   KEY `cid` (`cid`),
   KEY `ctype` (`ctype`),
-  KEY `active` (`active`)
+  KEY `active` (`active`),
+  KEY `version` (`version`)
 ) DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `search_backend_data`;
@@ -487,7 +490,7 @@ CREATE TABLE `search_backend_data` (
   `fullpath` varchar(765) CHARACTER SET ascii COLLATE ascii_general_ci DEFAULT NULL, /* path in ascii using the full key length of 765 bytes (PIMCORE-2654) */
   `maintype` varchar(8) NOT NULL DEFAULT '',
   `type` varchar(20) DEFAULT NULL,
-  `subtype` varchar(255) DEFAULT NULL,
+  `subtype` varchar(190) DEFAULT NULL,
   `published` bigint(20) DEFAULT NULL,
   `creationDate` bigint(20) DEFAULT NULL,
   `modificationDate` bigint(20) DEFAULT NULL,
@@ -502,8 +505,6 @@ CREATE TABLE `search_backend_data` (
   KEY `type` (`type`),
   KEY `subtype` (`subtype`),
   KEY `published` (`published`),
-  FULLTEXT KEY `data` (`data`),
-  FULLTEXT KEY `properties` (`properties`),
   FULLTEXT KEY `fulltext` (`data`,`properties`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 /* Engine is changed to InnoDB (if available) in Pimcore\Model\Tool\Setup\Resource::database() - not here because all comments are removed */
@@ -526,7 +527,7 @@ DROP TABLE IF EXISTS  `tags`;
 CREATE TABLE `tags` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `parentId` int(10) unsigned DEFAULT NULL,
-  `idPath` varchar(255) DEFAULT NULL,
+  `idPath` varchar(190) DEFAULT NULL,
   `name` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idpath` (`idPath`),
@@ -567,6 +568,7 @@ CREATE TABLE `targeting_rules` (
   PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8mb4;
 
+DROP TABLE IF EXISTS `tmp_store`;
 CREATE TABLE `tmp_store` (
   `id` varchar(190) NOT NULL DEFAULT '',
   `tag` varchar(190) DEFAULT NULL,
@@ -583,10 +585,10 @@ CREATE TABLE `tmp_store` (
 DROP TABLE IF EXISTS `tracking_events`;
 CREATE TABLE `tracking_events` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `category` varchar(255) DEFAULT NULL,
-  `action` varchar(255) DEFAULT NULL,
-  `label` varchar(255) DEFAULT NULL,
-  `data` varchar(255) DEFAULT NULL,
+  `category` varchar(190) DEFAULT NULL,
+  `action` varchar(190) DEFAULT NULL,
+  `label` varchar(190) DEFAULT NULL,
+  `data` varchar(190) DEFAULT NULL,
   `timestamp` bigint(20) unsigned DEFAULT NULL,
   `year` int(5) unsigned DEFAULT NULL,
   `month` int(2) unsigned DEFAULT NULL,
@@ -655,7 +657,7 @@ CREATE TABLE `users` (
   `parentId` int(11) unsigned DEFAULT NULL,
   `type` enum('user','userfolder','role','rolefolder') NOT NULL DEFAULT 'user',
   `name` varchar(50) DEFAULT NULL,
-  `password` varchar(255) DEFAULT NULL,
+  `password` varchar(190) DEFAULT NULL,
   `firstname` varchar(255) DEFAULT NULL,
   `lastname` varchar(255) DEFAULT NULL,
   `email` varchar(255) DEFAULT NULL,
@@ -674,6 +676,8 @@ CREATE TABLE `users` (
   `apiKey` varchar(255) DEFAULT NULL,
 	`activePerspective` VARCHAR(255) NULL DEFAULT NULL,
 	`perspectives` LONGTEXT NULL DEFAULT NULL,
+	`websiteTranslationLanguagesEdit` LONGTEXT NULL DEFAULT NULL,
+  `websiteTranslationLanguagesView` LONGTEXT NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `type_name` (`type`,`name`),
   KEY `parentId` (`parentId`),
@@ -767,18 +771,20 @@ CREATE TABLE `versions` (
   `ctype` enum('document','asset','object') default NULL,
   `userId` int(11) unsigned default NULL,
   `note` text,
+  `stackTrace` text,
   `date` bigint(1) unsigned default NULL,
   `public` tinyint(1) unsigned NOT NULL default '0',
   `serialized` tinyint(1) unsigned default '0',
   PRIMARY KEY  (`id`),
   KEY `cid` (`cid`),
-  KEY `ctype` (`ctype`)
+  KEY `ctype` (`ctype`),
+  KEY `date` (`date`)
 ) DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `website_settings`;
 CREATE TABLE `website_settings` (
 	`id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
-	`name` VARCHAR(255) NOT NULL DEFAULT '',
+	`name` VARCHAR(190) NOT NULL DEFAULT '',
 	`type` ENUM('text','document','asset','object','bool') DEFAULT NULL,
 	`data` TEXT,
 	`siteId` INT(11) UNSIGNED DEFAULT NULL,
@@ -789,10 +795,14 @@ CREATE TABLE `website_settings` (
 	INDEX `siteId` (`siteId`)
 ) DEFAULT CHARSET=utf8mb4;
 
+
+DROP TABLE IF EXISTS `classificationstore_relations`;
+DROP TABLE IF EXISTS `classificationstore_collectionrelations`;
+
 DROP TABLE IF EXISTS `classificationstore_stores`;
 CREATE TABLE `classificationstore_stores` (
 	`id` INT(11) NOT NULL AUTO_INCREMENT,
-	`name` VARCHAR(255) NULL DEFAULT NULL,
+	`name` VARCHAR(190) NULL DEFAULT NULL,
 	`description` LONGTEXT NULL,
 	PRIMARY KEY (`id`),
 	INDEX `name` (`name`)
@@ -803,7 +813,7 @@ CREATE TABLE `classificationstore_groups` (
 	`id` BIGINT(20) NOT NULL AUTO_INCREMENT,
 	`storeId` INT NULL DEFAULT NULL,
 	`parentId` BIGINT(20) NOT NULL DEFAULT '0',
-	`name` VARCHAR(255) NOT NULL DEFAULT '',
+	`name` VARCHAR(190) NOT NULL DEFAULT '',
 	`description` VARCHAR(255) NULL DEFAULT NULL,
 	`creationDate` BIGINT(20) UNSIGNED NULL DEFAULT '0',
 	`modificationDate` BIGINT(20) UNSIGNED NULL DEFAULT '0',
@@ -816,10 +826,10 @@ DROP TABLE IF EXISTS `classificationstore_keys`;
 CREATE TABLE `classificationstore_keys` (
 	`id` BIGINT(20) NOT NULL AUTO_INCREMENT,
 	`storeId` INT NULL DEFAULT NULL,
-	`name` VARCHAR(255) NOT NULL DEFAULT '',
+	`name` VARCHAR(190) NOT NULL DEFAULT '',
 	`title` VARCHAR(255) NOT NULL DEFAULT '',
 	`description` TEXT NULL,
-	`type` VARCHAR(255) NULL DEFAULT NULL,
+	`type` VARCHAR(190) NULL DEFAULT NULL,
 	`creationDate` BIGINT(20) UNSIGNED NULL DEFAULT '0',
 	`modificationDate` BIGINT(20) UNSIGNED NULL DEFAULT '0',
 	`definition` LONGTEXT NULL,
@@ -831,7 +841,6 @@ CREATE TABLE `classificationstore_keys` (
 	INDEX `storeId` (`storeId`)
 ) DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `classificationstore_relations`;
 CREATE TABLE `classificationstore_relations` (
 	`groupId` BIGINT(20) NOT NULL,
 	`keyId` BIGINT(20) NOT NULL,
@@ -858,7 +867,6 @@ CREATE TABLE `classificationstore_collections` (
 ) DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `classificationstore_collectionrelations`;
 CREATE TABLE `classificationstore_collectionrelations` (
 	`colId` BIGINT(20) NOT NULL,
 	`groupId` BIGINT(20) NOT NULL,

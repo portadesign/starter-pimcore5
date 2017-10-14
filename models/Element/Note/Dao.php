@@ -83,7 +83,9 @@ class Dao extends Model\Dao\AbstractDao
     /**
      * Save object to database
      *
-     * @return void
+     * @return boolean
+     *
+     * @todo: not all save methods return a boolean, why this one?
      */
     public function save()
     {
@@ -122,7 +124,7 @@ class Dao extends Model\Dao\AbstractDao
                     $data = $data->getId();
                 }
             } elseif ($type == "date") {
-                if ($data instanceof \DateTime) {
+                if ($data instanceof \DateTimeInterface) {
                     $data = $data->getTimestamp();
                 }
             } elseif ($type == "bool") {
@@ -142,8 +144,6 @@ class Dao extends Model\Dao\AbstractDao
 
     /**
      * Deletes object from database
-     *
-     * @return void
      */
     public function delete()
     {

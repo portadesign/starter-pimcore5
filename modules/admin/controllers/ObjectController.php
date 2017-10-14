@@ -144,7 +144,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
     }
 
     /**
-     * @param Object\AbstractObject $child
+     * @param Object\AbstractObject $element
      * @return array
      */
     protected function getTreeNodeConfig($element)
@@ -162,7 +162,12 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             "lockOwner" => $child->getLocked() ? true : false
         ];
 
-        $hasChildren = $child->hasChilds([Object\AbstractObject::OBJECT_TYPE_OBJECT, Object\AbstractObject::OBJECT_TYPE_FOLDER, Object\AbstractObject::OBJECT_TYPE_VARIANT]);
+        $allowedTypes = [Object\AbstractObject::OBJECT_TYPE_OBJECT, Object\AbstractObject::OBJECT_TYPE_FOLDER];
+        if ($child instanceof Object\Concrete && $child->getClass()->getShowVariants()) {
+            $allowedTypes[] = Object\AbstractObject::OBJECT_TYPE_VARIANT;
+        }
+
+        $hasChildren = $child->hasChildren($allowedTypes);
 
         $tmpObject["isTarget"] = false;
         $tmpObject["allowDrop"] = false;
@@ -412,9 +417,20 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
+    /**
+     * @var
+     */
     private $objectData;
+
+    /**
+     * @var
+     */
     private $metaData;
 
+    /**
+     * @param Object\Concrete $object
+     * @param bool $objectFromVersion
+     */
     private function getDataForObject(Object\Concrete $object, $objectFromVersion = false)
     {
         foreach ($object->getClass()->getFieldDefinitions() as $key => $def) {
@@ -425,10 +441,11 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
     /**
      * gets recursively attribute data from parent and fills objectData and metaData
      *
-     * @param  $object
-     * @param  $key
-     * @param  $fielddefinition
-     * @return void
+     * @param $object
+     * @param $key
+     * @param $fielddefinition
+     * @param $objectFromVersion
+     * @param int $level
      */
     private function getDataForField($object, $key, $fielddefinition, $objectFromVersion, $level = 0)
     {
@@ -525,6 +542,11 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
+    /**
+     * @param $object
+     * @param $key
+     * @return stdClass
+     */
     private function getParentValue($object, $key)
     {
         $parent = Object\Service::hasInheritableParentObject($object);
@@ -543,6 +565,10 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
+    /**
+     * @param Object\ClassDefinition\Data $fielddefinition
+     * @return bool
+     */
     private function isInheritableField(Object\ClassDefinition\Data $fielddefinition)
     {
         if ($fielddefinition instanceof Object\ClassDefinition\Data\Fieldcollections
@@ -564,6 +590,11 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
+    /**
+     * @param $layout
+     * @param $allowedView
+     * @param $allowedEdit
+     */
     public function setLayoutPermission(&$layout, $allowedView, $allowedEdit)
     {
         if ($layout->{"fieldtype"} == "localizedfields") {
@@ -585,7 +616,11 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
-
+    /**
+     * @param Object\AbstractObject $object
+     * @param $objectData
+     * @return mixed
+     */
     public function filterLocalizedFields(Object\AbstractObject $object, $objectData)
     {
         if (!($object instanceof Object\Concrete)) {
@@ -670,6 +705,10 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
+    /**
+     * @param $classes
+     * @return array
+     */
     protected function prepareChildClasses($classes)
     {
         $reduced = [];
@@ -1137,6 +1176,11 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         }
     }
 
+    /**
+     * @param Object\Concrete $object
+     * @param $originalModificationDate
+     * @param $data
+     */
     public function performFieldcollectionModificationCheck(Object\Concrete $object, $originalModificationDate, $data)
     {
         $modificationDate = $this->getParam("modificationDate");
@@ -1189,6 +1233,10 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
         $this->_helper->json(["success" => false, "message" => "missing_permission"]);
     }
 
+    /**
+     * @param $object
+     * @return mixed
+     */
     protected function assignPropertiesFromEditmode($object)
     {
         if ($this->getParam("properties")) {
@@ -1354,6 +1402,16 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                                 if (method_exists($object, $getter)) {
                                     /** @var  $classificationStoreData Object\Classificationstore */
                                     $classificationStoreData = $object->$getter();
+
+                                    $keyConfig = Object\Classificationstore\KeyConfig::getById($keyid);
+                                    if ($keyConfig) {
+                                        $fieldDefintion = $keyDef = Object\Classificationstore\Service::getFieldDefinitionFromJson(
+                                            json_decode($keyConfig->getDefinition()), $keyConfig->getType());
+                                        if ($fieldDefintion && method_exists($fieldDefintion, "getDataFromGridEditor")) {
+                                            $value = $fieldDefintion->getDataFromGridEditor($value, $object, []);
+                                        }
+                                    }
+
                                     $classificationStoreData->setLocalizedKeyValue($groupId, $keyid, $value, $requestedLanguage);
                                 }
                             } else {
@@ -1386,6 +1444,13 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                                 $brick = new $classname($object);
                                 $object->$fieldGetter()->$brickSetter($brick);
                             }
+
+                            $fieldDefintion = $this->getFieldDefinitionFromBrick($brickType, $brickKey);
+
+                            if ($fieldDefintion && method_exists($fieldDefintion, "getDataFromGridEditor")) {
+                                $value = $fieldDefintion->getDataFromGridEditor($value, $object, []);
+                            }
+
                             $brick->$valueSetter($value);
                         } else {
                             if (!$user->isAdmin() && $languagePermissions) {
@@ -1403,6 +1468,11 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
                                         }
                                     }
                                 }
+                            }
+
+                            $fieldDefintion = $this->getFieldDefinition($class, $key);
+                            if ($fieldDefintion && method_exists($fieldDefintion, "getDataFromGridEditor")) {
+                                $value = $fieldDefintion->getDataFromGridEditor($value, $object, []);
                             }
 
                             $objectData[$key] = $value;
@@ -1427,7 +1497,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             $colMappings = [
                 "filename" => "o_key",
                 "fullpath" => ["o_path", "o_key"],
-                "id" => "o_id",
+                "id" => "oo_id",
                 "published" => "o_published",
                 "modificationDate" => "o_modificationDate",
                 "creationDate" => "o_creationDate"
@@ -1435,7 +1505,7 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
 
             $start = 0;
             $limit = 20;
-            $orderKey = "o_id";
+            $orderKey = "oo_id";
             $order = "ASC";
 
             $fields = [];
@@ -1565,6 +1635,42 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
             }
             $this->_helper->json(["data" => $objects, "success" => true, "total" => $list->getTotalCount()]);
         }
+    }
+
+    /**
+     * @param string $class
+     * @param string $key
+     * @return Object\ClassDefinition\Data
+     */
+    protected function getFieldDefinition($class, $key)
+    {
+        $fieldDefinition = $class->getFieldDefinition($key);
+        if ($fieldDefinition) {
+            return $fieldDefinition;
+        }
+
+        $localized = $class->getFieldDefinition('localizedfields');
+        if ($localized instanceof Object\ClassDefinition\Data\Localizedfields) {
+            $fieldDefinition = $localized->getFielddefinition($key);
+        }
+
+        return $fieldDefinition;
+    }
+
+
+    /**
+     * @param string $brickType
+     * @param string $key
+     * @return Object\ClassDefinition\Data
+     */
+    protected function getFieldDefinitionFromBrick($brickType, $key)
+    {
+        $brickDefinition = Object\Objectbrick\Definition::getByKey($brickType);
+        if ($brickDefinition) {
+            $fieldDefinition = $brickDefinition->getFieldDefinition($key);
+        }
+
+        return $fieldDefinition;
     }
 
     public function copyInfoAction()
@@ -1782,7 +1888,6 @@ class Admin_ObjectController extends \Pimcore\Controller\Action\Admin\Element
      * @param  array $toDelete
      * @param  array $toAdd
      * @param  string $ownerFieldName
-     * @return void
      */
     protected function processRemoteOwnerRelations($object, $toDelete, $toAdd, $ownerFieldName)
     {

@@ -163,6 +163,9 @@ class Config extends Model\AbstractModel
         return $clone;
     }
 
+    /**
+     * @return Config
+     */
     public static function getPreviewConfig()
     {
         $thumbnail = new self();
@@ -203,8 +206,9 @@ class Config extends Model\AbstractModel
     }
 
     /**
-     * @param  $name
-     * @param  $parameters
+     * @param $name
+     * @param $parameters
+     * @param $media
      * @return bool
      */
     public function addItem($name, $parameters, $media = null)
@@ -226,8 +230,10 @@ class Config extends Model\AbstractModel
     }
 
     /**
-     * @param  $name
-     * @param  $parameters
+     * @param $position
+     * @param $name
+     * @param $parameters
+     * @param $media
      * @return bool
      */
     public function addItemAt($position, $name, $parameters, $media = null)
@@ -247,10 +253,6 @@ class Config extends Model\AbstractModel
         return true;
     }
 
-
-    /**
-     * @return void
-     */
     public function resetItems()
     {
         $this->items = [];
@@ -480,41 +482,49 @@ class Config extends Model\AbstractModel
             $pipe->addItem("cover", [
                 "width" => $config["width"],
                 "height" => $config["height"],
-                "positioning" => "center"
+                "positioning" => ((isset($config["positioning"]) && !empty($config["positioning"])) ? (string)$config["positioning"] : "center"),
+                "forceResize" => (isset($config["forceResize"]) ? (bool)$config["forceResize"] : false)
             ]);
         } elseif (isset($config["contain"])) {
             $pipe->addItem("contain", [
                 "width" => $config["width"],
-                "height" => $config["height"]
+                "height" => $config["height"],
+                "forceResize" => (isset($config["forceResize"]) ? (bool)$config["forceResize"] : false)
             ]);
         } elseif (isset($config["frame"])) {
             $pipe->addItem("frame", [
                 "width" => $config["width"],
-                "height" => $config["height"]
+                "height" => $config["height"],
+                "forceResize" => (isset($config["forceResize"]) ? (bool)$config["forceResize"] : false)
             ]);
         } elseif (isset($config["aspectratio"]) && $config["aspectratio"]) {
             if (isset($config["height"]) && isset($config["width"]) && $config["height"] > 0 && $config["width"] > 0) {
                 $pipe->addItem("contain", [
                     "width" => $config["width"],
-                    "height" => $config["height"]
+                    "height" => $config["height"],
+                    "forceResize" => (isset($config["forceResize"]) ? (bool)$config["forceResize"] : false)
                 ]);
             } elseif (isset($config["height"]) && $config["height"] > 0) {
                 $pipe->addItem("scaleByHeight", [
-                    "height" => $config["height"]
+                    "height" => $config["height"],
+                    "forceResize" => (isset($config["forceResize"]) ? (bool)$config["forceResize"] : false)
                 ]);
             } else {
                 $pipe->addItem("scaleByWidth", [
-                    "width" => $config["width"]
+                    "width" => $config["width"],
+                    "forceResize" => (isset($config["forceResize"]) ? (bool)$config["forceResize"] : false)
                 ]);
             }
         } else {
             if (!isset($config["width"]) && isset($config["height"])) {
                 $pipe->addItem("scaleByHeight", [
-                    "height" => $config["height"]
+                    "height" => $config["height"],
+                    "forceResize" => (isset($config["forceResize"]) ? (bool)$config["forceResize"] : false)
                 ]);
             } elseif (isset($config["width"]) && !isset($config["height"])) {
                 $pipe->addItem("scaleByWidth", [
-                    "width" => $config["width"]
+                    "width" => $config["width"],
+                    "forceResize" => (isset($config["forceResize"]) ? (bool)$config["forceResize"] : false)
                 ]);
             } elseif (isset($config["width"]) && isset($config["height"])) {
                 $pipe->addItem("resize", [
@@ -535,6 +545,10 @@ class Config extends Model\AbstractModel
     }
 
 
+    /**
+     * @param $asset
+     * @return array
+     */
     public function getEstimatedDimensions($asset)
     {
         $originalWidth = $asset->getWidth();

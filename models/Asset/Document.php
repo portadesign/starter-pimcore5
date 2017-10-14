@@ -53,6 +53,21 @@ class Document extends Model\Asset
         parent::update();
     }
 
+    /**
+     *
+     */
+    public function delete()
+    {
+        parent::delete();
+        $this->clearThumbnails(true);
+    }
+
+    /**
+     * @todo: Shouldnt' this always return an int?
+     *
+     * @param null $path
+     * @return int|null
+     */
     protected function readPageCount($path = null)
     {
         $pageCount = null;
@@ -81,6 +96,11 @@ class Document extends Model\Asset
         return $pageCount;
     }
 
+    /**
+     * @todo: Shouldn't this always return an int?
+     *
+     * @return int|null
+     */
     public function getPageCount()
     {
         if (!$pageCount = $this->getCustomSetting("document_page_count")) {
@@ -107,6 +127,10 @@ class Document extends Model\Asset
         return new Document\ImageThumbnail($this, $thumbnailName, $page, $deferred);
     }
 
+    /**
+     * @param null $page
+     * @return mixed|null
+     */
     public function getText($page = null)
     {
         if (\Pimcore\Document::isAvailable() && \Pimcore\Document::isFileTypeSupported($this->getFilename())) {
@@ -126,7 +150,7 @@ class Document extends Model\Asset
     }
 
     /**
-     * @return void
+     * @param bool $force
      */
     public function clearThumbnails($force = false)
     {

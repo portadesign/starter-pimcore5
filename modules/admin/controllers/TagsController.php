@@ -88,6 +88,13 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json($tags);
     }
 
+    /**
+     * @param Tag $tag
+     * @param $showSelection
+     * @param $assignedTagIds
+     * @param bool $loadChildren
+     * @return array
+     */
     protected function convertTagToArray(Tag $tag, $showSelection, $assignedTagIds, $loadChildren = false)
     {
         $tagArray = [
@@ -114,7 +121,6 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
 
         return $tagArray;
     }
-
 
     public function loadTagsForElementAction()
     {
@@ -203,6 +209,10 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
         $this->_helper->json(['success' => true, 'idLists' => $idListParts, 'totalCount' => count($idList)]);
     }
 
+    /**
+     * @param \Pimcore\Model\Object\AbstractObject $object
+     * @return mixed
+     */
     private function getSubObjectIds(\Pimcore\Model\Object\AbstractObject $object)
     {
         $childsList = new Pimcore\Model\Object\Listing();
@@ -222,6 +232,10 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
         return $childsList->loadIdList();
     }
 
+    /**
+     * @param \Pimcore\Model\Asset $asset
+     * @return mixed
+     */
     private function getSubAssetIds(\Pimcore\Model\Asset $asset)
     {
         $childsList = new Pimcore\Model\Asset\Listing();
@@ -230,9 +244,9 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
             $userIds = $this->getUser()->getRoles();
             $userIds[] = $this->getUser()->getId();
             $condition .= " AND (
-                (SELECT `view` FROM users_workspaces_asset WHERE userId IN (\" . implode(',', $userIds) . \") and LOCATE(CONCAT(path,filename),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                (SELECT `view` FROM users_workspaces_asset WHERE userId IN (" . implode(',', $userIds) . ") and LOCATE(CONCAT(path,filename),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
                     OR
-                (SELECT `view` FROM users_workspaces_asset WHERE userId IN (\" . implode(',', $userIds) . \") and LOCATE(cpath,CONCAT(path,filename))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                (SELECT `view` FROM users_workspaces_asset WHERE userId IN (" . implode(',', $userIds) . ") and LOCATE(cpath,CONCAT(path,filename))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
             )";
         }
 
@@ -241,6 +255,10 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
         return $childsList->loadIdList();
     }
 
+    /**
+     * @param \Pimcore\Model\Document $document
+     * @return mixed
+     */
     private function getSubDocumentIds(\Pimcore\Model\Document $document)
     {
         $childsList = new Pimcore\Model\Document\Listing();
@@ -249,9 +267,9 @@ class Admin_TagsController extends \Pimcore\Controller\Action\Admin
             $userIds = $this->getUser()->getRoles();
             $userIds[] = $this->getUser()->getId();
             $condition .= " AND (
-                (SELECT `view` FROM users_workspaces_document WHERE userId IN (\" . implode(',', $userIds) . \") and LOCATE(CONCAT(path,`key`),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                (SELECT `view` FROM users_workspaces_document WHERE userId IN (" . implode(',', $userIds) . ") and LOCATE(CONCAT(path,`key`),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
                     OR
-                (SELECT `view` FROM users_workspaces_document WHERE userId IN (\" . implode(',', $userIds) . \") and LOCATE(cpath,CONCAT(path,`key`))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                (SELECT `view` FROM users_workspaces_document WHERE userId IN (" . implode(',', $userIds) . ") and LOCATE(cpath,CONCAT(path,`key`))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
             )";
         }
 

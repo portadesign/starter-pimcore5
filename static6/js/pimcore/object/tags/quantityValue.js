@@ -41,22 +41,19 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
     },
 
     setData: function(data) {
-        this.storeData = data;
-        this.store.loadData(data.data);
+        var storeData = data.data;
+        storeData.unshift({'id': -1, 'abbreviation' : "(" + t("empty") + ")"});
+
+        this.store.loadData(storeData);
 
         if (this.unitField) {
             this.unitField.reset();
         }
-
     },
 
     getLayoutEdit: function () {
 
-        var input = {
-            fieldLabel: this.fieldConfig.title,
-            componentCls: "object_field",
-            labelWidth: 100
-        };
+        var input = {};
 
         var valueInvalid = false;
 
@@ -64,7 +61,9 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             input.value = this.data.value;
         } else {
             // wipe invalid data
-            this.data.value = null;
+            if (this.data) {
+                this.data.value = null;
+            }
             valueInvalid = true;
         }
 
@@ -72,8 +71,9 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             input.width = this.fieldConfig.width;
         }
 
+        var labelWidth = 100;
         if (this.fieldConfig.labelWidth) {
-            input.labelWidth = this.fieldConfig.labelWidth;
+            labelWidth = this.fieldConfig.labelWidth;
         }
 
         var options = {
@@ -83,15 +83,17 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             editable: true,
             selectOnFocus: true,
             allowBlank: true,
-            forceSelection: false,
+            forceSelection: true,
             store: this.store,
             valueField: 'id',
             displayField: 'abbreviation',
             queryMode: 'local'
         };
 
-        if(this.data) {
+        if(this.data && this.data.unit != null && !isNaN(this.data.unit)) {
             options.value = this.data.unit;
+        } else {
+            options.value = -1;
         }
 
         this.unitField = new Ext.form.ComboBox(options);
@@ -99,16 +101,13 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
         this.inputField = new Ext.form.field.Number(input);
 
         this.component = new Ext.form.FieldContainer({
-            layout: {
-                type: 'table',
-                tdAttrs: {
-                    valign: 'center'
-                }
-            },
+            layout: 'hbox',
             margin: '0 0 10 0',
+            fieldLabel: this.fieldConfig.title,
+            labelWidth: labelWidth,
             combineErrors: false,
             items: [this.inputField, this.unitField],
-            cls: "object_field",
+            componentCls: "object_field",
             isDirty: function() {
                 return this.inputField.isDirty() || this.unitField.isDirty() || valueInvalid
             }.bind(this)
@@ -130,7 +129,7 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             }
 
             if (value) {
-                return value.value + " " + value.unit;
+                return (value.value ? value.value : "") + " " + value.unitAbbr;
             } else {
                 return "";
             }
@@ -138,6 +137,7 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
         }.bind(this, field.key);
 
         return {
+            getEditor:this.getCellEditor.bind(this, field),
             header:ts(field.label),
             sortable:true,
             dataIndex:field.key,
@@ -158,9 +158,17 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
     getValue: function () {
         return {
             unit: this.unitField.getValue(),
+            unitAbbr: this.unitField.getRawValue(),
             value: this.inputField.getValue()
         };
     },
+
+    getCellEditValue: function () {
+        var value = this.getValue();
+        value["unitAbbr"] = this.unitField.getRawValue();
+        return value;
+    },
+
 
     getName: function () {
         return this.fieldConfig.name;
@@ -171,5 +179,12 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             return false;
         }
         return true;
-    }
+    },
+
+    getCellEditor: function ( field, record) {
+        return new pimcore.object.helpers.gridCellEditor({
+            fieldInfo: field
+        });
+    },
+
 });

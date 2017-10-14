@@ -17,6 +17,7 @@ namespace Pimcore;
 use Pimcore\Model;
 use Pimcore\Model\Element;
 use Pimcore\Logger;
+use Pimcore\Tool\DeviceDetector;
 
 class View extends \Zend_View
 {
@@ -140,6 +141,7 @@ class View extends \Zend_View
      *
      * @param $include
      * @param array $params
+     * @param bool $cacheEnabled
      * @return string
      */
     public function inc($include, $params = null, $cacheEnabled = true)
@@ -212,7 +214,7 @@ class View extends \Zend_View
             // add a class and the pimcore id / type so that it can be opened in editmode using the context menu
             // if there's no first level HTML container => add one (wrapper)
             if ($this->editmode) {
-                include_once("simple_html_dom.php");
+                include_once(PIMCORE_PATH . "/lib/simple_html_dom.php");
 
                 $editmodeClass = " pimcore_editable pimcore_tag_inc ";
 
@@ -241,7 +243,7 @@ class View extends \Zend_View
         \Zend_Registry::set("pimcore_editmode", $editmodeBackup);
 
         // write contents to the cache, if output-cache is enabled
-        if ($cacheConfig) {
+        if ($cacheConfig && !DeviceDetector::getInstance()->wasUsed()) {
             Cache::save($content, $cacheKey, ["output", "output_inline"], $cacheConfig["lifetime"]);
         }
 

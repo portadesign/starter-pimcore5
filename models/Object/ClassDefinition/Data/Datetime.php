@@ -16,6 +16,7 @@
 
 namespace Pimcore\Model\Object\ClassDefinition\Data;
 
+use Pimcore\Db;
 use Pimcore\Model;
 
 class Datetime extends Model\Object\ClassDefinition\Data
@@ -47,7 +48,7 @@ class Datetime extends Model\Object\ClassDefinition\Data
      *
      * @var string
      */
-    public $phpdocType = "\\Pimcore\\Date";
+    public $phpdocType = "\\Carbon\\Carbon";
 
 
     /**
@@ -176,7 +177,7 @@ class Datetime extends Model\Object\ClassDefinition\Data
     {
         if ($data instanceof \Zend_Date) {
             return $data->toString("Y-m-d H:i", "php");
-        } elseif ($data instanceof \DateTime) {
+        } elseif ($data instanceof \DateTimeInterface) {
             return $data->format("Y-m-d H:i");
         }
     }
@@ -194,7 +195,7 @@ class Datetime extends Model\Object\ClassDefinition\Data
         $data = $this->getDataFromObjectParam($object, $params);
         if ($data instanceof \Zend_Date) {
             return $data->toString("Y-m-d H:i", "php");
-        } elseif ($data instanceof \DateTime) {
+        } elseif ($data instanceof \DateTimeInterface) {
             return $data->format("Y-m-d H:i");
         }
 
@@ -217,6 +218,15 @@ class Datetime extends Model\Object\ClassDefinition\Data
         return null;
     }
 
+    /**
+     * @param $object
+     * @param mixed $params
+     * @return string
+     */
+    public function getDataForSearchIndex($object, $params = [])
+    {
+        return "";
+    }
 
     /**
      * converts data to be exposed via webservices
@@ -344,5 +354,26 @@ class Datetime extends Model\Object\ClassDefinition\Data
         $result[] = $diffdata;
 
         return $result;
+    }
+
+    /**
+     * returns sql query statement to filter according to this data types value(s)
+     * @param $value
+     * @param $operator
+     * @param array $params optional params used to change the behavior
+     * @return string
+     */
+    public function getFilterConditionExt($value, $operator, $params = [])
+    {
+        if ($operator == "=") {
+            $db = Db::get();
+            $maxTime = $value + (86400 - 1); //specifies the top point of the range used in the condition
+            $filterField = $params["name"] ? $params["name"] : $this->getName();
+            $condition = "`" . $filterField . "` BETWEEN " . $db->quote($value) . " AND " . $db->quote($maxTime);
+
+            return $condition;
+        }
+
+        return parent::getFilterConditionExt($value, $operator, $params);
     }
 }

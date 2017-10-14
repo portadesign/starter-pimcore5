@@ -32,6 +32,7 @@ class WkHtmlToPdf extends Processor
      */
     private $options = "";
 
+    protected $config = [];
 
     /**
      * @param string $wkhtmltopdfBin
@@ -53,6 +54,7 @@ class WkHtmlToPdf extends Processor
             }
         }
 
+
         if ($options) {
             foreach ($options as $key => $value) {
                 $this->options .= " --" . (string)$key;
@@ -65,8 +67,15 @@ class WkHtmlToPdf extends Processor
         }
     }
 
+    /**
+     * @param Document\PrintAbstract $document
+     * @param $config
+     * @return string
+     * @throws \Exception
+     */
     protected function buildPdf(Document\PrintAbstract $document, $config)
     {
+        $this->config = $config;
         $web2printConfig = Config::getWeb2PrintConfig();
 
         $params = [];
@@ -99,14 +108,24 @@ class WkHtmlToPdf extends Processor
         return $pdf;
     }
 
+    /**
+     * @return array
+     */
     public function getProcessingOptions()
     {
-        return [];
+        $options = [];
+
+        $returnValueContainer = new \Pimcore\Model\Tool\Admin\EventDataContainer($options);
+
+        \Pimcore::getEventManager()->trigger("document.print.processor.modifyProcessingOptions", $this, [
+            "returnValueContainer" => $returnValueContainer
+        ]);
+
+        return $returnValueContainer->getData();
     }
 
     /**
      * @param string $options
-     * @return void
      */
     public function setOptions($options)
     {
@@ -155,10 +174,10 @@ class WkHtmlToPdf extends Processor
 
 
     /**
-     * @throws \Exception
-     * @param string $srcFile
+     * @param string $srcUrl
      * @param string $dstFile
      * @return string
+     * @throws \Exception
      */
     protected function convert($srcUrl, $dstFile = null)
     {
@@ -172,7 +191,30 @@ class WkHtmlToPdf extends Processor
         }
 
         $retVal = 0;
-        $cmd = $this->wkhtmltopdfBin . " " . $this->options . " " . escapeshellarg($srcUrl) . " " . escapeshellarg($dstFile) . " > " . $outputFile;
+
+
+        $params = [
+            'wkhtmltopdfBin' => $this->wkhtmltopdfBin,
+            'options' => $this->options,
+            'srcUrl' => $srcUrl,
+            'dstFile' => $dstFile,
+            'outputFile' => $outputFile,
+            'config' => $this->config
+        ];
+
+        $returnValueContainer = new \Pimcore\Model\Tool\Admin\EventDataContainer($params);
+        \Pimcore::getEventManager()->trigger("document.print.processor.modifyConfig", $this, [
+            "returnValueContainer" => $returnValueContainer
+        ]);
+
+        $params = $returnValueContainer->getData();
+
+        if ($params['cmd']) {
+            $cmd = $params['cmd'];
+        } else {
+            $cmd = $params['wkhtmltopdfBin'] . " " . $params['options'] . " " . escapeshellarg($params['srcUrl']) . " " . escapeshellarg($params['dstFile']) . " > " . $params['outputFile'];
+        }
+
         system($cmd, $retVal);
         $output = file_get_contents($outputFile);
         @unlink($outputFile);
@@ -184,6 +226,9 @@ class WkHtmlToPdf extends Processor
         return $dstFile;
     }
 
+    /**
+     * @return string
+     */
     public static function getTempFileUrl()
     {
         $web2printConfig = Config::getWeb2PrintConfig();

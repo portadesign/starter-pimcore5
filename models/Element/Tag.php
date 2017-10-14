@@ -58,7 +58,7 @@ class Tag extends Model\AbstractModel
     /**
      * @static
      * @param $id
-     * @return Pimcore\Model\Element\Tag
+     * @return Tag|null
      */
     public static function getById($id)
     {
@@ -246,6 +246,10 @@ class Tag extends Model\AbstractModel
         return $this->getIdPath() . $this->getId() . "/";
     }
 
+    /**
+     * @param bool $includeOwnName
+     * @return string
+     */
     public function getNamePath($includeOwnName = true)
     {
         //set id path to correct value
@@ -279,6 +283,9 @@ class Tag extends Model\AbstractModel
         return $this->children;
     }
 
+    /**
+     * @return bool
+     */
     public function hasChildren()
     {
         return count($this->getChildren()) > 0;

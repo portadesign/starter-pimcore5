@@ -141,6 +141,12 @@ class Geobounds extends Model\Object\ClassDefinition\Data\Geo\AbstractGeo
         return;
     }
 
+    /**
+     * @param $data
+     * @param null $object
+     * @param array $params
+     * @return array
+     */
     public function getDataForGrid($data, $object = null, $params = [])
     {
         return $this->getDataForEditmode($data, $object, $params);
@@ -221,6 +227,15 @@ class Geobounds extends Model\Object\ClassDefinition\Data\Geo\AbstractGeo
         return $value;
     }
 
+    /**
+     * @param $object
+     * @param mixed $params
+     * @return string
+     */
+    public function getDataForSearchIndex($object, $params = [])
+    {
+        return "";
+    }
 
     /**
      * converts data to be exposed via webservices

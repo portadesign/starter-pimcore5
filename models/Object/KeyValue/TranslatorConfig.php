@@ -20,6 +20,7 @@ use Pimcore\Model;
 use Pimcore\Logger;
 
 /**
+ * @deprecated will be removed entirely in Pimcore 5
  * @method \Pimcore\Model\Object\KeyValue\TranslatorConfig\Dao getDao()
  */
 class TranslatorConfig extends Model\AbstractModel
@@ -114,11 +115,17 @@ class TranslatorConfig extends Model\AbstractModel
         return $this;
     }
 
+    /**
+     * @param $translator
+     */
     public function setTranslator($translator)
     {
         $this->translator = $translator;
     }
 
+    /**
+     * @return mixed
+     */
     public function getTranslator()
     {
         return $this->translator;

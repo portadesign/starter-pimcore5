@@ -90,9 +90,6 @@ abstract class Admin extends Action
             // init translations
             self::initTranslations($this);
 
-            // init zend action helpers, we need to leave the prefixed class name here as the plugin loader isn't able to handle namespaces
-            \Zend_Controller_Action_HelperBroker::addPrefix('Pimcore_Controller_Action_Helper');
-
             // this is to make it possible to use the session id as a part of the route (ZF default route) used for external editors, etc.
             if ($this->getParam("pimcore_admin_sid")) {
                 $_REQUEST["pimcore_admin_sid"] = $this->getParam("pimcore_admin_sid");
@@ -132,10 +129,14 @@ abstract class Admin extends Action
                     "cookie" => $_COOKIE
                 ]);
 
-                // send a auth header for the client (is covered by the ajax object in javascript)
-                $this->getResponse()->setHeader("X-Pimcore-Auth", "required");
-                // redirect to login page
-                $this->redirect("/admin/login");
+                if ($this->getRequest()->isXmlHttpRequest()) {
+                    header('HTTP/1.0 403 Forbidden', true, 403);
+                    echo "Session expired or unauthorized request. Please reload and try again!";
+                } else {
+                    // redirect to login page
+                    $this->redirect("/admin/login");
+                }
+
                 // exit the execution -> just to be sure
                 exit;
             }
@@ -237,15 +238,22 @@ abstract class Admin extends Action
             \Zend_Registry::set("Zend_Locale", $locale);
         } else {
             // check if given language is installed if not => skip
-            if (!in_array((string) $locale->getLanguage(), AdminTool::getLanguages())) {
-                return;
+            $translationLocale = (string) $locale;
+            if (!in_array((string) $locale, AdminTool::getLanguages())) {
+                if (in_array((string) $locale->getLanguage(), AdminTool::getLanguages())) {
+                    $translationLocale = new \Zend_Locale($locale->getLanguage());
+                } elseif (in_array((string) $language, AdminTool::getLanguages())) {
+                    $translationLocale = $language;
+                } else {
+                    return;
+                }
             }
 
             \Zend_Registry::set("Zend_Locale", $locale);
             if (\Zend_Registry::isRegistered("Zend_Translate")) {
                 $t = \Zend_Registry::get("Zend_Translate");
                 if ((string) $locale != (string) $t->getLocale()) {
-                    $languageFile = AdminTool::getLanguageFile($locale);
+                    $languageFile = AdminTool::getLanguageFile($translationLocale);
                     $t->addTranslation($languageFile, $locale);
                     $t->setLocale($locale);
                 }
