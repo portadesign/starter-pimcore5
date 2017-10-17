@@ -10,12 +10,14 @@
  *
  * @category   Pimcore
  * @package    Site
- * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
+ *
+ * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
 namespace Pimcore\Model;
 
+use Pimcore\Cache\Runtime;
 use Pimcore\Logger;
 
 /**
@@ -23,9 +25,13 @@ use Pimcore\Logger;
  */
 class Site extends AbstractModel
 {
+    /**
+     * @var Site
+     */
+    protected static $currentSite;
 
     /**
-     * @var integer
+     * @var int
      */
     public $id;
 
@@ -37,7 +43,7 @@ class Site extends AbstractModel
     /**
      * Contains the ID to the Root-Document
      *
-     * @var integer
+     * @var int
      */
     public $rootId;
 
@@ -54,12 +60,12 @@ class Site extends AbstractModel
     /**
      * @var string
      */
-    public $mainDomain = "";
+    public $mainDomain = '';
 
     /**
      * @var string
      */
-    public $errorDocument = "";
+    public $errorDocument = '';
 
     /**
      * @var bool
@@ -67,17 +73,18 @@ class Site extends AbstractModel
     public $redirectToMainDomain = false;
 
     /**
-     * @var integer
+     * @var int
      */
     public $creationDate;
 
     /**
-     * @var integer
+     * @var int
      */
     public $modificationDate;
 
     /**
-     * @param integer $id
+     * @param int $id
+     *
      * @return Site
      */
     public static function getById($id)
@@ -89,7 +96,8 @@ class Site extends AbstractModel
     }
 
     /**
-     * @param integer $id
+     * @param int $id
+     *
      * @return Site
      */
     public static function getByRootId($id)
@@ -102,17 +110,19 @@ class Site extends AbstractModel
 
     /**
      * @param $domain
+     *
      * @return mixed|Site|string
+     *
      * @throws \Exception
      */
     public static function getByDomain($domain)
     {
 
         // cached because this is called in the route (Pimcore_Controller_Router_Route_Frontend)
-        $cacheKey = "site_domain_". md5($domain);
+        $cacheKey = 'site_domain_'. md5($domain);
 
-        if (\Zend_Registry::isRegistered($cacheKey)) {
-            $site = \Zend_Registry::get($cacheKey);
+        if (Runtime::isRegistered($cacheKey)) {
+            $site = Runtime::get($cacheKey);
         } elseif (!$site = \Pimcore\Cache::load($cacheKey)) {
             $site = new self();
 
@@ -120,16 +130,16 @@ class Site extends AbstractModel
                 $site->getDao()->getByDomain($domain);
             } catch (\Exception $e) {
                 Logger::debug($e);
-                $site = "failed";
+                $site = 'failed';
             }
 
-            \Pimcore\Cache::save($site, $cacheKey, ["system", "site"], null, 999);
+            \Pimcore\Cache::save($site, $cacheKey, ['system', 'site'], null, 999);
         }
 
-        \Zend_Registry::set($cacheKey, $site);
+        Runtime::set($cacheKey, $site);
 
-        if ($site == "failed" || !$site) {
-            $msg = "there is no site for the requested domain [" . $domain . "], content was [" . $site . "]";
+        if ($site == 'failed' || !$site) {
+            $msg = 'there is no site for the requested domain [' . $domain . '], content was [' . $site . ']';
             Logger::debug($msg);
             throw new \Exception($msg);
         }
@@ -137,9 +147,9 @@ class Site extends AbstractModel
         return $site;
     }
 
-
     /**
      * @param $mixed
+     *
      * @return Site
      */
     public static function getBy($mixed)
@@ -157,6 +167,7 @@ class Site extends AbstractModel
 
     /**
      * @param array $data
+     *
      * @return Site
      */
     public static function create($data)
@@ -169,12 +180,14 @@ class Site extends AbstractModel
 
     /**
      * returns true if the current process/request is inside a site
+     *
      * @static
+     *
      * @return bool
      */
     public static function isSiteRequest()
     {
-        if (\Zend_Registry::isRegistered("pimcore_site")) {
+        if (null !== self::$currentSite) {
             return true;
         }
 
@@ -182,22 +195,31 @@ class Site extends AbstractModel
     }
 
     /**
+     * @return Site
+     *
      * @throws \Exception
-     * @throws \Zend_Exception
      */
     public static function getCurrentSite()
     {
-        if (\Zend_Registry::isRegistered("pimcore_site")) {
-            $site = \Zend_Registry::get("pimcore_site");
-
-            return $site;
+        if (null !== self::$currentSite) {
+            return self::$currentSite;
         } else {
-            throw new \Exception("This request/process is not inside a subsite");
+            throw new \Exception('This request/process is not inside a subsite');
         }
     }
 
     /**
-     * @return integer
+     * Register the current site
+     *
+     * @param Site $site
+     */
+    public static function setCurrentSite(Site $site)
+    {
+        self::$currentSite = $site;
+    }
+
+    /**
+     * @return int
      */
     public function getId()
     {
@@ -213,7 +235,7 @@ class Site extends AbstractModel
     }
 
     /**
-     * @return integer
+     * @return int
      */
     public function getRootId()
     {
@@ -229,7 +251,8 @@ class Site extends AbstractModel
     }
 
     /**
-     * @param integer $id
+     * @param int $id
+     *
      * @return $this
      */
     public function setId($id)
@@ -241,6 +264,7 @@ class Site extends AbstractModel
 
     /**
      * @param mixed $domains
+     *
      * @return $this
      */
     public function setDomains($domains)
@@ -254,7 +278,8 @@ class Site extends AbstractModel
     }
 
     /**
-     * @param integer $rootId
+     * @param int $rootId
+     *
      * @return $this
      */
     public function setRootId($rootId)
@@ -269,6 +294,7 @@ class Site extends AbstractModel
 
     /**
      * @param Document\Page $rootDocument
+     *
      * @return $this
      */
     public function setRootDocument($rootDocument)
@@ -280,6 +306,7 @@ class Site extends AbstractModel
 
     /**
      * @param $path
+     *
      * @return $this
      */
     public function setRootPath($path)
@@ -334,7 +361,7 @@ class Site extends AbstractModel
     }
 
     /**
-     * @param boolean $redirectToMainDomain
+     * @param bool $redirectToMainDomain
      */
     public function setRedirectToMainDomain($redirectToMainDomain)
     {
@@ -342,7 +369,7 @@ class Site extends AbstractModel
     }
 
     /**
-     * @return boolean
+     * @return bool
      */
     public function getRedirectToMainDomain()
     {
@@ -354,7 +381,7 @@ class Site extends AbstractModel
 
         // this is mostly called in Site\Dao not here
         try {
-            \Pimcore\Cache::clearTag("site");
+            \Pimcore\Cache::clearTag('site');
         } catch (\Exception $e) {
             Logger::crit($e);
         }
@@ -362,6 +389,7 @@ class Site extends AbstractModel
 
     /**
      * @param $modificationDate
+     *
      * @return $this
      */
     public function setModificationDate($modificationDate)
@@ -381,6 +409,7 @@ class Site extends AbstractModel
 
     /**
      * @param $creationDate
+     *
      * @return $this
      */
     public function setCreationDate($creationDate)

@@ -8,7 +8,7 @@
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
@@ -93,7 +93,7 @@ class Mime
         'dcr'       => 'application/x-director',
         'dir'       => 'application/x-director',
         'dxr'       => 'application/x-director',
-    'dxf'       => 'application/x-autocad',
+        'dxf'       => 'application/x-autocad',
         'dvi'       => 'application/x-dvi',
         'spl'       => 'application/x-futuresplash',
         'tgz'       => 'application/x-gtar',
@@ -176,7 +176,7 @@ class Mime
         'rgb'       => 'image/x-rgb',
         'xbm'       => 'image/x-xbitmap',
         'psd'       => 'image/x-photoshop',
-        'ps'       => 'image/x-photoshop',
+        'psb'       => 'image/x-photoshop',
         'xpm'       => 'image/x-xpixmap',
         'xwd'       => 'image/x-xwindowdump',
         'eml'       => 'message/rfc822',
@@ -212,6 +212,7 @@ class Mime
         'm4u'       => 'video/vnd.mpegurl',
         'flv'       => 'video/x-flv',
         'f4v'       => 'video/mp4',
+        'mp4'       => 'video/mp4',
         'asf'       => 'video/x-ms-asf',
         'asx'       => 'video/x-ms-asf',
         'wmv'       => 'video/x-ms-wmv',
@@ -226,13 +227,15 @@ class Mime
     /**
      * @param $file
      * @param null $filename
+     *
      * @return mixed|string
+     *
      * @throws \Exception
      */
     public static function detect($file, $filename = null)
     {
         if (!file_exists($file)) {
-            throw new \Exception("File " . $file . " doesn't exist");
+            throw new \Exception('File ' . $file . " doesn't exist");
         }
 
         if (!$filename) {
@@ -261,6 +264,6 @@ class Mime
         }
 
         // return default mime-type if we're unable to detect it
-        return "application/octet-stream";
+        return 'application/octet-stream';
     }
 }

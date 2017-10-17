@@ -8,7 +8,7 @@
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) 2009-2016 pimcore GmbH (http://www.pimcore.org)
+ * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
  * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 
@@ -21,10 +21,34 @@ class Housekeeping
      */
     public static function cleanupTmpFiles($lastAccessGreaterThanDays = 90)
     {
-        $directory = new \RecursiveDirectoryIterator(PIMCORE_TEMPORARY_DIRECTORY);
-        $filter = new \RecursiveCallbackFilterIterator($directory, function (\SplFileInfo $current, $key, $iterator) use ($lastAccessGreaterThanDays) {
+        self::deleteFilesInFolderOlderThanDays(PIMCORE_TEMPORARY_DIRECTORY, $lastAccessGreaterThanDays);
+    }
+
+    /**
+     * @param int $olderThanDays
+     */
+    public static function cleanupSymfonyProfilingData($olderThanDays = 4)
+    {
+
+        // currently only for the 'dev' environment which has enabled the profiler by default
+        $profilerDir = PIMCORE_PRIVATE_VAR . '/cache/dev/profiler';
+        self::deleteFilesInFolderOlderThanDays($profilerDir, $olderThanDays);
+    }
+
+    /**
+     * @param $folder
+     * @param $days
+     */
+    protected static function deleteFilesInFolderOlderThanDays($folder, $days)
+    {
+        if (!is_dir($folder)) {
+            return;
+        }
+
+        $directory = new \RecursiveDirectoryIterator($folder);
+        $filter = new \RecursiveCallbackFilterIterator($directory, function (\SplFileInfo $current, $key, $iterator) use ($days) {
             if ($current->isFile()) {
-                if ($current->getATime() < (time() - ($lastAccessGreaterThanDays * 86400))) {
+                if ($current->getATime() < (time() - ($days * 86400))) {
                     return true;
                 }
             } else {
