@@ -16,10 +16,14 @@ namespace Pimcore\Bundle\EcommerceFrameworkBundle\DependencyInjection;
 
 use Pimcore\Bundle\EcommerceFrameworkBundle\AvailabilitySystem\AvailabilitySystemLocator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\CartManagerLocator;
+use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\ICartManagerLocator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CheckoutManager\CheckoutManagerFactoryLocator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CheckoutManager\CommitOrderProcessorLocator;
-use Pimcore\Bundle\EcommerceFrameworkBundle\DependencyInjection\IndexService\AttributeFactory;
+use Pimcore\Bundle\EcommerceFrameworkBundle\CheckoutManager\ICheckoutManagerFactoryLocator;
+use Pimcore\Bundle\EcommerceFrameworkBundle\CheckoutManager\ICommitOrderProcessorLocator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\FilterService\FilterServiceLocator;
+use Pimcore\Bundle\EcommerceFrameworkBundle\FilterService\IFilterServiceLocator;
+use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\IOrderManagerLocator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\OrderManagerLocator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PriceSystem\PriceSystemLocator;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -96,10 +100,12 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
 
     private function registerFactoryConfiguration(ContainerBuilder $container, array $config)
     {
-        $container->setAlias(
-            self::SERVICE_ID_FACTORY,
-            $config['factory_id']
-        );
+        $container
+            ->setAlias(
+                self::SERVICE_ID_FACTORY,
+                $config['factory_id']
+            )
+            ->setPublic(true);
 
         $container->setParameter(
             'pimcore_ecommerce.factory.strict_tenants',
@@ -109,10 +115,12 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
 
     private function registerEnvironmentConfiguration(ContainerBuilder $container, array $config)
     {
-        $container->setAlias(
-            self::SERVICE_ID_ENVIRONMENT,
-            $config['environment_id']
-        );
+        $container
+            ->setAlias(
+                self::SERVICE_ID_ENVIRONMENT,
+                $config['environment_id']
+            )
+            ->setPublic(true);
 
         $container->setParameter('pimcore_ecommerce.environment.options', $config['options']);
     }
@@ -155,9 +163,12 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
 
         $this->setupTenantAwareComponentLocator(
             $container,
-            'cart_manager',
+            ICartManagerLocator::class,
             $mapping,
-            CartManagerLocator::class
+            CartManagerLocator::class,
+            [
+                'pimcore_ecommerce.locator.cart_manager',
+            ]
         );
     }
 
@@ -189,18 +200,23 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
 
         $this->setupTenantAwareComponentLocator(
             $container,
-            'order_manager',
+            IOrderManagerLocator::class,
             $mapping,
-            OrderManagerLocator::class
+            OrderManagerLocator::class,
+            [
+                'pimcore_ecommerce.locator.order_manager'
+            ]
         );
     }
 
     private function registerPricingManagerConfiguration(ContainerBuilder $container, array $config)
     {
-        $container->setAlias(
-            self::SERVICE_ID_PRICING_MANAGER,
-            $config['pricing_manager_id']
-        );
+        $container
+            ->setAlias(
+                self::SERVICE_ID_PRICING_MANAGER,
+                $config['pricing_manager_id']
+            )
+            ->setPublic(true);
 
         $container->setParameter('pimcore_ecommerce.pricing_manager.enabled', $config['enabled']);
         $container->setParameter('pimcore_ecommerce.pricing_manager.condition_mapping', $config['conditions']);
@@ -293,22 +309,33 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
 
         $this->setupTenantAwareComponentLocator(
             $container,
-            'checkout_manager.commit_order_processor',
+            ICommitOrderProcessorLocator::class,
             $commitOrderProcessorMapping,
-            CommitOrderProcessorLocator::class
+            CommitOrderProcessorLocator::class,
+            [
+                'pimcore_ecommerce.locator.checkout_manager.commit_order_processor',
+            ]
         );
 
         $this->setupTenantAwareComponentLocator(
             $container,
-            'checkout_manager.factory',
+            ICheckoutManagerFactoryLocator::class,
             $checkoutManagerFactoryMapping,
-            CheckoutManagerFactoryLocator::class
+            CheckoutManagerFactoryLocator::class,
+            [
+                'pimcore_ecommerce.locator.checkout_manager.factory',
+            ]
         );
     }
 
     private function registerPaymentManagerConfiguration(ContainerBuilder $container, array $config)
     {
-        $container->setAlias(self::SERVICE_ID_PAYMENT_MANAGER, $config['payment_manager_id']);
+        $container
+            ->setAlias(
+                self::SERVICE_ID_PAYMENT_MANAGER,
+                $config['payment_manager_id']
+            )
+            ->setPublic(true);
 
         $mapping = [];
 
@@ -339,14 +366,17 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
 
     private function registerIndexServiceConfig(ContainerBuilder $container, array $config)
     {
-        $container->setAlias(
-            self::SERVICE_ID_INDEX_SERVICE,
-            $config['index_service_id']
-        );
+        $container
+            ->setAlias(
+                self::SERVICE_ID_INDEX_SERVICE,
+                $config['index_service_id']
+            )
+            ->setPublic(true);
 
         $container->setParameter('pimcore_ecommerce.index_service.default_tenant', $config['default_tenant']);
 
-        $attributeFactory = new AttributeFactory();
+        $getterIds      = [];
+        $interpreterIds = [];
 
         foreach ($config['tenants'] ?? [] as $tenant => $tenantConfig) {
             if (!$tenantConfig['enabled']) {
@@ -356,10 +386,25 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
             $configId = sprintf('pimcore_ecommerce.index_service.%s.config', $tenant);
             $workerId = sprintf('pimcore_ecommerce.index_service.%s.worker', $tenant);
 
+            $attributes = $tenantConfig['attributes'];
+
+            // collect configured getters and interpreters and
+            // create a locator service for each which will be used
+            // from attribute factory
+            foreach ($attributes as $attribute) {
+                if ($attribute['getter_id']) {
+                    $getterIds[$attribute['getter_id']] = $attribute['getter_id'];
+                }
+
+                if ($attribute['interpreter_id']) {
+                    $interpreterIds[$attribute['interpreter_id']] = $attribute['interpreter_id'];
+                }
+            }
+
             $config = new ChildDefinition($tenantConfig['config_id']);
             $config->setArguments([
                 '$tenantName'       => $tenant,
-                '$attributes'       => $attributeFactory->createAttributes($tenantConfig['attributes']),
+                '$attributes'       => $attributes,
                 '$searchAttributes' => $tenantConfig['search_attributes'],
                 '$filterTypes'      => []
             ]);
@@ -375,6 +420,9 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
             $container->setDefinition($configId, $config);
             $container->setDefinition($workerId, $worker);
         }
+
+        $this->setupServiceLocator($container, 'index_service.getters', $getterIds);
+        $this->setupServiceLocator($container, 'index_service.interpreters', $interpreterIds);
     }
 
     private function registerFilterServiceConfig(ContainerBuilder $container, array $config)
@@ -409,9 +457,12 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
 
         $this->setupTenantAwareComponentLocator(
             $container,
-            'filter_service',
+            IFilterServiceLocator::class,
             $mapping,
-            FilterServiceLocator::class
+            FilterServiceLocator::class,
+            [
+                'pimcore_ecommerce.locator.filter_service'
+            ]
         );
     }
 
@@ -423,28 +474,34 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
             $config['voucher_service_options']
         );
 
-        $container->setAlias(
-            self::SERVICE_ID_VOUCHER_SERVICE,
-            $config['voucher_service_id']
-        );
+        $container
+            ->setAlias(
+                self::SERVICE_ID_VOUCHER_SERVICE,
+                $config['voucher_service_id']
+            )
+            ->setPublic(true);
 
         $container->setParameter(
             'pimcore_ecommerce.voucher_service.token_manager.mapping',
             $config['token_managers']['mapping']
         );
 
-        $container->setAlias(
+        $container
+            ->setAlias(
             self::SERVICE_ID_TOKEN_MANAGER_FACTORY,
-            $config['token_managers']['factory_id']
-        );
+                $config['token_managers']['factory_id']
+            )
+            ->setPublic(true);
     }
 
     private function registerOfferToolConfig(ContainerBuilder $container, array $config)
     {
-        $container->setAlias(
-            self::SERVICE_ID_OFFER_TOOL,
-            $config['service_id']
-        );
+        $container
+            ->setAlias(
+                self::SERVICE_ID_OFFER_TOOL,
+                $config['service_id']
+            )
+            ->setPublic(true);
 
         $container->setParameter(
             'pimcore_ecommerce.offer_tool.order_storage.offer_class',
@@ -464,10 +521,12 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
 
     private function registerTrackingManagerConfiguration(ContainerBuilder $container, array $config)
     {
-        $container->setAlias(
-            self::SERVICE_ID_TRACKING_MANAGER,
-            $config['tracking_manager_id']
-        );
+        $container
+            ->setAlias(
+                self::SERVICE_ID_TRACKING_MANAGER,
+                $config['tracking_manager_id']
+            )
+            ->setPublic(true);
 
         foreach ($config['trackers'] as $name => $trackerConfig) {
             if (!$trackerConfig['enabled']) {
@@ -490,17 +549,19 @@ class PimcoreEcommerceFrameworkExtension extends ConfigurableExtension
         }
     }
 
-    private function setupTenantAwareComponentLocator(ContainerBuilder $container, string $id, array $mapping, string $class)
+    private function setupTenantAwareComponentLocator(ContainerBuilder $container, string $id, array $mapping, string $class, array $aliases)
     {
         $serviceLocator = $this->setupServiceLocator($container, $id, $mapping, false);
 
-        $locator = new Definition($class, [
+        $container->setDefinition($id, new Definition($class, [
             $serviceLocator,
             new Reference('pimcore_ecommerce.environment'),
             $container->getParameter('pimcore_ecommerce.factory.strict_tenants')
-        ]);
+        ]));
 
-        $container->setDefinition(sprintf('pimcore_ecommerce.locator.%s', $id), $locator);
+        foreach ($aliases as $alias) {
+            $container->setAlias($alias, $id);
+        }
     }
 
     private function setupNameServiceComponentLocator(ContainerBuilder $container, string $id, array $mapping, string $class)

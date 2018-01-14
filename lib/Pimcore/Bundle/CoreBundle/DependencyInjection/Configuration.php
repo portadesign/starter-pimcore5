@@ -15,7 +15,9 @@
 namespace Pimcore\Bundle\CoreBundle\DependencyInjection;
 
 use Pimcore\Cache\Pool\Redis;
-use Pimcore\Cache\Pool\Redis\ConnectionFactory;
+use Pimcore\Storage\Redis\ConnectionFactory;
+use Pimcore\Targeting\Storage\CookieStorage;
+use Pimcore\Targeting\Storage\TargetingStorageInterface;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\NodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
@@ -93,6 +95,8 @@ class Configuration implements ConfigurationInterface
         $this->addSecurityNode($rootNode);
         $this->addNewsletterNode($rootNode);
         $this->addCustomReportsNode($rootNode);
+        $this->addMigrationsNode($rootNode);
+        $this->addTargetingNode($rootNode);
 
         return $treeBuilder;
     }
@@ -562,6 +566,109 @@ class Configuration implements ConfigurationInterface
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->arrayNode('adapters')
+                            ->useAttributeAsKey('name')
+                                ->prototype('scalar')
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
+            ->end();
+    }
+
+    /**
+     * Adds configuration tree node for migrations
+     *
+     * @param ArrayNodeDefinition $rootNode
+     */
+    private function addMigrationsNode(ArrayNodeDefinition $rootNode)
+    {
+        $rootNode
+            ->children()
+                ->arrayNode('migrations')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->arrayNode('sets')
+                            ->useAttributeAsKey('identifier')
+                            ->defaultValue([])
+                            ->info('Migration sets which can be used apart from bundle migrations. Use the -s option in migration commands to select a specific set.')
+                            ->example([
+                                [
+                                    'custom_set' => [
+                                        'name'       => 'Custom Migrations',
+                                        'namespace'  => 'App\\Migrations\\Custom',
+                                        'directory'  => 'src/App/Migrations/Custom'
+                                    ],
+                                    'custom_set_2' => [
+                                        'name'       => 'Custom Migrations 2',
+                                        'namespace'  => 'App\\Migrations\\Custom2',
+                                        'directory'  => 'src/App/Migrations/Custom2',
+                                        'connection' => 'custom_connection'
+                                    ],
+                                ]
+                            ])
+                            ->prototype('array')
+                                ->children()
+                                    ->scalarNode('identifier')->end()
+                                    ->scalarNode('name')
+                                        ->isRequired()
+                                        ->cannotBeEmpty()
+                                    ->end()
+                                    ->scalarNode('namespace')
+                                        ->isRequired()
+                                        ->cannotBeEmpty()
+                                    ->end()
+                                    ->scalarNode('directory')
+                                        ->isRequired()
+                                        ->cannotBeEmpty()
+                                    ->end()
+                                    ->scalarNode('connection')
+                                        ->info('If defined, the DBAL connection defined here will be used')
+                                        ->defaultNull()
+                                        ->beforeNormalization()
+                                            ->ifTrue(function ($v) {
+                                                return empty(trim($v));
+                                            })
+                                            ->then(function () {
+                                                return null;
+                                            })
+                                        ->end()
+                                    ->end()
+                                ->end()
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
+            ->end();
+    }
+
+    private function addTargetingNode(ArrayNodeDefinition $rootNode)
+    {
+        $rootNode
+            ->children()
+                ->arrayNode('targeting')
+                    ->canBeDisabled()
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->scalarNode('storage_id')
+                            ->info('Service ID of the targeting storage which should be used. This ID will be aliased to ' . TargetingStorageInterface::class)
+                            ->defaultValue(CookieStorage::class)
+                            ->cannotBeEmpty()
+                        ->end()
+                        ->arrayNode('session')
+                            ->info('Enables HTTP session support by configuring session bags and the full page cache')
+                            ->canBeEnabled()
+                        ->end()
+                        ->arrayNode('data_providers')
+                            ->useAttributeAsKey('key')
+                                ->prototype('scalar')
+                            ->end()
+                        ->end()
+                        ->arrayNode('conditions')
+                            ->useAttributeAsKey('key')
+                                ->prototype('scalar')
+                            ->end()
+                        ->end()
+                        ->arrayNode('action_handlers')
                             ->useAttributeAsKey('name')
                                 ->prototype('scalar')
                             ->end()

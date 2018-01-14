@@ -281,7 +281,7 @@ class Update
                 }
 
                 if (array_key_exists('id', $file) && $file['id']) {
-                    // this is the new style, see https://www.pimcore.org/issues/browse/PIMCORE-2722
+                    // this is the new style
                     $srcFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/update/'.$revision.'/files/' . $file['id'] . '-' . $file['revision'];
                 } else {
                     // this is the old style, which we still have to support here, otherwise there's the risk that the
@@ -352,7 +352,7 @@ class Update
             } catch (\Exception $e) {
                 Logger::error($e);
                 $outputMessage .= 'EXCEPTION: ' . $e->getMessage();
-                $outputMessage .= '<br>For details please have a look into debug.log<br>';
+                $outputMessage .= '<br>For details please have a look into the log files in /var/logs<br>';
             }
             $outputMessage .= ob_get_clean();
         }
@@ -533,5 +533,13 @@ class Update
         } else {
             Logger::debug('MayMind GeoIP2 Download skipped, everything up to date, last update: ' . date('m/d/Y H:i', $filemtime));
         }
+    }
+
+    /**
+     * @return string
+     */
+    public static function getUpdateHost(): string
+    {
+        return self::$updateHost;
     }
 }

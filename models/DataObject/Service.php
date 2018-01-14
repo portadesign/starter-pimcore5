@@ -17,6 +17,9 @@
 
 namespace Pimcore\Model\DataObject;
 
+use Pimcore\Cache\Runtime;
+use Pimcore\DataObject\GridColumnConfig\ConfigElementInterface;
+use Pimcore\DataObject\GridColumnConfig\Service as GridColumnConfigService;
 use Pimcore\Db\ZendCompatibility\QueryBuilder;
 use Pimcore\Event\DataObjectEvents;
 use Pimcore\Event\Model\DataObjectEvent;
@@ -24,6 +27,8 @@ use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Element;
 use Pimcore\Tool\Admin as AdminTool;
+use Pimcore\Tool\Session;
+use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
 
 /**
  * @method \Pimcore\Model\Element\Dao getDao()
@@ -230,6 +235,16 @@ class Service extends Model\Element\Service
     }
 
     /**
+     * @param $field
+     *
+     * @return bool
+     */
+    public static function isHelperGridColumnConfig($field)
+    {
+        return strpos($field, '#') === 0;
+    }
+
+    /**
      * Language only user for classification store !!!
      *
      * @param  AbstractObject $object
@@ -240,7 +255,6 @@ class Service extends Model\Element\Service
      */
     public static function gridObjectData($object, $fields = null, $requestedLanguage = null)
     {
-        $localizedPermissionsResolved = false;
         $data = Element\Service::gridElementData($object);
 
         if ($object instanceof Concrete) {
@@ -251,15 +265,12 @@ class Service extends Model\Element\Service
 
             $user = AdminTool::getCurrentUser();
 
-            //TODO keep this for later!
-            //            if (!$user->isAdmin()) {
-            //                $permissionSet = $object->getPermissions(null, $user);
-            //                $fieldPermissions = self::getFieldPermissions($object, $permissionSet);
-            //            }
-
             if (empty($fields)) {
                 $fields = array_keys($object->getclass()->getFieldDefinitions());
             }
+
+            $haveHelperDefinition = false;
+
             foreach ($fields as $key) {
                 $brickType = null;
                 $brickGetter = null;
@@ -268,7 +279,15 @@ class Service extends Model\Element\Service
 
                 $def = $object->getClass()->getFieldDefinition($key);
 
-                if (substr($key, 0, 1) == '~') {
+                if (strpos($key, '#') === 0) {
+                    if (!$haveHelperDefinition) {
+                        $helperDefinitions = self::getHelperDefinitions();
+                        $haveHelperDefinition = true;
+                    }
+                    if ($helperDefinitions[$key]) {
+                        $data[$key] = self::calculateCellValue($object, $helperDefinitions, $key);
+                    }
+                } elseif (substr($key, 0, 1) == '~') {
                     $type = $keyParts[1];
                     if ($type == 'classificationstore') {
                         $field = $keyParts[2];
@@ -383,6 +402,95 @@ class Service extends Model\Element\Service
         }
 
         return $data;
+    }
+
+    /**
+     * @param $helperDefinitions
+     * @param $key
+     *
+     * @return bool
+     */
+    public static function expandGridColumnForExport($helperDefinitions, $key)
+    {
+        $config = self::getConfigForHelperDefinition($helperDefinitions, $key);
+        if ($config instanceof \Pimcore\DataObject\GridColumnConfig\Operator\AbstractOperator && $config->expandLocales()) {
+            return $config->getValidLanguages();
+        }
+
+        return false;
+    }
+
+    /**
+     * @param $helperDefinitions
+     * @param $key
+     *
+     * @return mixed|null|ConfigElementInterface|ConfigElementInterface[]
+     */
+    public static function getConfigForHelperDefinition($helperDefinitions, $key)
+    {
+        $cacheKey = 'gridcolumn_config_' . $key;
+        if (Runtime::isRegistered($cacheKey)) {
+            $config = Runtime::get($cacheKey);
+        } else {
+            $definition = $helperDefinitions[$key];
+            $attributes = json_decode(json_encode($definition->attributes));
+
+            // TODO refactor how the service is accessed into something non-static and inject the service there
+            $service = \Pimcore::getContainer()->get(GridColumnConfigService::class);
+            $config = $service->buildOutputDataConfig([$attributes]);
+
+            if (!$config) {
+                return null;
+            }
+            $config = $config[0];
+            Runtime::save($config, $cacheKey);
+        }
+
+        return $config;
+    }
+
+    /**
+     * @param $object
+     * @param $definition
+     *
+     * @return null
+     */
+    public static function calculateCellValue($object, $helperDefinitions, $key)
+    {
+        $config = static::getConfigForHelperDefinition($helperDefinitions, $key);
+        if (!$config) {
+            return null;
+        }
+
+        $result = $config->getLabeledValue($object);
+        if (isset($result->value)) {
+            $result = $result->value;
+
+            if ($config->renderer) {
+                $classname = 'Pimcore\\Model\\DataObject\\ClassDefinition\\Data\\' . ucfirst($config->renderer);
+                /** @var $rendererImpl Model\DataObject\ClassDefinition\Data */
+                $rendererImpl = new $classname();
+                if (method_exists($rendererImpl, 'getDataForGrid')) {
+                    $result = $rendererImpl->getDataForGrid($result, $object, []);
+                }
+            }
+
+            return $result;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return mixed
+     */
+    public static function getHelperDefinitions()
+    {
+        return Session::useSession(function (AttributeBagInterface $session) {
+            $existingColumns = $session->get('helpercolumns', []);
+
+            return $existingColumns;
+        }, 'pimcore_gridconfig');
     }
 
     /**
@@ -738,14 +846,30 @@ class Service extends Model\Element\Service
                 if ($field instanceof ClassDefinition\Data\Objectbricks) {
                     // custom field
                     $db = \Pimcore\Db::get();
+                    $brickPrefix = '';
+
+                    $ommitPrefix = false;
+
+                    if ($brickField instanceof  Model\DataObject\ClassDefinition\Data\Checkbox
+                            || (($brickField instanceof Model\DataObject\ClassDefinition\Data\Date || $brickField instanceof  Model\DataObject\ClassDefinition\Data\Datetime) && $brickField->getColumnType() == 'datetime')
+                    ) {
+                        $ommitPrefix = true;
+                    }
+
+                    if (!$ommitPrefix) {
+                        $brickPrefix =  $db->quoteIdentifier($brickType) . '.';
+                    }
                     if (is_array($filter['value'])) {
                         $fieldConditions = [];
                         foreach ($filter['value'] as $filterValue) {
-                            $fieldConditions[] = $db->quoteIdentifier($brickType) . '.' . $brickField->getFilterCondition($filterValue, $operator);
+                            $fieldConditions[] =  $brickPrefix . $brickField->getFilterCondition($filterValue, $operator,
+                                    ['brickType' => $brickType]
+                                );
                         }
                         $conditionPartsFilters[] = '(' . implode(' OR ', $fieldConditions) . ')';
                     } else {
-                        $conditionPartsFilters[] = $db->quoteIdentifier($brickType) . '.' . $brickField->getFilterCondition($filter['value'], $operator);
+                        $conditionPartsFilters[] = $brickPrefix . $brickField->getFilterCondition($filter['value'], $operator,
+                                ['brickType' => $brickType]);
                     }
                 } elseif ($field instanceof ClassDefinition\Data) {
                     // custom field
@@ -762,6 +886,8 @@ class Service extends Model\Element\Service
                     // system field
                     if ($filterField == 'fullpath') {
                         $conditionPartsFilters[] = 'concat(o_path, o_key) ' . $operator . ' ' . $db->quote('%' . $filter['value'] . '%');
+                    } elseif ($filterField == 'key') {
+                        $conditionPartsFilters[] = 'o_key ' . $operator . ' ' . $db->quote('%' . $filter['value'] . '%');
                     } else {
                         if ($filter['type'] == 'date' && $operator == '=') {
                             //if the equal operator is chosen with the date type, condition has to be changed
@@ -942,7 +1068,7 @@ class Service extends Model\Element\Service
         $list = new ClassDefinition\CustomLayout\Listing();
         $list->setOrderKey('name');
         $condition = 'classId = ' . $list->quote($classId);
-        if (count($layoutPermissions)) {
+        if (is_array($layoutPermissions) && count($layoutPermissions)) {
             $layoutIds = array_values($layoutPermissions);
             $condition .= ' AND id IN (' . implode(',', $layoutIds) . ')';
         }
@@ -1140,7 +1266,7 @@ class Service extends Model\Element\Service
             }
         }
 
-        $mergedFieldDefinition = unserialize(serialize($masterFieldDefinition));
+        $mergedFieldDefinition = self::cloneDefinition($masterFieldDefinition);
 
         if (count($layoutDefinitions)) {
             foreach ($mergedFieldDefinition as $key => $def) {
@@ -1190,6 +1316,19 @@ class Service extends Model\Element\Service
         }
 
         return $mergedFieldDefinition;
+    }
+
+    /**
+     * @param $definition
+     *
+     * @return mixed
+     */
+    public static function cloneDefinition($definition)
+    {
+        $deepCopy = new \DeepCopy\DeepCopy();
+        $theCopy = $deepCopy->copy($definition);
+
+        return $theCopy;
     }
 
     /**

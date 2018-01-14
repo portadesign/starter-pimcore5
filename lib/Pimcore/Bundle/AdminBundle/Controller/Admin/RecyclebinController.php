@@ -39,7 +39,7 @@ class RecyclebinController extends AdminController implements EventedControllerI
             $item = Recyclebin\Item::getById(\Pimcore\Bundle\AdminBundle\Helper\QueryParams::getRecordIdForGridRequest($request->get('data')));
             $item->delete();
 
-            return $this->json(['success' => true, 'data' => []]);
+            return $this->adminJson(['success' => true, 'data' => []]);
         } else {
             $db = \Pimcore\Db::get();
 
@@ -125,7 +125,7 @@ class RecyclebinController extends AdminController implements EventedControllerI
 
             $items = $list->load();
 
-            return $this->json(['data' => $items, 'success' => true, 'total' => $list->getTotalCount()]);
+            return $this->adminJson(['data' => $items, 'success' => true, 'total' => $list->getTotalCount()]);
         }
     }
 
@@ -141,7 +141,7 @@ class RecyclebinController extends AdminController implements EventedControllerI
         $item = Recyclebin\Item::getById($request->get('id'));
         $item->restore();
 
-        return $this->json(['success' => true]);
+        return $this->adminJson(['success' => true]);
     }
 
     /**
@@ -156,7 +156,7 @@ class RecyclebinController extends AdminController implements EventedControllerI
         $bin = new Element\Recyclebin();
         $bin->flush();
 
-        return $this->json(['success' => true]);
+        return $this->adminJson(['success' => true]);
     }
 
     /**
@@ -175,16 +175,16 @@ class RecyclebinController extends AdminController implements EventedControllerI
             $baseClass = Element\Service::getBaseClassNameForElement($type);
             $listClass = '\\Pimcore\\Model\\' . $baseClass . '\\Listing';
             $list = new $listClass();
-            $list->setCondition((($type == 'object') ? 'o_' : '') . "path LIKE '" . $element->getRealFullPath() . "/%'");
+            $list->setCondition((($type == 'object') ? 'o_' : '') . 'path LIKE ' . $list->quote($element->getRealFullPath() . '/%'));
             $children = $list->getTotalCount();
 
             if ($children <= 100) {
-                Recyclebin\Item::create($element, $this->getUser());
+                Recyclebin\Item::create($element, $this->getAdminUser());
             }
 
-            return $this->json(['success' => true]);
+            return $this->adminJson(['success' => true]);
         } else {
-            return $this->json(['success' => false]);
+            return $this->adminJson(['success' => false]);
         }
     }
 

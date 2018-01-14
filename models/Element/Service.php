@@ -759,7 +759,8 @@ class Service extends Model\AbstractModel
 
         if (!($foundElement = $type::getByPath($sanitizedPath))) {
             foreach ($parts as $part) {
-                $pathsArray[] = $pathsArray[count($pathsArray) - 1] . '/' . self::getValidKey($part, $type);
+                $pathPart = $pathsArray[count($pathsArray) - 1] ?? '';
+                $pathsArray[] = $pathPart . '/' . self::getValidKey($part, $type);
             }
 
             for ($i = 0; $i < count($pathsArray); $i++) {
@@ -1037,6 +1038,8 @@ class Service extends Model\AbstractModel
         $deepCopy->addFilter(new \DeepCopy\Filter\SetNullFilter(), new \DeepCopy\Matcher\PropertyNameMatcher('dao'));
         $deepCopy->addFilter(new \DeepCopy\Filter\SetNullFilter(), new \DeepCopy\Matcher\PropertyNameMatcher('resource'));
         $deepCopy->addFilter(new \DeepCopy\Filter\SetNullFilter(), new \DeepCopy\Matcher\PropertyNameMatcher('writeResource'));
+        $deepCopy->addFilter(new \DeepCopy\Filter\Doctrine\DoctrineCollectionFilter(), new \DeepCopy\Matcher\PropertyTypeMatcher('Doctrine\Common\Collections\Collection'));
+
         if ($element instanceof DataObject\Concrete) {
             DataObject\Service::loadAllObjectFields($element);
         }

@@ -638,8 +638,17 @@ class DefaultFindologic implements IProductList
 
                 $categories = explode('_', $catTree);
 
-                foreach (array_slice($categories, 0, -1) as $cat) {
-                    $field = $field->items->item;
+                foreach ($categories as $cat) {
+                    if (is_array($field->items->item)) {
+                        foreach ($field->items->item as $entry) {
+                            if ($entry->name == $cat) {
+                                $field = $entry;
+                                break;
+                            }
+                        }
+                    } else {
+                        $field = $field->items->item;
+                    }
                 }
             } elseif ($fieldname === 'price') {
                 $field = $this->groupedValues[$fieldname];
@@ -647,7 +656,7 @@ class DefaultFindologic implements IProductList
                 $groups[] = [
                     'value' => null, 'label' => null, 'count' => null, 'parameter' => $field->attributes->totalRange
                 ];
-            } elseif ($fieldname === \OnlineShop\Framework\FilterService\FilterType\Findologic\SelectCategory::FIELDNAME) {
+            } elseif ($fieldname === SelectCategory::FIELDNAME) {
                 $rec = function (array $items) use (&$rec, &$groups) {
                     foreach ($items as $item) {
                         $groups[$item->name] = [
@@ -667,15 +676,17 @@ class DefaultFindologic implements IProductList
                 $rec($field->items->item);
             }
 
-            $hits = $field->items->item instanceof \stdClass
-                ? [$field->items->item]
-                : $field->items->item
-            ;
+            if ($field->items->item) {
+                $hits = $field->items->item instanceof \stdClass
+                    ? [$field->items->item]
+                    : $field->items->item
+                ;
 
-            foreach ($hits as $item) {
-                $groups[] = [
-                    'value' => $item->name, 'label' => $item->name, 'count' => $item->frequency, 'parameter' => $item->parameters
-                ];
+                foreach ($hits as $item) {
+                    $groups[] = [
+                        'value' => $item->name, 'label' => $item->name, 'count' => $item->frequency, 'parameter' => $item->parameters
+                    ];
+                }
             }
         }
 

@@ -98,9 +98,9 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             }
             // custom views end
 
-            if (!$this->getUser()->isAdmin()) {
-                $userIds = $this->getUser()->getRoles();
-                $userIds[] = $this->getUser()->getId();
+            if (!$this->getAdminUser()->isAdmin()) {
+                $userIds = $this->getAdminUser()->getRoles();
+                $userIds[] = $this->getAdminUser()->getId();
                 $condition .= ' AND (
                                                     (select list from users_workspaces_object where userId in (' . implode(',', $userIds) . ') and LOCATE(CONCAT(o_path,o_key),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
                                                     OR
@@ -129,7 +129,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             $total = $cv
                 ? $childsList->count()
                 : $object->getChildAmount([DataObject\AbstractObject::OBJECT_TYPE_OBJECT, DataObject\AbstractObject::OBJECT_TYPE_FOLDER,
-                    DataObject\AbstractObject::OBJECT_TYPE_VARIANT], $this->getUser());
+                    DataObject\AbstractObject::OBJECT_TYPE_VARIANT], $this->getAdminUser());
         }
 
         //Hook for modifying return value - e.g. for changing permissions based on object data
@@ -141,7 +141,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
         $objects = $event->getArgument('objects');
 
         if ($request->get('limit')) {
-            return $this->json([
+            return $this->adminJson([
                 'offset' => $offset,
                 'limit' => $limit,
                 'total' => $total,
@@ -149,7 +149,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 'fromPaging' => intval($request->get('fromPaging'))
             ]);
         } else {
-            return $this->json($objects);
+            return $this->adminJson($objects);
         }
     }
 
@@ -291,7 +291,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             $object = $parent;
         }
 
-        return $this->json($data);
+        return $this->adminJson($data);
     }
 
     /**
@@ -305,7 +305,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
     {
         // check for lock
         if (Element\Editlock::isLocked($request->get('id'), 'object')) {
-            return $this->json([
+            return $this->adminJson([
                 'editlock' => Element\Editlock::getByElement($request->get('id'), 'object')
             ]);
         }
@@ -365,6 +365,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
             if ($object instanceof DataObject\Concrete) {
                 $objectData['lazyLoadedFields'] = $object->getLazyLoadedFields();
+                $objectData['general']['linkGeneratorReference'] = $object->getClass()->getLinkGeneratorReference();
             }
 
             $objectData['childdata']['id'] = $object->getId();
@@ -424,11 +425,11 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             \Pimcore::getEventDispatcher()->dispatch(AdminEvents::OBJECT_GET_PRE_SEND_DATA, $event);
             $data = $event->getArgument('data');
 
-            return $this->json($data);
+            return $this->adminJson($data);
         } else {
             Logger::debug('prevented getting object id [ ' . $object->getId() . ' ] because of missing permissions');
 
-            return $this->json(['success' => false, 'message' => 'missing_permission']);
+            return $this->adminJson(['success' => false, 'message' => 'missing_permission']);
         }
     }
 
@@ -617,7 +618,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
      * @param $allowedView
      * @param $allowedEdit
      */
-    public function setLayoutPermission(&$layout, $allowedView, $allowedEdit)
+    protected function setLayoutPermission(&$layout, $allowedView, $allowedEdit)
     {
         if ($layout->{'fieldtype'} == 'localizedfields' || $layout->{'fieldtype'} == 'classificationstore') {
             if (is_array($allowedView) && count($allowedView) > 0) {
@@ -669,7 +670,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
      *
      * @return mixed
      */
-    public function filterLocalizedFields(DataObject\AbstractObject $object, $objectData)
+    protected function filterLocalizedFields(DataObject\AbstractObject $object, $objectData)
     {
         if (!($object instanceof DataObject\Concrete)) {
             return $objectData;
@@ -711,7 +712,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
     {
         // check for lock
         if (Element\Editlock::isLocked($request->get('id'), 'object')) {
-            return $this->json([
+            return $this->adminJson([
                 'editlock' => Element\Editlock::getByElement($request->get('id'), 'object')
             ]);
         }
@@ -738,7 +739,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             $objectData['classes'] = $this->prepareChildClasses($object->getDao()->getClasses());
 
             // grid-config
-            $configFile = PIMCORE_CONFIGURATION_DIRECTORY . '/object/grid/' . $object->getId() . '-user_' . $this->getUser()->getId() . '.psf';
+            $configFile = PIMCORE_CONFIGURATION_DIRECTORY . '/object/grid/' . $object->getId() . '-user_' . $this->getAdminUser()->getId() . '.psf';
             if (is_file($configFile)) {
                 $gridConfig = Tool\Serialize::unserialize(file_get_contents($configFile));
                 if ($gridConfig) {
@@ -753,11 +754,11 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 }
             }
 
-            return $this->json($objectData);
+            return $this->adminJson($objectData);
         } else {
             Logger::debug('prevented getting folder id [ ' . $object->getId() . ' ] because of missing permissions');
 
-            return $this->json(['success' => false, 'message' => 'missing_permission']);
+            return $this->adminJson(['success' => false, 'message' => 'missing_permission']);
         }
     }
 
@@ -815,8 +816,8 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 $object->setParentId($request->get('parentId'));
                 $object->setKey($request->get('key'));
                 $object->setCreationDate(time());
-                $object->setUserOwner($this->getUser()->getId());
-                $object->setUserModification($this->getUser()->getId());
+                $object->setUserOwner($this->getAdminUser()->getId());
+                $object->setUserModification($this->getAdminUser()->getId());
                 $object->setPublished(false);
 
                 if ($request->get('objecttype') == DataObject\AbstractObject::OBJECT_TYPE_OBJECT
@@ -828,7 +829,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                     $object->save();
                     $success = true;
                 } catch (\Exception $e) {
-                    return $this->json(['success' => false, 'message' => $e->getMessage()]);
+                    return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
                 }
             } else {
                 $message = 'prevented creating object because object with same path+key already exists';
@@ -840,14 +841,14 @@ class DataObjectController extends ElementControllerBase implements EventedContr
         }
 
         if ($success) {
-            return $this->json([
+            return $this->adminJson([
                 'success' => $success,
                 'id' => $object->getId(),
                 'type' => $object->getType(),
                 'message' => $message
             ]);
         } else {
-            return $this->json([
+            return $this->adminJson([
                 'success' => $success,
                 'message' => $message
             ]);
@@ -871,28 +872,28 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 $folder = DataObject\Folder::create([
                     'o_parentId' => $request->get('parentId'),
                     'o_creationDate' => time(),
-                    'o_userOwner' => $this->getUser()->getId(),
-                    'o_userModification' => $this->getUser()->getId(),
+                    'o_userOwner' => $this->getAdminUser()->getId(),
+                    'o_userModification' => $this->getAdminUser()->getId(),
                     'o_key' => $request->get('key'),
                     'o_published' => true
                 ]);
 
                 $folder->setCreationDate(time());
-                $folder->setUserOwner($this->getUser()->getId());
-                $folder->setUserModification($this->getUser()->getId());
+                $folder->setUserOwner($this->getAdminUser()->getId());
+                $folder->setUserModification($this->getAdminUser()->getId());
 
                 try {
                     $folder->save();
                     $success = true;
                 } catch (\Exception $e) {
-                    return $this->json(['success' => false, 'message' => $e->getMessage()]);
+                    return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
                 }
             }
         } else {
             Logger::debug('prevented creating object id because of missing permissions');
         }
 
-        return $this->json(['success' => $success]);
+        return $this->adminJson(['success' => $success]);
     }
 
     /**
@@ -908,7 +909,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             $parentObject = DataObject::getById($request->get('id'));
 
             $list = new DataObject\Listing();
-            $list->setCondition("o_path LIKE '" . $parentObject->getRealFullPath() . "/%'");
+            $list->setCondition('o_path LIKE ' . $list->quote($parentObject->getRealFullPath() . '/%'));
             $list->setLimit(intval($request->get('amount')));
             $list->setOrderKey('LENGTH(o_path)', false);
             $list->setOrder('DESC');
@@ -923,19 +924,19 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 }
             }
 
-            return $this->json(['success' => true, 'deleted' => $deletedItems]);
+            return $this->adminJson(['success' => true, 'deleted' => $deletedItems]);
         } elseif ($request->get('id')) {
             $object = DataObject::getById($request->get('id'));
             if ($object) {
                 if (!$object->isAllowed('delete')) {
-                    return $this->json(['success' => false, 'message' => 'missing_permission']);
+                    return $this->adminJson(['success' => false, 'message' => 'missing_permission']);
                 } else {
                     $object->delete();
                 }
             }
 
             // return true, even when the object doesn't exist, this can be the case when using batch delete incl. children
-            return $this->json(['success' => true]);
+            return $this->adminJson(['success' => true]);
         }
     }
 
@@ -988,7 +989,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 if ($hasChilds) {
                     // get amount of childs
                     $list = new DataObject\Listing();
-                    $list->setCondition("o_path LIKE '" . $object->getRealFullPath() . "/%'");
+                    $list->setCondition('o_path LIKE ' . $list->quote($object->getRealFullPath() . '/%'));
                     $childs = $list->getTotalCount();
 
                     $totalChilds += $childs;
@@ -1026,7 +1027,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
         $deleteJobs = array_merge($recycleJobs, $deleteJobs);
 
-        return $this->json([
+        return $this->adminJson([
             'hasDependencies' => $hasDependency,
             'childs' => $totalChilds,
             'deletejobs' => $deleteJobs,
@@ -1059,7 +1060,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
         if ($object instanceof DataObject\Concrete) {
             $latestVersion = $object->getLatestVersion();
             if ($latestVersion && $latestVersion->getData()->getModificationDate() != $object->getModificationDate()) {
-                return $this->json(['success' => false, 'message' => "You can't relocate if there's a newer not published version"]);
+                return $this->adminJson(['success' => false, 'message' => "You can't relocate if there's a newer not published version"]);
             }
         }
 
@@ -1086,11 +1087,11 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                     if ($objectWithSamePath != null) {
                         $allowUpdate = false;
 
-                        return $this->json(['success' => false, 'message' => 'prevented creating object because object with same path+key already exists']);
+                        return $this->adminJson(['success' => false, 'message' => 'prevented creating object because object with same path+key already exists']);
                     }
 
                     if ($object->isLocked()) {
-                        return $this->json(['success' => false, 'message' => 'prevented moving object, because it is locked: ID: ' . $object->getId()]);
+                        return $this->adminJson(['success' => false, 'message' => 'prevented moving object, because it is locked: ID: ' . $object->getId()]);
                     }
 
                     $object->setParentId($values['parentId']);
@@ -1103,7 +1104,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
             if ($allowUpdate) {
                 $object->setModificationDate(time());
-                $object->setUserModification($this->getUser()->getId());
+                $object->setUserModification($this->getAdminUser()->getId());
 
                 try {
                     $object->save();
@@ -1111,7 +1112,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 } catch (\Exception $e) {
                     Logger::error($e);
 
-                    return $this->json(['success' => false, 'message' => $e->getMessage()]);
+                    return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
                 }
             } else {
                 Logger::debug('prevented move of object, object with same path+key already exists in this location.');
@@ -1125,13 +1126,13 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             } catch (\Exception $e) {
                 Logger::error($e);
 
-                return $this->json(['success' => false, 'message' => $e->getMessage()]);
+                return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
             }
         } else {
             Logger::debug('prevented update object because of missing permissions.');
         }
 
-        return $this->json(['success' => $success]);
+        return $this->adminJson(['success' => $success]);
     }
 
     /**
@@ -1151,7 +1152,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
             // set the latest available version for editmode
             $object = $this->getLatestVersion($object);
-            $object->setUserModification($this->getUser()->getId());
+            $object->setUserModification($this->getAdminUser()->getId());
 
             // data
             if ($request->get('data')) {
@@ -1246,7 +1247,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
                 $newObject = DataObject\AbstractObject::getById($object->getId(), true);
 
-                return $this->json([
+                return $this->adminJson([
                     'success' => true,
                     'general' => ['o_modificationDate' => $object->getModificationDate(),
                         'versionDate' => $newObject->getModificationDate()
@@ -1261,7 +1262,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                     $session->set($key, $object);
                 }, 'pimcore_objects');
 
-                return $this->json(['success' => true]);
+                return $this->adminJson(['success' => true]);
             } else {
                 if ($object->isAllowed('save')) {
                     $object->saveVersion();
@@ -1269,7 +1270,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
                     $newObject = DataObject\AbstractObject::getById($object->getId(), true);
 
-                    return $this->json([
+                    return $this->adminJson([
                         'success' => true,
                         'general' => ['o_modificationDate' => $object->getModificationDate(),
                             'versionDate' => $newObject->getModificationDate()
@@ -1291,7 +1292,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                     $detailedInfo .= '<br><br><b>Previous Trace:</b><br>' . $e->getPrevious()->getTraceAsString();
                 }
 
-                return $this->json(['success' => false, 'type' => 'ValidationException', 'message' => $e->getMessage(), 'stack' => $detailedInfo, 'code' => $e->getCode()]);
+                return $this->adminJson(['success' => false, 'type' => 'ValidationException', 'message' => $e->getMessage(), 'stack' => $detailedInfo, 'code' => $e->getCode()]);
             }
             throw $e;
         }
@@ -1305,7 +1306,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
      *
      * @return JsonResponse
      */
-    public function performFieldcollectionModificationCheck(Request $request, DataObject\Concrete $object, $originalModificationDate, $data)
+    protected function performFieldcollectionModificationCheck(Request $request, DataObject\Concrete $object, $originalModificationDate, $data)
     {
         $modificationDate = $request->get('modificationDate');
         if ($modificationDate != $originalModificationDate) {
@@ -1320,7 +1321,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                             $childDefinitions = $fdDef->getFieldDefinitions();
                             foreach ($childDefinitions as $childDef) {
                                 if ($childDef instanceof DataObject\ClassDefinition\Data\Localizedfields) {
-                                    return $this->json(['success' => false, 'message' => 'Could be that someone messed around with the fieldcollection in the meantime. Please reload and try again']);
+                                    return $this->adminJson(['success' => false, 'message' => 'Could be that someone messed around with the fieldcollection in the meantime. Please reload and try again']);
                                 }
                             }
                         }
@@ -1348,19 +1349,19 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 // general settings
                 $general = $this->decodeJson($request->get('general'));
                 $object->setValues($general);
-                $object->setUserModification($this->getUser()->getId());
+                $object->setUserModification($this->getAdminUser()->getId());
 
                 $object = $this->assignPropertiesFromEditmode($request, $object);
 
                 $object->save();
 
-                return $this->json(['success' => true]);
+                return $this->adminJson(['success' => true]);
             } catch (\Exception $e) {
-                return $this->json(['success' => false, 'message' => $e->getMessage()]);
+                return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
             }
         }
 
-        return $this->json(['success' => false, 'message' => 'missing_permission']);
+        return $this->adminJson(['success' => false, 'message' => 'missing_permission']);
     }
 
     /**
@@ -1421,24 +1422,24 @@ class DataObjectController extends ElementControllerBase implements EventedContr
         $currentObject = DataObject::getById($object->getId());
         if ($currentObject->isAllowed('publish')) {
             $object->setPublished(true);
-            $object->setUserModification($this->getUser()->getId());
+            $object->setUserModification($this->getAdminUser()->getId());
             try {
                 $object->save();
                 $treeData = [];
                 $treeData['qtipCfg'] = $object->getElementAdminStyle()->getElementQtipConfig();
 
-                return $this->json(
+                return $this->adminJson(
                     [
                         'success' => true,
                         'general' => ['o_modificationDate' => $object->getModificationDate() ],
                         'treeData' => $treeData]
                 );
             } catch (\Exception $e) {
-                return $this->json(['success' => false, 'message' => $e->getMessage()]);
+                return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
             }
         }
 
-        return $this->json(['success' => false, 'message' => 'missing_permission']);
+        return $this->adminJson(['success' => false, 'message' => 'missing_permission']);
     }
 
     /**
@@ -1644,9 +1645,9 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
                     $object->save();
 
-                    return $this->json(['data' => DataObject\Service::gridObjectData($object, $request->get('fields'), $requestedLanguage), 'success' => true]);
+                    return $this->adminJson(['data' => DataObject\Service::gridObjectData($object, $request->get('fields'), $requestedLanguage), 'success' => true]);
                 } catch (\Exception $e) {
-                    return $this->json(['success' => false, 'message' => $e->getMessage()]);
+                    return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
                 }
             }
         } else {
@@ -1656,6 +1657,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             $className = $class->getName();
 
             $colMappings = [
+                'key' => 'o_key',
                 'filename' => 'o_key',
                 'fullpath' => ['o_path', 'o_key'],
                 'id' => 'oo_id',
@@ -1676,14 +1678,8 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
                 foreach ($fields as $f) {
                     $parts = explode('~', $f);
-                    $sub = substr($f, 0, 1);
                     if (substr($f, 0, 1) == '~') {
                         $type = $parts[1];
-                        //                        $field = $parts[2];
-                        //                        $keyid = $parts[3];
-                        // key value, ignore for now
-                        if ($type == 'classificationstore') {
-                        }
                     } elseif (count($parts) > 1) {
                         $bricks[$parts[0]] = $parts[0];
                     }
@@ -1722,17 +1718,23 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             }
 
             $listClass = '\\Pimcore\\Model\\DataObject\\' . ucfirst($className) . '\\Listing';
+            /**
+             * @var $list DataObject\Listing\Concrete
+             */
+            $list = new $listClass();
 
             $conditionFilters = [];
             if ($request->get('only_direct_children') == 'true') {
                 $conditionFilters[] = 'o_parentId = ' . $folder->getId();
             } else {
-                $conditionFilters[] = "(o_path = '" . $folder->getRealFullPath() . "' OR o_path LIKE '" . str_replace('//', '/', $folder->getRealFullPath() . '/') . "%')";
+                $quotedPath = $list->quote($folder->getRealFullPath());
+                $quotedWildcardPath = $list->quote(str_replace('//', '/', $folder->getRealFullPath() . '/') . '%');
+                $conditionFilters[] = '(o_path = ' . $quotedPath . ' OR o_path LIKE ' . $quotedWildcardPath . ')';
             }
 
-            if (!$this->getUser()->isAdmin()) {
-                $userIds = $this->getUser()->getRoles();
-                $userIds[] = $this->getUser()->getId();
+            if (!$this->getAdminUser()->isAdmin()) {
+                $userIds = $this->getAdminUser()->getRoles();
+                $userIds[] = $this->getAdminUser()->getId();
                 $conditionFilters[] .= ' (
                                                     (select list from users_workspaces_object where userId in (' . implode(',', $userIds) . ') and LOCATE(CONCAT(o_path,o_key),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
                                                     OR
@@ -1751,11 +1753,10 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                     $featureJoins = array_merge($featureJoins, $featureFilters['joins']);
                 }
             }
-            if ($request->get('condition')) {
+            if ($request->get('condition') && $this->getAdminUser()->isAdmin()) {
                 $conditionFilters[] = '(' . $request->get('condition') . ')';
             }
 
-            $list = new $listClass();
             if (!empty($bricks)) {
                 foreach ($bricks as $b) {
                     $list->addObjectbrick($b);
@@ -1791,7 +1792,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 $objects[] = $o;
             }
 
-            return $this->json(['data' => $objects, 'success' => true, 'total' => $list->getTotalCount()]);
+            return $this->adminJson(['data' => $objects, 'success' => true, 'total' => $list->getTotalCount()]);
         }
     }
 
@@ -1866,7 +1867,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             if ($object->hasChildren([DataObject\AbstractObject::OBJECT_TYPE_OBJECT, DataObject\AbstractObject::OBJECT_TYPE_FOLDER, DataObject\AbstractObject::OBJECT_TYPE_VARIANT])) {
                 // get amount of children
                 $list = new DataObject\Listing();
-                $list->setCondition("o_path LIKE '" . $object->getRealFullPath() . "/%'");
+                $list->setCondition('o_path LIKE ' . $list->quote($object->getRealFullPath() . '/%'));
                 $list->setOrderKey('LENGTH(o_path)', false);
                 $list->setOrder('ASC');
                 $list->setObjectTypes([DataObject\AbstractObject::OBJECT_TYPE_OBJECT, DataObject\AbstractObject::OBJECT_TYPE_FOLDER, DataObject\AbstractObject::OBJECT_TYPE_VARIANT]);
@@ -1913,7 +1914,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             ]];
         }
 
-        return $this->json([
+        return $this->adminJson([
             'pastejobs' => $pasteJobs
         ]);
     }
@@ -1945,7 +1946,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
 
         $object = DataObject\Service::rewriteIds($object, $rewriteConfig);
 
-        $object->setUserModification($this->getUser()->getId());
+        $object->setUserModification($this->getAdminUser()->getId());
         $object->save();
 
         // write the store back to the session
@@ -1953,7 +1954,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             $session->set($transactionId, $idStore);
         }, 'pimcore_copy');
 
-        return $this->json([
+        return $this->adminJson([
             'success' => true,
             'id' => $id
         ]);
@@ -2022,15 +2023,15 @@ class DataObjectController extends ElementControllerBase implements EventedContr
             } else {
                 Logger::error("could not execute copy/paste, source object with id [ $sourceId ] not found");
 
-                return $this->json(['success' => false, 'message' => 'source object not found']);
+                return $this->adminJson(['success' => false, 'message' => 'source object not found']);
             }
         } else {
             Logger::error('could not execute copy/paste because of missing permissions on target [ ' . $targetId . ' ]');
 
-            return $this->json(['error' => false, 'message' => 'missing_permission']);
+            return $this->adminJson(['error' => false, 'message' => 'missing_permission']);
         }
 
-        return $this->json(['success' => $success, 'message' => $message]);
+        return $this->adminJson(['success' => $success, 'message' => $message]);
     }
 
     /**
@@ -2095,7 +2096,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                         if ($currentData[$i]->getId() == $object->getId()) {
                             unset($currentData[$i]);
                             $owner->$setter($currentData);
-                            $owner->setUserModification($this->getUser()->getId());
+                            $owner->setUserModification($this->getAdminUser()->getId());
                             $owner->save();
                             Logger::debug('Saved object id [ ' . $owner->getId() . ' ] by remote modification through [' . $object->getId() . '], Action: deleted [ ' . $object->getId() . " ] from [ $ownerFieldName]");
                             break;
@@ -2113,7 +2114,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
                 $currentData[] = $object;
 
                 $owner->$setter($currentData);
-                $owner->setUserModification($this->getUser()->getId());
+                $owner->setUserModification($this->getAdminUser()->getId());
                 $owner->save();
                 Logger::debug('Saved object id [ ' . $owner->getId() . ' ] by remote modification through [' . $object->getId() . '], Action: added [ ' . $object->getId() . " ] to [ $ownerFieldName ]");
             }
@@ -2199,7 +2200,7 @@ class DataObjectController extends ElementControllerBase implements EventedContr
         // check permissions
         $this->checkPermission('objects');
 
-        $this->_objectService = new DataObject\Service($this->getUser());
+        $this->_objectService = new DataObject\Service($this->getAdminUser());
     }
 
     /**

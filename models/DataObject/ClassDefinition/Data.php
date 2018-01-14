@@ -661,17 +661,19 @@ abstract class Data
      *
      * @param  $value
      * @param  $operator
+     * @param  $params
      *
      * @return string
      *
      */
-    public function getFilterCondition($value, $operator)
+    public function getFilterCondition($value, $operator, $params = [])
     {
+        $params['name']= $this->name;
+
         return $this->getFilterConditionExt(
             $value,
             $operator,
-            [
-            'name' => $this->name]
+            $params
         );
     }
 
@@ -1133,6 +1135,10 @@ abstract class Data
     protected function getDataFromObjectParam($object, $params = [])
     {
         $data = null;
+
+        if (isset($params['injectedData'])) {
+            return $params['injectedData'];
+        }
 
         $context = $params && $params['context'] ? $params['context'] : null;
 

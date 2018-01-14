@@ -411,14 +411,15 @@ CREATE TABLE `recyclebin` (
 DROP TABLE IF EXISTS `redirects`;
 CREATE TABLE `redirects` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `type` varchar(100) NOT NULL,
   `source` varchar(255) DEFAULT NULL,
-  `sourceEntireUrl` tinyint(1) DEFAULT NULL,
   `sourceSite` int(11) DEFAULT NULL,
-  `passThroughParameters` tinyint(1) DEFAULT NULL,
   `target` varchar(255) DEFAULT NULL,
   `targetSite` int(11) DEFAULT NULL,
   `statusCode` varchar(3) DEFAULT NULL,
   `priority` int(2) DEFAULT '0',
+  `regex` tinyint(1) DEFAULT NULL,
+  `passThroughParameters` tinyint(1) DEFAULT NULL,
   `active` tinyint(1) DEFAULT NULL,
   `expiry` int(11) unsigned DEFAULT NULL,
   `creationDate` int(11) unsigned DEFAULT '0',
@@ -511,17 +512,6 @@ CREATE TABLE `tags_assignment` (
   KEY `tagid` (`tagid`)
 ) DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `targeting_personas`;
-CREATE TABLE `targeting_personas` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL DEFAULT '',
-  `description` text,
-  `conditions` longtext,
-  `threshold` int(11) DEFAULT NULL,
-  `active` tinyint(1) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) DEFAULT CHARSET=utf8mb4;
-
 DROP TABLE IF EXISTS `targeting_rules`;
 CREATE TABLE `targeting_rules` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -529,10 +519,35 @@ CREATE TABLE `targeting_rules` (
   `description` text,
   `scope` varchar(50) DEFAULT NULL,
   `active` tinyint(1) DEFAULT NULL,
+  `prio` smallint(5) unsigned NOT NULL DEFAULT '0',
   `conditions` longtext,
   `actions` longtext,
   PRIMARY KEY (`id`)
-) DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DROP TABLE IF EXISTS `targeting_storage`;
+CREATE TABLE `targeting_storage` (
+  `visitorId` varchar(100) NOT NULL,
+  `scope` varchar(50) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `value` text,
+  `creationDate` datetime DEFAULT NULL,
+  `modificationDate` datetime DEFAULT NULL,
+  PRIMARY KEY (`visitorId`,`scope`,`name`),
+  KEY `targeting_storage_scope_index` (`scope`),
+  KEY `targeting_storage_name_index` (`name`),
+  KEY `targeting_storage_visitorId_index` (`visitorId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DROP TABLE IF EXISTS `targeting_target_groups`;
+CREATE TABLE `targeting_target_groups` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL DEFAULT '',
+  `description` text,
+  `threshold` int(11) DEFAULT NULL,
+  `active` tinyint(1) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `tmp_store`;
 CREATE TABLE `tmp_store` (
@@ -846,7 +861,7 @@ DROP TABLE IF EXISTS `quantityvalue_units`;
 CREATE TABLE `quantityvalue_units` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `group` varchar(50) DEFAULT NULL,
-  `abbreviation` varchar(10) NOT NULL,
+  `abbreviation` varchar(20) NOT NULL,
   `longname` varchar(250) DEFAULT NULL,
   `baseunit` varchar(10) DEFAULT NULL,
   `factor` double DEFAULT NULL,
@@ -864,3 +879,80 @@ CREATE TABLE `element_workflow_state` (
   `status` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`cid`,`ctype`,`workflowId`)
 ) DEFAULT CHARSET=utf8mb4;
+
+DROP TABLE IF EXISTS `gridconfigs`;
+CREATE TABLE `gridconfigs` (
+	`id` INT(11) NOT NULL AUTO_INCREMENT,
+	`ownerId` INT(11) NULL,
+	`classId` INT(11) NULL,
+	`name` VARCHAR(50) NULL,
+	`searchType` VARCHAR(50) NULL,
+	`config` LONGTEXT NULL,
+	`description` LONGTEXT NULL,
+	`creationDate` INT(11) NULL,
+	`modificationDate` INT(11) NULL,
+	`shareGlobally` TINYINT(1) NULL,
+	PRIMARY KEY (`id`),
+	INDEX `ownerId` (`ownerId`),
+	INDEX `classId` (`classId`),
+	INDEX `searchType` (`searchType`),
+	INDEX `shareGlobally` (`shareGlobally`)
+)
+DEFAULT CHARSET=utf8mb4;
+;
+
+DROP TABLE IF EXISTS `gridconfig_favourites`;
+CREATE TABLE `gridconfig_favourites` (
+	`ownerId` INT(11) NOT NULL,
+	`classId` INT(11) NOT NULL,
+  `objectId` INT(11) NOT NULL DEFAULT '0',
+	`gridConfigId` INT(11) NULL,
+	`searchType` VARCHAR(50) NOT NULL DEFAULT '',
+  PRIMARY KEY (`ownerId`, `classId`, `searchType`, `objectId`),
+	INDEX `ownerId` (`ownerId`),
+	INDEX `classId` (`classId`),
+	INDEX `searchType` (`searchType`)
+)
+DEFAULT CHARSET=utf8mb4;
+;
+
+DROP TABLE IF EXISTS `gridconfig_shares`;
+CREATE TABLE `gridconfig_shares` (
+	`gridConfigId` INT(11) NOT NULL,
+	`sharedWithUserId` INT(11) NOT NULL,
+	PRIMARY KEY (`gridConfigId`, `sharedWithUserId`),
+	INDEX `gridConfigId` (`gridConfigId`),
+	INDEX `sharedWithUserId` (`sharedWithUserId`)
+)
+DEFAULT CHARSET=utf8mb4;
+;
+
+DROP TABLE IF EXISTS `importconfigs`;
+CREATE TABLE `importconfigs` (
+	`id` INT(11) NOT NULL AUTO_INCREMENT,
+	`ownerId` INT(11) NULL,
+	`classId` INT(11) NULL,
+	`name` VARCHAR(50) NULL,
+	`config` LONGTEXT NULL,
+  `description` LONGTEXT NULL,
+	`creationDate` INT(11) NULL,
+	`modificationDate` INT(11) NULL,
+	`shareGlobally` TINYINT(1) NULL,
+	PRIMARY KEY (`id`),
+	INDEX `ownerId` (`ownerId`),
+	INDEX `classId` (`classId`),
+	INDEX `shareGlobally` (`shareGlobally`)
+)
+DEFAULT CHARSET=utf8mb4;
+;
+
+DROP TABLE IF EXISTS `importconfig_shares`;
+CREATE TABLE `importconfig_shares` (
+	`importConfigId` INT(11) NOT NULL,
+	`sharedWithUserId` INT(11) NOT NULL,
+	PRIMARY KEY (`importConfigId`, `sharedWithUserId`),
+	INDEX `data.sharedRoleIds` (`importConfigId`),
+	INDEX `sharedWithUserId` (`sharedWithUserId`)
+)
+DEFAULT CHARSET=utf8mb4;
+;
