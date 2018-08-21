@@ -37,7 +37,7 @@ trait Wrapper
         $this->raiseHardlinkError();
     }
 
-    protected function update()
+    protected function update($params = [])
     {
         $this->raiseHardlinkError();
     }

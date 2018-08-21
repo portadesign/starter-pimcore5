@@ -88,6 +88,8 @@ class Translator implements TranslatorInterface, TranslatorBagInterface
      */
     public function trans($id, array $parameters = [], $domain = null, $locale = null)
     {
+        $id = trim($id);
+
         if ($this->disableTranslations) {
             return $id;
         }
@@ -116,6 +118,8 @@ class Translator implements TranslatorInterface, TranslatorBagInterface
      */
     public function transChoice($id, $number, array $parameters = [], $domain = null, $locale = null)
     {
+        $id = trim($id);
+
         if ($this->disableTranslations) {
             return $id;
         }
@@ -150,36 +154,16 @@ class Translator implements TranslatorInterface, TranslatorBagInterface
 
     private function getFromCatalogue(MessageCatalogueInterface $catalogue, $id, $domain, $locale)
     {
-        $term = $catalogue->get($id, $domain);
-
-        // handle case insensitive translations if caseInsensitive is configured
-        if ($this->caseInsensitive && (empty($term) || $term == $id) && in_array($domain, ['messages', 'admin'])) {
-            $term = $this->getCaseInsensitiveFromCatalogue($catalogue, $term, $id, $domain);
+        $originalId = $id;
+        if ($this->caseInsensitive && in_array($domain, ['messages', 'admin'])) {
+            $id = mb_strtolower($id);
         }
+
+        $term = $catalogue->get($id, $domain);
 
         // only check for empty translation on original ID - we don't want to create empty
         // translations for normalized IDs when case insensitive
-        $term = $this->checkForEmptyTranslation($id, $term, $domain, $locale);
-
-        return $term;
-    }
-
-    private function getCaseInsensitiveFromCatalogue(MessageCatalogueInterface $catalogue, $term, $id, $domain)
-    {
-        $normalizedId = mb_strtolower($id);
-
-        // nothing to do - we already looked up that key
-        if ($normalizedId === $id) {
-            return $term;
-        }
-
-        if ($catalogue->has($normalizedId, $domain)) {
-            $normalizedTerm = $catalogue->get($normalizedId, $domain);
-
-            if (!empty($normalizedTerm) && $normalizedTerm !== $normalizedId) {
-                $term = $normalizedTerm;
-            }
-        }
+        $term = $this->checkForEmptyTranslation($originalId, $term, $domain, $locale);
 
         return $term;
     }
@@ -289,12 +273,17 @@ class Translator implements TranslatorInterface, TranslatorBagInterface
      */
     protected function checkForEmptyTranslation($id, $translated, $domain, $locale)
     {
+        $normalizedId = $id;
+        if ($this->caseInsensitive) {
+            $normalizedId = mb_strtolower($id);
+        }
+
         $lookForFallback = empty($translated);
         if (empty($id)) {
             return $translated;
-        } elseif ($id != $translated && $translated) {
+        } elseif ($normalizedId != $translated && $translated) {
             return $translated;
-        } elseif ($id == $translated && !$this->getCatalogue($locale)->has($id, $domain)) {
+        } elseif ($normalizedId == $translated && !$this->getCatalogue($locale)->has($normalizedId, $domain)) {
             $backend = $this->getBackendForDomain($domain);
             if ($backend) {
                 if (strlen($id) > 190) {
@@ -314,7 +303,8 @@ class Translator implements TranslatorInterface, TranslatorBagInterface
                         if (!$t->hasTranslation($locale)) {
                             $t->addTranslation($locale, '');
                         } else {
-                            return $translated;
+                            // return the original not lowercased ID
+                            return $id;
                         }
                     } catch (\Exception $e) {
                         $t = new $class();
@@ -332,8 +322,9 @@ class Translator implements TranslatorInterface, TranslatorBagInterface
 
                 // put it into the catalogue, otherwise when there are more calls to the same key during one process
                 // the key would be inserted/updated several times, what would be redundant
-                $this->getCatalogue($locale)->set($id, $id, $domain);
+                $this->getCatalogue($locale)->set($normalizedId, $id, $domain);
 
+                $translated = $id; // use the original translation key, this is necessary if using case-insensitive configuration
                 $lookForFallback = true;
             }
         }
@@ -346,16 +337,13 @@ class Translator implements TranslatorInterface, TranslatorBagInterface
 
                 $fallbackValue = '';
 
-                if ($catalogue->has($id, $domain)) {
-                    $fallbackValue = $catalogue->get($id, $domain);
+                if ($catalogue->has($normalizedId, $domain)) {
+                    $fallbackValue = $catalogue->get($normalizedId, $domain);
                 }
 
-                if ($this->caseInsensitive && (empty($fallbackValue) || $fallbackValue == $id)) {
-                    $fallbackValue = $this->getCaseInsensitiveFromCatalogue($catalogue, $fallbackValue, $id, $domain);
-                }
                 if ($fallbackValue) {
                     // update fallback value in original catalogue otherwise multiple calls to the same id will not work
-                    $this->getCatalogue($locale)->set($id, $fallbackValue, $domain);
+                    $this->getCatalogue($locale)->set($normalizedId, $fallbackValue, $domain);
 
                     return $fallbackValue;
                 }

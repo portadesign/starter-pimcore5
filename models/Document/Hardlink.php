@@ -28,6 +28,7 @@ use Pimcore\Model\Redirect;
 class Hardlink extends Document
 {
     use Element\ChildsCompatibilityTrait;
+    use Document\Traits\ScheduledTasksTrait;
 
     /**
      * static type of this object
@@ -280,11 +281,16 @@ class Hardlink extends Document
         $this->childs = null;
     }
 
-    protected function update()
+    /**
+     * @params array $params additional parameters (e.g. "versionNote" for the version note)
+     *
+     * @throws \Exception
+     */
+    protected function update($params = [])
     {
         $oldPath = $this->getDao()->getCurrentFullPath();
 
-        parent::update();
+        parent::update($params);
 
         $config = \Pimcore\Config::getSystemConfig();
         if ($oldPath && $config->documents->createredirectwhenmoved && $oldPath != $this->getRealFullPath()) {
@@ -296,5 +302,7 @@ class Hardlink extends Document
             $redirect->setExpiry(time() + 86400 * 60); // this entry is removed automatically after 60 days
             $redirect->save();
         }
+
+        $this->saveScheduledTasks();
     }
 }

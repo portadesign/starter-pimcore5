@@ -113,14 +113,14 @@ class Asset extends Element\AbstractElement
      *
      * @var int
      */
-    public $userOwner = 0;
+    public $userOwner;
 
     /**
      * ID of the user who make the latest changes
      *
      * @var int
      */
-    public $userModification = 0;
+    public $userModification;
 
     /**
      * List of properties
@@ -463,13 +463,24 @@ class Asset extends Element\AbstractElement
      */
     public function save()
     {
+        // additional parameters (e.g. "versionNote" for the version note)
+        $params = [];
+        if (func_num_args() && is_array(func_get_arg(0))) {
+            $params =  func_get_arg(0);
+        }
+
         $isUpdate = false;
+
+        $preEvent = new AssetEvent($this, $params);
+
         if ($this->getId()) {
             $isUpdate = true;
-            \Pimcore::getEventDispatcher()->dispatch(AssetEvents::PRE_UPDATE, new AssetEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(AssetEvents::PRE_UPDATE, $preEvent);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(AssetEvents::PRE_ADD, new AssetEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(AssetEvents::PRE_ADD, $preEvent);
         }
+
+        $params = $preEvent->getArguments();
 
         $this->correctPath();
 
@@ -491,7 +502,7 @@ class Asset extends Element\AbstractElement
                     $oldPath = $this->getDao()->getCurrentFullPath();
                 }
 
-                $this->update();
+                $this->update($params);
 
                 // if the old path is different from the new path, update all children
                 $updatedChildren = [];
@@ -505,6 +516,13 @@ class Asset extends Element\AbstractElement
                         $this->getDao()->updateWorkspaces();
                         $updatedChildren = $this->getDao()->updateChildsPaths($oldPath);
                     }
+                }
+
+                // lastly create a new version if necessary
+                // this has to be after the registry update and the DB update, otherwise this would cause problem in the
+                // $this->__wakeUp() method which is called by $version->save(); (path correction for version restore)
+                if ($this->getType() != 'folder') {
+                    $this->saveVersion(false, false, isset($params['versionNote']) ? $params['versionNote'] : null);
                 }
 
                 $this->commit();
@@ -604,23 +622,17 @@ class Asset extends Element\AbstractElement
             }
         }
 
-        if (strlen($this->getRealFullPath()) > 765) {
-            throw new \Exception("Full path is limited to 765 characters, reduce the length of your parent's path");
-        }
+        $this->validatePathLength();
     }
 
     /**
+     * @params array $params additional parameters (e.g. "versionNote" for the version note)
+     *
      * @throws \Exception
      */
-    protected function update()
+    protected function update($params = [])
     {
-
-        // set date
-        $this->setModificationDate(time());
-
-        if (!$this->getCreationDate()) {
-            $this->setCreationDate(time());
-        }
+        $this->updateModificationInfos();
 
         // create foldertree
         // use current file name in order to prevent problems when filename has changed
@@ -655,6 +667,14 @@ class Asset extends Element\AbstractElement
                 $src = $this->getStream();
                 $streamMeta = stream_get_meta_data($src);
                 if ($destinationPath != $streamMeta['uri']) {
+                    if (file_exists($destinationPath)) {
+                        // We don't open a stream on existing files, because they could be possibly used by versions
+                        // using hardlinks, so it's safer to delete them first, so the inode and therefore also the
+                        // versioning information persists. Using the stream on the existing file would overwrite the
+                        // contents of the inode and therefore leads to wrong version data
+                        unlink($destinationPath);
+                    }
+
                     $dest = fopen($destinationPath, 'w', false, File::getContext());
                     if ($dest) {
                         stream_copy_to_stream($src, $dest);
@@ -684,6 +704,12 @@ class Asset extends Element\AbstractElement
                 if ($type != $this->getType()) {
                     $this->setType($type);
                     $typeChanged = true;
+                }
+
+                // not only check if the type is set but also if the implementation can be found
+                $className = 'Pimcore\\Model\\Asset\\' . ucfirst($this->getType());
+                if (!\Pimcore::getContainer()->get('pimcore.model.factory')->supports($className)) {
+                    throw new \Exception('unable to resolve asset implementation with type: ' . $this->getType());
                 }
             }
 
@@ -738,25 +764,19 @@ class Asset extends Element\AbstractElement
             \Pimcore\Cache\Runtime::set('asset_' . $this->getId(), $asset);
         }
 
-        // lastly create a new version if necessary
-        // this has to be after the registry update and the DB update, otherwise this would cause problem in the
-        // $this->__wakeUp() method which is called by $version->save(); (path correction for version restore)
-        if ($this->getType() != 'folder') {
-            $this->saveVersion(false, false);
-        }
-
         $this->closeStream();
     }
 
     /**
      * @param bool $setModificationDate
      * @param bool $callPluginHook
+     * @param string $versionNote version note
      *
      * @return null|Version
      *
      * @throws \Exception
      */
-    public function saveVersion($setModificationDate = true, $callPluginHook = true)
+    public function saveVersion($setModificationDate = true, $callPluginHook = true, $versionNote = null)
     {
 
         // hook should be also called if "save only new version" is selected
@@ -788,6 +808,7 @@ class Asset extends Element\AbstractElement
             $version->setDate($this->getModificationDate());
             $version->setUserId($this->getUserModification());
             $version->setData($this);
+            $version->setNote($versionNote);
             $version->save();
         }
 
@@ -1400,7 +1421,7 @@ class Asset extends Element\AbstractElement
      */
     public function setUserOwner($userOwner)
     {
-        $this->userOwner = $userOwner;
+        $this->userOwner = (int) $userOwner;
 
         return $this;
     }
@@ -1412,7 +1433,7 @@ class Asset extends Element\AbstractElement
      */
     public function setUserModification($userModification)
     {
-        $this->userModification = $userModification;
+        $this->userModification = (int) $userModification;
 
         return $this;
     }

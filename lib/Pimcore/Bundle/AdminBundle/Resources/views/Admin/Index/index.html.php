@@ -215,7 +215,7 @@ $scriptLibs = array(
 
     // library
     "lib/prototype-light.js",
-    "lib/jquery.min.js",
+    "lib/jquery-3.3.1.min.js",
     "lib/ext/ext-all" . $debugSuffix . ".js",
     "lib/ext/classic/theme-triton/theme-triton" . $debugSuffix . ".js",
 
@@ -412,8 +412,10 @@ $scripts = array(
     "pimcore/object/classes/data/data.js",          // THIS MUST BE THE FIRST FILE, DO NOT MOVE THIS DOWN !!!
     "pimcore/object/classes/data/block.js",
     "pimcore/object/classes/data/classificationstore.js",
+    "pimcore/object/classes/data/rgbaColor.js",
     "pimcore/object/classes/data/date.js",
     "pimcore/object/classes/data/datetime.js",
+    "pimcore/object/classes/data/encryptedField.js",
     "pimcore/object/classes/data/time.js",
     "pimcore/object/classes/data/href.js",
     "pimcore/object/classes/data/image.js",
@@ -521,11 +523,13 @@ $scripts = array(
     "pimcore/object/objectbricks/field.js",
     "pimcore/object/tags/abstract.js",
     "pimcore/object/tags/block.js",
+    "pimcore/object/tags/rgbaColor.js",
     "pimcore/object/tags/date.js",
     "pimcore/object/tags/datetime.js",
     "pimcore/object/tags/time.js",
     "pimcore/object/tags/href.js",
     "pimcore/object/tags/image.js",
+    "pimcore/object/tags/encryptedField.js",
     "pimcore/object/tags/externalImage.js",
     "pimcore/object/tags/hotspotimage.js",
     "pimcore/object/tags/imagegallery.js",
@@ -593,6 +597,8 @@ $scripts = array(
     "pimcore/plugin/broker.js",
     "pimcore/plugin/plugin.js",
 
+    "pimcore/event-dispatcher.js",
+
     // reports
     "pimcore/report/panel.js",
     "pimcore/report/broker.js",
@@ -659,6 +665,9 @@ $scripts = array(
     "pimcore/analytics/piwik/widget_store_provider.js",
     "pimcore/report/piwik/settings.js",
     "pimcore/report/piwik/dashboard_iframe.js",
+
+    // color picker
+    "pimcore/colorpicker-overrides.js",
 );
 
 // google maps API key

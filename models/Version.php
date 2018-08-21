@@ -186,13 +186,24 @@ class Version extends AbstractModel
         } else {
             File::put($this->getFilePath(), $dataString);
 
-            // assets are kina special because they can contain massive amount of binary data which isn't serialized, we append it to the data file
-            if ($data instanceof Asset && $data->getType() != 'folder') {
-                // append binary data to version file
-                $handle = fopen($this->getBinaryFilePath(), 'w', false, File::getContext());
-                $src = $data->getStream();
-                stream_copy_to_stream($src, $handle);
-                fclose($handle);
+            // assets are kinda special because they can contain massive amount of binary data which isn't serialized, we append it to the data file
+            if ($data instanceof Asset && $data->getType() != 'folder' && file_exists($data->getFileSystemPath())) {
+                $linked = false;
+
+                // we always try to create a hardlink onto the original file, the asset ensures that not the actual
+                // inodes get overwritten but creates new inodes if the content changes. This is done by deleting the
+                // old file first before opening a new stream -> see Asset::update()
+                if (stream_is_local($this->getBinaryFilePath()) && stream_is_local($data->getFileSystemPath())) {
+                    $linked = link($data->getFileSystemPath(), $this->getBinaryFilePath());
+                }
+
+                if (!$linked) {
+                    // append binary data to version file
+                    $handle = fopen($this->getBinaryFilePath(), 'w', false, File::getContext());
+                    $src = $data->getStream();
+                    stream_copy_to_stream($src, $handle);
+                    fclose($handle);
+                }
             }
         }
         \Pimcore::getEventDispatcher()->dispatch(VersionEvents::POST_SAVE, new VersionEvent($this));

@@ -29,6 +29,8 @@ use Pimcore\Model\Document;
  */
 abstract class PageSnippet extends Model\Document
 {
+    use Document\Traits\ScheduledTasksTrait;
+
     /**
      * @var string
      */
@@ -64,13 +66,6 @@ abstract class PageSnippet extends Model\Document
     public $versions = null;
 
     /**
-     * Contains all scheduled tasks
-     *
-     * @var array
-     */
-    public $scheduledTasks = null;
-
-    /**
      * @var null|int
      */
     public $contentMasterDocumentId;
@@ -86,9 +81,11 @@ abstract class PageSnippet extends Model\Document
     public $legacy = false;
 
     /**
-     * @see Document::update
+     * @params array $params additional parameters (e.g. "versionNote" for the version note)
+     *
+     * @throws \Exception
      */
-    protected function update()
+    protected function update($params = [])
     {
 
         // update elements
@@ -112,21 +109,22 @@ abstract class PageSnippet extends Model\Document
         $this->getElements();
 
         // update this
-        parent::update();
+        parent::update($params);
 
         // save version if needed
-        $this->saveVersion(false, false);
+        $this->saveVersion(false, false, isset($params['versionNote']) ? $params['versionNote'] : null);
     }
 
     /**
      * @param bool $setModificationDate
      * @param bool $callPluginHook
+     * @param $versionNote string version note
      *
      * @return null|Model\Version
      *
      * @throws \Exception
      */
-    public function saveVersion($setModificationDate = true, $callPluginHook = true)
+    public function saveVersion($setModificationDate = true, $callPluginHook = true, $versionNote = null)
     {
 
         // hook should be also called if "save only new version" is selected
@@ -158,6 +156,7 @@ abstract class PageSnippet extends Model\Document
             $version->setDate($this->getModificationDate());
             $version->setUserId($this->getUserModification());
             $version->setData($this);
+            $version->setNote($versionNote);
             $version->save();
         }
 
@@ -541,48 +540,6 @@ abstract class PageSnippet extends Model\Document
     public function getHref()
     {
         return $this->getFullPath();
-    }
-
-    /**
-     * @return array the $scheduledTasks
-     */
-    public function getScheduledTasks()
-    {
-        if ($this->scheduledTasks === null) {
-            $taskList = new Model\Schedule\Task\Listing();
-            $taskList->setCondition("cid = ? AND ctype='document'", $this->getId());
-            $this->setScheduledTasks($taskList->load());
-        }
-
-        return $this->scheduledTasks;
-    }
-
-    /**
-     * @param $scheduledTasks
-     *
-     * @return $this
-     */
-    public function setScheduledTasks($scheduledTasks)
-    {
-        $this->scheduledTasks = $scheduledTasks;
-
-        return $this;
-    }
-
-    public function saveScheduledTasks()
-    {
-        $scheduled_tasks = $this->getScheduledTasks();
-        $this->getDao()->deleteAllTasks();
-
-        if (is_array($scheduled_tasks) && count($scheduled_tasks) > 0) {
-            foreach ($scheduled_tasks as $task) {
-                $task->setId(null);
-                $task->setDao(null);
-                $task->setCid($this->getId());
-                $task->setCtype('document');
-                $task->save();
-            }
-        }
     }
 
     public function __sleep()

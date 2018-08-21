@@ -29,6 +29,28 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
      */
     protected $__dataVersionTimestamp = null;
 
+    protected function updateModificationInfos()
+    {
+        $updateTime = time();
+        $this->setModificationDate($updateTime);
+
+        if (!$this->getCreationDate()) {
+            $this->setCreationDate($updateTime);
+        }
+
+        // auto assign user if possible, if no user present, use ID=0 which represents the "system" user
+        $userId = 0;
+        $user = \Pimcore\Tool\Admin::getCurrentUser();
+        if ($user instanceof Model\User) {
+            $userId = $user->getId();
+        }
+        $this->setUserModification($userId);
+
+        if ($this->getUserOwner() === null) {
+            $this->setUserOwner($userId);
+        }
+    }
+
     /**
      * Get specific property data or the property object itself ($asContainer=true) by its name, if the
      * property doesn't exists return null
@@ -186,6 +208,13 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
             if ($element) {
                 $element->clearDependentCache();
             }
+        }
+    }
+
+    protected function validatePathLength()
+    {
+        if (mb_strlen($this->getRealFullPath()) > 765) {
+            throw new \Exception("Full path is limited to 765 characters, reduce the length of your parent's path");
         }
     }
 

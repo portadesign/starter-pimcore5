@@ -176,12 +176,12 @@ class AbstractObject extends Model\Element\AbstractElement
     /**
      * @var int
      */
-    public $o_userOwner = 0;
+    public $o_userOwner;
 
     /**
      * @var int
      */
-    public $o_userModification = 0;
+    public $o_userModification;
 
     /**
      * @var array
@@ -566,13 +566,23 @@ class AbstractObject extends Model\Element\AbstractElement
      */
     public function save()
     {
+        // additional parameters (e.g. "versionNote" for the version note)
+        $params = [];
+        if (func_num_args() && is_array(func_get_arg(0))) {
+            $params =  func_get_arg(0);
+        }
+
         $isUpdate = false;
+
+        $preEvent = new DataObjectEvent($this, $params);
         if ($this->getId()) {
             $isUpdate = true;
-            \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::PRE_UPDATE, new DataObjectEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::PRE_UPDATE, $preEvent);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::PRE_ADD, new DataObjectEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::PRE_ADD, $preEvent);
         }
+
+        $params = $preEvent->getArguments();
 
         $this->correctPath();
 
@@ -612,7 +622,7 @@ class AbstractObject extends Model\Element\AbstractElement
                     $updatedChildren = $this->getDao()->updateChildsPaths($oldPath);
                 }
 
-                $this->update();
+                $this->update($isUpdate, $params);
 
                 self::setHideUnpublished($hideUnpublishedBackup);
 
@@ -717,23 +727,18 @@ class AbstractObject extends Model\Element\AbstractElement
             }
         }
 
-        if (strlen($this->getRealFullPath()) > 765) {
-            throw new \Exception("Full path is limited to 765 characters, reduce the length of your parent's path");
-        }
+        $this->validatePathLength();
     }
 
     /**
+     * @param $isUpdate
+     * @param $params
+     *
      * @throws \Exception
      */
-    protected function update()
+    protected function update($isUpdate = null, $params = [])
     {
-
-        // set mod date
-        $this->setModificationDate(time());
-
-        if (!$this->getCreationDate()) {
-            $this->setCreationDate(time());
-        }
+        $this->updateModificationInfos();
 
         // save properties
         $this->getProperties();

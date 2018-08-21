@@ -16,7 +16,6 @@
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
-use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 
@@ -226,8 +225,9 @@ class CalculatedValue extends Model\DataObject\ClassDefinition\Data
      */
     public function getForCsvExport($object, $params = [])
     {
-        Logger::debug('csv not supported');
-        //TODO
+        $data = $this->getDataFromObjectParam($object, $params);
+
+        return $data;
     }
 
     /**
@@ -254,7 +254,9 @@ class CalculatedValue extends Model\DataObject\ClassDefinition\Data
      */
     public function getForWebserviceExport($object, $params = [])
     {
-        //TODO
+        $data = $this->getDataFromObjectParam($object, $params);
+
+        return $data;
     }
 
     /**
@@ -522,5 +524,17 @@ class CalculatedValue extends Model\DataObject\ClassDefinition\Data
         $code .= "}\n\n";
 
         return $code;
+    }
+
+    /**
+     * @param \Zend_Date|\DateTime $data
+     * @param null $object
+     * @param mixed $params
+     *
+     * @return null
+     */
+    public function getDataForGrid($data, $object = null, $params = [])
+    {
+        return $data;
     }
 }

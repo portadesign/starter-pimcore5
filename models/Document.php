@@ -160,14 +160,14 @@ class Document extends Element\AbstractElement
      *
      * @var int
      */
-    public $userOwner = 0;
+    public $userOwner;
 
     /**
      * User-ID of the user last modified the document
      *
      * @var int
      */
-    public $userModification = 0;
+    public $userModification;
 
     /**
      * Permissions for the user which requested this document in editmode*
@@ -401,21 +401,28 @@ class Document extends Element\AbstractElement
     }
 
     /**
-     * Save the document.
-     *
      * @return Document
      *
      * @throws \Exception
      */
     public function save()
     {
+        // additional parameters (e.g. "versionNote" for the version note)
+        $params = [];
+        if (func_num_args() && is_array(func_get_arg(0))) {
+            $params =  func_get_arg(0);
+        }
+
         $isUpdate = false;
+        $preEvent = new DocumentEvent($this, $params);
         if ($this->getId()) {
             $isUpdate = true;
-            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_UPDATE, new DocumentEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_UPDATE, $preEvent);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_ADD, new DocumentEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_ADD, $preEvent);
         }
+
+        $params = $preEvent->getArguments();
 
         $this->correctPath();
 
@@ -427,12 +434,7 @@ class Document extends Element\AbstractElement
             $this->beginTransaction();
 
             try {
-                // set date
-                $this->setModificationDate(time());
-
-                if (!$this->getCreationDate()) {
-                    $this->setCreationDate(time());
-                }
+                $this->updateModificationInfos();
 
                 if (!$isUpdate) {
                     $this->getDao()->create();
@@ -444,7 +446,7 @@ class Document extends Element\AbstractElement
                     $oldPath = $this->getDao()->getCurrentFullPath();
                 }
 
-                $this->update();
+                $this->update($params);
 
                 // if the old path is different from the new path, update all children
                 $updatedChildren = [];
@@ -547,15 +549,15 @@ class Document extends Element\AbstractElement
             }
         }
 
-        if (strlen($this->getRealFullPath()) > 765) {
-            throw new \Exception("Full path is limited to 765 characters, reduce the length of your parent's path");
-        }
+        $this->validatePathLength();
     }
 
     /**
+     * @param array $params additional parameters (e.g. "versionNote" for the version note)
+     *
      * @throws \Exception
      */
-    protected function update()
+    protected function update($params = [])
     {
         $disallowedKeysInFirstLevel = ['install', 'admin', 'webservice', 'plugin'];
         if ($this->getParentId() == 1 && in_array($this->getKey(), $disallowedKeysInFirstLevel)) {
@@ -656,7 +658,7 @@ class Document extends Element\AbstractElement
     public function setChildren($children)
     {
         $this->childs=$children;
-        if (is_array($children) and count($children > 0)) {
+        if (is_array($children) and count($children) > 0) {
             $this->hasChilds=true;
         } elseif ($children === null) {
             $this->hasChilds = null;

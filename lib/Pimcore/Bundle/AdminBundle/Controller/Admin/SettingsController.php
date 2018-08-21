@@ -16,7 +16,11 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
 use Pimcore\Cache;
+use Pimcore\Cache\Core\CoreHandlerInterface;
+use Pimcore\Cache\Symfony\CacheClearer;
 use Pimcore\Config;
+use Pimcore\Db\Connection;
+use Pimcore\Event\SystemEvents;
 use Pimcore\File;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
@@ -30,9 +34,14 @@ use Pimcore\Model\Staticroute;
 use Pimcore\Model\Tool\Tag;
 use Pimcore\Model\WebsiteSetting;
 use Pimcore\Tool;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Routing\Annotation\Route;
 
 /**
@@ -40,6 +49,84 @@ use Symfony\Component\Routing\Annotation\Route;
  */
 class SettingsController extends AdminController
 {
+    /**
+     * @Route("/display-custom-logo", name="pimcore_settings_display_custom_logo")
+     *
+     * @param Request $request
+     *
+     * @return BinaryFileResponse
+     */
+    public function displayCustomLogoAction(Request $request)
+    {
+        // default logo
+        $logo = PIMCORE_WEB_ROOT . '/pimcore/static6/img/logo-claim-gray.svg';
+        $mime = 'image/svg+xml';
+        $customLogoPath = PIMCORE_CONFIGURATION_DIRECTORY . '/custom-logo.';
+
+        foreach (['svg', 'png', 'jpg'] as $format) {
+            $customLogoFile = $customLogoPath . $format;
+            if (file_exists($customLogoFile)) {
+                try {
+                    $mime = Tool\Mime::detect($customLogoFile);
+                    $logo = $customLogoFile;
+                    break;
+                } catch (\Exception $e) {
+                    // do nothing
+                }
+            }
+        }
+
+        return new BinaryFileResponse($logo, 200, ['Content-Type' => $mime]);
+    }
+
+    /**
+     * @Route("/upload-custom-logo")
+     *
+     * @param Request $request
+     *
+     * @return JsonResponse
+     *
+     * @throws \Exception
+     */
+    public function uploadCustomLogoAction(Request $request)
+    {
+        $fileExt = File::getFileExtension($_FILES['Filedata']['name']);
+        if (!in_array($fileExt, ['svg', 'png', 'jpg'])) {
+            throw new \Exception('Unsupported file format');
+        }
+        $customLogoPath = PIMCORE_CONFIGURATION_DIRECTORY . '/custom-logo.' . $fileExt;
+
+        copy($_FILES['Filedata']['tmp_name'], $customLogoPath);
+        @chmod($customLogoPath, File::getDefaultMode());
+
+        // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
+        // Ext.form.Action.Submit and mark the submission as failed
+
+        $response = $this->adminJson(['success' => true]);
+        $response->headers->set('Content-Type', 'text/html');
+
+        return $response;
+    }
+
+    /**
+     * @Route("/delete-custom-logo")
+     *
+     * @param Request $request
+     *
+     * @return JsonResponse
+     */
+    public function deleteCustomLogoAction(Request $request)
+    {
+        $customLogoPath = PIMCORE_CONFIGURATION_DIRECTORY . '/custom-logo.*';
+
+        $files = glob($customLogoPath);
+        foreach ($files as $file) {
+            unlink($file);
+        }
+
+        return $this->adminJson(['success' => true]);
+    }
+
     /**
      * @Route("/metadata")
      *
@@ -426,6 +513,10 @@ class SettingsController extends AdminController
                 'instanceIdentifier' => $values['general.instanceIdentifier'],
                 'show_cookie_notice' => $values['general.show_cookie_notice'],
             ],
+            'branding' => [
+                'color_login_screen' => $values['branding.color_login_screen'],
+                'color_admin_interface' => $values['branding.color_admin_interface'],
+            ],
             'documents' => [
                 'versions' => [
                     'days' => $values['documents.versions.days'],
@@ -639,48 +730,119 @@ class SettingsController extends AdminController
      * @Route("/clear-cache")
      *
      * @param Request $request
+     * @param KernelInterface $kernel
+     * @param EventDispatcherInterface $eventDispatcher
+     * @param CoreHandlerInterface $cache
+     * @param Connection $db
+     * @param Filesystem $filesystem
+     * @param CacheClearer $symfonyCacheClearer
      *
      * @return JsonResponse
      */
-    public function clearCacheAction(Request $request)
-    {
+    public function clearCacheAction(
+        Request $request,
+        KernelInterface $kernel,
+        EventDispatcherInterface $eventDispatcher,
+        CoreHandlerInterface $cache,
+        Connection $db,
+        Filesystem $filesystem,
+        CacheClearer $symfonyCacheClearer
+    ) {
         $this->checkPermission('clear_cache');
 
-        $onlyPimcoreCache = (bool)$request->get('only_pimcore_cache');
-        $onlySymfonyCache = (bool)$request->get('only_symfony_cache');
+        $result = [
+            'success' => true
+        ];
 
-        if (!$onlySymfonyCache) {
+        $clearPimcoreCache = !(bool)$request->get('only_symfony_cache');
+        $clearSymfonyCache = !(bool)$request->get('only_pimcore_cache');
+
+        if ($clearPimcoreCache) {
             // empty document cache
-            Cache::clearAll();
+            $cache->clearAll();
 
-            $db = \Pimcore\Db::get();
             $db->query('truncate table cache_tags');
             $db->query('truncate table cache');
-        }
 
-        if (!$onlyPimcoreCache) {
-            \Pimcore\Tool::clearSymfonyCache($this->container);
-        }
+            if ($filesystem->exists(PIMCORE_CACHE_DIRECTORY)) {
+                $filesystem->remove(PIMCORE_CACHE_DIRECTORY);
+            }
 
-        if (!$onlySymfonyCache) {
-            $this->get('filesystem')->remove(PIMCORE_CACHE_DIRECTORY);
             // PIMCORE-1854 - recreate .dummy file => should remain
-            \Pimcore\File::put(PIMCORE_CACHE_DIRECTORY . '/.gitkeep', '');
+            File::put(PIMCORE_CACHE_DIRECTORY . '/.gitkeep', '');
 
-            \Pimcore::getEventDispatcher()->dispatch(\Pimcore\Event\SystemEvents::CACHE_CLEAR);
+            $eventDispatcher->dispatch(SystemEvents::CACHE_CLEAR);
         }
 
-        return $this->adminJson(['success' => true]);
+        if ($clearSymfonyCache) {
+            // pass one or move env parameters to clear multiple envs
+            // if no env is passed it will use the current one
+            $environments = $request->get('env', $kernel->getEnvironment());
+
+            if (!is_array($environments)) {
+                $environments = trim((string)$environments);
+
+                if (empty($environments)) {
+                    $environments = [];
+                } else {
+                    $environments = [$environments];
+                }
+            }
+
+            if (empty($environments)) {
+                $environments = [$kernel->getEnvironment()];
+            }
+
+            $result['environments'] = $environments;
+
+            if (in_array($kernel->getEnvironment(), $environments)) {
+                // remove terminate and exception event listeners for the current env as they break with a
+                // cleared container - see #2434
+                foreach ($eventDispatcher->getListeners(KernelEvents::TERMINATE) as $listener) {
+                    $eventDispatcher->removeListener(KernelEvents::TERMINATE, $listener);
+                }
+
+                foreach ($eventDispatcher->getListeners(KernelEvents::EXCEPTION) as $listener) {
+                    $eventDispatcher->removeListener(KernelEvents::EXCEPTION, $listener);
+                }
+            }
+
+            foreach ($environments as $environment) {
+                try {
+                    $symfonyCacheClearer->clear($environment);
+                } catch (\Throwable $e) {
+                    $errors = $result['errors'] ?? [];
+                    $errors[] = $e->getMessage();
+
+                    $result = array_merge($result, [
+                        'success' => false,
+                        'errors'  => $errors
+                    ]);
+                }
+            }
+        }
+
+        $response = new JsonResponse($result);
+
+        if ($clearSymfonyCache) {
+            // we send the response directly here and exit to make sure no code depending on the stale container
+            // is running after this
+            $response->sendHeaders();
+            $response->sendContent();
+            exit;
+        }
+
+        return $response;
     }
 
     /**
      * @Route("/clear-output-cache")
      *
-     * @param Request $request
+     * @param EventDispatcherInterface $eventDispatcher
      *
      * @return JsonResponse
      */
-    public function clearOutputCacheAction(Request $request)
+    public function clearOutputCacheAction(EventDispatcherInterface $eventDispatcher)
     {
         $this->checkPermission('clear_cache');
 
@@ -690,7 +852,7 @@ class SettingsController extends AdminController
         // empty document cache
         Cache::clearTags(['output', 'output_lifetime']);
 
-        \Pimcore::getEventDispatcher()->dispatch(\Pimcore\Event\SystemEvents::CACHE_CLEAR_FULLPAGE_CACHE);
+        $eventDispatcher->dispatch(SystemEvents::CACHE_CLEAR_FULLPAGE_CACHE);
 
         return $this->adminJson(['success' => true]);
     }
@@ -698,11 +860,11 @@ class SettingsController extends AdminController
     /**
      * @Route("/clear-temporary-files")
      *
-     * @param Request $request
+     * @param EventDispatcherInterface $eventDispatcher
      *
      * @return JsonResponse
      */
-    public function clearTemporaryFilesAction(Request $request)
+    public function clearTemporaryFilesAction(EventDispatcherInterface $eventDispatcher)
     {
         $this->checkPermission('clear_temp_files');
 
@@ -713,10 +875,10 @@ class SettingsController extends AdminController
         recursiveDelete(PIMCORE_SYSTEM_TEMP_DIRECTORY, false);
 
         // recreate .dummy files # PIMCORE-2629
-        \Pimcore\File::put(PIMCORE_TEMPORARY_DIRECTORY . '/.dummy', '');
-        \Pimcore\File::put(PIMCORE_SYSTEM_TEMP_DIRECTORY . '/.dummy', '');
+        File::put(PIMCORE_TEMPORARY_DIRECTORY . '/.dummy', '');
+        File::put(PIMCORE_SYSTEM_TEMP_DIRECTORY . '/.dummy', '');
 
-        \Pimcore::getEventDispatcher()->dispatch(\Pimcore\Event\SystemEvents::CACHE_CLEAR_TEMPORARY_FILES);
+        $eventDispatcher->dispatch(SystemEvents::CACHE_CLEAR_TEMPORARY_FILES);
 
         return $this->adminJson(['success' => true]);
     }
@@ -1462,7 +1624,7 @@ class SettingsController extends AdminController
 
         if ($request->get('data') !== null) {
             // save data
-            \Pimcore\File::put($robotsPath, $request->get('data'));
+            File::put($robotsPath, $request->get('data'));
 
             return $this->adminJson([
                 'success' => true
@@ -1688,24 +1850,45 @@ class SettingsController extends AdminController
 
                 $list = new WebsiteSetting\Listing();
 
-                $list->setLimit($request->get('limit'));
-                $list->setOffset($request->get('start'));
+                $limit = $request->get('limit');
+                $start = $request->get('start');
 
                 $sortingSettings = \Pimcore\Bundle\AdminBundle\Helper\QueryParams::extractSortingSettings(array_merge($request->request->all(), $request->query->all()));
-                if ($sortingSettings['orderKey']) {
-                    $list->setOrderKey($sortingSettings['orderKey']);
-                    $list->setOrder($sortingSettings['order']);
-                } else {
-                    $list->setOrderKey('name');
-                    $list->setOrder('asc');
-                }
 
                 if ($request->get('filter')) {
-                    $list->setCondition('`name` LIKE ' . $list->quote('%'.$request->get('filter').'%'));
+                    $filter = $request->get('filter');
+                    $list->setFilter(function ($row) use ($filter) {
+                        foreach ($row as $value) {
+                            if (strpos($value, $filter) !== false) {
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    });
                 }
+
+                $list->setOrder(function ($a, $b) use ($sortingSettings) {
+                    if (!$sortingSettings) {
+                        return 0;
+                    }
+                    $orderKey = $sortingSettings['orderKey'];
+                    if ($a[$orderKey] == $b[$orderKey]) {
+                        return 0;
+                    }
+
+                    $result = $a[$orderKey] < $b[$orderKey] ? -1 : 1;
+                    if ($sortingSettings['order'] == 'DESC') {
+                        $result = -1 * $result;
+                    }
+
+                    return $result;
+                });
 
                 $totalCount = $list->getTotalCount();
                 $list = $list->load();
+
+                $list = array_slice($list, $start, $limit);
 
                 $settings = [];
                 foreach ($list as $item) {
@@ -1723,7 +1906,7 @@ class SettingsController extends AdminController
     }
 
     /**
-     * @param $item
+     * @param WebsiteSetting $item
      *
      * @return array
      */
@@ -1732,6 +1915,7 @@ class SettingsController extends AdminController
         $resultItem = [
             'id' => $item->getId(),
             'name' => $item->getName(),
+            'language' => $item->getLanguage(),
             'type' => $item->getType(),
             'data' => null,
             'siteId' => $item->getSiteId(),

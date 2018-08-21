@@ -14,6 +14,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
+use Pimcore\Analytics\Google\Config\SiteConfigProvider;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
 use Pimcore\Config;
 use Pimcore\Controller\Configuration\TemplatePhp;
@@ -32,6 +33,7 @@ use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
+use Symfony\Component\HttpKernel\KernelInterface;
 
 class IndexController extends AdminController
 {
@@ -52,10 +54,19 @@ class IndexController extends AdminController
      * @Route("/", name="pimcore_admin_index")
      * @TemplatePhp()
      *
+     * @param Request $request
+     * @param SiteConfigProvider $siteConfigProvider
+     * @param KernelInterface $kernel
+     *
      * @return ViewModel
+     *
+     * @throws \Exception
      */
-    public function indexAction(Request $request)
-    {
+    public function indexAction(
+        Request $request,
+        SiteConfigProvider $siteConfigProvider,
+        KernelInterface $kernel
+    ) {
         $user = $this->getAdminUser();
         $view = new ViewModel([
             'config' => Config::getSystemConfig()
@@ -66,7 +77,8 @@ class IndexController extends AdminController
             ->addReportConfig($view)
             ->addPluginAssets($view);
 
-        $settings = $this->buildPimcoreSettings($request, $view, $user);
+        $settings = $this->buildPimcoreSettings($request, $view, $user, $kernel);
+        $this->buildGoogleAnalyticsSettings($view, $settings, $siteConfigProvider);
 
         // allow to alter settings via an event
         $this->eventDispatcher->dispatch(AdminEvents::INDEX_SETTINGS, new IndexSettingsEvent($settings));
@@ -126,10 +138,11 @@ class IndexController extends AdminController
      * @param Request $request
      * @param ViewModel $view
      * @param User $user
+     * @param KernelInterface $kernel
      *
      * @return ViewModel
      */
-    protected function buildPimcoreSettings(Request $request, ViewModel $view, User $user)
+    protected function buildPimcoreSettings(Request $request, ViewModel $view, User $user, KernelInterface $kernel)
     {
         $config = $view->config;
 
@@ -139,6 +152,7 @@ class IndexController extends AdminController
             'buildDate'     => Version::getBuildDate(),
             'debug'     => \Pimcore::inDebugMode(),
             'devmode'   => PIMCORE_DEVMODE || $view->extjsDev,
+            'environment' => $kernel->getEnvironment(),
             'sessionId' => htmlentities(Session::getSessionId(), ENT_QUOTES, 'UTF-8'),
             'isLegacyModeAvailable' => \Pimcore::isLegacyModeAvailable()
         ]);
@@ -176,13 +190,6 @@ class IndexController extends AdminController
             'disabledPortlets'      => $dashboardHelper->getDisabledPortlets(),
         ]);
 
-        // google settings
-        $settings->getParameters()->add([
-            'google_analytics_enabled'      => (bool)Google\Analytics::isConfigured(),
-            'google_webmastertools_enabled' => (bool)Google\Webmastertools::isConfigured(),
-            'google_maps_api_key'           => $config->services->google->browserapikey ?: ''
-        ]);
-
         $this
             ->addSystemVarSettings($settings)
             ->addCsrfToken($settings, $user)
@@ -191,6 +198,20 @@ class IndexController extends AdminController
             ->addCustomViewSettings($settings);
 
         return $settings;
+    }
+
+    private function buildGoogleAnalyticsSettings(
+        ViewModel $view,
+        ViewModel $settings,
+        SiteConfigProvider $siteConfigProvider
+    ) {
+        $config = $view->config;
+
+        $settings->getParameters()->add([
+            'google_analytics_enabled'      => (bool)$siteConfigProvider->isSiteReportingConfigured(),
+            'google_webmastertools_enabled' => (bool)Google\Webmastertools::isConfigured(),
+            'google_maps_api_key'           => $config->services->google->browserapikey ?: ''
+        ]);
     }
 
     /**

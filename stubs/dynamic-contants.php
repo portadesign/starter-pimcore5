@@ -1,5 +1,8 @@
 <?php
 
+// just to have a link to the real constants :)
+require_once '../config/constants.php';
+
 // constants generated in pimcore/config/constants.php
 define('PIMCORE_COMPOSER_PATH', '');
 define('PIMCORE_COMPOSER_FILE_PATH', '');
@@ -15,7 +18,6 @@ define('PIMCORE_CONFIGURATION_DIRECTORY', '');
 define('PIMCORE_VERSION_DIRECTORY', '');
 define('PIMCORE_LOG_DIRECTORY', '');
 define('PIMCORE_LOG_FILEOBJECT_DIRECTORY', '');
-define('PIMCORE_LOG_MAIL_TEMP', '');
 define('PIMCORE_TEMPORARY_DIRECTORY', '');
 define('PIMCORE_CACHE_DIRECTORY', '');
 define('PIMCORE_CUSTOMLAYOUT_DIRECTORY', '');
