@@ -17,6 +17,7 @@
 
 namespace Pimcore\Model\Document\Tag;
 
+use Pimcore\FeatureToggles\Features\DebugMode;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
@@ -381,8 +382,8 @@ class Video extends Model\Document\Tag
                 if ($this->poster && ($poster = Asset::getById($this->poster))) {
                     $image = $poster->getThumbnail($imageThumbnailConf);
                 } else {
-                    if ($asset->getCustomSetting('image_thumbnail_asset')) {
-                        $image = (string) $asset->getImageThumbnail($imageThumbnailConf);
+                    if ($asset->getCustomSetting('image_thumbnail_asset') && ($customPreviewAsset = Asset::getById($asset->getCustomSetting('image_thumbnail_asset')))) {
+                        $image = (string) $customPreviewAsset->getImageThumbnail($imageThumbnailConf);
                     } else {
                         $image = (string) $asset->getImageThumbnail($imageThumbnailConf);
                     }
@@ -436,18 +437,64 @@ class Video extends Model\Document\Tag
         }
 
         // only display error message in debug mode
-        if (!\Pimcore::inDebugMode()) {
+        if (!\Pimcore::inDebugMode(DebugMode::RENDER_DOCUMENT_TAG_ERRORS)) {
             $message = '';
         }
 
         $code = '
         <div id="pimcore_video_' . $this->getName() . '" class="pimcore_tag_video">
-            <div class="pimcore_tag_video_error" style="text-align:center; width: ' . $width . '; height: ' . ($this->getHeight() - 1) . 'px; border:1px solid #000; background: url(/pimcore/static6/img/filetype-not-supported.svg) no-repeat center center #fff;">
+            <div class="pimcore_tag_video_error" style="text-align:center; width: ' . $width . '; height: ' . ($this->getHeight() - 1) . 'px; border:1px solid #000; background: url(/bundles/pimcoreadmin/img/filetype-not-supported.svg) no-repeat center center #fff;">
                 ' . $message . '
             </div>
         </div>';
 
         return $code;
+    }
+
+    /**
+     * @return mixed|string
+     */
+    private function parseYoutubeId()
+    {
+        $youtubeId = '';
+        if ($this->type == 'youtube') {
+            if ($youtubeId = $this->id) {
+                if (strpos($youtubeId, '//') !== false) {
+                    $parts = parse_url($this->id);
+                    parse_str($parts['query'], $vars);
+
+                    if ($vars['v']) {
+                        $youtubeId = $vars['v'];
+                    }
+
+                    //get youtube id if form urls like  http://www.youtube.com/embed/youtubeId
+                    if (strpos($this->id, 'embed') !== false) {
+                        $explodedPath = explode('/', $parts['path']);
+                        $youtubeId = $explodedPath[array_search('embed', $explodedPath) + 1];
+                    }
+
+                    if ($parts['host'] == 'youtu.be') {
+                        $youtubeId = trim($parts['path'], ' /');
+                    }
+                }
+            }
+        }
+
+        return $youtubeId;
+    }
+
+    /**
+     * @return string
+     */
+    public function getYoutubeUrlEmbedded()
+    {
+        if ($this->type == 'youtube') {
+            if ($youtubeId = $this->parseYoutubeId()) {
+                return 'https://www.youtube-nocookie.com/embed/'.$youtubeId;
+            }
+        }
+
+        return '';
     }
 
     /**
@@ -462,27 +509,7 @@ class Video extends Model\Document\Tag
         $options = $this->getOptions();
         $code = '';
 
-        // get youtube id
-        $youtubeId = $this->id;
-        if (strpos($youtubeId, '//') !== false) {
-            $parts = parse_url($this->id);
-            parse_str($parts['query'], $vars);
-
-            if ($vars['v']) {
-                $youtubeId = $vars['v'];
-            }
-
-            //get youtube id if form urls like  http://www.youtube.com/embed/youtubeId
-            if (strpos($this->id, 'embed') !== false) {
-                $explodedPath = explode('/', $parts['path']);
-                $youtubeId = $explodedPath[array_search('embed', $explodedPath) + 1];
-            }
-
-            if ($parts['host'] == 'youtu.be') {
-                $youtubeId = trim($parts['path'], ' /');
-            }
-        }
-
+        $youtubeId = $this->parseYoutubeId();
         if (!$youtubeId) {
             return $this->getEmptyCode();
         }
@@ -497,7 +524,7 @@ class Video extends Model\Document\Tag
             $height = $options['height'];
         }
 
-        $valid_youtube_prams=[ 'autohide',
+        $valid_youtube_prams = [ 'autohide',
             'autoplay',
             'cc_load_policy',
             'color',
@@ -511,14 +538,16 @@ class Video extends Model\Document\Tag
             'listType',
             'loop',
             'modestbranding',
+            'mute',
             'origin',
             'playerapiid',
             'playlist',
             'rel',
             'showinfo',
             'start',
-            'theme'];
-        $additional_params='';
+            'theme'
+            ];
+        $additional_params = '';
 
         $clipConfig = [];
         if (isset($options['config']['clip']) && is_array($options['config']['clip'])) {
@@ -532,7 +561,7 @@ class Video extends Model\Document\Tag
         }
 
         if (!empty($configurations)) {
-            foreach ($configurations as $key=>$value) {
+            foreach ($configurations as $key => $value) {
                 if (in_array($key, $valid_youtube_prams)) {
                     if (is_bool($value)) {
                         if ($value) {
@@ -586,11 +615,14 @@ class Video extends Model\Document\Tag
                 $height = $options['height'];
             }
 
-            $valid_vimeo_prams=[
+            $valid_vimeo_prams = [
                 'autoplay',
-                'loop'];
+                'background',
+                'loop',
+                'muted'
+                ];
 
-            $additional_params='';
+            $additional_params = '';
 
             $clipConfig = [];
             if (is_array($options['config']['clip'])) {
@@ -604,7 +636,7 @@ class Video extends Model\Document\Tag
             }
 
             if (!empty($configurations)) {
-                foreach ($configurations as $key=>$value) {
+                foreach ($configurations as $key => $value) {
                     if (in_array($key, $valid_vimeo_prams)) {
                         if (is_bool($value)) {
                             if ($value) {
@@ -662,11 +694,12 @@ class Video extends Model\Document\Tag
                 $height = $options['height'];
             }
 
-            $valid_dailymotion_prams=[
+            $valid_dailymotion_prams = [
                 'autoplay',
-                'loop'];
+                'loop',
+                'mute'];
 
-            $additional_params='';
+            $additional_params = '';
 
             $clipConfig = [];
             if (is_array($options['config']['clip'])) {
@@ -680,7 +713,7 @@ class Video extends Model\Document\Tag
             }
 
             if (!empty($configurations)) {
-                foreach ($configurations as $key=>$value) {
+                foreach ($configurations as $key => $value) {
                     if (in_array($key, $valid_dailymotion_prams)) {
                         if (is_bool($value)) {
                             if ($value) {
@@ -755,12 +788,12 @@ class Video extends Model\Document\Tag
                 //"interactionCount" => "1234",
             ];
 
+            if (!$thumbnail) {
+                $thumbnail = $video->getImageThumbnail([]);
+            }
+
             if (!preg_match('@https?://@', $thumbnail)) {
-                if ($thumbnail) {
-                    $jsonLd['thumbnailUrl'] = Tool::getHostUrl() . $thumbnail;
-                } else {
-                    $jsonLd['thumbnailUrl'] = Tool::getHostUrl() . $video->getImageThumbnail([]);
-                }
+                $jsonLd['thumbnailUrl'] = Tool::getHostUrl() . $thumbnail;
             }
 
             $code .= "\n\n<script type=\"application/ld+json\">\n" . json_encode($jsonLd) . "\n</script>\n\n";
@@ -835,7 +868,7 @@ class Video extends Model\Document\Tag
                     font-family:Arial,Verdana,sans-serif;
                     line-height:66px;
                     box-sizing:content-box;
-                    background:#fff url(/pimcore/static6/img/video-loading.gif) center center no-repeat;
+                    background:#fff url(/bundles/pimcoreadmin/img/video-loading.gif) center center no-repeat;
                     width:66px;
                     height:66px;
                     padding:20px;

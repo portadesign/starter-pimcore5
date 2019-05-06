@@ -28,12 +28,12 @@ class DocumentTest extends RestTestCase
         $this->assertTrue($id > 1, 'id must be greater than 1');
 
         $documentDirect = Document::getById($id);
-        $creationDate   = $documentDirect->getCreationDate();
+        $creationDate = $documentDirect->getCreationDate();
 
         $this->assertGreaterThanOrEqual($time, $creationDate, 'wrong creation date');
 
         // as the object key is unique there must be exactly one document with that key
-        $list = $this->restClient->getDocumentList("`key` = '" . $unsavedObject->getKey() . "'");
+        $list = $this->restClient->getDocumentList('{"key": "' . $unsavedObject->getKey() . '"}');
 
         $this->assertEquals(1, count($list));
     }

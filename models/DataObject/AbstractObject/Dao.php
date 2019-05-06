@@ -17,6 +17,7 @@
 
 namespace Pimcore\Model\DataObject\AbstractObject;
 
+use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
@@ -55,14 +56,8 @@ class Dao extends Model\Element\Dao
      */
     public function getByPath($path)
     {
-
-        // check for root node
-        $_path = $path != '/' ? dirname($path) : $path;
-        $_path = str_replace('\\', '/', $_path); // windows patch
-        $_key = basename($path);
-        $_path .= $_path != '/' ? '/' : '';
-
-        $data = $this->db->fetchRow('SELECT o_id FROM objects WHERE o_path = ' . $this->db->quote($_path) . ' and `o_key` = ' . $this->db->quote($_key));
+        $params = $this->extractKeyAndPath($path);
+        $data = $this->db->fetchRow('SELECT o_id FROM objects WHERE o_path = :path AND `o_key` = :key', $params);
 
         if ($data['o_id']) {
             $this->assignVariablesToModel($data);
@@ -96,11 +91,13 @@ class Dao extends Model\Element\Dao
      */
     public function update($isUpdate = null)
     {
-        $object = get_object_vars($this->model);
+        $object = $this->model->getObjectVars();
 
         $data = [];
+        $validTableColumns = $this->getValidTableColumns('objects');
+
         foreach ($object as $key => $value) {
-            if (in_array($key, $this->getValidTableColumns('objects'))) {
+            if (in_array($key, $validTableColumns)) {
                 if (is_bool($value)) {
                     $value = (int)$value;
                 }
@@ -175,7 +172,8 @@ class Dao extends Model\Element\Dao
             }
 
             //update object child paths
-            $this->db->query('update objects set o_path = replace(o_path,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . "), o_modificationDate = '" . time() . "', o_userModification = '" . $userId . "' where o_path like " . $this->db->quote($oldPath . '/%') . ';');
+            // we don't update the modification date here, as this can have side-effects when there's an unpublished version for an element
+            $this->db->query('update objects set o_path = replace(o_path,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . "), o_userModification = '" . $userId . "' where o_path like " . $this->db->quote($oldPath . '/%') . ';');
 
             //update object child permission paths
             $this->db->query('update users_workspaces_object set cpath = replace(cpath,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . ') where cpath like ' . $this->db->quote($oldPath . '/%') . ';');
@@ -210,6 +208,21 @@ class Dao extends Model\Element\Dao
         }
 
         return $path;
+    }
+
+    /**
+     * @return int
+     */
+    public function getVersionCountForUpdate(): int
+    {
+        $versionCount = (int) $this->db->fetchOne('SELECT o_versionCount FROM objects WHERE o_id = ? FOR UPDATE', $this->model->getId());
+
+        if ($this->model instanceof DataObject\Concrete) {
+            $versionCount2 = (int) $this->db->fetchOne("SELECT MAX(versionCount) FROM versions WHERE cid = ? AND ctype = 'object'", $this->model->getId());
+            $versionCount = max($versionCount, $versionCount2);
+        }
+
+        return (int) $versionCount;
     }
 
     /**
@@ -287,15 +300,23 @@ class Dao extends Model\Element\Dao
     }
 
     /**
-     * Quick test if there are childs
+     * Quick test if there are children
      *
      * @param array $objectTypes
+     * @param bool $unpublished
      *
      * @return bool
      */
-    public function hasChildren($objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER])
+    public function hasChildren($objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER], $unpublished = false)
     {
-        $c = $this->db->fetchOne("SELECT o_id FROM objects WHERE o_parentId = ? AND o_type IN ('" . implode("','", $objectTypes) . "')", $this->model->getId());
+        $sql = 'SELECT o_id FROM objects WHERE o_parentId = ?';
+
+        if (DataObject\AbstractObject::doHideUnpublished() && !$unpublished) {
+            $sql .= ' AND o_published = 1';
+        }
+        $sql .= " AND o_type IN ('" . implode("','", $objectTypes) . "') LIMIT 1";
+
+        $c = $this->db->fetchOne($sql, $this->model->getId());
 
         return (bool)$c;
     }
@@ -317,21 +338,24 @@ class Dao extends Model\Element\Dao
     /**
      * returns the amount of directly childs (not recursivly)
      *
-     * @param array $objectTypes
+     * @param array|null $objectTypes
      * @param Model\User $user
      *
      * @return int
      */
     public function getChildAmount($objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER], $user = null)
     {
+        $query = 'SELECT COUNT(*) AS count FROM objects o WHERE o_parentId = ?';
+
+        if (!empty($objectTypes)) {
+            $query .= sprintf(' AND o_type IN (\'%s\')', implode("','", $objectTypes));
+        }
+
         if ($user and !$user->isAdmin()) {
             $userIds = $user->getRoles();
             $userIds[] = $user->getId();
 
-            $query = "SELECT COUNT(*) AS count FROM objects o WHERE o_parentId = ? AND o_type IN ('" . implode("','", $objectTypes) . "')
-                              AND (select list as locate from users_workspaces_object where userId in (" . implode(',', $userIds) . ') and LOCATE(cpath,CONCAT(o.o_path,o.o_key))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1;';
-        } else {
-            $query = "SELECT COUNT(*) AS count FROM objects WHERE o_parentId = ? AND o_type IN ('" . implode("','", $objectTypes) . "')";
+            $query .= ' AND (select list as locate from users_workspaces_object where userId in (' . implode(',', $userIds) . ') and LOCATE(cpath,CONCAT(o.o_path,o.o_key))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1;';
         }
 
         $c = $this->db->fetchOne($query, $this->model->getId());
@@ -563,12 +587,24 @@ class Dao extends Model\Element\Dao
     }
 
     /**
+     * @param $index
+     */
+    public function saveIndex($index)
+    {
+        $this->db->update('objects', [
+            'o_index' => $index
+        ], [
+            'o_id' => $this->model->getId()
+        ]);
+    }
+
+    /**
      * @return bool
      */
     public function __isBasedOnLatestData()
     {
-        $currentDataTimestamp = $this->db->fetchOne('SELECT o_modificationDate from objects WHERE o_id = ?', $this->model->getId());
-        if ($currentDataTimestamp == $this->model->__getDataVersionTimestamp()) {
+        $data = $this->db->fetchRow('SELECT o_modificationDate, o_versionCount  from objects WHERE o_id = ?', $this->model->getId());
+        if ($data['o_modificationDate'] == $this->model->__getDataVersionTimestamp() && $data['o_versionCount'] == $this->model->getVersionCount()) {
             return true;
         }
 

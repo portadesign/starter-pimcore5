@@ -364,8 +364,8 @@ class Data extends \Pimcore\Model\AbstractModel
 
         $this->id = new Data\Id($element);
         $this->fullPath = $element->getRealFullPath();
-        $this->creationDate=$element->getCreationDate();
-        $this->modificationDate=$element->getModificationDate();
+        $this->creationDate = $element->getCreationDate();
+        $this->modificationDate = $element->getModificationDate();
         $this->userModification = $element->getUserModification();
         $this->userOwner = $element->getUserOwner();
 
@@ -389,10 +389,10 @@ class Data extends \Pimcore\Model\AbstractModel
             }
         }
 
-        $this->data = '';
+        $this->data = $element->getKey();
+
         if ($element instanceof Document) {
             if ($element instanceof Document\Folder) {
-                $this->data = $element->getKey();
                 $this->published = true;
             } elseif ($element instanceof Document\Link) {
                 $this->published = $element->isPublished();
@@ -420,8 +420,6 @@ class Data extends \Pimcore\Model\AbstractModel
                 }
             }
         } elseif ($element instanceof Asset) {
-            $this->data = $element->getFilename();
-
             $elementMetadata = $element->getMetadata();
             if (is_array($elementMetadata)) {
                 foreach ($elementMetadata as $md) {
@@ -473,12 +471,11 @@ class Data extends \Pimcore\Model\AbstractModel
 
                 $this->published = $element->isPublished();
                 foreach ($element->getClass()->getFieldDefinitions() as $key => $value) {
-                    $this->data .= $value->getDataForSearchIndex($element).' ';
+                    $this->data .= ' ' . $value->getDataForSearchIndex($element);
                 }
 
                 DataObject\AbstractObject::setGetInheritedValues($getInheritedValues);
             } elseif ($element instanceof DataObject\Folder) {
-                $this->data=$element->getKey();
                 $this->published = true;
             }
         } else {
@@ -488,9 +485,9 @@ class Data extends \Pimcore\Model\AbstractModel
         // replace all occurrences of @ to # because when using InnoDB @ is reserved for the @distance operator
         $this->data = str_replace('@', '#', $this->data);
 
-        if ($element instanceof Element\ElementInterface) {
-            $this->data = 'ID: ' . $element->getId() . "  \nPath: " . $this->getFullPath() . "  \n"  . $this->cleanupData($this->data);
-        }
+        $pathWords = str_replace([ '-', '_', '/', '.', '(', ')'], ' ', $this->getFullPath());
+        $this->data .= ' ' . $pathWords;
+        $this->data = 'ID: ' . $element->getId() . "  \nPath: " . $this->getFullPath() . "  \n"  . $this->cleanupData($this->data);
 
         return $this;
     }
@@ -547,7 +544,29 @@ class Data extends \Pimcore\Model\AbstractModel
     {
         if ($this->id instanceof Data\Id) {
             \Pimcore::getEventDispatcher()->dispatch(SearchBackendEvents::PRE_SAVE, new SearchBackendEvent($this));
-            $this->getDao()->save();
+
+            $maxRetries = 5;
+            for ($retries = 0; $retries < $maxRetries; $retries++) {
+                try {
+                    $this->getDao()->save();
+                    // successfully completed, so we cancel the loop here -> no restart required
+                    break;
+                } catch (\Exception $e) {
+                    // we try to start saving $maxRetries times again (deadlocks, ...)
+                    if ($retries < ($maxRetries - 1)) {
+                        $run = $retries + 1;
+                        $waitTime = rand(1, 5) * 100000;
+                        Logger::warn('Unable to finish transaction (' . $run . ". run) because of the following reason '" . $e->getMessage() . "'. --> Retrying in " . $waitTime . ' microseconds ... (' . ($run + 1) . ' of ' . $maxRetries . ')');
+
+                        // wait specified time until we restart
+                        usleep($waitTime);
+                    } else {
+                        // if we fail after $maxRetries retries, we throw out the exception
+                        throw $e;
+                    }
+                }
+            }
+
             \Pimcore::getEventDispatcher()->dispatch(SearchBackendEvents::POST_SAVE, new SearchBackendEvent($this));
         } else {
             throw new \Exception('Search\\Backend\\Data cannot be saved - no id set!');

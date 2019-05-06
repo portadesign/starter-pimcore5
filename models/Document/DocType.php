@@ -29,67 +29,74 @@ class DocType extends Model\AbstractModel
      *
      * @var int
      */
-    public $id;
+    protected $id;
 
     /**
      * Name of the document-type
      *
      * @var string
      */
-    public $name;
+    protected $name;
+
+    /**
+     * Group of document-types
+     *
+     * @var string
+     */
+    protected $group;
 
     /**
      * @var string
      */
-    public $module;
+    protected $module;
 
     /**
      * The specified controller
      *
      * @var string
      */
-    public $controller;
+    protected $controller;
 
     /**
      * The specified action
      *
      * @var string
      */
-    public $action;
+    protected $action;
 
     /**
      * The specified template
      *
      * @var string
      */
-    public $template;
+    protected $template;
 
     /**
      * Type, must be one of the following: page,snippet,email
      *
      * @var string
      */
-    public $type;
+    protected $type;
 
     /**
      * @var int
      */
-    public $priority = 0;
+    protected $priority = 0;
 
     /**
      * @var int
      */
-    public $creationDate;
+    protected $creationDate;
 
     /**
      * @var int
      */
-    public $modificationDate;
+    protected $modificationDate;
 
     /**
      * @var bool
      */
-    public $legacy = false;
+    protected $legacy = false;
 
     /**
      * Static helper to retrieve an instance of Document\DocType by the given ID
@@ -160,6 +167,14 @@ class DocType extends Model\AbstractModel
     /**
      * @return string
      */
+    public function getGroup()
+    {
+        return $this->group;
+    }
+
+    /**
+     * @return string
+     */
     public function getTemplate()
     {
         return $this->template;
@@ -209,6 +224,18 @@ class DocType extends Model\AbstractModel
     public function setName($name)
     {
         $this->name = $name;
+
+        return $this;
+    }
+
+    /**
+     * @param string $group
+     *
+     * @return $this
+     */
+    public function setGroup($group)
+    {
+        $this->group = $group;
 
         return $this;
     }

@@ -23,6 +23,7 @@ use Pimcore\Event\FrontendEvents;
 use Pimcore\Event\Model\DocumentEvent;
 use Pimcore\Logger;
 use Pimcore\Model\Document\Listing;
+use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Tool;
 use Pimcore\Tool\Frontend as FrontendTool;
 use Symfony\Component\EventDispatcher\GenericEvent;
@@ -43,41 +44,9 @@ class Document extends Element\AbstractElement
     public static $types = ['folder', 'page', 'snippet', 'link', 'hardlink', 'email', 'newsletter', 'printpage', 'printcontainer'];
 
     /**
-     * Add document type to the $types array. It defines additional document types available in Pimcore.
-     *
-     * @param $type
-     */
-    public static function addDocumentType($type)
-    {
-        if (!in_array($type, self::$types)) {
-            self::$types[] = $type;
-        }
-    }
-
-    /**
      * @var bool
      */
-    private static $hidePublished = false;
-
-    /**
-     * Set true if want to hide documents.
-     *
-     * @param bool $flag
-     */
-    public static function setHideUnpublished($flag)
-    {
-        self::$hidePublished = $flag;
-    }
-
-    /**
-     * Checks if unpublished documents should be hidden.
-     *
-     * @return bool
-     */
-    public static function doHideUnpublished()
-    {
-        return self::$hidePublished;
-    }
+    private static $hideUnpublished = false;
 
     /**
      * @var array
@@ -89,21 +58,21 @@ class Document extends Element\AbstractElement
      *
      * @var int
      */
-    public $id;
+    protected $id;
 
     /**
      * ID of the parent document, on root document this is null
      *
      * @var int
      */
-    public $parentId;
+    protected $parentId;
 
     /**
      * The parent document.
      *
      * @var Document
      */
-    public $parent;
+    protected $parent;
 
     /**
      * Type of the document as string (enum)
@@ -111,117 +80,120 @@ class Document extends Element\AbstractElement
      *
      * @var string
      */
-    public $type;
+    protected $type;
 
     /**
      * Filename/Key of the document
      *
      * @var string
      */
-    public $key;
+    protected $key;
 
     /**
      * Path to the document, not conaining the key (the full path of the parent document)
      *
      * @var string
      */
-    public $path;
+    protected $path;
 
     /**
      * Sorter index in the tree, can also be used for generating a navigation and so on
      *
      * @var int
      */
-    public $index;
+    protected $index;
 
     /**
      * published or not
      *
      * @var bool
      */
-    public $published = true;
+    protected $published = true;
 
     /**
      * timestamp of creationdate
      *
      * @var int
      */
-    public $creationDate;
+    protected $creationDate;
 
     /**
      * timestamp of modificationdate
      *
      * @var int
      */
-    public $modificationDate;
+    protected $modificationDate;
 
     /**
      * User-ID of the owner
      *
      * @var int
      */
-    public $userOwner;
+    protected $userOwner;
 
     /**
      * User-ID of the user last modified the document
      *
      * @var int
      */
-    public $userModification;
+    protected $userModification;
 
     /**
      * Permissions for the user which requested this document in editmode*
      */
-    public $userPermissions;
+    protected $userPermissions;
 
     /**
      * Dependencies for this document
      *
      * @var Dependency
      */
-    public $dependencies;
+    protected $dependencies;
 
     /**
      * List of Property, concerning the folder
      *
      * @var array
      */
-    public $properties = null;
+    protected $properties = null;
 
     /**
      * Contains a list of child-documents
      *
      * @var array
      */
-    public $childs;
+    protected $childs;
 
     /**
      * Indicator of document has childs or not.
      *
      * @var bool
      */
-    public $hasChilds;
+    protected $hasChilds;
 
     /**
      * Contains a list of sibling documents
      *
      * @var array
      */
-    public $siblings;
+    protected $siblings;
 
     /**
      * Indicator if document has siblings or not
      *
      * @var bool
      */
-    public $hasSiblings;
+    protected $hasSiblings;
 
     /**
      * Check if the document is locked.
      *
      * @var string
      */
-    public $locked = null;
+    protected $locked = null;
+
+    /** @var int */
+    protected $versionCount;
 
     /**
      * get possible types
@@ -255,19 +227,31 @@ class Document extends Element\AbstractElement
 
         try {
             $helperDoc = new Document();
-            // validate path
-            if (Tool::isValidPath($path)) {
-                $helperDoc->getDao()->getByPath($path);
-            }
-
-            $doc = self::getById($helperDoc->getId(), $force);
+            $helperDoc->getDao()->getByPath($path);
+            $doc = static::getById($helperDoc->getId(), $force);
             \Pimcore\Cache\Runtime::set($cacheKey, $doc);
         } catch (\Exception $e) {
-            Logger::debug($e->getMessage());
             $doc = null;
         }
 
         return $doc;
+    }
+
+    /**
+     * @param Document $document
+     *
+     * @return bool
+     */
+    protected static function typeMatch(Document $document)
+    {
+        $staticType = get_called_class();
+        if ($staticType != Document::class) {
+            if (!$document instanceof $staticType) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -280,17 +264,16 @@ class Document extends Element\AbstractElement
      */
     public static function getById($id, $force = false)
     {
-        $id = intval($id);
-
-        if ($id < 1) {
+        if (!is_numeric($id) || $id < 1) {
             return null;
         }
+        $id = intval($id);
 
         $cacheKey = 'document_' . $id;
 
         if (!$force && \Pimcore\Cache\Runtime::isRegistered($cacheKey)) {
             $document = \Pimcore\Cache\Runtime::get($cacheKey);
-            if ($document) {
+            if ($document && static::typeMatch($document)) {
                 return $document;
             }
         }
@@ -311,7 +294,7 @@ class Document extends Element\AbstractElement
                     }
                 }
 
-                $document = \Pimcore::getContainer()->get('pimcore.model.factory')->build($className);
+                $document = self::getModelFactory()->build($className);
                 \Pimcore\Cache\Runtime::set($cacheKey, $document);
                 $document->getDao()->getById($id);
                 $document->__setDataVersionTimestamp($document->getModificationDate());
@@ -321,12 +304,10 @@ class Document extends Element\AbstractElement
                 \Pimcore\Cache\Runtime::set($cacheKey, $document);
             }
         } catch (\Exception $e) {
-            Logger::warning($e->getMessage());
-
             return null;
         }
 
-        if (!$document) {
+        if (!$document || !static::typeMatch($document)) {
             return null;
         }
 
@@ -371,7 +352,7 @@ class Document extends Element\AbstractElement
     {
         if (is_array($config)) {
             $listClass = 'Pimcore\\Model\\Document\\Listing';
-            $list = \Pimcore::getContainer()->get('pimcore.model.factory')->build($listClass);
+            $list = self::getModelFactory()->build($listClass);
             $list->setValues($config);
             $list->load();
 
@@ -392,7 +373,7 @@ class Document extends Element\AbstractElement
     {
         if (is_array($config)) {
             $listClass = 'Pimcore\\Model\\Document\\Listing';
-            $list = \Pimcore::getContainer()->get('pimcore.model.factory')->build($listClass);
+            $list = self::getModelFactory()->build($listClass);
             $list->setValues($config);
             $count = $list->getTotalCount();
 
@@ -407,98 +388,115 @@ class Document extends Element\AbstractElement
      */
     public function save()
     {
-        // additional parameters (e.g. "versionNote" for the version note)
-        $params = [];
-        if (func_num_args() && is_array(func_get_arg(0))) {
-            $params =  func_get_arg(0);
-        }
+        try {
+            // additional parameters (e.g. "versionNote" for the version note)
+            $params = [];
+            if (func_num_args() && is_array(func_get_arg(0))) {
+                $params = func_get_arg(0);
+            }
 
-        $isUpdate = false;
-        $preEvent = new DocumentEvent($this, $params);
-        if ($this->getId()) {
-            $isUpdate = true;
-            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_UPDATE, $preEvent);
-        } else {
-            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_ADD, $preEvent);
-        }
+            $isUpdate = false;
+            $preEvent = new DocumentEvent($this, $params);
+            if ($this->getId()) {
+                $isUpdate = true;
+                \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_UPDATE, $preEvent);
+            } else {
+                \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_ADD, $preEvent);
+            }
 
-        $params = $preEvent->getArguments();
+            $params = $preEvent->getArguments();
 
-        $this->correctPath();
+            $this->correctPath();
 
-        // we wrap the save actions in a loop here, so that we can restart the database transactions in the case it fails
-        // if a transaction fails it gets restarted $maxRetries times, then the exception is thrown out
-        // this is especially useful to avoid problems with deadlocks in multi-threaded environments (forked workers, ...)
-        $maxRetries = 5;
-        for ($retries=0; $retries < $maxRetries; $retries++) {
-            $this->beginTransaction();
+            // we wrap the save actions in a loop here, so that we can restart the database transactions in the case it fails
+            // if a transaction fails it gets restarted $maxRetries times, then the exception is thrown out
+            // this is especially useful to avoid problems with deadlocks in multi-threaded environments (forked workers, ...)
+            $maxRetries = 5;
+            for ($retries = 0; $retries < $maxRetries; $retries++) {
+                $this->beginTransaction();
 
-            try {
-                $this->updateModificationInfos();
-
-                if (!$isUpdate) {
-                    $this->getDao()->create();
-                }
-
-                // get the old path from the database before the update is done
-                $oldPath = null;
-                if ($isUpdate) {
-                    $oldPath = $this->getDao()->getCurrentFullPath();
-                }
-
-                $this->update($params);
-
-                // if the old path is different from the new path, update all children
-                $updatedChildren = [];
-                if ($oldPath && $oldPath != $this->getRealFullPath()) {
-                    $this->getDao()->updateWorkspaces();
-                    $updatedChildren = $this->getDao()->updateChildsPaths($oldPath);
-                }
-
-                $this->commit();
-
-                break; // transaction was successfully completed, so we cancel the loop here -> no restart required
-            } catch (\Exception $e) {
                 try {
-                    $this->rollBack();
-                } catch (\Exception $er) {
-                    // PDO adapter throws exceptions if rollback fails
-                    Logger::error($er);
-                }
+                    $this->updateModificationInfos();
 
-                // we try to start the transaction $maxRetries times again (deadlocks, ...)
-                if ($retries < ($maxRetries - 1)) {
-                    $run = $retries + 1;
-                    $waitTime = 100000; // microseconds
-                    Logger::warn('Unable to finish transaction (' . $run . ". run) because of the following reason '" . $e->getMessage() . "'. --> Retrying in " . $waitTime . ' microseconds ... (' . ($run + 1) . ' of ' . $maxRetries . ')');
+                    if (!$isUpdate) {
+                        $this->getDao()->create();
+                    }
 
-                    usleep($waitTime); // wait specified time until we restart the transaction
-                } else {
-                    // if the transaction still fail after $maxRetries retries, we throw out the exception
-                    throw $e;
+                    // get the old path from the database before the update is done
+                    $oldPath = null;
+                    if ($isUpdate) {
+                        $oldPath = $this->getDao()->getCurrentFullPath();
+                    }
+
+                    $this->update($params);
+
+                    // if the old path is different from the new path, update all children
+                    $updatedChildren = [];
+                    if ($oldPath && $oldPath != $this->getRealFullPath()) {
+                        $differentOldPath = $oldPath;
+                        $this->getDao()->updateWorkspaces();
+                        $updatedChildren = $this->getDao()->updateChildsPaths($oldPath);
+                    }
+
+                    $this->commit();
+
+                    break; // transaction was successfully completed, so we cancel the loop here -> no restart required
+                } catch (\Exception $e) {
+                    try {
+                        $this->rollBack();
+                    } catch (\Exception $er) {
+                        // PDO adapter throws exceptions if rollback fails
+                        Logger::error($er);
+                    }
+
+                    // we try to start the transaction $maxRetries times again (deadlocks, ...)
+                    if ($retries < ($maxRetries - 1)) {
+                        $run = $retries + 1;
+                        $waitTime = rand(1, 5) * 100000; // microseconds
+                        Logger::warn('Unable to finish transaction (' . $run . ". run) because of the following reason '" . $e->getMessage() . "'. --> Retrying in " . $waitTime . ' microseconds ... (' . ($run + 1) . ' of ' . $maxRetries . ')');
+
+                        usleep($waitTime); // wait specified time until we restart the transaction
+                    } else {
+                        // if the transaction still fail after $maxRetries retries, we throw out the exception
+                        throw $e;
+                    }
                 }
             }
-        }
 
-        $additionalTags = [];
-        if (isset($updatedChildren) && is_array($updatedChildren)) {
-            foreach ($updatedChildren as $documentId) {
-                $tag = 'document_' . $documentId;
-                $additionalTags[] = $tag;
+            $additionalTags = [];
+            if (isset($updatedChildren) && is_array($updatedChildren)) {
+                foreach ($updatedChildren as $documentId) {
+                    $tag = 'document_' . $documentId;
+                    $additionalTags[] = $tag;
 
-                // remove the child also from registry (internal cache) to avoid path inconsistencies during long running scripts, such as CLI
-                \Pimcore\Cache\Runtime::set($tag, null);
+                    // remove the child also from registry (internal cache) to avoid path inconsistencies during long running scripts, such as CLI
+                    \Pimcore\Cache\Runtime::set($tag, null);
+                }
             }
-        }
-        $this->clearDependentCache($additionalTags);
+            $this->clearDependentCache($additionalTags);
 
-        if ($isUpdate) {
-            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_UPDATE, new DocumentEvent($this));
-        } else {
-            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_ADD, new DocumentEvent($this));
-        }
+            if ($isUpdate) {
+                $updateEvent = new DocumentEvent($this);
+                if ($differentOldPath) {
+                    $updateEvent->setArgument('oldPath', $differentOldPath);
+                }
+                \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_UPDATE, $updateEvent);
+            } else {
+                \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_ADD, new DocumentEvent($this));
+            }
 
-        return $this;
+            return $this;
+        } catch (\Exception $e) {
+            $failureEvent = new DocumentEvent($this);
+            $failureEvent->setArgument('exception', $e);
+            if ($isUpdate) {
+                \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_UPDATE_FAILURE, $failureEvent);
+            } else {
+                \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_ADD_FAILURE, $failureEvent);
+            }
+
+            throw $e;
+        }
     }
 
     /**
@@ -585,8 +583,9 @@ class Document extends Element\AbstractElement
         }
 
         // save dependencies
-        $d = $this->getDependencies();
-        $d->clean();
+        $d = new Dependency();
+        $d->setSourceType('document');
+        $d->setSourceId($this->getId());
 
         foreach ($this->resolveDependencies() as $requirement) {
             if ($requirement['id'] == $this->getId() && $requirement['type'] == 'document') {
@@ -600,7 +599,7 @@ class Document extends Element\AbstractElement
 
         $this->getDao()->update();
 
-        //set object to registry
+        //set document to registry
         \Pimcore\Cache\Runtime::set('document_' . $this->getId(), $this);
     }
 
@@ -657,13 +656,13 @@ class Document extends Element\AbstractElement
      */
     public function setChildren($children)
     {
-        $this->childs=$children;
+        $this->childs = $children;
         if (is_array($children) and count($children) > 0) {
-            $this->hasChilds=true;
+            $this->hasChilds = true;
         } elseif ($children === null) {
             $this->hasChilds = null;
         } else {
-            $this->hasChilds=false;
+            $this->hasChilds = false;
         }
 
         return $this;
@@ -693,19 +692,21 @@ class Document extends Element\AbstractElement
     /**
      * Returns true if the document has at least one child
      *
+     * @param $unpublished
+     *
      * @return bool
      */
-    public function hasChildren()
+    public function hasChildren($unpublished = false)
     {
         if (is_bool($this->hasChilds)) {
             if (($this->hasChilds and empty($this->childs)) or (!$this->hasChilds and !empty($this->childs))) {
-                return $this->getDao()->hasChildren();
+                return $this->getDao()->hasChildren($unpublished);
             } else {
                 return $this->hasChilds;
             }
         }
 
-        return $this->getDao()->hasChildren();
+        return $this->getDao()->hasChildren($unpublished);
     }
 
     /**
@@ -778,43 +779,58 @@ class Document extends Element\AbstractElement
     }
 
     /**
-     * Deletes the document
+     * @param bool $isNested
+     *
+     * @throws \Exception
      */
-    public function delete()
+    public function delete(bool $isNested = false)
     {
         \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_DELETE, new DocumentEvent($this));
 
-        // remove childs
-        if ($this->hasChildren()) {
-            // delete also unpublished children
-            $unpublishedStatus = self::doHideUnpublished();
-            self::setHideUnpublished(false);
-            foreach ($this->getChildren(true) as $child) {
-                $child->delete();
+        $this->beginTransaction();
+
+        try {
+            // remove childs
+            if ($this->hasChildren()) {
+                // delete also unpublished children
+                $unpublishedStatus = self::doHideUnpublished();
+                self::setHideUnpublished(false);
+                foreach ($this->getChildren(true) as $child) {
+                    $child->delete(true);
+                }
+                self::setHideUnpublished($unpublishedStatus);
             }
-            self::setHideUnpublished($unpublishedStatus);
+
+            // remove all properties
+            $this->getDao()->deleteAllProperties();
+
+            // remove permissions
+            $this->getDao()->deleteAllPermissions();
+
+            // remove dependencies
+            $d = $this->getDependencies();
+            $d->cleanAllForElement($this);
+
+            // remove translations
+            $service = new Document\Service;
+            $service->removeTranslation($this);
+
+            $this->getDao()->delete();
+
+            $this->commit();
+        } catch (\Exception $e) {
+            $this->rollBack();
+            $failureEvent = new DocumentEvent($this);
+            $failureEvent->setArgument('exception', $e);
+            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_DELETE_FAILURE, $failureEvent);
+            Logger::error($e);
+            throw $e;
         }
-
-        // remove all properties
-        $this->getDao()->deleteAllProperties();
-
-        // remove permissions
-        $this->getDao()->deleteAllPermissions();
-
-        // remove dependencies
-        $d = $this->getDependencies();
-        $d->cleanAllForElement($this);
-
-        // remove translations
-        $service = new Document\Service;
-        $service->removeTranslation($this);
-
-        $this->getDao()->delete();
 
         // clear cache
         $this->clearDependentCache();
 
-        //set object to registry
+        //clear document from registry
         \Pimcore\Cache\Runtime::set('document_' . $this->getId(), null);
 
         \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_DELETE, new DocumentEvent($this));
@@ -877,7 +893,7 @@ class Document extends Element\AbstractElement
 
             // TODO using the container directly is discouraged, maybe we find a better way (e.g. moving this into a service)?
             $request = \Pimcore::getContainer()->get('pimcore.http.request_helper')->getRequest();
-            $scheme  = $request->getScheme() . '://';
+            $scheme = $request->getScheme() . '://';
 
             /** @var Site $site */
             if ($site = FrontendTool::getSiteForDocument($this)) {
@@ -1348,15 +1364,15 @@ class Document extends Element\AbstractElement
     {
         $finalVars = [];
         $parentVars = parent::__sleep();
+        $blockedVars = ['dependencies', 'userPermissions', 'hasChilds', 'versions', 'scheduledTasks', 'parent'];
 
         if (isset($this->_fulldump)) {
             // this is if we want to make a full dump of the object (eg. for a new version), including childs for recyclebin
-            $blockedVars = ['dependencies', 'userPermissions', 'hasChilds', 'versions', 'scheduledTasks', 'parent'];
             $finalVars[] = '_fulldump';
             $this->removeInheritedProperties();
         } else {
             // this is if we want to cache the object
-            $blockedVars = ['dependencies', 'userPermissions', 'childs', 'hasChilds', 'versions', 'scheduledTasks', 'properties', 'parent'];
+            $blockedVars = array_merge($blockedVars, ['childs', 'properties']);
         }
 
         foreach ($parentVars as $key) {
@@ -1431,5 +1447,65 @@ class Document extends Element\AbstractElement
     public function doRenderWithLegacyStack()
     {
         return false;
+    }
+
+    /**
+     * Add document type to the $types array. It defines additional document types available in Pimcore.
+     *
+     * @param $type
+     */
+    public static function addDocumentType($type)
+    {
+        if (!in_array($type, self::$types)) {
+            self::$types[] = $type;
+        }
+    }
+
+    /**
+     * Set true if want to hide documents.
+     *
+     * @param bool $hideUnpublished
+     */
+    public static function setHideUnpublished($hideUnpublished)
+    {
+        self::$hideUnpublished = $hideUnpublished;
+    }
+
+    /**
+     * Checks if unpublished documents should be hidden.
+     *
+     * @return bool
+     */
+    public static function doHideUnpublished()
+    {
+        return self::$hideUnpublished;
+    }
+
+    /**
+     * @param mixed $userPermissions
+     */
+    public function setUserPermissions($userPermissions): void
+    {
+        $this->userPermissions = $userPermissions;
+    }
+
+    /**
+     * @return int
+     */
+    public function getVersionCount(): int
+    {
+        return $this->versionCount ? $this->versionCount : 0;
+    }
+
+    /**
+     * @param int|null $versionCount
+     *
+     * @return Document
+     */
+    public function setVersionCount(?int $versionCount): ElementInterface
+    {
+        $this->versionCount = (int) $versionCount;
+
+        return $this;
     }
 }

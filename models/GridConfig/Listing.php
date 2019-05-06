@@ -21,6 +21,7 @@ use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\GridConfig\Listing\Dao getDao()
+ * @method Model\GridConfig[] load()
  */
 class Listing extends Model\Listing\AbstractListing
 {
@@ -29,26 +30,14 @@ class Listing extends Model\Listing\AbstractListing
      *
      * @var array
      */
-    public $gridconfigs = [];
-
-    /**
-     * Tests if the given key is an valid order key to sort the results
-     *
-     * @param $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-    }
+    public $gridConfigs = [];
 
     /**
      * @return array
      */
     public function getGridConfigs()
     {
-        return $this->gridconfigs;
+        return $this->gridConfigs;
     }
 
     /**

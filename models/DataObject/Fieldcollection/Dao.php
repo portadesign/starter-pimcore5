@@ -17,8 +17,12 @@
 
 namespace Pimcore\Model\DataObject\Fieldcollection;
 
+use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data\CustomResourcePersistingInterface;
+use Pimcore\Model\DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface;
+use Pimcore\Tool;
 
 /**
  * @property \Pimcore\Model\DataObject\Fieldcollection $model
@@ -27,10 +31,13 @@ class Dao extends Model\Dao\AbstractDao
 {
     /**
      * @param DataObject\Concrete $object
+     * @param $params mixed
+     *
+     * @return whether an insert should be done
      */
-    public function save(DataObject\Concrete $object)
+    public function save(DataObject\Concrete $object, $params = [])
     {
-        $this->delete($object);
+        return $this->delete($object, true);
     }
 
     /**
@@ -69,23 +76,45 @@ class Dao extends Model\Dao\AbstractDao
                 $collection->setObject($object);
 
                 foreach ($fieldDefinitions as $key => $fd) {
-                    if (method_exists($fd, 'load')) {
-                        // datafield has it's own loader
-                        $value = $fd->load(
-                            $collection,
-                            [
-                                'context' => [
-                                    'object' => $object,
-                                    'containerType' => 'fieldcollection',
-                                    'containerKey' => $type,
-                                    'fieldname' =>  $this->model->getFieldname(),
-                                    'index' => $result['index']
-                            ]]
-                        );
-                        if ($value === 0 || !empty($value)) {
-                            $collection->setValue($key, $value);
+                    if ($fd instanceof CustomResourcePersistingInterface || method_exists($fd, 'load')) {
+                        if (!$fd instanceof CustomResourcePersistingInterface) {
+                            Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'load', CustomResourcePersistingInterface::class);
                         }
-                    } else {
+
+                        $doLoad = true;
+                        if ($fd instanceof DataObject\ClassDefinition\Data\Relations\AbstractRelations) {
+                            if (!DataObject\Concrete::isLazyLoadingDisabled() && $fd->getLazyLoading()) {
+                                $doLoad = false;
+                            }
+                        }
+
+                        if ($doLoad) {
+                            // datafield has it's own loader
+                            $value = $fd->load(
+                                $collection,
+                                [
+                                    'context' => [
+                                        'object' => $object,
+                                        'containerType' => 'fieldcollection',
+                                        'containerKey' => $type,
+                                        'fieldname' => $this->model->getFieldname(),
+                                        'index' => $result['index']
+                                    ]]
+                            );
+
+                            if ($value === 0 || !empty($value)) {
+                                $collection->setValue($key, $value);
+
+                                if ($collection instanceof DataObject\DirtyIndicatorInterface) {
+                                    $collection->markFieldDirty($key, false);
+                                }
+                            }
+                        }
+                    }
+                    if ($fd instanceof ResourcePersistenceAwareInterface || method_exists($fd, 'getDataFromResource')) {
+                        if (!$fd instanceof ResourcePersistenceAwareInterface) {
+                            Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'getDataFromResource', ResourcePersistenceAwareInterface::class);
+                        }
                         if (is_array($fd->getColumnType())) {
                             $multidata = [];
                             foreach ($fd->getColumnType() as $fkey => $fvalue) {
@@ -116,11 +145,15 @@ class Dao extends Model\Dao\AbstractDao
 
     /**
      * @param DataObject\Concrete $object
+     * @param $saveMode true if called from save method
+     *
+     * @return whether relational data should be inserted or not
      */
-    public function delete(DataObject\Concrete $object)
+    public function delete(DataObject\Concrete $object, $saveMode = false)
     {
         // empty or create all relevant tables
         $fieldDef = $object->getClass()->getFieldDefinition($this->model->getFieldname(), ['suppressEnrichment' => true]);
+        $hasLocalizedFields = false;
 
         foreach ($fieldDef->getAllowedTypes() as $type) {
             try {
@@ -128,6 +161,10 @@ class Dao extends Model\Dao\AbstractDao
                 $definition = DataObject\Fieldcollection\Definition::getByKey($type);
             } catch (\Exception $e) {
                 continue;
+            }
+
+            if ($definition->getFieldDefinition('localizedfields')) {
+                $hasLocalizedFields = true;
             }
 
             $tableName = $definition->getTableName($object->getClass());
@@ -151,7 +188,7 @@ class Dao extends Model\Dao\AbstractDao
                         'fieldname' => $this->model->getFieldname()
                     ]);
                 } catch (\Exception $e) {
-                    \Logger::error($e);
+                    Logger::error($e);
                 }
             }
 
@@ -159,14 +196,25 @@ class Dao extends Model\Dao\AbstractDao
 
             if (is_array($childDefinitions)) {
                 foreach ($childDefinitions as $fd) {
-                    if (method_exists($fd, 'delete')) {
+                    if (!DataObject\AbstractObject::isDirtyDetectionDisabled() && $this->model instanceof DataObject\DirtyIndicatorInterface) {
+                        if ($fd instanceof DataObject\ClassDefinition\Data\Relations\AbstractRelations && !$this->model->isFieldDirty(
+                                '_self'
+                            )) {
+                            continue;
+                        }
+                    }
+
+                    if ($fd instanceof CustomResourcePersistingInterface || method_exists($fd, 'delete')) {
+                        if (!$fd instanceof CustomResourcePersistingInterface) {
+                            Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'delete', CustomResourcePersistingInterface::class);
+                        }
                         $fd->delete(
                             $object,
                             [
                                 'context' => [
                                     'containerType' => 'fieldcollection',
                                     'containerKey' => $type,
-                                    'fieldname' =>  $this->model->getFieldname()
+                                    'fieldname' => $this->model->getFieldname()
                                 ]
                             ]
                         );
@@ -175,11 +223,30 @@ class Dao extends Model\Dao\AbstractDao
             }
         }
 
+        if (!$this->model->isFieldDirty('_self') && !DataObject\AbstractObject::isDirtyDetectionDisabled()) {
+            return [];
+        }
+        $whereLocalizedFields = "(ownertype = 'localizedfield' AND "
+            . $this->db->quoteInto('ownername LIKE ?', '/fieldcollection~'
+                . $this->model->getFieldname() . '/%')
+            . ' AND ' . $this->db->quoteInto('src_id = ?', $object->getId()). ')';
+
+        if ($saveMode) {
+            if (!DataObject\AbstractObject::isDirtyDetectionDisabled() && !$this->model->hasDirtyFields() && $hasLocalizedFields) {
+                // always empty localized fields
+                $this->db->deleteWhere('object_relations_' . $object->getClassId(), $whereLocalizedFields);
+
+                return ['saveLocalizedRelations' => true];
+            }
+        }
+
+        $where = "(ownertype = 'fieldcollection' AND " . $this->db->quoteInto('ownername = ?', $this->model->getFieldname())
+            . ' AND ' . $this->db->quoteInto('src_id = ?', $object->getId()) . ')'
+            . ' OR ' . $whereLocalizedFields;
+
         // empty relation table
-        $this->db->deleteWhere(
-            'object_relations_' . $object->getClassId(),
-            "(ownertype = 'fieldcollection' AND " . $this->db->quoteInto('ownername = ?', $this->model->getFieldname()) . ' AND ' . $this->db->quoteInto('src_id = ?', $object->getId()) . ')'
-            . " OR (ownertype = 'localizedfield' AND " . $this->db->quoteInto('ownername LIKE ?', '/fieldcollection~' . $this->model->getFieldname() . '/%') . ' AND ' . $this->db->quoteInto('src_id = ?', $object->getId()). ')'
-        );
+        $this->db->deleteWhere('object_relations_' . $object->getClassId(), $where);
+
+        return ['saveFieldcollectionRelations' => true, 'saveLocalizedRelations' => true];
     }
 }

@@ -17,9 +17,12 @@
 
 namespace Pimcore\Model\DataObject\Objectbrick;
 
+use Pimcore\Cache\Runtime;
 use Pimcore\File;
+use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Tool;
 
 /**
  * @method \Pimcore\Model\DataObject\Objectbrick\Definition\Dao getDao()
@@ -37,6 +40,16 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
      * @var array
      */
     private $oldClassDefinitions = [];
+
+    /**
+     * @var string
+     */
+    public $title;
+
+    /**
+     * @var string
+     */
+    public $group;
 
     /**
      * @param $classDefinitions
@@ -65,7 +78,7 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
      *
      * @param $key
      *
-     * @return mixed
+     * @return self
      */
     public static function getByKey($key)
     {
@@ -97,11 +110,58 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
     /**
      * @throws \Exception
      */
-    public function save()
+    public function checkTablenames()
+    {
+        $tables = [];
+        $key = $this->getKey();
+        if (!$this->getFieldDefinitions()) {
+            return;
+        }
+        $isLocalized = $this->getFieldDefinition('localizedfields') ? true : false;
+
+        $classDefinitions = $this->getClassDefinitions();
+        $validLanguages = Tool::getValidLanguages();
+        foreach ($classDefinitions as $classDef) {
+            $classname = $classDef['classname'];
+
+            $class = DataObject\ClassDefinition::getByName($classname);
+
+            if (!$class) {
+                Logger::error('class ' . $classname . " doesn't exist anymore");
+                continue;
+            }
+
+            $tables[] = 'object_brick_query_' . $key .  '_' . $class->getId();
+            $tables[] = 'object_brick_store_' . $key .  '_' . $class->getId();
+            if ($isLocalized) {
+                foreach ($validLanguages as $validLanguage) {
+                    $tables[] = 'object_brick_localized_query_' . $key . '_' . $class->getId() . '_' . $validLanguage;
+                    $tables[] = 'object_brick_localized_' . $key . '_' . $class->getId() . '_' . $validLanguage;
+                }
+            }
+        }
+
+        array_multisort(array_map('strlen', $tables), $tables);
+        $longestTablename = end($tables);
+
+        $length = strlen($longestTablename);
+        if ($length > 64) {
+            throw new \Exception('table name ' . $longestTablename . ' would be too long. Max length is 64. Current length would be ' .  $length . '.');
+        }
+    }
+
+    /**
+     * @param bool $saveDefinitionFile
+     *
+     * @throws \Exception
+     */
+    public function save($saveDefinitionFile = true)
     {
         if (!$this->getKey()) {
             throw new \Exception('A object-brick needs a key to be saved!');
         }
+
+        $this->checkTablenames();
 
         $definitionFile = $this->getDefinitionFile();
 
@@ -122,21 +182,25 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
 
         $this->cleanupOldFiles($definitionFile);
 
-        $clone = clone $this;
-        $clone->setDao(null);
-        unset($clone->oldClassDefinitions);
-        unset($clone->fieldDefinitions);
+        if ($saveDefinitionFile) {
+            $clone = clone $this;
+            $clone->setDao(null);
+            unset($clone->oldClassDefinitions);
+            unset($clone->fieldDefinitions);
 
-        $exportedClass = var_export($clone, true);
+            DataObject\ClassDefinition::cleanupForExport($clone->layoutDefinitions);
 
-        $data = '<?php ';
-        $data .= "\n\n";
-        $data .= $infoDocBlock;
-        $data .= "\n\n";
+            $exportedClass = var_export($clone, true);
 
-        $data .= "\nreturn " . $exportedClass . ";\n";
+            $data = '<?php ';
+            $data .= "\n\n";
+            $data .= $infoDocBlock;
+            $data .= "\n\n";
 
-        \Pimcore\File::put($definitionFile, $data);
+            $data .= "\nreturn " . $exportedClass . ";\n";
+
+            \Pimcore\File::put($definitionFile, $data);
+        }
 
         $extendClass = 'DataObject\\Objectbrick\\Data\\AbstractData';
         if ($this->getParentClass()) {
@@ -155,16 +219,32 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         $cd .= 'use Pimcore\\Model\\DataObject;';
         $cd .= "\n\n";
 
-        $cd .= 'class ' . ucfirst($this->getKey()) . ' extends ' . $extendClass . '  {';
+        $cd .= 'class ' . ucfirst($this->getKey()) . ' extends ' . $extendClass . ' implements \\Pimcore\\Model\\DataObject\\DirtyIndicatorInterface {';
         $cd .= "\n\n";
 
-        $cd .= 'public $type = "' . $this->getKey() . "\";\n";
+        $cd .= "\n\n";
+        $cd .= 'use \\Pimcore\\Model\\DataObject\\Traits\\DirtyIndicatorTrait;';
+        $cd .= "\n\n";
+
+        $cd .= 'protected $type = "' . $this->getKey() . "\";\n";
 
         if (is_array($this->getFieldDefinitions()) && count($this->getFieldDefinitions())) {
             foreach ($this->getFieldDefinitions() as $key => $def) {
-                $cd .= 'public $' . $key . ";\n";
+                $cd .= 'protected $' . $key . ";\n";
             }
         }
+
+        $cd .= "\n\n";
+
+        $cd .= '/**' ."\n";
+        $cd .= '* ' . ucfirst($this->getKey()) . ' constructor.' . "\n";
+        $cd .= '* @param DataObject\Concrete $object' . "\n";
+        $cd .= '*/' . "\n";
+
+        $cd .= 'public function __construct(DataObject\Concrete $object) {' . "\n";
+        $cd .= "\t" . 'parent::__construct($object);' . "\n";
+        $cd .= "\t" .'$this->markFieldDirty("_self");' . "\n";
+        $cd .= '}' . "\n";
 
         $cd .= "\n\n";
 
@@ -182,10 +262,54 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         $cd .= "}\n";
         $cd .= "\n";
 
-        File::put($this->getPhpClassFile(), $cd);
+        File::putPhpFile($this->getPhpClassFile(), $cd);
+        $cacheKey = 'objectbrick_' . $this->getKey();
+        // for localized fields getting a fresh copy
+        Runtime::set($cacheKey, $this);
 
         $this->createContainerClasses();
         $this->updateDatabase();
+    }
+
+    /**
+     * @param $definitions
+     *
+     * @return array
+     */
+    protected function buildClassList($definitions)
+    {
+        $result = [];
+        foreach ($definitions as $definition) {
+            $result[] = $definition['classname'] . '-' . $definition['fieldname'];
+        }
+
+        return $result;
+    }
+
+    /** Returns a list of classes which need to be "rebuild" because they are affected of changes.
+     * @param $oldObject
+     *
+     * @return array
+     */
+    protected function getClassesToCleanup($oldObject)
+    {
+        $oldDefinitions = $oldObject->getClassDefinitions() ? $oldObject->getClassDefinitions() : [];
+        $newDefinitions = $this->getClassDefinitions() ? $this->getClassDefinitions() : [];
+
+        $old = $this->buildClassList($oldDefinitions);
+        $new = $this->buildClassList($newDefinitions);
+
+        $diff1 = array_diff($old, $new);
+        $diff2 = array_diff($new, $old);
+
+        $diff = array_merge($diff1, $diff2);
+        $result = [];
+        foreach ($diff as $item) {
+            $parts = explode('-', $item);
+            $result[] = ['classname' => $parts[0], 'fieldname' => $parts[1]];
+        }
+
+        return $result;
     }
 
     /**
@@ -200,7 +324,9 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         }
 
         if ($oldObject && !empty($oldObject->classDefinitions)) {
-            foreach ($oldObject->classDefinitions as $cl) {
+            $classlist = $this->getClassesToCleanup($oldObject);
+
+            foreach ($classlist as $cl) {
                 $this->oldClassDefinitions[$cl['classname']] = $cl['classname'];
                 $class = DataObject\ClassDefinition::getByName($cl['classname']);
                 if ($class) {
@@ -266,6 +392,29 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
     }
 
     /**
+     * @param DataObject\ClassDefinition $class
+     *
+     * @return array
+     */
+    private function getAllowedTypesWithFieldname(DataObject\ClassDefinition $class)
+    {
+        $result = [];
+        $fieldDefinitions = $class->getFieldDefinitions();
+        foreach ($fieldDefinitions as $fd) {
+            if (!$fd instanceof DataObject\ClassDefinition\Data\Objectbricks) {
+                continue;
+            }
+
+            $allowedTypes = $fd->getAllowedTypes() ? $fd->getAllowedTypes() : [];
+            foreach ($allowedTypes as $allowedType) {
+                $result[] = $fd->getName() . '-' . $allowedType;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * @throws \Exception
      *
      * @todo: creates a PHP-Dock with "@return void" (line 351)
@@ -284,12 +433,23 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
                 if (!$fd) {
                     throw new \Exception('Could not resolve field definition for ' . $cl['fieldname']);
                 }
-                $allowedTypes = $fd->getAllowedTypes();
+
+                $old = $this->getAllowedTypesWithFieldname($class);
+
+                $allowedTypes = $fd->getAllowedTypes() ? $fd->getAllowedTypes() : [];
+
                 if (!in_array($this->key, $allowedTypes)) {
                     $allowedTypes[] = $this->key;
                 }
+
                 $fd->setAllowedTypes($allowedTypes);
-                $class->save();
+                $new = $this->getAllowedTypesWithFieldname($class);
+
+                if (array_diff($new, $old) || array_diff($old, $new)) {
+                    $class->save();
+                } else {
+                    Logger::debug('Objectbrick ' . $this->getKey() . ', no change for class ' . $class->getName());
+                }
             }
         }
 
@@ -330,10 +490,10 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
                 $cd .= "\n\n";
 
                 foreach ($brickKeys as $brickKey) {
-                    $cd .= 'public $' . $brickKey . " = null;\n\n";
+                    $cd .= 'protected $' . $brickKey . " = null;\n\n";
 
                     $cd .= '/**' . "\n";
-                    $cd .= '* @return \\Pimcore\\Model\\DataObject\\Objectbrick\\Data\\' . $brickKey . "\n";
+                    $cd .= '* @return \\Pimcore\\Model\\DataObject\\Objectbrick\\Data\\' . ucfirst($brickKey) . "\n";
                     $cd .= '*/' . "\n";
                     $cd .= 'public function get' . ucfirst($brickKey) . "() { \n";
 
@@ -350,12 +510,12 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
                     $cd .= "}\n\n";
 
                     $cd .= '/**' . "\n";
-                    $cd .= '* @param \\Pimcore\\Model\\DataObject\\Objectbrick\\Data\\' . $brickKey . ' $' . $brickKey . "\n";
-                    $cd .= "* @return void\n";
+                    $cd .= '* @param \\Pimcore\\Model\\DataObject\\Objectbrick\\Data\\' . ucfirst($brickKey) . ' $' . $brickKey . "\n";
+                    $cd .= '* @return \\'.$namespace.'\\'.$className."\n";
                     $cd .= '*/' . "\n";
                     $cd .= 'public function set' . ucfirst($brickKey) . ' (' . '$' . $brickKey . ") {\n";
                     $cd .= "\t" . '$this->' . $brickKey . ' = ' . '$' . $brickKey . ";\n";
-                    $cd .= "\t" . 'return $this;' . ";\n";
+                    $cd .= "\t" . 'return $this' . ";\n";
                     $cd .= "}\n\n";
                 }
 
@@ -455,7 +615,7 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         }
     }
 
-    public function doEnrichFieldDefinition($fieldDefinition, $context = [])
+    protected function doEnrichFieldDefinition($fieldDefinition, $context = [])
     {
         if (method_exists($fieldDefinition, 'enrichFieldDefinition')) {
             $context['containerType'] = 'objectbrick';
@@ -486,5 +646,21 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         $classFile = $classFolder . '/' . ucfirst($this->getKey()) . '.php';
 
         return $classFile;
+    }
+
+    /**
+     * @return string
+     */
+    public function getTitle()
+    {
+        return $this->title;
+    }
+
+    /**
+     * @param string $title
+     */
+    public function setTitle($title)
+    {
+        $this->title = $title;
     }
 }

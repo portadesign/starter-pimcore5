@@ -22,6 +22,7 @@ use Pimcore\Model\Tool\Targeting\TargetGroup;
 
 /**
  * @method Listing\Dao getDao()
+ * @method TargetGroup[] load()
  */
 class Listing extends Model\Listing\AbstractListing
 {
@@ -31,18 +32,6 @@ class Listing extends Model\Listing\AbstractListing
      * @var TargetGroup[]
      */
     public $targetGroups = [];
-
-    /**
-     * Tests if the given key is an valid order key to sort the results
-     *
-     * @param $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key): bool
-    {
-        return true;
-    }
 
     /**
      * @param TargetGroup[] $targetGroups

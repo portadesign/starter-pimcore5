@@ -23,8 +23,9 @@ use Pimcore\Model\DataObject;
 /**
  * @method \Pimcore\Model\DataObject\Data\ElementMetadata\Dao getDao()
  */
-class ElementMetadata extends Model\AbstractModel
+class ElementMetadata extends Model\AbstractModel implements DataObject\OwnerAwareFieldInterface
 {
+    use DataObject\Traits\OwnerAwareFieldTrait;
     /**
      * @var string
      */
@@ -48,7 +49,7 @@ class ElementMetadata extends Model\AbstractModel
     /**
      * @var array
      */
-    public $data = [];
+    protected $data = [];
 
     /**
      * @param $fieldname
@@ -72,6 +73,7 @@ class ElementMetadata extends Model\AbstractModel
     {
         $this->elementType = $elementType;
         $this->elementId = $elementId;
+        $this->markMeDirty();
     }
 
     /**
@@ -98,6 +100,7 @@ class ElementMetadata extends Model\AbstractModel
             $key = strtolower(substr($name, 3, strlen($name) - 3));
             if (in_array($key, $this->columns)) {
                 $this->data[$key] = $arguments[0];
+                $this->markMeDirty();
             } else {
                 throw new \Exception("Requested data $key not available");
             }
@@ -109,28 +112,30 @@ class ElementMetadata extends Model\AbstractModel
      * @param string $ownertype
      * @param $ownername
      * @param $position
+     * @param $index
      */
-    public function save($object, $ownertype = 'object', $ownername, $position)
+    public function save($object, $ownertype = 'object', $ownername, $position, $index)
     {
         $element = $this->getElement();
         $type = Model\Element\Service::getElementType($element);
-        $this->getDao()->save($object, $ownertype, $ownername, $position, $type);
+        $this->getDao()->save($object, $ownertype, $ownername, $position, $index, $type);
     }
 
     /**
      * @param DataObject\Concrete $source
-     * @param $destination
+     * @param $destinationId
      * @param $fieldname
      * @param $ownertype
      * @param $ownername
      * @param $position
-     * @param $type
+     * @param $index
+     * @param $destinationType
      *
      * @return mixed
      */
-    public function load(DataObject\Concrete $source, $destinationId, $fieldname, $ownertype, $ownername, $position, $destinationType)
+    public function load(DataObject\Concrete $source, $destinationId, $fieldname, $ownertype, $ownername, $position, $index, $destinationType)
     {
-        return $this->getDao()->load($source, $destinationId, $fieldname, $ownertype, $ownername, $position, $destinationType);
+        return $this->getDao()->load($source, $destinationId, $fieldname, $ownertype, $ownername, $position, $index, $destinationType);
     }
 
     /**
@@ -141,6 +146,7 @@ class ElementMetadata extends Model\AbstractModel
     public function setFieldname($fieldname)
     {
         $this->fieldname = $fieldname;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -160,6 +166,7 @@ class ElementMetadata extends Model\AbstractModel
      */
     public function setElement($element)
     {
+        $this->markMeDirty();
         if (!$element) {
             $this->setElementTypeAndId(null, null);
 
@@ -212,6 +219,7 @@ class ElementMetadata extends Model\AbstractModel
     public function setColumns($columns)
     {
         $this->columns = $columns;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -222,6 +230,23 @@ class ElementMetadata extends Model\AbstractModel
     public function getColumns()
     {
         return $this->columns;
+    }
+
+    /**
+     * @return array
+     */
+    public function getData(): array
+    {
+        return $this->data;
+    }
+
+    /**
+     * @param array $data
+     */
+    public function setData(array $data): void
+    {
+        $this->data = $data;
+        $this->markMeDirty();
     }
 
     /**

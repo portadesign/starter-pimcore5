@@ -19,6 +19,7 @@ namespace Pimcore\Model\Document;
 
 use Egulias\EmailValidator\EmailValidator;
 use Egulias\EmailValidator\Validation\RFCValidation;
+use Pimcore\Helper\Mail;
 use Pimcore\Model;
 
 /**
@@ -31,49 +32,49 @@ class Email extends Model\Document\PageSnippet
      *
      * @var string
      */
-    public $type = 'email';
+    protected $type = 'email';
 
     /**
      * Contains the email subject
      *
      * @var string
      */
-    public $subject = '';
+    protected $subject = '';
 
     /**
      * Contains the from email address
      *
      * @var string
      */
-    public $from = '';
+    protected $from = '';
 
     /**
      * Contains the reply to email addresses
      *
      * @var string
      */
-    public $replyTo = '';
+    protected $replyTo = '';
 
     /**
      * Contains the email addresses of the recipients
      *
      * @var string
      */
-    public $to = '';
+    protected $to = '';
 
     /**
      * Contains the carbon copy recipients
      *
      * @var string
      */
-    public $cc = '';
+    protected $cc = '';
 
     /**
      * Contains the blind carbon copy recipients
      *
      * @var string
      */
-    public $bcc = '';
+    protected $bcc = '';
 
     /**
      * Contains the email subject
@@ -126,6 +127,8 @@ class Email extends Model\Document\PageSnippet
     /**
      * Returns the "to" receivers as array
      *
+     * @deprecated use \Pimcore\Helper\Mail::parseEmailAddressField instead
+     *
      * @return array
      */
     public function getToAsArray()
@@ -138,17 +141,18 @@ class Email extends Model\Document\PageSnippet
      *
      * @param $key
      *
+     * @deprecated use \Pimcore\Helper\Mail::parseEmailAddressField instead
+     *
      * @return array
      */
     protected function getAsArray($key)
     {
-        $emailAddresses = preg_split('/,|;/', $this->{'get' . ucfirst($key)}());
+        $parsedAddresses = Mail::parseEmailAddressField($this->{'get' . ucfirst($key)}());
+        $emailAddresses = [];
 
-        foreach ($emailAddresses as $key => $emailAddress) {
-            if ($validAddress = self::validateEmailAddress(trim($emailAddress))) {
-                $emailAddresses[$key] = $validAddress;
-            } else {
-                unset($emailAddresses[$key]);
+        foreach ($parsedAddresses as $emailInfo) {
+            if ($validAddress = self::validateEmailAddress($emailInfo['email'])) {
+                $emailAddresses[] = $emailInfo['email'];
             }
         }
 
@@ -203,13 +207,15 @@ class Email extends Model\Document\PageSnippet
     /**
      * Returns the "from" email address as array
      *
+     * @deprecated use \Pimcore\Helper\Mail::parseEmailAddressField instead
+     *
      * @return array
      */
     public function getFromAsArray()
     {
         $emailAddresses = preg_split('/,|;/', $this->getFrom());
 
-        return $emailAddresses;
+        return array_map('trim', $emailAddresses);
     }
 
     /**
@@ -239,6 +245,8 @@ class Email extends Model\Document\PageSnippet
     /**
      * Returns the "replyTo" email address as array
      *
+     * @deprecated use \Pimcore\Helper\Mail::parseEmailAddressField instead
+     *
      * @return array
      */
     public function getReplyToAsArray()
@@ -249,7 +257,7 @@ class Email extends Model\Document\PageSnippet
 
         $emailAddresses = preg_split('/,|;/', $this->getReplyTo());
 
-        return $emailAddresses;
+        return array_map('trim', $emailAddresses);
     }
 
     /**
@@ -278,6 +286,8 @@ class Email extends Model\Document\PageSnippet
 
     /**
      * Returns the carbon copy receivers as array
+     *
+     * @deprecated use \Pimcore\Helper\Mail::parseEmailAddressField instead
      *
      * @return array
      */
@@ -312,6 +322,8 @@ class Email extends Model\Document\PageSnippet
 
     /**
      * Returns the blind carbon copy receivers as array
+     *
+     * @deprecated use \Pimcore\Helper\Mail::parseEmailAddressField instead
      *
      * @return array
      */

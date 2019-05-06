@@ -19,8 +19,16 @@ namespace Pimcore\Model\Schedule\Maintenance;
 
 use Pimcore\Model\Tool\Lock;
 
+/**
+ * @deprecated Usage of Job is deprecated since Pimcore 5.7 and will be removed in 6.0. Please use Tagged Services now for Maintenance tasks
+ */
 class Job
 {
+    /**
+     * By default, 24h expire timestamp.
+     */
+    const EXPIRE_TIMESTAMP = 86400;
+
     /**
      * @var string
      */
@@ -37,25 +45,37 @@ class Job
     private $arguments = [];
 
     /**
+     * @var int
+     */
+    private $expire = self::EXPIRE_TIMESTAMP;
+
+    /**
      * @param string $id
      * @param mixed $callable
      * @param array|null $arguments
+     * @param int $expire
      */
-    public function __construct(string $id, $callable, array $arguments = [])
+    public function __construct(string $id, $callable, array $arguments = [], int $expire = self::EXPIRE_TIMESTAMP)
     {
-        $this->id        = $id;
-        $this->callable  = $callable;
+        $this->id = $id;
+        $this->callable = $callable;
         $this->arguments = $arguments;
+        $this->expire = $expire;
+
+        trigger_error(
+            'Usage of Job is deprecated since Pimcore 5.7 and will be removed in 6.0. Please use Tagged Services now for Maintenance tasks',
+            E_USER_DEPRECATED
+        );
     }
 
-    public static function fromMethodCall(string $id, $object, string $method, array $arguments = []): Job
+    public static function fromMethodCall(string $id, $object, string $method, array $arguments = [], int $expire = self::EXPIRE_TIMESTAMP): Job
     {
-        return new static($id, [$object, $method], $arguments);
+        return new static($id, [$object, $method], $arguments, $expire);
     }
 
-    public static function fromClosure(string $id, \Closure $closure, array $arguments = []): Job
+    public static function fromClosure(string $id, \Closure $closure, array $arguments = [], int $expire = self::EXPIRE_TIMESTAMP): Job
     {
-        return new static($id, $closure, $arguments);
+        return new static($id, $closure, $arguments, $expire);
     }
 
     public function getId(): string
@@ -80,7 +100,7 @@ class Job
 
     public function isLocked(): bool
     {
-        return Lock::isLocked($this->getLockKey(), 86400); // 24h expire
+        return Lock::isLocked($this->getLockKey(), $this->expire);
     }
 
     public function execute()

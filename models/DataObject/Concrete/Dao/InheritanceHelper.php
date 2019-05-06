@@ -17,7 +17,7 @@
 
 namespace Pimcore\Model\DataObject\Concrete\Dao;
 
-use Pimcore\Db\Connection;
+use Pimcore\Db\ConnectionInterface;
 use Pimcore\Model\DataObject;
 
 class InheritanceHelper
@@ -33,7 +33,7 @@ class InheritanceHelper
     const ID_FIELD = 'oo_id';
 
     /**
-     * @var Connection
+     * @var ConnectionInterface
      */
     protected $db;
 
@@ -403,7 +403,7 @@ class InheritanceHelper
             return $node;
         }
 
-        $objectRelationsResult =  $this->db->fetchAll('SELECT fieldname, count(*) as COUNT FROM ' . $this->relationtable . " WHERE src_id = ? AND fieldname IN('" . implode("','", array_keys($this->relations)) . "') GROUP BY fieldname;", [$node->id]);
+        $objectRelationsResult = $this->db->fetchAll('SELECT fieldname, count(*) as COUNT FROM ' . $this->relationtable . " WHERE src_id = ? AND fieldname IN('" . implode("','", array_keys($this->relations)) . "') GROUP BY fieldname;", [$node->id]);
 
         $objectRelations = [];
         if (!empty($objectRelationsResult)) {

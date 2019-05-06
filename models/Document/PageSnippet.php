@@ -26,49 +26,49 @@ use Pimcore\Model\Document;
 
 /**
  * @method \Pimcore\Model\Document\PageSnippet\Dao getDao()
+ * @method \Pimcore\Model\Version getLatestVersion()
  */
 abstract class PageSnippet extends Model\Document
 {
     use Document\Traits\ScheduledTasksTrait;
+    /**
+     * @var string
+     */
+    protected $module;
 
     /**
      * @var string
      */
-    public $module;
+    protected $controller = 'default';
 
     /**
      * @var string
      */
-    public $controller = 'default';
+    protected $action = 'default';
 
     /**
      * @var string
      */
-    public $action = 'default';
-
-    /**
-     * @var string
-     */
-    public $template;
+    protected $template;
 
     /**
      * Contains all content-elements of the document
      *
      * @var array
      */
-    public $elements = null;
+    protected $elements = null;
 
     /**
      * Contains all versions of the document
      *
      * @var array
      */
-    public $versions = null;
+    protected $versions = null;
 
     /**
      * @var null|int
      */
-    public $contentMasterDocumentId;
+    protected $contentMasterDocumentId;
 
     /**
      * @var array
@@ -78,10 +78,10 @@ abstract class PageSnippet extends Model\Document
     /**
      * @var bool
      */
-    public $legacy = false;
+    protected $legacy = false;
 
     /**
-     * @params array $params additional parameters (e.g. "versionNote" for the version note)
+     * @param array $params additional parameters (e.g. "versionNote" for the version note)
      *
      * @throws \Exception
      */
@@ -117,73 +117,85 @@ abstract class PageSnippet extends Model\Document
 
     /**
      * @param bool $setModificationDate
-     * @param bool $callPluginHook
+     * @param bool $saveOnlyVersion
      * @param $versionNote string version note
      *
      * @return null|Model\Version
      *
      * @throws \Exception
      */
-    public function saveVersion($setModificationDate = true, $callPluginHook = true, $versionNote = null)
+    public function saveVersion($setModificationDate = true, $saveOnlyVersion = true, $versionNote = null)
     {
+        try {
+            // hook should be also called if "save only new version" is selected
+            if ($saveOnlyVersion) {
+                \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_UPDATE, new DocumentEvent($this, [
+                    'saveVersionOnly' => true
+                ]));
+            }
 
-        // hook should be also called if "save only new version" is selected
-        if ($callPluginHook) {
-            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::PRE_UPDATE, new DocumentEvent($this, [
-                'saveVersionOnly' => true
+            // set date
+            if ($setModificationDate) {
+                $this->setModificationDate(time());
+            }
+
+            // scheduled tasks are saved always, they are not versioned!
+            $this->saveScheduledTasks();
+
+            // create version
+            $version = null;
+
+            // only create a new version if there is at least 1 allowed
+            // or if saveVersion() was called directly (it's a newer version of the object)
+            if (Config::getSystemConfig()->documents->versions->steps
+                || Config::getSystemConfig()->documents->versions->days
+                || $setModificationDate) {
+                $version = $this->doSaveVersion($versionNote, $saveOnlyVersion);
+            }
+
+            // hook should be also called if "save only new version" is selected
+            if ($saveOnlyVersion) {
+                \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_UPDATE, new DocumentEvent($this, [
+                    'saveVersionOnly' => true
+                ]));
+            }
+
+            return $version;
+        } catch (\Exception $e) {
+            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_UPDATE_FAILURE, new DocumentEvent($this, [
+                'saveVersionOnly' => true,
+                'exception' => $e
             ]));
+
+            throw $e;
         }
-
-        // set date
-        if ($setModificationDate) {
-            $this->setModificationDate(time());
-        }
-
-        // scheduled tasks are saved always, they are not versioned!
-        $this->saveScheduledTasks();
-
-        // create version
-        $version = null;
-
-        // only create a new version if there is at least 1 allowed
-        // or if saveVersion() was called directly (it's a newer version of the object)
-        if (Config::getSystemConfig()->documents->versions->steps
-            || Config::getSystemConfig()->documents->versions->days
-            || $setModificationDate) {
-            $version = new Model\Version();
-            $version->setCid($this->getId());
-            $version->setCtype('document');
-            $version->setDate($this->getModificationDate());
-            $version->setUserId($this->getUserModification());
-            $version->setData($this);
-            $version->setNote($versionNote);
-            $version->save();
-        }
-
-        // hook should be also called if "save only new version" is selected
-        if ($callPluginHook) {
-            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_UPDATE, new DocumentEvent($this, [
-                'saveVersionOnly' => true
-            ]));
-        }
-
-        return $version;
     }
 
     /**
-     * @see Document::delete
+     * @inheritdoc
      */
-    public function delete()
+    public function delete(bool $isNested = false)
     {
-        $versions = $this->getVersions();
-        foreach ($versions as $version) {
-            $version->delete();
+        $this->beginTransaction();
+
+        try {
+            $versions = $this->getVersions();
+            foreach ($versions as $version) {
+                $version->delete();
+            }
+
+            // remove all tasks
+            $this->getDao()->deleteAllTasks();
+
+            parent::delete(true);
+
+            $this->commit();
+        } catch (\Exception $e) {
+            $this->rollBack();
+            \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_DELETE_FAILURE, new DocumentEvent($this));
+            Logger::error($e);
+            throw $e;
         }
-
-        // remove all tasks
-        $this->getDao()->deleteAllTasks();
-
-        parent::delete();
     }
 
     /**
@@ -331,7 +343,7 @@ abstract class PageSnippet extends Model\Document
     {
         try {
             if ($type) {
-                $loader  = \Pimcore::getContainer()->get('pimcore.implementation_loader.document.tag');
+                $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.document.tag');
                 $element = $loader->build($type);
 
                 $this->elements[$name] = $element;
@@ -431,7 +443,7 @@ abstract class PageSnippet extends Model\Document
             $contentMasterDocument = null;
         }
 
-        if ($contentMasterDocumentId == $this->getId()) {
+        if ($contentMasterDocumentId && $contentMasterDocumentId == $this->getId()) {
             throw new \Exception('You cannot use the current document as a master document, please choose a different one.');
         }
 
@@ -450,10 +462,16 @@ abstract class PageSnippet extends Model\Document
 
     /**
      * @return Document
+     *
+     * @throws \Exception
      */
     public function getContentMasterDocument()
     {
-        return Document::getById($this->getContentMasterDocumentId());
+        if ($masterDocumentId = $this->getContentMasterDocumentId()) {
+            return Document::getById($masterDocumentId);
+        }
+
+        return null;
     }
 
     /**
@@ -590,5 +608,41 @@ abstract class PageSnippet extends Model\Document
     public function setLegacy($legacy)
     {
         $this->legacy = (bool) $legacy;
+    }
+
+    /**
+     * @param null $hostname
+     * @param null $scheme
+     *
+     * @return string
+     *
+     * @throws \Exception
+     */
+    public function getUrl($hostname = null, $scheme = null)
+    {
+        if (!$scheme) {
+            $scheme = 'http://';
+            $requestHelper = \Pimcore::getContainer()->get('pimcore.http.request_helper');
+            if ($requestHelper->hasMasterRequest()) {
+                $scheme = $requestHelper->getMasterRequest()->getScheme() . '://';
+            }
+        }
+
+        if (!$hostname) {
+            if (!$hostname = \Pimcore\Config::getSystemConfig()->general->domain) {
+                if (!$hostname = \Pimcore\Tool::getHostname()) {
+                    throw new \Exception('No hostname available');
+                }
+            }
+        }
+
+        $url = $scheme . $hostname . $this->getFullPath();
+
+        $site = \Pimcore\Tool\Frontend::getSiteForDocument($this);
+        if ($site instanceof Model\Site && $site->getMainDomain()) {
+            $url = $scheme . $site->getMainDomain() . preg_replace('@^' . $site->getRootPath() . '/?@', '/', $this->getRealFullPath());
+        }
+
+        return $url;
     }
 }

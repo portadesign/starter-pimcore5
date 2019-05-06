@@ -26,6 +26,8 @@ use Pimcore\Model\DataObject;
  */
 class Dao extends Model\Dao\AbstractDao
 {
+    use DataObject\ClassDefinition\Helper\Dao;
+
     /**
      * @var null
      */
@@ -49,7 +51,10 @@ class Dao extends Model\Dao\AbstractDao
 
     public function save()
     {
-        $object = $this->model->object;
+        if (!DataObject\AbstractObject::isDirtyDetectionDisabled() && !$this->model->hasDirtyFields()) {
+            return;
+        }
+        $object = $this->model->getObject();
         $objectId = $object->getId();
         $dataTable = $this->getDataTableName();
         $fieldname = $this->model->getFieldname();
@@ -80,8 +85,12 @@ class Dao extends Model\Dao\AbstractDao
                     if ($fd instanceof DataObject\ClassDefinition\Data\Password) {
                         $value = $fd->getDataForResource($value, null, []);
                         $this->model->setLocalizedKeyValue($groupId, $keyId, $value, $language);
+                    } elseif ($fd instanceof DataObject\ClassDefinition\Data\EncryptedField) {
+                        $value = $fd->getDataForResource($value, $object, ['skipEncryption' => true]);
+                        $delegate = $fd->getDelegate();
+                        $value = new DataObject\Data\EncryptedField($delegate, $value);
                     } else {
-                        $value = $fd->getDataForResource($value, $this->model->object);
+                        $value = $fd->getDataForResource($value, $this->model->getObject());
                     }
                     $value = $fd->marshal($value, $object);
 
@@ -114,7 +123,7 @@ class Dao extends Model\Dao\AbstractDao
 
     public function delete()
     {
-        $object = $this->model->object;
+        $object = $this->model->getObject();
         $objectId = $object->getId();
         $dataTable = $this->getDataTableName();
         $groupsTable = $this->getGroupsTableName();
@@ -159,7 +168,7 @@ class Dao extends Model\Dao\AbstractDao
             $fd = Service::getFieldDefinitionFromKeyConfig($keyConfig);
             $value = $fd->unmarshal($value, $object);
 
-            $value = $fd->getDataFromResource($value, $object);
+            $value = $fd->getDataFromResource($value, $object, ['skipDecryption' => true]);
 
             $language = $item['language'];
             $classificationStore->setLocalizedKeyValue($groupId, $keyId, $value, $language);
@@ -178,6 +187,7 @@ class Dao extends Model\Dao\AbstractDao
 
         $classificationStore->setActiveGroups($list);
         $classificationStore->setGroupCollectionMappings($groupCollectionMapping);
+        $classificationStore->resetDirtyMap();
     }
 
     public function createUpdateTable()
@@ -213,5 +223,7 @@ class Dao extends Model\Dao\AbstractDao
         ) DEFAULT CHARSET=utf8mb4;');
 
         $this->tableDefinitions = null;
+
+        $this->handleEncryption($this->model->getClass(), [$groupsTable, $dataTable]);
     }
 }

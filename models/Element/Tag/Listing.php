@@ -20,7 +20,10 @@ namespace Pimcore\Model\Element\Tag;
 use Pimcore\Model;
 
 /**
- * @method \Pimcore\Model\Element\Tag\Listing\Dao getDao()
+ * @method Model\Element\Tag\Listing\Dao getDao()
+ * @method Model\Element\Tag[] load()
+ * @method int[] loadIdList()
+ * @method int getTotalCount()
  */
 class Listing extends Model\Listing\AbstractListing
 {
@@ -30,20 +33,6 @@ class Listing extends Model\Listing\AbstractListing
      * @var array
      */
     public $tags = [];
-
-    /**
-     * Tests if the given key is an valid order key to sort the results
-     *
-     * @todo remove the dummy-always-true rule
-     *
-     * @param $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-    }
 
     /**
      * @param $tags

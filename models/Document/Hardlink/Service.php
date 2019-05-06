@@ -38,18 +38,19 @@ class Service
                 $destDoc->setPath($doc->getRealPath());
                 $destDoc->initDao(get_class($sourceDoc), true);
                 $destDoc->setHardLinkSource($doc);
+                $destDoc->setSourceDocument($sourceDoc);
 
                 return $destDoc;
             }
         } else {
-            $sourceClass = get_class($doc);
-            $doc = self::upperCastDocument($doc);
-            $doc->initDao($sourceClass, true);
+            $destDoc = self::upperCastDocument($doc);
+            $destDoc->initDao(get_class($doc), true);
+            $destDoc->setSourceDocument($doc);
 
-            return $doc;
+            return $destDoc;
         }
 
-        return;
+        return null;
     }
 
     /**
@@ -63,7 +64,7 @@ class Service
     {
         $to_class = 'Pimcore\\Model\\Document\\Hardlink\\Wrapper\\' . ucfirst($doc->getType());
 
-        $old_serialized_prefix  = 'O:'.strlen(get_class($doc));
+        $old_serialized_prefix = 'O:'.strlen(get_class($doc));
         $old_serialized_prefix .= ':"'.get_class($doc).'":';
 
         // unset eventually existing children, because of performance reasons when serializing the document

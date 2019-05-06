@@ -19,10 +19,11 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\Element;
 use Pimcore\Tool;
 
-class Localizedfields extends Model\DataObject\ClassDefinition\Data
+class Localizedfields extends Data implements CustomResourcePersistingInterface
 {
     use Element\ChildsCompatibilityTrait;
 
@@ -86,6 +87,11 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     public $labelWidth;
 
     /**
+     * @var bool
+     */
+    public $provideSplitView;
+
+    /**
      * @var
      */
     public $hideLabelsWhenTabsReached;
@@ -103,13 +109,13 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     public $fieldDefinitionsCache;
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return array
      */
     public function getDataForEditmode($data, $object = null, $params = [])
     {
@@ -140,7 +146,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @param $data
+     * @param $data DataObject\Localizedfield
      * @param $object
      * @param $fieldData
      * @param $metaData
@@ -148,14 +154,35 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
      *
      * @return array
      */
-    private function doGetDataForEditMode($data, $object, &$fieldData, &$metaData, $level = 1, $params)
+    private function doGetDataForEditMode($data, $object, &$fieldData, &$metaData, $level = 1, $params = [])
     {
         $class = $object->getClass();
         $inheritanceAllowed = $class->getAllowInherit();
         $inherited = false;
 
-        foreach ($data->getItems() as $language => $values) {
+        $dataItems = $data->getInternalData(true);
+        foreach ($dataItems as $language => $values) {
             foreach ($this->getFieldDefinitions() as $fd) {
+                if ($fd instanceof Data\Relations\AbstractRelations && !DataObject\Concrete::isLazyLoadingDisabled() && $fd->getLazyLoading()) {
+                    $lazyKey = $fd->getName() . DataObject\LazyLoadedFieldsInterface::LAZY_KEY_SEPARATOR . $language;
+                    if (!$data->isLazyKeyLoaded($lazyKey)) {
+                        $params['language'] = $language;
+                        $params['object'] = $object;
+                        if (!isset($params['context'])) {
+                            $params['context'] = [];
+                        }
+                        $params['context']['object'] = $object;
+
+                        $value = $fd->load($data, $params);
+                        if ($value === 0 || !empty($value)) {
+                            $data->setLocalizedValue($fd->getName(), $value, $language, false);
+                            $values[$fd->getName()] = $value;
+                        }
+
+                        $data->markLazyKeyAsLoaded($lazyKey);
+                    }
+                }
+
                 $key = $fd->getName();
                 $fdata = isset($values[$fd->getName()]) ? $values[$fd->getName()] : null;
 
@@ -199,16 +226,31 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
                 }
 
                 if ($foundEmptyValue) {
+                    $parentData = null;
                     // still some values are passing, ask the parent
-                    $parentData = $parent->getLocalizedFields();
-                    $parentResult = $this->doGetDataForEditMode(
-                        $parentData,
-                        $parent,
-                        $fieldData,
-                        $metaData,
-                        $level + 1,
-                        $params
-                    );
+                    if ($params['context'] && $params['context']['containerType'] == 'objectbrick') {
+                        $brickContainerGetter = 'get' . ucfirst($params['fieldname']);
+                        $brickContainer = $parent->$brickContainerGetter();
+                        $brickGetter = 'get' . ucfirst($params['context']['containerKey']);
+                        $brickData = $brickContainer->$brickGetter();
+                        if ($brickData) {
+                            $parentData = $brickData->getLocalizedFields();
+                        }
+                    } else {
+                        if (method_exists($parent, 'getLocalizedFields')) {
+                            $parentData = $parent->getLocalizedFields();
+                        }
+                    }
+                    if ($parentData) {
+                        $parentResult = $this->doGetDataForEditMode(
+                            $parentData,
+                            $parent,
+                            $fieldData,
+                            $metaData,
+                            $level + 1,
+                            $params
+                        );
+                    }
                 }
             }
         }
@@ -223,13 +265,13 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
-     * @param string $data
+     * @param array $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return DataObject\Localizedfield
      */
     public function getDataFromEditmode($data, $object = null, $params = [])
     {
@@ -241,6 +283,9 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
 
         $context = isset($params['context']) ? $params['context'] : null;
         $localizedFields->setContext($context);
+        if ($object) {
+            $localizedFields->setObject($object);
+        }
 
         if (is_array($data)) {
             foreach ($data as $language => $fields) {
@@ -270,7 +315,12 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         $result = new \stdClass();
         foreach ($this->getFieldDefinitions() as $fd) {
             $key = $fd->getName();
-            $result->$key = $object->{'get'.ucfirst($fd->getName())}();
+            $context = $params['context'];
+            if ($context && $context['containerType'] == 'objectbrick') {
+                $result->$key = 'NOT SUPPORTED';
+            } else {
+                $result->$key = $object->{'get' . ucfirst($fd->getName())}();
+            }
             if (method_exists($fd, 'getDataForGrid')) {
                 $result->$key = $fd->getDataForGrid($result->$key, $object, $params);
             }
@@ -280,7 +330,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param string $data
      * @param null|DataObject\AbstractObject $object
@@ -334,7 +384,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         $lfData = $this->getDataFromObjectParam($object);
 
         if ($lfData instanceof DataObject\Localizedfield) {
-            foreach ($lfData->getItems() as $language => $values) {
+            foreach ($lfData->getInternalData(true) as $language => $values) {
                 foreach ($values as $lData) {
                     if (is_string($lData)) {
                         $dataString .= $lData.' ';
@@ -354,7 +404,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
      */
     public function getForWebserviceExport($object, $params = [])
     {
-        $data = $object->{$this->getName()};
+        $data = $object->getObjectVar($this->getName());
         $wsData = [];
 
         $items = null;
@@ -362,7 +412,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         if (!$data instanceof DataObject\Localizedfield) {
             $items = [];
         } else {
-            $items = $data->getItems();
+            $items = $data->getInternalData(true);
         }
 
         $user = Tool\Admin::getCurrentUser();
@@ -438,7 +488,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
             }
 
             if ($object instanceof DataObject\Concrete) {
-                $localizedFields->setObject($object);
+                $localizedFields->setObject($object, false);
             }
 
             $user = Tool\Admin::getCurrentUser();
@@ -605,13 +655,19 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     {
         $localizedFields = $this->getDataFromObjectParam($object, $params);
         if ($localizedFields instanceof DataObject\Localizedfield) {
-            if ($object instanceof DataObject\Fieldcollection\Data\AbstractData) {
+            if ((!isset($params['newParent']) || !$params['newParent']) && isset($params['isUpdate']) && $params['isUpdate'] && !$localizedFields->hasDirtyLanguages()) {
+                return;
+            }
+
+            if ($object instanceof DataObject\Fieldcollection\Data\AbstractData || $object instanceof DataObject\Objectbrick\Data\AbstractData) {
                 $object = $object->getObject();
             }
-            $localizedFields->setObject($object);
+
+            $localizedFields->setObject($object, false);
             $context = isset($params['context']) ? $params['context'] : null;
             $localizedFields->setContext($context);
-            $localizedFields->save();
+            $localizedFields->loadLazyData();
+            $localizedFields->save($params);
         }
     }
 
@@ -623,7 +679,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
      */
     public function load($object, $params = [])
     {
-        if ($object instanceof DataObject\Fieldcollection\Data\AbstractData) {
+        if ($object instanceof DataObject\Fieldcollection\Data\AbstractData || $object instanceof DataObject\Objectbrick\Data\AbstractData) {
             $object = $object->getObject();
         }
 
@@ -632,6 +688,9 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         $context = isset($params['context']) ? $params['context'] : null;
         $localizedFields->setContext($context);
         $localizedFields->load($object, $params);
+
+        $localizedFields->resetDirtyMap();
+        $localizedFields->resetLanguageDirtyMap();
 
         return $localizedFields;
     }
@@ -648,7 +707,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
             $localizedFields->setObject($object);
             $context = isset($params['context']) ? $params['context'] : null;
             $localizedFields->setContext($context);
-            $localizedFields->delete();
+            $localizedFields->delete(true, false);
         }
     }
 
@@ -664,7 +723,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         $localizedFields->setClass($class);
         $context = isset($params['context']) ? $params['context'] : null;
         $localizedFields->setContext($context);
-        $localizedFields->createUpdateTable();
+        $localizedFields->createUpdateTable($params);
 
         foreach ($this->getFieldDefinitions() as $fd) {
             if (method_exists($fd, 'classSaved')) {
@@ -683,15 +742,25 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
      */
     public function preGetData($container, $params = [])
     {
-        if (!$container instanceof DataObject\Concrete && !$container instanceof DataObject\Fieldcollection\Data\AbstractData) {
-            throw new \Exception('Localized Fields are only valid in Objects and Fieldcollections');
+        if (!$container instanceof DataObject\Concrete && !$container instanceof DataObject\Fieldcollection\Data\AbstractData
+                    && !$container instanceof DataObject\Objectbrick\Data\AbstractData) {
+            throw new \Exception('Localized Fields are only valid in Objects, Fieldcollections and Objectbricks');
         }
 
-        if (!$container->localizedfields instanceof DataObject\Localizedfield) {
+        $lf = $container->getObjectVar('localizedfields');
+        if (!$lf instanceof DataObject\Localizedfield) {
             $lf = new DataObject\Localizedfield();
 
             $object = $container;
-            if ($container instanceof DataObject\Fieldcollection\Data\AbstractData) {
+            if ($container instanceof DataObject\Objectbrick\Data\AbstractData) {
+                $object = $container->getObject();
+
+                $context = [
+                    'containerType' => 'objectbrick',
+                    'containerKey' => $container->getType(),
+                ];
+                $lf->setContext($context);
+            } elseif ($container instanceof DataObject\Fieldcollection\Data\AbstractData) {
                 $object = $container->getObject();
 
                 $context = [
@@ -702,10 +771,10 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
             }
             $lf->setObject($object);
 
-            $container->localizedfields = $lf;
+            $container->setObjectVar('localizedfields', $lf);
         }
 
-        return $container->localizedfields;
+        return $container->getObjectVar('localizedfields');
     }
 
     /**
@@ -766,7 +835,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         $fds = $this->getFieldDefinitions($context);
         if (isset($fds[$name])) {
             $fieldDefinition = $fds[$name];
-            if (isset($context['suppressEnrichment']) && $context['suppressEnrichment']) {
+            if (!\Pimcore::inAdmin() || (isset($context['suppressEnrichment']) && $context['suppressEnrichment'])) {
                 return $fieldDefinition;
             }
 
@@ -796,7 +865,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
             $this->fieldDefinitionsCache = $definitions;
         }
 
-        if (isset($context['suppressEnrichment']) && $context['suppressEnrichment']) {
+        if (!\Pimcore::inAdmin() || (isset($context['suppressEnrichment']) && $context['suppressEnrichment'])) {
             return $this->fieldDefinitionsCache;
         }
 
@@ -811,7 +880,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         return $enrichedFieldDefinitions;
     }
 
-    public function doEnrichFieldDefinition($fieldDefinition, $context = [])
+    protected function doEnrichFieldDefinition($fieldDefinition, $context = [])
     {
         if (method_exists($fieldDefinition, 'enrichFieldDefinition')) {
             $context['class'] = $this;
@@ -870,7 +939,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
             return $tags;
         }
 
-        foreach ($data->getItems() as $language => $values) {
+        foreach ($data->getInternalData(true) as $language => $values) {
             foreach ($this->getFieldDefinitions() as $fd) {
                 $tags = $fd->getCacheTags($values[$fd->getName()], $tags);
             }
@@ -892,7 +961,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
             return [];
         }
 
-        foreach ($data->getItems() as $language => $values) {
+        foreach ($data->getInternalData(true) as $language => $values) {
             foreach ($this->getFieldDefinitions() as $fd) {
                 $dependencies = array_merge($dependencies, $fd->resolveDependencies($values[$fd->getName()]));
             }
@@ -944,21 +1013,19 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     /**
      * @param string $name
      *
-     * @return $this|void
+     * @return $this|Data
+     *
+     * @throws \Exception
      */
     public function setName($name)
     {
+        if ($name !== 'localizedfields') {
+            throw new \Exception('Localizedfields can only be named `localizedfields`, no other names are allowed');
+        }
+
         $this->name = $name;
 
         return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getName()
-    {
-        return $this->name;
     }
 
     /**
@@ -979,26 +1046,6 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     public function getRegion()
     {
         return $this->region;
-    }
-
-    /**
-     * @param string $title
-     *
-     * @return $this|void
-     */
-    public function setTitle($title)
-    {
-        $this->title = $title;
-
-        return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getTitle()
-    {
-        return $this->title;
     }
 
     /**
@@ -1037,16 +1084,28 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         }
 
         $data = $this->getDataForValidity($data, $languages);
+        $validationExceptions = [];
         if (!$omitMandatoryCheck) {
             foreach ($languages as $language) {
                 foreach ($this->getFieldDefinitions() as $fd) {
-                    if (isset($data[$language]) && isset($data[$language][$fd->getName()])) {
-                        $fd->checkValidity($data[$language][$fd->getName()]);
-                    } else {
-                        $fd->checkValidity(null);
+                    try {
+                        if (isset($data[$language]) && isset($data[$language][$fd->getName()])) {
+                            $fd->checkValidity($data[$language][$fd->getName()]);
+                        } else {
+                            $fd->checkValidity(null);
+                        }
+                    } catch (Model\Element\ValidationException $ve) {
+                        $ve->addContext($this->getName() . '-' . $language);
+                        $validationExceptions[] = $ve;
                     }
                 }
             }
+        }
+
+        if (count($validationExceptions) > 0) {
+            $aggregatedExceptions = new Model\Element\ValidationException();
+            $aggregatedExceptions->setSubItems($validationExceptions);
+            throw $aggregatedExceptions;
         }
     }
 
@@ -1058,11 +1117,10 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
      */
     protected function getDataForValidity($localizedObject, array $languages)
     {
-        //TODO verify if in any place in the code \Pimcore\Model\DataObject\ClassDefinition\Data\Localizedfields::checkValidity is used with different parameter then DataObject\Localizedfield
-        if (!$localizedObject->object
-            || $localizedObject->object->getType() != 'variant'
+        if (!$localizedObject->getObject()
+            || $localizedObject->getObject()->getType() != 'variant'
             || !$localizedObject instanceof DataObject\Localizedfield) {
-            return $localizedObject->getItems();
+            return $localizedObject->getInternalData(true);
         }
 
         //prepare data for variants
@@ -1094,7 +1152,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
             return [];
         }
 
-        foreach ($data->getItems() as $language => $values) {
+        foreach ($data->getInternalData(true) as $language => $values) {
             foreach ($this->getFieldDefinitions() as $fd) {
                 $fieldname = $fd->getName();
 
@@ -1132,7 +1190,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
      * @param null $object
      * @param mixed $params
      *
-     * @return null|\Pimcore_Date
+     * @return DataObject\Localizedfield
      */
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
@@ -1141,7 +1199,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
 
         // get existing data
         if ($localFields instanceof DataObject\Localizedfield) {
-            $localData = $localFields->getItems();
+            $localData = $localFields->getInternalData(true);
         }
 
         $mapping = [];
@@ -1293,6 +1351,22 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         return $this->labelWidth;
     }
 
+    /**
+     * @return bool
+     */
+    public function getProvideSplitView()
+    {
+        return $this->provideSplitView;
+    }
+
+    /**
+     * @param bool $provideSplitView
+     */
+    public function setProvideSplitView($provideSplitView): void
+    {
+        $this->provideSplitView = $provideSplitView;
+    }
+
     /** Encode value for packing it into a single column.
      * @param mixed $value
      * @param Model\DataObject\AbstractObject $object
@@ -1303,7 +1377,7 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
     public function marshal($value, $object = null, $params = [])
     {
         if ($value instanceof DataObject\Localizedfield) {
-            $items = $value->getItems();
+            $items = $value->getInternalData();
             if (is_array($items)) {
                 $result = [];
                 foreach ($items as $language => $languageData) {
@@ -1366,5 +1440,13 @@ class Localizedfields extends Model\DataObject\ClassDefinition\Data
         }
 
         return $lf;
+    }
+
+    /**
+     * @return bool
+     */
+    public function supportsDirtyDetection()
+    {
+        return true;
     }
 }

@@ -14,8 +14,11 @@
 
 namespace Pimcore\Model\Search\Backend\Data;
 
+use Pimcore\Model\Search\Backend\Data;
+
 /**
  * @method \Pimcore\Model\Search\Backend\Data\Listing\Dao getDao()
+ * @method Data[] load()
  */
 class Listing extends \Pimcore\Model\Listing\AbstractListing
 {
@@ -23,22 +26,6 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing
      * @var array
      */
     public $entries;
-
-    /**
-     * @var array
-     */
-    public $validOrderKeys = [
-        'id',
-        'fullpath',
-        'maintype',
-        'type',
-        'subtype',
-        'published',
-        'creationDate',
-        'modificationDate',
-        'userOwner',
-        'userModification'
-    ];
 
     /**
      * @return array
@@ -66,19 +53,5 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing
     public function __construct()
     {
         $this->initDao('\\Pimcore\\Model\\Search\\Backend\\Data\\Listing');
-    }
-
-    /**
-     * @param string $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        if (in_array($key, $this->validOrderKeys)) {
-            return true;
-        }
-
-        return false;
     }
 }

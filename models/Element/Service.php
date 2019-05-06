@@ -17,6 +17,7 @@
 
 namespace Pimcore\Model\Element;
 
+use Pimcore\Db;
 use Pimcore\Db\ZendCompatibility\QueryBuilder;
 use Pimcore\Event\SystemEvents;
 use Pimcore\File;
@@ -52,7 +53,7 @@ class Service extends Model\AbstractModel
         }
 
         if ($ne) {
-            $path = self::getIdPath($ne, $path);
+            $path = self::getIdPath($ne);
         }
 
         if ($element) {
@@ -82,7 +83,7 @@ class Service extends Model\AbstractModel
         }
 
         if ($ne) {
-            $path = self::getTypePath($ne, $path);
+            $path = self::getTypePath($ne);
         }
 
         if ($element) {
@@ -110,7 +111,7 @@ class Service extends Model\AbstractModel
      * @param $list array | \Pimcore\Model\Listing\AbstractListing
      * @param string $idGetter
      *
-     * @return array
+     * @return int[]
      */
     public static function getIdList($list, $idGetter = 'getId')
     {
@@ -138,13 +139,13 @@ class Service extends Model\AbstractModel
      *
      * @return array
      */
-    public static function getRequiredByDependenciesForFrontend(Dependency $d)
+    public static function getRequiredByDependenciesForFrontend(Dependency $d, $offset, $limit)
     {
         $dependencies['hasHidden'] = false;
         $dependencies['requiredBy'] = [];
 
         // requiredBy
-        foreach ($d->getRequiredBy() as $r) {
+        foreach ($d->getRequiredBy($offset, $limit) as $r) {
             if ($e = self::getDependedElement($r)) {
                 if ($e->isAllowed('list')) {
                     $dependencies['requiredBy'][] = self::getDependencyForFrontend($e);
@@ -162,13 +163,13 @@ class Service extends Model\AbstractModel
      *
      * @return array
      */
-    public static function getRequiresDependenciesForFrontend(Dependency $d)
+    public static function getRequiresDependenciesForFrontend(Dependency $d, $offset, $limit)
     {
         $dependencies['hasHidden'] = false;
         $dependencies['requires'] = [];
 
         // requires
-        foreach ($d->getRequires() as $r) {
+        foreach ($d->getRequires($offset, $limit) as $r) {
             if ($e = self::getDependedElement($r)) {
                 if ($e->isAllowed('list')) {
                     $dependencies['requires'][] = self::getDependencyForFrontend($e);
@@ -236,6 +237,91 @@ class Service extends Model\AbstractModel
         }
 
         return false;
+    }
+
+    /**
+     * @param $data
+     *
+     * @return array
+     *
+     * @throws \Exception
+     */
+    public static function filterUnpublishedAdvancedElements($data)
+    {
+        if (DataObject\AbstractObject::doHideUnpublished() and is_array($data)) {
+            $publishedList = [];
+            $mapping = [];
+            foreach ($data as $advancedElement) {
+                if (!$advancedElement instanceof DataObject\Data\ObjectMetadata
+                    && !$advancedElement instanceof DataObject\Data\ElementMetadata) {
+                    throw new \Exception('only supported for advanced many-to-many (+object) relations');
+                }
+
+                $elementId = null;
+                if ($advancedElement instanceof DataObject\Data\ObjectMetadata) {
+                    $elementId = $advancedElement->getObjectId();
+                    $elementType = 'object';
+                } else {
+                    $elementId = $advancedElement->getElementId();
+                    $elementType = $advancedElement->getElementType();
+                }
+
+                if (!$elementId) {
+                    continue;
+                }
+                if ($elementType == 'asset') {
+                    // there is no published flag for assets
+                    continue;
+                }
+                $mapping[$elementType][$elementId] = true;
+            }
+
+            $db = Db::get();
+            $publishedMapping = [];
+
+            // now do the query;
+            foreach ($mapping as $elementType => $idList) {
+                $idList = array_keys($mapping[$elementType]);
+                switch ($elementType) {
+                    case 'document':
+                        $idColumn = 'id';
+                        $publishedColumn = 'published';
+                        break;
+                    case 'object':
+                        $idColumn = 'o_id';
+                        $publishedColumn = 'o_published';
+                        break;
+                    default:
+                        throw new \Exception('unknown type');
+                }
+                $query = 'SELECT ' . $idColumn . ' FROM ' . $elementType . 's WHERE ' . $publishedColumn . '=1 AND ' . $idColumn . ' IN (' . implode(',', $idList) . ');';
+                $publishedIds = $db->fetchCol($query);
+                $publishedMapping[$elementType] = $publishedIds;
+            }
+
+            foreach ($data as $advancedElement) {
+                $elementId = null;
+                if ($advancedElement instanceof DataObject\Data\ObjectMetadata) {
+                    $elementId = $advancedElement->getObjectId();
+                    $elementType = 'object';
+                } else {
+                    $elementId = $advancedElement->getElementId();
+                    $elementType = $advancedElement->getElementType();
+                }
+
+                if ($elementType == 'asset') {
+                    $publishedList[] = $advancedElement;
+                }
+
+                if (isset($publishedMapping[$elementType]) && in_array($elementId, $publishedMapping[$elementType])) {
+                    $publishedList[] = $advancedElement;
+                }
+            }
+
+            return $publishedList;
+        }
+
+        return is_array($data) ? $data : [];
     }
 
     /**
@@ -403,59 +489,6 @@ class Service extends Model\AbstractModel
         $sanityCheck->save();
     }
 
-    public static function runSanityCheck()
-    {
-        $sanityCheck = Sanitycheck::getNext();
-        $count = 0;
-        while ($sanityCheck) {
-            $count++;
-            if ($count % 10 == 0) {
-                \Pimcore::collectGarbage();
-            }
-
-            $element = self::getElementById($sanityCheck->getType(), $sanityCheck->getId());
-            if ($element) {
-                try {
-                    self::performSanityCheck($element);
-                } catch (\Exception $e) {
-                    Logger::error('Element\\Service: sanity check for element with id [ ' . $element->getId() . ' ] and type [ ' . self::getType($element) . ' ] failed');
-                }
-                $sanityCheck->delete();
-            } else {
-                $sanityCheck->delete();
-            }
-            $sanityCheck = Sanitycheck::getNext();
-
-            // reduce load on server
-            Logger::debug('Now timeout for 3 seconds');
-            sleep(3);
-        }
-    }
-
-    /**
-     * @static
-     *
-     * @param ElementInterface $element
-     *
-     * @todo: I think ElementInterface is the wrong type here, it has no getter latestVersion
-     */
-    protected static function performSanityCheck($element)
-    {
-        if ($latestVersion = $element->getLatestVersion()) {
-            if ($latestVersion->getDate() > $element->getModificationDate()) {
-                return;
-            }
-        }
-
-        $element->setUserModification(0);
-        $element->save();
-
-        if ($version = $element->getLatestVersion(true)) {
-            $version->setNote('Sanitycheck');
-            $version->save();
-        }
-    }
-
     /**
      * @static
      *
@@ -484,20 +517,20 @@ class Service extends Model\AbstractModel
             if ($p->getData() instanceof Document || $p->getData() instanceof Asset || $p->getData() instanceof DataObject\AbstractObject) {
                 $pa = [];
 
-                $vars = get_object_vars($p->getData());
+                $vars = $p->getData()->getObjectVars();
 
                 foreach ($vars as $k => $value) {
                     if (in_array($k, $allowedProperties)) {
-                        $pa[$k] = $p->getData()->$k;
+                        $pa[$k] = $value;
                     }
                 }
 
                 // clone it because of caching
                 $tmp = clone $p;
                 $tmp->setData($pa);
-                $properties[$key] = object2array($tmp);
+                $properties[$key] = $tmp->getObjectVars();
             } else {
-                $properties[$key] = object2array($p);
+                $properties[$key] = $p->getObjectVars();
             }
 
             // add config from predefined properties
@@ -593,10 +626,10 @@ class Service extends Model\AbstractModel
         }
 
         // get workspaces
-        $workspaces = $user->{'getWorkspaces'.ucfirst($type)}();
+        $workspaces = $user->{'getWorkspaces' . ucfirst($type)}();
         foreach ($user->getRoles() as $roleId) {
             $role = Model\User\Role::getById($roleId);
-            $workspaces = array_merge($workspaces, $role->{'getWorkspaces'.ucfirst($type)}());
+            $workspaces = array_merge($workspaces, $role->{'getWorkspaces' . ucfirst($type)}());
         }
 
         $forbidden = [];
@@ -618,14 +651,21 @@ class Service extends Model\AbstractModel
      *
      * @param Document|Asset|DataObject\AbstractObject $data
      * @param bool $initial
+     * @param string $key
      *
      * @return mixed
      */
-    public static function renewReferences($data, $initial = true)
+    public static function renewReferences($data, $initial = true, $key = null)
     {
+        if ($data instanceof \__PHP_Incomplete_Class) {
+            Logger::err(sprintf('Renew References: Cannot read data (%s) of incomplete class.', is_null($key) ? 'not available' : $key));
+
+            return null;
+        }
+
         if (is_array($data)) {
-            foreach ($data as &$value) {
-                $value = self::renewReferences($value, false);
+            foreach ($data as $dataKey => &$value) {
+                $value = self::renewReferences($value, false, $dataKey);
             }
 
             return $data;
@@ -653,9 +693,20 @@ class Service extends Model\AbstractModel
                     }
                 }
 
-                $properties = get_object_vars($data);
-                foreach ($properties as $name => $value) {
-                    $data->$name = self::renewReferences($value, false);
+                if ($data instanceof Model\AbstractModel) {
+                    $properties = $data->getObjectVars();
+                    foreach ($properties as $name => $value) {
+                        $data->setObjectVar($name, self::renewReferences($value, false, $name), true);
+                    }
+                } else {
+                    $properties = method_exists($data, 'getObjectVars') ? $data->getObjectVars() : get_object_vars($data);
+                    foreach ($properties as $name => $value) {
+                        if (method_exists($data, 'setObjectVar')) {
+                            $data->setObjectVar($name, self::renewReferences($value, false, $name), true);
+                        } else {
+                            $data->$name = self::renewReferences($value, false, $name);
+                        }
+                    }
                 }
 
                 return $data;
@@ -753,57 +804,60 @@ class Service extends Model\AbstractModel
         $parts = array_filter($parts, '\\Pimcore\\Model\\Element\\Service::filterNullValues');
 
         $sanitizedPath = '/';
+
+        $itemType = self::getElementType(new $type);
+
         foreach ($parts as $part) {
-            $sanitizedPath = $sanitizedPath . self::getValidKey($part, $type) . '/';
+            $sanitizedPath = $sanitizedPath . self::getValidKey($part, $itemType) . '/';
         }
 
-        if (!($foundElement = $type::getByPath($sanitizedPath))) {
-            foreach ($parts as $part) {
-                $pathPart = $pathsArray[count($pathsArray) - 1] ?? '';
-                $pathsArray[] = $pathPart . '/' . self::getValidKey($part, $type);
-            }
+        if (self::pathExists($sanitizedPath, $itemType)) {
+            return $type::getByPath($sanitizedPath);
+        }
 
-            for ($i = 0; $i < count($pathsArray); $i++) {
-                $currentPath = $pathsArray[$i];
-                if (!($type::getByPath($currentPath) instanceof $type)) {
-                    $parentFolderPath = ($i == 0) ? '/' : $pathsArray[$i - 1];
+        foreach ($parts as $part) {
+            $pathPart = $pathsArray[count($pathsArray) - 1] ?? '';
+            $pathsArray[] = $pathPart . '/' . self::getValidKey($part, $itemType);
+        }
 
-                    $parentFolder = $type::getByPath($parentFolderPath);
+        for ($i = 0; $i < count($pathsArray); $i++) {
+            $currentPath = $pathsArray[$i];
+            if (!self::pathExists($currentPath, $itemType)) {
+                $parentFolderPath = ($i == 0) ? '/' : $pathsArray[$i - 1];
 
-                    $folder = new $folderType();
-                    $folder->setParent($parentFolder);
-                    if ($parentFolder) {
-                        $folder->setParentId($parentFolder->getId());
-                    } else {
-                        $folder->setParentId(1);
-                    }
+                $parentFolder = $type::getByPath($parentFolderPath);
 
-                    $key = substr($currentPath, strrpos($currentPath, '/') + 1, strlen($currentPath));
-
-                    if (method_exists($folder, 'setKey')) {
-                        $folder->setKey($key);
-                    }
-
-                    if (method_exists($folder, 'setFilename')) {
-                        $folder->setFilename($key);
-                    }
-
-                    if (method_exists($folder, 'setType')) {
-                        $folder->setType('folder');
-                    }
-
-                    $folder->setPath($currentPath);
-                    $folder->setUserModification(0);
-                    $folder->setUserOwner(1);
-                    $folder->setCreationDate(time());
-                    $folder->setModificationDate(time());
-                    $folder->setValues($options);
-                    $folder->save();
-                    $lastFolder = $folder;
+                $folder = new $folderType();
+                $folder->setParent($parentFolder);
+                if ($parentFolder) {
+                    $folder->setParentId($parentFolder->getId());
+                } else {
+                    $folder->setParentId(1);
                 }
+
+                $key = substr($currentPath, strrpos($currentPath, '/') + 1, strlen($currentPath));
+
+                if (method_exists($folder, 'setKey')) {
+                    $folder->setKey($key);
+                }
+
+                if (method_exists($folder, 'setFilename')) {
+                    $folder->setFilename($key);
+                }
+
+                if (method_exists($folder, 'setType')) {
+                    $folder->setType('folder');
+                }
+
+                $folder->setPath($currentPath);
+                $folder->setUserModification(0);
+                $folder->setUserOwner(1);
+                $folder->setCreationDate(time());
+                $folder->setModificationDate(time());
+                $folder->setValues($options);
+                $folder->save();
+                $lastFolder = $folder;
             }
-        } else {
-            return $foundElement;
         }
 
         return $lastFolder;
@@ -859,7 +913,7 @@ class Service extends Model\AbstractModel
     }
 
     /**
-     * @param $key
+     * @param string $key
      * @param null $type
      *
      * @return mixed|string
@@ -875,6 +929,8 @@ class Service extends Model\AbstractModel
 
         // replace all 4 byte unicode characters
         $key = preg_replace('/[\x{10000}-\x{10FFFF}]/u', '-', $key);
+        // replace slashes with a hyphen
+        $key = str_replace('/', '-', $key);
 
         if ($type == 'document') {
             // no spaces & utf8 for documents / clean URLs
@@ -886,23 +942,46 @@ class Service extends Model\AbstractModel
             // keys shouldn't start with a "." (=hidden file) *nix operating systems
             // keys shouldn't end with a "." - Windows issue: filesystem API trims automatically . at the end of a folder name (no warning ... et al)
             $key = trim($key, '. ');
+
+            // windows forbidden filenames + URL reserved characters (at least the once which are problematic)
+            $key = preg_replace('/[#\?\*\:\\\\<\>\|"%]/', '-', $key);
         } else {
             $key = trim($key);
             $key = ltrim($key, '.');
         }
 
+        $key = mb_substr($key, 0, 255);
+
         return $key;
     }
 
     /**
-     * @param $key
-     * @param $type
+     * @param string $key
+     * @param string $type
      *
      * @return bool
      */
     public static function isValidKey($key, $type)
     {
         return self::getValidKey($key, $type) == $key;
+    }
+
+    /**
+     * @param string $path
+     * @param string $type
+     *
+     * @return bool
+     */
+    public static function isValidPath($path, $type)
+    {
+        $parts = explode('/', $path);
+        foreach ($parts as $part) {
+            if (!self::isValidKey($part, $type)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -932,7 +1011,7 @@ class Service extends Model\AbstractModel
     public static function fixAllowedTypes($data, $type)
     {
         // this is the new method with Ext.form.MultiSelect
-        if ((is_string($data) && !empty($data)) || (is_array($data) && count($data))) {
+        if (is_array($data) && count($data)) {
             $first = reset($data);
             if (!is_array($first)) {
                 $parts = $data;
@@ -970,15 +1049,24 @@ class Service extends Model\AbstractModel
      */
     public static function getSafeVersionInfo($versions)
     {
+        $indexMap = [];
+
         if (is_array($versions)) {
             $versions = json_decode(json_encode($versions), true);
             $result = [];
+            /** @var $version Model\Version */
             foreach ($versions as $version) {
                 $name = $version['user']['name'];
                 $id = $version['user']['id'];
                 unset($version['user']);
                 $version['user']['name'] = $name;
                 $version['user']['id'] = $id;
+                $versionKey = $version['date'] . '-' . $version['versionCount'];
+                if (!isset($indexMap[$versionKey])) {
+                    $indexMap[$versionKey] = 0;
+                }
+                $version['index'] = $indexMap[$versionKey];
+                $indexMap[$versionKey] = $indexMap[$versionKey] + 1;
 
                 $result[] = $version;
             }
@@ -1048,5 +1136,79 @@ class Service extends Model\AbstractModel
         $theCopy->setParent(null);
 
         return $theCopy;
+    }
+
+    /**
+     * @param Note $note
+     *
+     * @return array
+     */
+    public static function getNoteData(Note $note)
+    {
+        $cpath = '';
+        if ($note->getCid() && $note->getCtype()) {
+            if ($element = Service::getElementById($note->getCtype(), $note->getCid())) {
+                $cpath = $element->getRealFullPath();
+            }
+        }
+
+        $e = [
+            'id' => $note->getId(),
+            'type' => $note->getType(),
+            'cid' => $note->getCid(),
+            'ctype' => $note->getCtype(),
+            'cpath' => $cpath,
+            'date' => $note->getDate(),
+            'title' => $note->getTitle(),
+            'description' => $note->getDescription()
+        ];
+
+        // prepare key-values
+        $keyValues = [];
+        if (is_array($note->getData())) {
+            foreach ($note->getData() as $name => $d) {
+                $type = $d['type'];
+                $data = $d['data'];
+
+                if ($type == 'document' || $type == 'object' || $type == 'asset') {
+                    if ($d['data'] instanceof ElementInterface) {
+                        $data = [
+                            'id' => $d['data']->getId(),
+                            'path' => $d['data']->getRealFullPath(),
+                            'type' => $d['data']->getType()
+                        ];
+                    }
+                } elseif ($type == 'date') {
+                    if (is_object($d['data'])) {
+                        $data = $d['data']->getTimestamp();
+                    }
+                }
+
+                $keyValue = [
+                    'type' => $type,
+                    'name' => $name,
+                    'data' => $data
+                ];
+
+                $keyValues[] = $keyValue;
+            }
+        }
+
+        $e['data'] = $keyValues;
+
+        // prepare user data
+        if ($note->getUser()) {
+            $user = Model\User::getById($note->getUser());
+            if ($user) {
+                $e['user'] = [
+                    'id' => $user->getId(),
+                    'name' => $user->getName()
+                ];
+            } else {
+                $e['user'] = '';
+            }
+        }
+
+        return $e;
     }
 }

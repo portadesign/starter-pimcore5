@@ -17,6 +17,8 @@
 
 namespace Pimcore\Model\Translation;
 
+use Pimcore\Event\Model\TranslationEvent;
+use Pimcore\Event\TranslationEvents;
 use Pimcore\File;
 use Pimcore\Model;
 use Pimcore\Tool;
@@ -69,7 +71,7 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
      */
     public function setKey($key)
     {
-        $this->key = self::getValidTranslationKey($key);
+        $this->key = $key;
 
         return $this;
     }
@@ -191,18 +193,6 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
     }
 
     /**
-     * @static
-     *
-     * @param $key
-     *
-     * @return string
-     */
-    protected static function getValidTranslationKey($key)
-    {
-        return $key;
-    }
-
-    /**
      * @param $id
      * @param bool $create
      * @param bool $returnIdIfEmpty
@@ -220,16 +210,14 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
         }
 
         $translation = new static();
-
         $idOriginal = $id;
-
         $languages = static::getLanguages();
 
         try {
-            $translation->getDao()->getByKey(self::getValidTranslationKey($id));
+            $translation->getDao()->getByKey($id);
         } catch (\Exception $e) {
             if (!$create) {
-                throw new \Exception($e->getMessage());
+                return null;
             } else {
                 $translation->setKey($id);
                 $translation->setCreationDate(time());
@@ -288,6 +276,8 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
 
     public function save()
     {
+        \Pimcore::getEventDispatcher()->dispatch(TranslationEvents::PRE_SAVE, new TranslationEvent($this));
+
         if (!$this->getCreationDate()) {
             $this->setCreationDate(time());
         }
@@ -298,13 +288,19 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
 
         $this->getDao()->save();
 
+        \Pimcore::getEventDispatcher()->dispatch(TranslationEvents::POST_SAVE, new TranslationEvent($this));
+
         self::clearDependentCache();
     }
 
     public function delete()
     {
+        \Pimcore::getEventDispatcher()->dispatch(TranslationEvents::PRE_DELETE, new TranslationEvent($this));
+
         $this->getDao()->delete();
         self::clearDependentCache();
+
+        \Pimcore::getEventDispatcher()->dispatch(TranslationEvents::POST_DELETE, new TranslationEvent($this));
     }
 
     /**
@@ -316,12 +312,13 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
      * @param $file - path to the csv file
      * @param bool $replaceExistingTranslations
      * @param array $languages
+     * @param array $dialect
      *
      * @return mixed
      *
      * @throws \Exception
      */
-    public static function importTranslationsFromFile($file, $replaceExistingTranslations = true, $languages = null)
+    public static function importTranslationsFromFile($file, $replaceExistingTranslations = true, $languages = null, $dialect = null)
     {
         $delta = [];
 
@@ -346,8 +343,11 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
             $importFileOriginal = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/import_translations_original';
             File::put($importFileOriginal, $tmpData);
 
-            // determine csv type
-            $dialect = Tool\Admin::determineCsvDialect(PIMCORE_SYSTEM_TEMP_DIRECTORY . '/import_translations_original');
+            // determine csv type if not set
+            if (empty($dialect)) {
+                $dialect = Tool\Admin::determineCsvDialect(PIMCORE_SYSTEM_TEMP_DIRECTORY . '/import_translations_original');
+            }
+
             //read data
             if (($handle = fopen(PIMCORE_SYSTEM_TEMP_DIRECTORY . '/import_translations', 'r')) !== false) {
                 while (($rowData = fgetcsv($handle, 0, $dialect->delimiter, $dialect->quotechar, $dialect->escapechar)) !== false) {
@@ -390,12 +390,12 @@ abstract class AbstractTranslation extends Model\AbstractModel implements Transl
                                             $dirty = true;
                                         }
                                     } elseif ($t->getTranslation($key) != $value && $value) {
-                                        $delta[]=
+                                        $delta[] =
                                             [
                                                 'lg' => $key,
                                                 'key' => $textKey,
                                                 'text' => $t->getTranslation($key),
-                                                'csv' =>  $value
+                                                'csv' => $value
                                             ];
                                     }
                                 }

@@ -18,6 +18,7 @@ use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\WebsiteSetting\Listing\Dao getDao()
+ * @method \Pimcore\Model\WebsiteSetting[] load()
  */
 class Listing extends Model\Listing\JsonListing
 {
@@ -27,18 +28,6 @@ class Listing extends Model\Listing\JsonListing
      * @var array
      */
     public $settings = [];
-
-    /**
-     * Tests if the given key is an valid order key to sort the results
-     *
-     * @param $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-    }
 
     /**
      * @param array $settings

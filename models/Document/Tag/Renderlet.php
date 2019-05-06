@@ -17,7 +17,7 @@
 
 namespace Pimcore\Model\Document\Tag;
 
-use Pimcore\Config;
+use Pimcore\FeatureToggles\Features\DebugMode;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
@@ -25,6 +25,7 @@ use Pimcore\Model\DataObject;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
 use Pimcore\Targeting\Document\DocumentTargetingConfigurator;
+use Pimcore\Tool;
 
 /**
  * @method \Pimcore\Model\Document\Tag\Dao getDao()
@@ -109,7 +110,7 @@ class Renderlet extends Model\Document\Tag
     public function frontend()
     {
         // TODO inject services via DI when tags are built through container
-        $container  = \Pimcore::getContainer();
+        $container = \Pimcore::getContainer();
         $tagHandler = $container->get('pimcore.document.tag.handler');
 
         if (!$tagHandler->supports($this->view)) {
@@ -117,8 +118,7 @@ class Renderlet extends Model\Document\Tag
         }
 
         if (!$this->options['controller'] && !$this->options['action']) {
-            $this->options['controller'] = Config::getSystemConfig()->documents->default_controller;
-            $this->options['action'] = Config::getSystemConfig()->documents->default_action;
+            $this->options += Tool::getRoutingDefaults();
         }
 
         if (method_exists($this->o, 'isPublished')) {
@@ -142,7 +142,6 @@ class Renderlet extends Model\Document\Tag
                 'type' => $this->type,
                 'subtype' => $this->subtype,
                 'pimcore_request_source' => 'renderlet',
-                'disableBlockClearing' => true
             ];
 
             foreach ($this->options as $key => $value) {
@@ -170,7 +169,7 @@ class Renderlet extends Model\Document\Tag
 
                 return $content;
             } catch (\Exception $e) {
-                if (\Pimcore::inDebugMode()) {
+                if (\Pimcore::inDebugMode(DebugMode::RENDER_DOCUMENT_TAG_ERRORS)) {
                     return 'ERROR: ' . $e->getMessage() . ' (for details see log files in /var/logs)';
                 }
                 Logger::error($e);
@@ -356,8 +355,8 @@ class Renderlet extends Model\Document\Tag
                 Logger::notice('Detected insane relation, removing reference to non existent '.$this->type.' with id ['.$this->id.']');
                 $this->id = null;
                 $this->type = null;
-                $this->o=null;
-                $this->subtype=null;
+                $this->o = null;
+                $this->subtype = null;
             }
         }
 

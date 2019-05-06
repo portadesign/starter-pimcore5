@@ -18,9 +18,13 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 
-class Multiselect extends Model\DataObject\ClassDefinition\Data
+class Multiselect extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface
 {
+    use Extension\ColumnType;
+    use Extension\QueryColumnType;
+
     /**
      * Static type of this element
      *
@@ -49,6 +53,11 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
      * @var int
      */
     public $maxItems;
+
+    /**
+     * @var string
+     */
+    public $renderType;
 
     /** Options provider class
      * @var string
@@ -162,47 +171,69 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForResource
+     * @param $renderType
      *
-     * @param string $data
+     * @return $this
+     */
+    public function setRenderType($renderType)
+    {
+        $this->renderType = $renderType;
+
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getRenderType()
+    {
+        return $this->renderType;
+    }
+
+    /**
+     * @see ResourcePersistenceAwareInterface::getDataForResource
+     *
+     * @param array $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
         if (is_array($data)) {
             return implode(',', $data);
         }
+
+        return null;
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataFromResource
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
         if (strlen($data)) {
             return explode(',', $data);
-        } else {
-            return null;
         }
+
+        return null;
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForQueryResource
+     * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
-     * @param string $data
+     * @param array $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataForQueryResource($data, $object = null, $params = [])
     {
@@ -210,27 +241,29 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
             return ','.implode(',', $data).',';
         }
 
-        return;
+        return null;
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
-     * @param string $data
+     * @param array $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataForEditmode($data, $object = null, $params = [])
     {
         if (is_array($data)) {
             return implode(',', $data);
         }
+
+        return null;
     }
 
     /**
-     * @param string $data
+     * @param array $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
@@ -242,7 +275,7 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -256,19 +289,21 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param string $data
      * @param null|DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getVersionPreview($data, $object = null, $params = [])
     {
         if (is_array($data)) {
             return implode(',', $data);
         }
+
+        return null;
     }
 
     /**
@@ -277,16 +312,16 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
      * @param mixed $data
      * @param bool $omitMandatoryCheck
      *
-     * @throws \Exception
+     * @throws Model\Element\ValidationException
      */
     public function checkValidity($data, $omitMandatoryCheck = false)
     {
         if (!$omitMandatoryCheck and $this->getMandatory() and empty($data)) {
-            throw new \Exception('Empty mandatory field [ '.$this->getName().' ]');
+            throw new Model\Element\ValidationException('Empty mandatory field [ '.$this->getName().' ]');
         }
 
         if (!is_array($data) and !empty($data)) {
-            throw new \Exception('Invalid multiselect data');
+            throw new Model\Element\ValidationException('Invalid multiselect data');
         }
     }
 
@@ -349,7 +384,7 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
      */
     public function getFilterCondition($value, $operator, $params = [])
     {
-        $params['name']= $this->name;
+        $params['name'] = $this->name;
 
         return $this->getFilterConditionExt(
             $value,
@@ -371,7 +406,7 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
     {
         if ($operator == '=') {
             $name = $params['name'] ? $params['name'] : $this->name;
-            $value = "'%".$value."%'";
+            $value = "'%,".$value.",%'";
 
             return '`'.$name.'` LIKE '.$value.' ';
         }
@@ -509,5 +544,22 @@ class Multiselect extends Model\DataObject\ClassDefinition\Data
         }
 
         return $this;
+    }
+
+    /**
+     * @param $existingData
+     * @param $additionalData
+     *
+     * @return mixed
+     */
+    public function appendData($existingData, $additionalData)
+    {
+        if (!is_array($existingData)) {
+            $existingData = [];
+        }
+
+        $existingData = array_unique(array_merge($existingData, $additionalData));
+
+        return $existingData;
     }
 }

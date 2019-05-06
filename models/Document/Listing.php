@@ -23,11 +23,12 @@ use Zend\Paginator\Adapter\AdapterInterface;
 use Zend\Paginator\AdapterAggregateInterface;
 
 /**
- * @method int load()
+ * @method Document[] load()
  * @method int getTotalCount()
  * @method int getCount()
- * @method int loadIdList()
+ * @method int[] loadIdList()
  * @method \Pimcore\Model\Document\Listing\Dao getDao()
+ * @method onCreateQuery(callable $callback)
  */
 class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterAggregate, \Iterator, AdapterInterface, AdapterAggregateInterface
 {
@@ -49,31 +50,6 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
      * @var bool
      */
     public $unpublished = false;
-
-    /**
-     * Valid order keys
-     *
-     * @var array
-     */
-    public $validOrderKeys = [
-        'creationDate',
-        'modificationDate',
-        'id',
-        'key',
-        'index'
-    ];
-
-    /**
-     * Tests if the given key is an valid order key to sort the results
-     *
-     * @param $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-    }
 
     /**
      * Returns documents, also loads the rows if these aren't loaded.

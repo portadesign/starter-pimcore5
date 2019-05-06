@@ -20,6 +20,7 @@ use Defuse\Crypto\Crypto;
 use Defuse\Crypto\Key;
 use Pimcore\Logger;
 use Pimcore\Model;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 
 /**
  * Class EncryptedField
@@ -28,8 +29,10 @@ use Pimcore\Model;
  *
  * How to generate a key: vendor/bin/generate-defuse-key
  */
-class EncryptedField extends Model\DataObject\ClassDefinition\Data
+class EncryptedField extends Data implements ResourcePersistenceAwareInterface
 {
+    use Extension\ColumnType;
+
     /**
      * don't throw an error it encrypted field cannot be decoded (default)
      */
@@ -63,13 +66,6 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
     public $delegate;
 
     /**
-     * Type for the column to query
-     *
-     * @var array
-     */
-    public $queryColumnType = null;
-
-    /**
      * Type for the column
      *
      * @var array
@@ -84,13 +80,13 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
     public $phpdocType;
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataForResource
+     * @see ResourcePersistenceAwareInterface::getDataForResource
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return array
+     * @return mixed
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
@@ -99,11 +95,15 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
             if ($fd) {
                 $data = $data instanceof Model\DataObject\Data\EncryptedField ? $data->getPlain() : $data;
                 $result = $fd->getDataForResource($data, $object, $params);
-                $result = $this->encrypt($result, $object, $params);
-
-                return $result;
+                if (isset($params['skipEncryption']) && $params['skipEncryption']) {
+                    return $result;
+                } else {
+                    return $this->encrypt($result, $object, $params);
+                }
             }
         }
+
+        return null;
     }
 
     /**
@@ -130,7 +130,10 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
             if (method_exists($this->delegate, 'marshalBeforeEncryption')) {
                 $data = $this->delegate->marshalBeforeEncryption($data, $object, $params);
             }
-            $data = Crypto::encrypt($data, $key, true);
+
+            $rawBinary = (isset($params['asString']) && $params['asString']) ? false : true;
+
+            $data = Crypto::encrypt((string)$data, $key, $rawBinary);
         }
 
         return $data;
@@ -158,9 +161,14 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
 
                         return;
                     }
-                    throw new \Exception('could not laod key');
+                    throw new \Exception('could not load key');
                 }
-                $data = Crypto::decrypt($data, $key, true);
+
+                $rawBinary = (isset($params['asString']) && $params['asString']) ? false : true;
+
+                if (!(isset($params['skipDecryption']) && $params['skipDecryption'])) {
+                    $data = Crypto::decrypt($data, $key, $rawBinary);
+                }
 
                 if (method_exists($this->delegate, 'unmarshalAfterDecryption')) {
                     $data = $this->delegate->unmarshalAfterDecryption($data, $object, $params);
@@ -177,13 +185,13 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromResource
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return Model\DataObject\Data\RgbaColor|null
+     * @return Model\DataObject\Data\EncryptedField|null
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
@@ -192,26 +200,20 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
             $data = $this->decrypt($data, $object, $params);
             $data = $fd->getDataFromResource($data, $object, $params);
 
-            return new Model\DataObject\Data\EncryptedField($this->delegate, $data);
-        }
-    }
+            $field = new Model\DataObject\Data\EncryptedField($this->delegate, $data);
 
-    /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataForQueryResource
-     *
-     * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
-     * @param mixed $params
-     *
-     * @return array
-     */
-    public function getDataForQueryResource($data, $object = null, $params = [])
-    {
+            if (isset($params['owner'])) {
+                $field->setOwner($params['owner'], $params['fieldname'], $params['language']);
+            }
+
+            return $field;
+        }
+
         return null;
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -231,7 +233,7 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -269,22 +271,6 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @return string
-     */
-    public function getQueryColumnType()
-    {
-        return null;
-    }
-
-    /**
-     * @return string
-     */
-    public function getColumnType()
-    {
-        return 'LONGBLOB';
-    }
-
-    /**
      * Checks if data is valid for current data field
      *
      * @param mixed $data
@@ -296,7 +282,7 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
     {
         $fd = $this->getDelegateDatatypeDefinition();
         if ($fd) {
-            $data = $data instanceof Model\DataObject\Data\EncryptedField ? $data->getPlain() : data;
+            $data = $data instanceof Model\DataObject\Data\EncryptedField ? $data->getPlain() : $data;
             $result = $fd->checkValidity($data, $omitMandatoryCheck);
 
             return $result;
@@ -419,6 +405,15 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
         if ($fd) {
             $value = $value instanceof Model\DataObject\Data\EncryptedField ? $value->getPlain() : null;
             $result = $fd->marshal($value, $object, $params);
+            if ($result) {
+                $params['asString'] = true;
+                if ($params['raw']) {
+                    $result = $this->encrypt($result, $object, $params);
+                } else {
+                    $result['value'] = $this->encrypt($result['value'], $object, $params);
+                    $result['value2'] = $this->encrypt($result['value2'], $object, $params);
+                }
+            }
 
             return $result;
         }
@@ -434,8 +429,15 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
     public function unmarshal($value, $object = null, $params = [])
     {
         $fd = $this->getDelegateDatatypeDefinition();
-        if ($fd) {
-            $value = $value instanceof Model\DataObject\Data\EncryptedField ? $value->getPlain() : null;
+        if ($fd && $value) {
+            $params['asString'] = true;
+            if ($params['raw']) {
+                $value = $this->decrypt($value, $object, $params);
+            } else {
+                $value['value'] = $this->decrypt($value['value'], $object, $params);
+                $value['value2'] = $this->decrypt($value['value2'], $object, $params);
+            }
+
             $result = $fd->unmarshal($value, $object, $params);
 
             return $result;
@@ -548,7 +550,6 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
                 if (method_exists($className, '__set_state')) {
                     $delegate = $className::__set_state($data);
                 }
-                $delegate->setFieldtype($this->getDelegateDatatype());
                 $this->delegate = $delegate;
             }
         }
@@ -604,25 +605,18 @@ class EncryptedField extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @param string | array $columnType
-     *
-     * @return $this
-     */
-    public function setColumnType($columnType)
-    {
-        $this->columnType = 'LONGBLOB';
-    }
-
-    /**
      * @param $object
      * @param array $context
      */
     public function enrichLayoutDefinition($object, $context = [])
     {
         $delegate = $this->getDelegate();
-        if (method_exists($delegate, enrichLayoutDefinition)) {
+
+        if (method_exists($delegate, 'enrichLayoutDefinition')) {
             $delegate->enrichLayoutDefinition($object, $context);
         }
+
+        return $this;
     }
 
     /**

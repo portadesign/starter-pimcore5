@@ -22,23 +22,24 @@ use Pimcore\Model\DataObject;
 
 /**
  * @method \Pimcore\Model\DataObject\Listing\Concrete\Dao getDao()
+ * @method Model\Webservice\Data\DataObject\Concrete[] load()
  */
 abstract class Concrete extends Model\DataObject\Listing
 {
     /**
      * @var int
      */
-    public $classId;
+    protected $classId;
 
     /**
      * @var string
      */
-    public $className;
+    protected $className;
 
     /**
      * @var string|
      */
-    public $locale;
+    protected $locale;
 
     /**
      * do not use the localized views for this list (in the case the class contains localized fields),
@@ -58,19 +59,7 @@ abstract class Concrete extends Model\DataObject\Listing
     }
 
     /**
-     * @todo remove always true
-     *
-     * @param string $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-    }
-
-    /**
-     * @return int
+     * @return string
      */
     public function getClassId()
     {

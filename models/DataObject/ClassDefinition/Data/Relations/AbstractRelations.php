@@ -20,10 +20,14 @@ use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
+use Pimcore\Model\DataObject\ClassDefinition\Data\CustomResourcePersistingInterface;
 use Pimcore\Model\Element;
 
-abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
+abstract class AbstractRelations extends Data implements CustomResourcePersistingInterface, DataObject\ClassDefinition\PathFormatterAwareInterface
 {
+    const RELATION_ID_SEPARATOR = '$$';
+
     /**
      * @var bool
      */
@@ -162,9 +166,9 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
                         $allowedTypes[] = $t;
                     } elseif (is_array($t) && count($t) > 0) {
                         if (isset($t['assetTypes'])) {
-                            $allowedTypes[]= $t['assetTypes'];
+                            $allowedTypes[] = $t['assetTypes'];
                         } else {
-                            $allowedTypes[]= $t;
+                            $allowedTypes[] = $t;
                         }
                     }
                 }
@@ -185,7 +189,7 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
      *
      * Checks if an document is an allowed relation
      *
-     * @param Document $document
+     * @param Model\Document $document
      *
      * @return bool
      */
@@ -246,10 +250,10 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
             $relation['ownertype'] = 'localizedfield';
             $relation['ownername'] = 'localizedfield';
             $context = $object->getContext();
-            if ($context && $context['containerType'] == 'fieldcollection') {
+            if ($context && ($context['containerType'] == 'fieldcollection' || $context['containerType'] == 'objectbrick')) {
                 $fieldname = $context['fieldname'];
                 $index = $context['index'];
-                $relation['ownername'] = '/fieldcollection~' . $fieldname . '/' . $index . '/localizedfield~' . $relation['ownername'];
+                $relation['ownername'] = '/' . $context['containerType'] . '~' . $fieldname . '/' . $index . '/localizedfield~' . $relation['ownername'];
             }
 
             $relation['position'] = $params['language'];
@@ -273,10 +277,35 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
      */
     public function save($object, $params = [])
     {
+        if (isset($params['isUntouchable']) && $params['isUntouchable']) {
+            return;
+        }
+
+        if (!isset($params['context'])) {
+            $params['context'] = null;
+        }
+        $context = $params['context'];
+
+        if (!DataObject\AbstractObject::isDirtyDetectionDisabled() && $object instanceof DataObject\DirtyIndicatorInterface) {
+            if ($object instanceof DataObject\Localizedfield) {
+                if ($context['containerType'] != 'fieldcollection' && $object->getObject() instanceof DataObject\DirtyIndicatorInterface) {
+                    if (!$object->hasDirtyFields()) {
+                        return;
+                    }
+                }
+            } else {
+                if ($context['containerType'] !== 'fieldcollection' && $this->supportsDirtyDetection()) {
+                    if (!$object->isFieldDirty($this->getName())) {
+                        return;
+                    }
+                }
+            }
+        }
+
         $db = Db::get();
 
         $data = $this->getDataFromObjectParam($object, $params);
-        $relations = $this->getDataForResource($data, $object, $params);
+        $relations = $this->prepareDataForPersistence($data, $object, $params);
 
         if (is_array($relations) && !empty($relations)) {
             foreach ($relations as $relation) {
@@ -319,11 +348,15 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
         } elseif ($object instanceof DataObject\Fieldcollection\Data\AbstractData) {
             $relations = $db->fetchAll('SELECT * FROM object_relations_' . $object->getObject()->getClassId() . " WHERE src_id = ? AND fieldname = ? AND ownertype = 'fieldcollection' AND ownername = ? AND position = ?", [$object->getObject()->getId(), $this->getName(), $object->getFieldname(), $object->getIndex()]);
         } elseif ($object instanceof DataObject\Localizedfield) {
-            if (isset($params['context']) && $params['context']['containerType'] == 'fieldcollection') {
+            if (isset($params['context']) && isset($params['context']['containerType']) && (($params['context']['containerType'] == 'fieldcollection' || $params['context']['containerType'] == 'objectbrick'))) {
                 $context = $params['context'];
                 $fieldname = $context['fieldname'];
-                $index = $context['index'];
-                $filter = '/fieldcollection~' . $fieldname . '/' . $index . '/%';
+                if ($params['context']['containerType'] == 'fieldcollection') {
+                    $index = $context['index'];
+                    $filter = '/' . $params['context']['containerType'] . '~' . $fieldname . '/' . $index . '/%';
+                } else {
+                    $filter = '/' . $params['context']['containerType'] .'~' . $fieldname . '/%';
+                }
                 $relations = $db->fetchAll(
                     'SELECT * FROM object_relations_' . $object->getObject()->getClassId() . " WHERE src_id = ? AND fieldname = ? AND ownertype = 'localizedfield'  AND position = ? AND ownername LIKE ?",
                     [$object->getObject()->getId(), $this->getName(), $params['language'], $filter]
@@ -351,9 +384,38 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
             return ($a['index'] < $b['index']) ? -1 : 1;
         });
 
-        $data = $this->getDataFromResource($relations, $object, $params);
+        $data = $this->loadData($relations, $object, $params);
+        if ($object instanceof DataObject\DirtyIndicatorInterface && $data['dirty']) {
+            $object->markFieldDirty($this->getName(), true);
+        }
 
-        return $data;
+        return $data['data'];
+    }
+
+    /**
+     * @param array $data
+     * @param DataObject\Concrete $object
+     * @param array $params
+     *
+     * @return mixed
+     */
+    abstract public function loadData($data, $object = null, $params = []);
+
+    /**
+     * @param array $data
+     * @param DataObject\Concrete $object
+     * @param array $params
+     *
+     * @return mixed
+     */
+    abstract public function prepareDataForPersistence($data, $object = null, $params = []);
+
+    /**
+     * @param $object
+     * @param array $params
+     */
+    public function delete($object, $params = [])
+    {
     }
 
     /**
@@ -391,7 +453,7 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
     /**
      * @return null|string
      */
-    public function getPathFormatterClass()
+    public function getPathFormatterClass(): ?string
     {
         return $this->pathFormatterClass;
     }
@@ -430,8 +492,8 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
         /** @var $item Element\ElementInterface */
         foreach ($existingData as $item) {
             $key = $this->buildUniqueKeyForAppending($item);
-            $map[$key]= 1;
-            $newData[]= $item;
+            $map[$key] = 1;
+            $newData[] = $item;
         }
 
         if (is_array($additionalData)) {
@@ -457,5 +519,83 @@ abstract class AbstractRelations extends Model\DataObject\ClassDefinition\Data
         $id = $item->getId();
 
         return $elementType . $id;
+    }
+
+    /**
+     * @param $array1
+     * @param $array2
+     *
+     * @return bool
+     */
+    public function isEqual($array1, $array2)
+    {
+        $array1 = array_filter(is_array($array1) ? $array1 : []);
+        $array2 = array_filter(is_array($array2) ? $array2 : []);
+        $count1 = count($array1);
+        $count2 = count($array2);
+        if ($count1 != $count2) {
+            return false;
+        }
+
+        $values1 = array_values($array1);
+        $values2 = array_values($array2);
+
+        for ($i = 0; $i < $count1; $i++) {
+            /** @var $el1 Element\ElementInterface */
+            $el1 = $values1[$i];
+            /** @var $el2 Element\ElementInterface */
+            $el2 = $values2[$i];
+
+            if (! ($el1->getType() == $el2->getType() && ($el1->getId() == $el2->getId()))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function supportsDirtyDetection()
+    {
+        return true;
+    }
+
+    /**
+     * @param DataObject\Fieldcollection\Data\AbstractData $object
+     *
+     * @throws \Exception
+     */
+    public function loadLazyFieldcollectionField(DataObject\Fieldcollection\Data\AbstractData $item)
+    {
+        if ($this->getLazyLoading() && $item->getObject()) {
+            /** @var $container DataObject\Fieldcollection */
+            $container = $item->getObject()->getObjectVar($item->getFieldname());
+            if ($container) {
+                $container->loadLazyField($item->getObject(), $item->getType(), $item->getFieldname(), $item->getIndex(), $this->getName());
+            } else {
+                // if container is not available we assume that it is a newly set item
+                $item->markLazyKeyAsLoaded($this->getName());
+            }
+        }
+    }
+
+    /**
+     * @param DataObject\Objectbrick\Data\AbstractData $object
+     *
+     * @throws \Exception
+     */
+    public function loadLazyBrickField(DataObject\Objectbrick\Data\AbstractData $item)
+    {
+        if ($this->getLazyLoading() && $item->getObject()) {
+            /** @var $container DataObject\Objectbrick */
+            $container = $item->getObject()->getObjectVar($item->getFieldname());
+            if ($container) {
+                $container->loadLazyField($item->getType(), $item->getFieldname(), $this->getName());
+            } else {
+                $item->markLazyKeyAsLoaded($this->getName());
+            }
+        }
     }
 }

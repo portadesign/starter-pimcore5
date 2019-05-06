@@ -13,13 +13,16 @@
  */
 use Pimcore\Cache;
 use Pimcore\Config;
-use Pimcore\Db;
+use Pimcore\FeatureToggles\Feature;
+use Pimcore\FeatureToggles\FeatureManager;
+use Pimcore\FeatureToggles\FeatureManagerInterface;
+use Pimcore\FeatureToggles\Features\DebugMode;
+use Pimcore\FeatureToggles\Features\DevMode;
+use Pimcore\FeatureToggles\FeatureState;
 use Pimcore\File;
 use Pimcore\Logger;
 use Pimcore\Model;
-use Pimcore\Tool;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpKernel\KernelInterface;
 
 class Pimcore
@@ -30,9 +33,9 @@ class Pimcore
     public static $adminMode;
 
     /**
-     * @var bool
+     * @var FeatureManagerInterface
      */
-    private static $debugMode;
+    private static $featureManager;
 
     /**
      * @var bool
@@ -48,11 +51,6 @@ class Pimcore
      * @var \Composer\Autoload\ClassLoader
      */
     private static $autoloader;
-
-    /**
-     * @var array items to be excluded from garbage collection
-     */
-    private static $globallyProtectedItems;
 
     /**
      * @static
@@ -87,66 +85,76 @@ class Pimcore
         }
 
         $debug = self::inDebugMode();
-
         if (!defined('PIMCORE_DEBUG')) {
             define('PIMCORE_DEBUG', $debug);
         }
 
-        // custom error logging in DEBUG mode & DEVMODE
-        if (PIMCORE_DEVMODE || PIMCORE_DEBUG) {
+        // custom error logging when debug flag is set
+        if (self::inDebugMode(DebugMode::ERROR_REPORTING)) {
             error_reporting(E_ALL & ~E_NOTICE);
         }
 
         return $conf;
     }
 
+    public static function setFeatureManager(FeatureManagerInterface $featureManager)
+    {
+        self::$featureManager = $featureManager;
+    }
+
+    public static function getFeatureManager(): FeatureManagerInterface
+    {
+        if (null === static::$featureManager) {
+            $featureManager = new FeatureManager(null, [
+                DebugMode::getDefaultInitializer(),
+                DevMode::getDefaultInitializer()
+            ]);
+
+            static::$featureManager = $featureManager;
+        }
+
+        return static::$featureManager;
+    }
+
+    public static function isFeatureEnabled(Feature $feature): bool
+    {
+        return static::getFeatureManager()->isEnabled($feature);
+    }
+
     /**
-     * @static
+     * @param DebugMode|int|null $flag
      *
      * @return bool
      */
-    public static function inDebugMode()
+    public static function inDebugMode($flag = null): bool
     {
-        if (null !== self::$debugMode) {
-            return self::$debugMode;
+        if (is_int($flag)) {
+            $flag = new DebugMode($flag);
         }
 
-        if (defined('PIMCORE_DEBUG')) {
-            return PIMCORE_DEBUG;
+        if (null !== $flag && !$flag instanceof DebugMode) {
+            throw new \InvalidArgumentException(sprintf('Flag must be an integer or an instance of %s', DebugMode::class));
         }
 
-        $debug = false;
+        return static::getFeatureManager()->isEnabled($flag ?? DebugMode::ALL());
+    }
 
-        $debugModeFile = PIMCORE_CONFIGURATION_DIRECTORY . '/debug-mode.php';
-        if (file_exists($debugModeFile)) {
-            $conf = include $debugModeFile;
-            $debug = $conf['active'];
-
-            // enable debug mode only for a comma-separated list of IP addresses/ranges
-            if ($debug && $conf['ip']) {
-                $debug = false;
-
-                $clientIp = Tool::getClientIp();
-                if (null !== $clientIp) {
-                    $debugIpAddresses = explode_and_trim(',', $conf['ip']);
-
-                    if (IpUtils::checkIp($clientIp, $debugIpAddresses)) {
-                        $debug = true;
-                    }
-                }
-            }
+    /**
+     * @param DevMode|int|null $flag
+     *
+     * @return bool
+     */
+    public static function inDevMode($flag = null): bool
+    {
+        if (is_int($flag)) {
+            $flag = new DevMode($flag);
         }
 
-        if ($debug) {
-            $request = Tool::resolveRequest();
-            if ($request && (bool)$request->cookies->get('pimcore_disable_debug')) {
-                $debug = false;
-            }
+        if (null !== $flag && !$flag instanceof DevMode) {
+            throw new \InvalidArgumentException(sprintf('Flag must be an integer or an instance of %s', DevMode::class));
         }
 
-        self::$debugMode = $debug;
-
-        return $debug;
+        return static::getFeatureManager()->isEnabled($flag ?? DevMode::ALL());
     }
 
     /**
@@ -156,7 +164,7 @@ class Pimcore
      */
     public static function setDebugMode(bool $debugMode = true)
     {
-        self::$debugMode = (bool)$debugMode;
+        self::getFeatureManager()->setState(FeatureState::fromFeature($debugMode ? DebugMode::ALL() : DebugMode::NONE()));
     }
 
     /**
@@ -193,6 +201,20 @@ class Pimcore
         }
 
         return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public static function isInstalled()
+    {
+        try {
+            \Pimcore\Db::get();
+
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -235,6 +257,8 @@ class Pimcore
      * Accessing the container this way is discouraged as dependencies should be wired through the container instead of
      * needing to access the container directly. This exists mainly for compatibility with legacy code.
      *
+     * @internal
+     *
      * @return ContainerInterface
      */
     public static function getContainer()
@@ -275,20 +299,26 @@ class Pimcore
 
     /** Add $keepItems to the list of items which are protected from garbage collection.
      * @param $keepItems
+     *
+     * @deprecated
      */
     public static function addToGloballyProtectedItems($keepItems)
     {
         if (is_string($keepItems)) {
             $keepItems = [$keepItems];
         }
-        if (!is_array(self::$globallyProtectedItems) && $keepItems) {
-            self::$globallyProtectedItems = [];
+        if (is_array($keepItems)) {
+            $longRunningHelper = self::getContainer()->get(\Pimcore\Helper\LongRunningHelper::class);
+            $longRunningHelper->addPimcoreRuntimeCacheProtectedItems($keepItems);
+        } else {
+            throw new \InvalidArgumentException('keepItems must be an instance of array');
         }
-        self::$globallyProtectedItems = array_merge(self::$globallyProtectedItems, $keepItems);
     }
 
     /** Items to be deleted.
      * @param $deleteItems
+     *
+     * @deprecated
      */
     public static function removeFromGloballyProtectedItems($deleteItems)
     {
@@ -296,13 +326,11 @@ class Pimcore
             $deleteItems = [$deleteItems];
         }
 
-        if (is_array($deleteItems) && is_array(self::$globallyProtectedItems)) {
-            foreach ($deleteItems as $item) {
-                $key = array_search($item, self::$globallyProtectedItems);
-                if ($key !== false) {
-                    unset(self::$globallyProtectedItems[$key]);
-                }
-            }
+        if (is_array($deleteItems)) {
+            $longRunningHelper = self::getContainer()->get(\Pimcore\Helper\LongRunningHelper::class);
+            $longRunningHelper->removePimcoreRuntimeCacheProtectedItems($deleteItems);
+        } else {
+            throw new \InvalidArgumentException('deleteItems must be an instance of array');
         }
     }
 
@@ -315,42 +343,12 @@ class Pimcore
      */
     public static function collectGarbage($keepItems = [])
     {
-
-        // close mysql-connection
-        Db::close();
-
-        $protectedItems = [
-            'Config_system',
-            'pimcore_admin_user',
-            'Config_website',
-            'pimcore_editmode',
-            'pimcore_error_document',
-            'pimcore_site',
-            'Pimcore_Db'
-        ];
-
-        if (is_array($keepItems) && count($keepItems) > 0) {
-            $protectedItems = array_merge($protectedItems, $keepItems);
-        }
-
-        if (is_array(self::$globallyProtectedItems) && count(self::$globallyProtectedItems)) {
-            $protectedItems = array_merge($protectedItems, self::$globallyProtectedItems);
-        }
-
-        Cache\Runtime::clear($protectedItems);
-
-        if (class_exists('Pimcore\\Legacy')) {
-            // @TODO: should be removed
-            Pimcore\Legacy::collectGarbage($protectedItems);
-        }
-
-        Db::reset();
-
-        // force PHP garbage collector
-        gc_enable();
-        $collectedCycles = gc_collect_cycles();
-
-        Logger::debug('garbage collection finished, collected cycles: ' . $collectedCycles);
+        $longRunningHelper = self::getContainer()->get(\Pimcore\Helper\LongRunningHelper::class);
+        $longRunningHelper->cleanUp([
+            'pimcoreRuntimeCache' => [
+                'keepItems' => $keepItems
+            ]
+        ]);
     }
 
     /**
@@ -372,21 +370,35 @@ class Pimcore
         Model\Tool\Lock::releaseAll();
     }
 
-    /**
-     * @static
-     *
-     */
+    public static function disableMinifyJs(): bool
+    {
+        if (self::inDevMode(DevMode::UNMINIFIED_JS)) {
+            return true;
+        }
+
+        // magic parameter for debugging ExtJS stuff
+        if (array_key_exists('unminified_js', $_REQUEST) && self::inDebugMode(DebugMode::MAGIC_PARAMS)) {
+            return true;
+        }
+
+        return false;
+    }
+
     public static function initLogger()
     {
         // special request log -> if parameter pimcore_log is set
-        if (array_key_exists('pimcore_log', $_REQUEST) && self::inDebugMode()) {
-            if (empty($_REQUEST['pimcore_log'])) {
-                $requestLogName = date('Y-m-d_H-i-s');
-            } else {
-                $requestLogName = $_REQUEST['pimcore_log'];
+        if (array_key_exists('pimcore_log', $_REQUEST) && self::inDebugMode(DebugMode::MAGIC_PARAMS)) {
+            $requestLogName = date('Y-m-d_H-i-s');
+            if (!empty($_REQUEST['pimcore_log'])) {
+                // slashed are not allowed, replace them with hyphens
+                $requestLogName = str_replace('/', '-', $_REQUEST['pimcore_log']);
             }
 
-            $requestLogFile = PIMCORE_LOG_DIRECTORY . '/request-' . $requestLogName . '.log';
+            $requestLogFile = resolvePath(PIMCORE_LOG_DIRECTORY . '/request-' . $requestLogName . '.log');
+            if (strpos($requestLogFile, PIMCORE_LOG_DIRECTORY) !== 0) {
+                throw new \Exception('Not allowed');
+            }
+
             if (!file_exists($requestLogFile)) {
                 File::put($requestLogFile, '');
             }

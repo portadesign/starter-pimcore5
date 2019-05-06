@@ -21,6 +21,7 @@ use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\ImportConfig\Listing\Dao getDao()
+ * @method Model\ImportConfig[] load()
  */
 class Listing extends Model\Listing\AbstractListing
 {
@@ -30,18 +31,6 @@ class Listing extends Model\Listing\AbstractListing
      * @var array
      */
     public $importconfigs = [];
-
-    /**
-     * Tests if the given key is an valid order key to sort the results
-     *
-     * @param $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-    }
 
     /**
      * @return array

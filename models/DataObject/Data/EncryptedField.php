@@ -21,19 +21,23 @@ use Defuse\Crypto\Crypto;
 use Defuse\Crypto\Key;
 use Pimcore\Logger;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
+use Pimcore\Model\DataObject\OwnerAwareFieldInterface;
+use Pimcore\Model\DataObject\Traits\OwnerAwareFieldTrait;
 use Pimcore\Tool\Serialize;
 
-class EncryptedField
+class EncryptedField implements OwnerAwareFieldInterface
 {
+    use OwnerAwareFieldTrait;
+
     /**
      * @var Data
      */
-    public $delegate;
+    protected $delegate;
 
     /**
      * @var mixed
      */
-    public $plain;
+    protected $plain;
 
     /**
      * @var mixed
@@ -50,6 +54,7 @@ class EncryptedField
     {
         $this->plain = $plain;
         $this->delegate = $delegate;
+        $this->markMeDirty();
     }
 
     /**
@@ -63,7 +68,7 @@ class EncryptedField
     /**
      * @param Data $delegate
      */
-    public function setDelegate(Data $delegate): void
+    public function setDelegate(Data $delegate)
     {
         $this->delegate = $delegate;
     }
@@ -79,9 +84,10 @@ class EncryptedField
     /**
      * @param mixed $plain
      */
-    public function setPlain($plain): void
+    public function setPlain($plain)
     {
         $this->plain = $plain;
+        $this->markMeDirty();
     }
 
     /**
@@ -101,7 +107,7 @@ class EncryptedField
                 $this->encrypted = $data;
             } catch (\Exception $e) {
                 Logger::error($e);
-                throw new \Exception('could not laod key');
+                throw new \Exception('could not load key');
             }
 
             return ['encrypted'];
@@ -124,7 +130,7 @@ class EncryptedField
                 $this->plain = $data;
             } catch (\Exception $e) {
                 Logger::error($e);
-                throw new \Exception('could not laod key');
+                throw new \Exception('could not load key');
             }
         }
         unset($this->encrypted);

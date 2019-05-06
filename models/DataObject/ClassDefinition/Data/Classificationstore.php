@@ -18,10 +18,11 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\Element;
 use Pimcore\Tool;
 
-class Classificationstore extends Model\DataObject\ClassDefinition\Data
+class Classificationstore extends Data implements CustomResourcePersistingInterface
 {
     use Element\ChildsCompatibilityTrait;
 
@@ -93,6 +94,16 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
     public $storeId;
 
     /**
+     * @var bool
+     */
+    public $hideEmptyData;
+
+    /**
+     * @var bool
+     */
+    public $disallowAddRemove;
+
+    /**
      * contains further localized field definitions if there are more than one localized fields in on class
      *
      * @var array
@@ -110,7 +121,7 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
     public $allowedGroupIds;
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -162,7 +173,7 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
                     $childData = new DataObject\Data\CalculatedValue($this->getName());
                     $childData->setContextualData('classificationstore', $this->getName(), null, $language, $groupId, $keyId, $childDef);
                     $childData = $childDef->getDataForEditmode($childData, $object, $params);
-                    $result['data'][$language][$groupId][$keyId]= $childData;
+                    $result['data'][$language][$groupId][$keyId] = $childData;
                 }
             }
         }
@@ -250,7 +261,7 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
                 }
 
                 if ($foundEmptyValue) {
-                    // still some values are passing, ask the parent
+                    // still some values are missing, ask the parent
                     $getter = 'get' . ucfirst($this->getName());
                     $parentData = $parent->$getter();
                     $parentResult = $this->doGetDataForEditMode($parentData, $parent, $fieldData, $metaData, $level + 1);
@@ -268,7 +279,7 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param string $containerData
      * @param null|Model\DataObject\AbstractObject $object
@@ -345,7 +356,7 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param $data
      * @param null|DataObject\AbstractObject $object
@@ -417,35 +428,52 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @param DataObject\AbstractObject $object
+     * @param DataObject\Concrete $object
      * @param mixed $params
      *
      * @throws \Exception
      */
     public function getForWebserviceExport($object, $params = [])
     {
+        $this->doGetForWebserviceExport($object, $params, $result);
+
+        return $result;
+    }
+
+    /**
+     * @param $object DataObject\AbstractObject
+     * @param array $params
+     * @param array $result
+     * @param int $level
+     *
+     * @throws \Exception
+     */
+    private function doGetForWebserviceExport($object, $params = [], &$result = [], $level = 0)
+    {
+
         /** @var $data DataObject\Classificationstore */
         $data = $this->getDataFromObjectParam($object, $params);
 
-        if ($data) {
-            if ($this->isLocalized()) {
-                $validLanguages = Tool::getValidLanguages();
-            } else {
-                $validLanguages = [];
-            }
-            array_unshift($validLanguages, 'default');
+        if ($this->isLocalized()) {
+            $validLanguages = Tool::getValidLanguages();
+        } else {
+            $validLanguages = [];
+        }
+        array_unshift($validLanguages, 'default');
 
-            $result = [];
+        if ($data) {
             $activeGroups = [];
             $items = $data->getActiveGroups();
             if (is_array($items)) {
                 foreach ($items as $groupId => $groupData) {
                     $groupDef = DataObject\Classificationstore\GroupConfig::getById($groupId);
-                    $activeGroups[] = [
-                        'id' => $groupId,
-                        'name' => $groupDef->getName(). ' - ' . $groupDef->getDescription(),
-                        'enabled' => $groupData
-                    ];
+                    if (!is_null($groupDef)) {
+                        $activeGroups[$groupId] = [
+                            'id' => $groupId,
+                            'name' => $groupDef->getName(). ' - ' . $groupDef->getDescription(),
+                            'enabled' => $groupData
+                        ];
+                    }
                 }
             }
 
@@ -466,29 +494,71 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
                     ];
 
                     foreach ($validLanguages as $language) {
+                        $context['language'] = $language;
                         $value = $fd->getForWebserviceExport($object, ['context' => $context, 'language' => $language]);
-                        $groupResult[$language][] = [
+                        $resultItem = [
                             'id' => $keyId,
                             'name' => $keyConfig->getName(),
                             'description' => $keyConfig->getDescription(),
                             'value' => $value
                         ];
+                        if ($level > 0) {
+                            $resultItem['inheritedFrom'] = $object->getId();
+                        }
+                        $groupResult[$language][] = $resultItem;
                     }
                 }
 
                 if ($groupResult) {
                     $groupDef = DataObject\Classificationstore\GroupConfig::getById($groupId);
-                    $groupResult = [
-                        'id' => $groupId,
-                        'name' => $groupDef->getName(). ' - ' . $groupDef->getDescription(),
-                        'keys' => $groupResult
-                    ];
+                    if (!is_null($groupDef)) {
+                        $groupResult = [
+                            'id' => $groupId,
+                            'name' => $groupDef->getName(). ' - ' . $groupDef->getDescription(),
+                            'keys' => $groupResult
+                        ];
+                    }
                 }
 
                 $result['groups'][] = $groupResult;
             }
+        }
 
-            return $result;
+        $inheritanceAllowed = $object->getClass()->getAllowInherit();
+        if (DataObject\AbstractObject::doGetInheritedValues($object)) {
+            $parent = DataObject\Service::hasInheritableParentObject($object);
+            if ($parent) {
+                $foundEmptyValue = false;
+
+                $activeGroupIds = $this->recursiveGetActiveGroupsIds($object);
+
+                foreach ($validLanguages as $language) {
+                    foreach ($activeGroupIds as $groupId => $enabled) {
+                        if (!$enabled) {
+                            continue;
+                        }
+
+                        $relation = new DataObject\Classificationstore\KeyGroupRelation\Listing();
+                        $relation->setCondition('groupId = ' . $relation->quote($groupId));
+                        $relation = $relation->load();
+                        foreach ($relation as $key) {
+                            $keyId = $key->getKeyId();
+                            $fd = DataObject\Classificationstore\Service::getFieldDefinitionFromKeyConfig($key);
+
+                            if ($fd->isEmpty($result[$language][$groupId][$keyId])) {
+                                $foundEmptyValue = true;
+                            }
+                        }
+                    }
+                }
+
+                if ($foundEmptyValue) {
+                    // still some values are missing, ask the parent
+                    $getter = 'get' . ucfirst($this->getName());
+                    $parentData = $parent->$getter();
+                    $parentResult = $this->doGetForWebserviceExport($parent, $params, $result, $level + 1);
+                }
+            }
         }
     }
 
@@ -496,7 +566,7 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
      * @param mixed $value
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
-     * @param IdMapper $idMapper
+     * @param Model\Webservice\Data\Mapper $idMapper
      *
      * @return mixed|null|DataObject\Classificationstore
      *
@@ -663,8 +733,9 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
 
     /**
      * @param $object
+     * @param array $params
      */
-    public function delete($object)
+    public function delete($object, $params = [])
     {
         $classificationStore = $this->getDataFromObjectParam($object);
 
@@ -699,18 +770,18 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
     public function preGetData($object, $params = [])
     {
         if (!$object instanceof DataObject\Concrete) {
-            throw new \Exception('Localized Fields are only valid in Objects');
+            throw new \Exception('Classification store fields are only valid in Objects');
         }
 
-        if (!$object->{$this->getName()} instanceof DataObject\Classificationstore) {
+        if (!$object->getObjectVar($this->getName()) instanceof DataObject\Classificationstore) {
             $store = new DataObject\Classificationstore();
             $store->setObject($object);
             $store->setFieldname($this->getName());
 
-            $object->{$this->getName()} = $store;
+            $object->{'set' . $this->getName()}($store);
         }
 
-        return $object->{$this->getName()};
+        return $object->getObjectVar($this->getName());
     }
 
     /**
@@ -924,7 +995,7 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
         if ($errors) {
             $messages = [];
             foreach ($errors as $e) {
-                $messages[]= $e->getMessage() . ' (' . $validLanguage . ')';
+                $messages[] = $e->getMessage() . ' (' . $validLanguage . ')';
             }
             $validationException = new Model\Element\ValidationException(implode(', ', $messages));
             $validationException->setSubItems($errors);
@@ -1151,7 +1222,8 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
                     continue;
                 }
                 $definition = \Pimcore\Model\DataObject\Classificationstore\Service::getFieldDefinitionFromKeyConfig($keyGroupRelation);
-                $definition->setTooltip($definition->getName() . ' - ' . $keyGroupRelation->getDescription());
+                $fallbackTooltip = $definition->getName() . ' - ' . $keyGroupRelation->getDescription();
+                $definition->setTooltip($definition->getTooltip() ?: $fallbackTooltip);
 
                 if (method_exists($definition, '__wakeup')) {
                     $definition->__wakeup();
@@ -1164,7 +1236,7 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
                         $context['class'] = $object->getClass();
                         $context['ownerType'] = 'classificationstore';
                         $context['ownerName'] = $this->getName();
-                        $context['keyId'] =  $keyGroupRelation->getKeyId();
+                        $context['keyId'] = $keyGroupRelation->getKeyId();
                         $context['groupId'] = $keyGroupRelation->getGroupId();
                         $context['keyDefinition'] = $definition;
                         $definition = $definition->enrichLayoutDefinition($object, $context);
@@ -1235,6 +1307,8 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
         if (is_string($allowedGroupIds) && !empty($allowedGroupIds)) {
             $allowedGroupIds = str_replace([' ', "\n"], '', $allowedGroupIds);
             $parts = explode(',', $allowedGroupIds);
+        } elseif (is_array($allowedGroupIds)) {
+            $parts = $allowedGroupIds;
         }
 
         $this->allowedGroupIds = $parts;
@@ -1269,5 +1343,45 @@ class Classificationstore extends Model\DataObject\ClassDefinition\Data
         array_unshift($validLanguages, 'default');
 
         return $validLanguages;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getHideEmptyData()
+    {
+        return $this->hideEmptyData;
+    }
+
+    /**
+     * @param $hideEmptyData bool
+     *
+     * @return $this
+     */
+    public function setHideEmptyData($hideEmptyData)
+    {
+        $this->hideEmptyData = (bool) $hideEmptyData;
+
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDisallowAddRemove()
+    {
+        return $this->disallowAddRemove;
+    }
+
+    /**
+     * @param bool $disallowAddRemove
+     *
+     * @return $this
+     */
+    public function setDisallowAddRemove($disallowAddRemove)
+    {
+        $this->disallowAddRemove = $disallowAddRemove;
+
+        return $this;
     }
 }

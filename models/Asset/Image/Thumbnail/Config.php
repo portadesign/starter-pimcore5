@@ -23,9 +23,13 @@ use Pimcore\Tool\Serialize;
 
 /**
  * @method \Pimcore\Model\Asset\Image\Thumbnail\Config\Dao getDao()
+ * @method void save()
+ * @method void delete()
  */
 class Config extends Model\AbstractModel
 {
+    use Model\Asset\Thumbnail\ClearTempFilesTrait;
+
     /**
      * format of array:
      * array(
@@ -61,6 +65,11 @@ class Config extends Model\AbstractModel
     /**
      * @var string
      */
+    public $group = '';
+
+    /**
+     * @var string
+     */
     public $format = 'SOURCE';
 
     /**
@@ -82,6 +91,16 @@ class Config extends Model\AbstractModel
      * @var bool
      */
     public $preserveMetaData = false;
+
+    /**
+     * @var bool
+     */
+    public $rasterizeSVG = false;
+
+    /**
+     * @var bool
+     */
+    public $downloadable = false;
 
     /**
      * @var int
@@ -166,21 +185,36 @@ class Config extends Model\AbstractModel
     }
 
     /**
+     * @param bool $hdpi
+     *
      * @return Config
      */
-    public static function getPreviewConfig()
+    public static function getPreviewConfig($hdpi = false)
     {
-        $thumbnail = new self();
-        $thumbnail->setName('pimcore-system-treepreview');
-        $thumbnail->addItem('scaleByWidth', [
-            'width' => 400
-        ]);
-        $thumbnail->addItem('setBackgroundImage', [
-            'path' => '/pimcore/static6/img/tree-preview-transparent-background.png',
-            'mode' => 'cropTopLeft'
-        ]);
-        $thumbnail->setQuality(60);
-        $thumbnail->setFormat('PJPEG');
+        $customPreviewImageThumbnail = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['preview_image_thumbnail'];
+        $thumbnail = null;
+
+        if ($customPreviewImageThumbnail) {
+            $thumbnail = self::getByName($customPreviewImageThumbnail);
+        }
+
+        if (!$thumbnail) {
+            $thumbnail = new self();
+            $thumbnail->setName('pimcore-system-treepreview');
+            $thumbnail->addItem('scaleByWidth', [
+                'width' => 400
+            ]);
+            $thumbnail->addItem('setBackgroundImage', [
+                'path' => '/bundles/pimcoreadmin/img/tree-preview-transparent-background.png',
+                'mode' => 'asTexture'
+            ]);
+            $thumbnail->setQuality(60);
+            $thumbnail->setFormat('PJPEG');
+        }
+
+        if ($hdpi) {
+            $thumbnail->setHighResolution(2);
+        }
 
         return $thumbnail;
     }
@@ -715,5 +749,73 @@ class Config extends Model\AbstractModel
     public function setPreserveMetaData($preserveMetaData)
     {
         $this->preserveMetaData = $preserveMetaData;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isRasterizeSVG(): bool
+    {
+        return $this->rasterizeSVG;
+    }
+
+    /**
+     * @param bool $rasterizeSVG
+     */
+    public function setRasterizeSVG(bool $rasterizeSVG): void
+    {
+        $this->rasterizeSVG = $rasterizeSVG;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSvgTargetFormatPossible()
+    {
+        $supportedTransformations = ['resize', 'scaleByWidth', 'scaleByHeight'];
+        foreach ($this->getItems() as $item) {
+            if (!in_array($item['method'], $supportedTransformations)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return string
+     */
+    public function getGroup(): string
+    {
+        return $this->group;
+    }
+
+    /**
+     * @param string $group
+     */
+    public function setGroup(string $group): void
+    {
+        $this->group = $group;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDownloadable(): bool
+    {
+        return $this->downloadable;
+    }
+
+    /**
+     * @param bool $downloadable
+     */
+    public function setDownloadable(bool $downloadable): void
+    {
+        $this->downloadable = $downloadable;
+    }
+
+    public function clearTempFiles()
+    {
+        $this->doClearTempFiles(PIMCORE_TEMPORARY_DIRECTORY . '/image-thumbnails', $this->getName());
     }
 }

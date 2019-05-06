@@ -17,9 +17,18 @@
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
 use Pimcore\Model;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 
-class Numeric extends Model\DataObject\ClassDefinition\Data
+class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface
 {
+    use Model\DataObject\Traits\SimpleComparisonTrait;
+    use Extension\ColumnType {
+        getColumnType as public genericGetColumnType;
+    }
+    use Extension\QueryColumnType {
+        getQueryColumnType as public genericGetQueryColumnType;
+    }
+
     const DECIMAL_SIZE_DEFAULT = 64;
     const DECIMAL_PRECISION_DEFAULT = 0;
 
@@ -288,7 +297,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
             return $this->buildDecimalColumnType();
         }
 
-        return parent::getColumnType();
+        return $this->genericGetColumnType();
     }
 
     /**
@@ -304,7 +313,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
             return $this->buildDecimalColumnType();
         }
 
-        return parent::getQueryColumnType();
+        return $this->genericGetQueryColumnType();
     }
 
     public function isDecimalType(): bool
@@ -324,7 +333,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
 
         // these are named after what MySQL expects - DECIMAL(precision, scale)
         $precision = self::DECIMAL_SIZE_DEFAULT;
-        $scale     = self::DECIMAL_PRECISION_DEFAULT;
+        $scale = self::DECIMAL_PRECISION_DEFAULT;
 
         if (null !== $this->decimalSize) {
             $precision = intval($this->decimalSize);
@@ -353,7 +362,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataForResource
+     * @see ResourcePersistenceAwareInterface::getDataForResource
      *
      * @param float|int|string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -371,7 +380,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromResource
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param float|int|string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -389,7 +398,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataForQueryResource
+     * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
      * @param float|int|string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -403,7 +412,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
      * @param float|int|string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -417,7 +426,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param float|int|string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -431,7 +440,7 @@ class Numeric extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param float|int|string $data
      * @param null|Model\DataObject\AbstractObject $object

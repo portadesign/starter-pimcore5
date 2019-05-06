@@ -75,15 +75,30 @@ class Dao extends Model\Dao\AbstractDao
      *
      * @return array
      */
-    public function getTranslations(Document $document)
+    public function getTranslations(Document $document, $task = 'open')
     {
         $sourceId = $this->getTranslationSourceId($document);
+        $data = $this->db->fetchAll('SELECT id,language FROM documents_translations WHERE sourceId IN(?, ?) UNION SELECT sourceId as id,"source" FROM documents_translations WHERE id = ?', [$sourceId, $document->getId(), $document->getId()]);
 
-        $data = $this->db->fetchAll('SELECT id,language FROM documents_translations WHERE sourceId = ?', [$sourceId]);
+        if ($task == 'open') {
+            $linkedData = [];
+            foreach ($data as $key => $value) {
+                $linkedData = $this->db->fetchAll('SELECT id,language FROM documents_translations WHERE sourceId = ? UNION SELECT sourceId as id,"source" FROM documents_translations WHERE id = ?', [$value['id'], $value['id']]);
+            }
+
+            if (count($linkedData) > 0) {
+                $data = array_merge($data, $linkedData);
+            }
+        }
 
         $translations = [];
         foreach ($data as $translation) {
-            $translations[$translation['language']] = $translation['id'];
+            if ($translation['language'] == 'source') {
+                $sourceDocument = Document::getById($translation['id']);
+                $translations[$sourceDocument->getProperty('language')] = $translation['id'];
+            } else {
+                $translations[$translation['language']] = $translation['id'];
+            }
         }
 
         // add language from source document
@@ -128,5 +143,28 @@ class Dao extends Model\Dao\AbstractDao
             $this->db->update('documents_translations', ['sourceId' => $newSourceId], ['sourceId' => $document->getId()]);
             $this->db->delete('documents_translations', ['id' => $newSourceId]);
         }
+    }
+
+    /**
+     * @param Document $sourceDocument
+     * @param Document $targetDocument
+     */
+    public function removeTranslationLink(Document $document, Document $targetDocument)
+    {
+        $sourceId = $this->getTranslationSourceId($document);
+
+        if ($targetDocument->getId() == $sourceId) {
+            $sourceId = $document->getId();
+        }
+
+        $newSourceId = $this->db->fetchOne('SELECT id FROM documents_translations WHERE id = ? AND sourceId = ?', [$targetDocument->getId(), $sourceId]);
+
+        if (empty($newSourceId)) {
+            $sourceId = $document->getId();
+        }
+
+        // Remove in both way
+        $this->db->delete('documents_translations', ['id' => $targetDocument->getId(), 'sourceId' => $sourceId]);
+        $this->db->delete('documents_translations', ['id' => $sourceId, 'sourceId' => $targetDocument->getId()]);
     }
 }

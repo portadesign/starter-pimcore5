@@ -88,6 +88,11 @@ class Asset extends Model\Webservice\Data
     public $metadata;
 
     /**
+     * @var Model\Element\Note[]
+     */
+    public $notes;
+
+    /**
      * @param $object
      * @param null $options
      */
@@ -131,7 +136,7 @@ class Asset extends Model\Webservice\Data
         $metadata = $this->metadata;
         if (is_array($metadata)) {
             $metadata = json_decode(json_encode($metadata), true);
-            $object->metadata = $metadata;
+            $object->setMetadata($metadata);
         }
     }
 }

@@ -19,6 +19,9 @@ namespace Pimcore\Model\DataObject\Objectbrick;
 
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data\CustomResourcePersistingInterface;
+use Pimcore\Model\DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface;
+use Pimcore\Tool;
 
 /**
  * @property \Pimcore\Model\DataObject\Objectbrick $model
@@ -61,20 +64,39 @@ class Dao extends Model\DataObject\Fieldcollection\Dao
                 $brick->setObject($object);
 
                 foreach ($fieldDefinitions as $key => $fd) {
-                    if (method_exists($fd, 'load')) {
-                        // datafield has it's own loader
-                        $context = [];
-                        $context['object'] = $object;
-                        $context['containerType'] = 'objectbrick';
-                        $context['containerKey'] = $brick->getType();
-                        $context['brickField'] = $key;
-                        $context['fieldname'] = $brick->getFieldname();
-                        $params['context'] = $context;
-                        $value = $fd->load($brick, $params);
-                        if ($value === 0 || !empty($value)) {
-                            $brick->setValue($key, $value);
+                    if ($fd instanceof CustomResourcePersistingInterface || method_exists($fd, 'load')) {
+                        if (!$fd instanceof CustomResourcePersistingInterface) {
+                            Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'load', CustomResourcePersistingInterface::class);
                         }
-                    } else {
+
+                        $doLoad = true;
+
+                        if ($fd instanceof  DataObject\ClassDefinition\Data\Relations\AbstractRelations) {
+                            if (!DataObject\Concrete::isLazyLoadingDisabled() && $fd->getLazyLoading()) {
+                                $doLoad = false;
+                            }
+                        }
+
+                        if ($doLoad) {
+                            // datafield has it's own loader
+                            $context = [];
+                            $context['object'] = $object;
+                            $context['containerType'] = 'objectbrick';
+                            $context['containerKey'] = $brick->getType();
+                            $context['brickField'] = $key;
+                            $context['fieldname'] = $brick->getFieldname();
+                            $params['context'] = $context;
+
+                            $value = $fd->load($brick, $params);
+                            if ($value === 0 || !empty($value)) {
+                                $brick->setValue($key, $value);
+                            }
+                        }
+                    }
+                    if ($fd instanceof ResourcePersistenceAwareInterface || method_exists($fd, 'getDataFromResource')) {
+                        if (!$fd instanceof ResourcePersistenceAwareInterface) {
+                            Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'getDataFromResource', ResourcePersistenceAwareInterface::class);
+                        }
                         if (is_array($fd->getColumnType())) {
                             $multidata = [];
                             foreach ($fd->getColumnType() as $fkey => $fvalue) {
@@ -94,6 +116,11 @@ class Dao extends Model\DataObject\Fieldcollection\Dao
                 }
 
                 $setter = 'set' . ucfirst($type);
+
+                if ($brick instanceof DataObject\DirtyIndicatorInterface) {
+                    $brick->markFieldDirty($key, false);
+                }
+
                 $this->model->$setter($brick);
 
                 $values[] = $brick;
@@ -104,11 +131,12 @@ class Dao extends Model\DataObject\Fieldcollection\Dao
     }
 
     /**
-     * @throws \Exception
-     *
      * @param DataObject\Concrete $object
+     * @param $saveMode true if called from save method
+     *
+     * @return whether an insert should be done or not
      */
-    public function delete(DataObject\Concrete $object)
+    public function delete(DataObject\Concrete $object, $saveMode = false)
     {
         // this is to clean up also the inherited values
         $fieldDef = $object->getClass()->getFieldDefinition($this->model->getFieldname());

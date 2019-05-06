@@ -39,6 +39,16 @@ class Definition extends Model\AbstractModel
     public $parentClass;
 
     /**
+     * @var string
+     */
+    public $title;
+
+    /**
+     * @var string
+     */
+    public $group;
+
+    /**
      * @var array
      */
     public $layoutDefinitions;
@@ -84,6 +94,22 @@ class Definition extends Model\AbstractModel
     }
 
     /**
+     * @return string
+     */
+    public function getTitle()
+    {
+        return $this->title;
+    }
+
+    /**
+     * @param string $title
+     */
+    public function setTitle($title)
+    {
+        $this->title = $title;
+    }
+
+    /**
      * @return array
      */
     public function getLayoutDefinitions()
@@ -113,7 +139,7 @@ class Definition extends Model\AbstractModel
      */
     public function getFieldDefinitions($context = [])
     {
-        if (isset($context['suppressEnrichment']) && $context['suppressEnrichment']) {
+        if (!\Pimcore::inAdmin() || (isset($context['suppressEnrichment']) && $context['suppressEnrichment'])) {
             return $this->fieldDefinitions;
         }
 
@@ -161,8 +187,8 @@ class Definition extends Model\AbstractModel
      */
     public function getFieldDefinition($key, $context = [])
     {
-        if (array_key_exists($key, $this->fieldDefinitions)) {
-            if (isset($context['suppressEnrichment']) && $context['suppressEnrichment']) {
+        if (is_array($this->fieldDefinitions) && array_key_exists($key, $this->fieldDefinitions)) {
+            if (!\Pimcore::inAdmin() || (isset($context['suppressEnrichment']) && $context['suppressEnrichment'])) {
                 return $this->fieldDefinitions[$key];
             }
 
@@ -174,7 +200,7 @@ class Definition extends Model\AbstractModel
         return false;
     }
 
-    public function doEnrichFieldDefinition($fieldDefinition, $context = [])
+    protected function doEnrichFieldDefinition($fieldDefinition, $context = [])
     {
         if (method_exists($fieldDefinition, 'enrichFieldDefinition')) {
             $context['containerType'] = 'fieldcollection';
@@ -245,9 +271,11 @@ class Definition extends Model\AbstractModel
     }
 
     /**
+     * @param bool $saveDefinitionFile
+     *
      * @throws \Exception
      */
-    public function save()
+    public function save($saveDefinitionFile = true)
     {
         if (!$this->getKey()) {
             throw new \Exception('A field-collection needs a key to be saved!');
@@ -257,20 +285,23 @@ class Definition extends Model\AbstractModel
 
         $definitionFile = $this->getDefinitionFile();
 
-        $clone = clone $this;
-        $clone->setDao(null);
-        unset($clone->fieldDefinitions);
+        if ($saveDefinitionFile) {
+            $clone = clone $this;
+            $clone->setDao(null);
+            unset($clone->fieldDefinitions);
+            DataObject\ClassDefinition::cleanupForExport($clone->layoutDefinitions);
 
-        $exportedClass = var_export($clone, true);
+            $exportedClass = var_export($clone, true);
 
-        $data = '<?php ';
-        $data .= "\n\n";
-        $data .= $infoDocBlock;
-        $data .= "\n\n";
+            $data = '<?php ';
+            $data .= "\n\n";
+            $data .= $infoDocBlock;
+            $data .= "\n\n";
 
-        $data .= "\nreturn " . $exportedClass . ";\n";
+            $data .= "\nreturn " . $exportedClass . ";\n";
 
-        \Pimcore\File::put($definitionFile, $data);
+            \Pimcore\File::put($definitionFile, $data);
+        }
 
         $extendClass = 'DataObject\\Fieldcollection\\Data\\AbstractData';
         if ($this->getParentClass()) {
@@ -288,14 +319,17 @@ class Definition extends Model\AbstractModel
         $cd .= 'use Pimcore\\Model\\DataObject;';
         $cd .= "\n\n";
 
-        $cd .= 'class ' . ucfirst($this->getKey()) . ' extends ' . $extendClass . '  {';
+        $cd .= 'class ' . ucfirst($this->getKey()) . ' extends ' . $extendClass . ' implements \\Pimcore\\Model\\DataObject\\DirtyIndicatorInterface {';
+
+        $cd .= "\n\n";
+        $cd .= 'use \\Pimcore\\Model\\DataObject\\Traits\\DirtyIndicatorTrait;';
         $cd .= "\n\n";
 
-        $cd .= 'public $type = "' . $this->getKey() . "\";\n";
+        $cd .= 'protected $type = "' . $this->getKey() . "\";\n";
 
         if (is_array($this->getFieldDefinitions()) && count($this->getFieldDefinitions())) {
             foreach ($this->getFieldDefinitions() as $key => $def) {
-                $cd .= 'public $' . $key . ";\n";
+                $cd .= 'protected $' . $key . ";\n";
             }
         }
 
@@ -415,5 +449,21 @@ class Definition extends Model\AbstractModel
         $cd .= '*/ ';
 
         return $cd;
+    }
+
+    /**
+     * @return string
+     */
+    public function getGroup()
+    {
+        return $this->group;
+    }
+
+    /**
+     * @param string $group
+     */
+    public function setGroup($group)
+    {
+        $this->group = $group;
     }
 }

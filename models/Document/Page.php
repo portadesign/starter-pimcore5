@@ -17,11 +17,12 @@
 
 namespace Pimcore\Model\Document;
 
-use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model\Document\Targeting\TargetingDocumentInterface;
 use Pimcore\Model\Redirect;
+use Pimcore\Model\Site;
 use Pimcore\Model\Tool\Targeting\TargetGroup;
+use Pimcore\Tool\Frontend;
 
 /**
  * @method \Pimcore\Model\Document\Page\Dao getDao()
@@ -43,43 +44,43 @@ class Page extends TargetingDocument
      *
      * @var string
      */
-    public $title = '';
+    protected $title = '';
 
     /**
      * Contains the description of the page (meta-description)
      *
      * @var string
      */
-    public $description = '';
+    protected $description = '';
 
     /**
      * @var array
      */
-    public $metaData = [];
+    protected $metaData = [];
 
     /**
      * Static type of the document
      *
      * @var string
      */
-    public $type = 'page';
+    protected $type = 'page';
 
     /**
      * @var string
      */
-    public $prettyUrl;
+    protected $prettyUrl;
 
     /**
      * Comma separated IDs of target groups
      *
      * @var string
      */
-    public $targetGroupIds = '';
+    protected $targetGroupIds = '';
 
     /**
-     * @throws \Exception
+     * @inheritdoc
      */
-    public function delete()
+    public function delete(bool $isNested = false)
     {
         if ($this->getId() == 1) {
             throw new \Exception('root-node cannot be deleted');
@@ -94,11 +95,15 @@ class Page extends TargetingDocument
             $redirect->delete();
         }
 
-        parent::delete();
+        if ($site = Site::getByRootId($this->getId())) {
+            $site->delete();
+        }
+
+        parent::delete($isNested);
     }
 
     /**
-     * @params array $params additional parameters (e.g. "versionNote" for the version note)
+     * @param array $params additional parameters (e.g. "versionNote" for the version note)
      *
      * @throws \Exception
      */
@@ -110,27 +115,20 @@ class Page extends TargetingDocument
 
         $config = \Pimcore\Config::getSystemConfig();
         if ($oldPath && $config->documents->createredirectwhenmoved && $oldPath != $this->getRealFullPath()) {
-
-            // check if the current page is in a site
-            $siteCheckQuery = "
-                SELECT documentsites.id FROM documents dd 
-                INNER JOIN (
-                    SELECT s.id, mainDomain, concat(d.path, d.key, '%') fullPath FROM `sites` s INNER JOIN documents d ON s.rootId = d.id
-                  ) documentsites
-                  ON dd.path LIKE documentsites.fullPath
-                WHERE dd.id = ?";
-
-            $siteId = Db::get()->fetchOne($siteCheckQuery, [$this->getId()]);
-
             // create redirect for old path
             $redirect = new Redirect();
+            $redirect->setType(Redirect::TYPE_PATH);
+            $redirect->setRegex(true);
             $redirect->setTarget($this->getId());
             $redirect->setSource('@' . $oldPath . '/?@');
             $redirect->setStatusCode(301);
             $redirect->setExpiry(time() + 86400 * 60); // this entry is removed automatically after 60 days
 
-            if ($siteId) {
-                $redirect->setSourceSite($siteId);
+            $site = Frontend::getSiteForDocument($this);
+            if ($site) {
+                $redirect->setSourceSite($site->getId());
+                $oldPath = preg_replace('@^' . preg_quote($site->getRootPath()) . '@', '', $oldPath);
+                $redirect->setSource('@' . $oldPath . '/?@');
             }
 
             $redirect->save();
@@ -420,5 +418,20 @@ class Page extends TargetingDocument
     public function getUsePersona()
     {
         return $this->getUseTargetGroup();
+    }
+
+    /**
+     * @param bool $hdpi
+     *
+     * @return string
+     */
+    public function getPreviewImageFilesystemPath($hdpi = false)
+    {
+        $suffix = '';
+        if ($hdpi) {
+            $suffix = '@2x';
+        }
+
+        return PIMCORE_SYSTEM_TEMP_DIRECTORY . '/document-page-previews/document-page-screenshot-' . $this->getId() . $suffix . '.jpg';
     }
 }

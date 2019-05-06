@@ -31,6 +31,12 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
 
     protected function updateModificationInfos()
     {
+        $this->setVersionCount($this->getDao()->getVersionCountForUpdate() + 1);
+
+        if ($this->getVersionCount() > 4200000000) {
+            $this->setVersionCount(1);
+        }
+
         $updateTime = time();
         $this->setModificationDate($updateTime);
 
@@ -258,5 +264,39 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
     public function __isBasedOnLatestData()
     {
         return $this->getDao()->__isBasedOnLatestData();
+    }
+
+    /**
+     * @param null $versionNote
+     * @param bool $saveOnlyVersion
+     *
+     * @return Model\Version
+     *
+     * @throws \Exception
+     */
+    protected function doSaveVersion($versionNote = null, $saveOnlyVersion = true)
+    {
+        /**
+         * @var Model\Version $version
+         */
+        $version = self::getModelFactory()->build(Model\Version::class);
+        $version->setCid($this->getId());
+        $version->setCtype(Service::getElementType($this));
+        $version->setDate($this->getModificationDate());
+        $version->setUserId($this->getUserModification());
+        $version->setData($this);
+        $version->setNote($versionNote);
+
+        if ($saveOnlyVersion) {
+            $versionCount = $this->getDao()->getVersionCountForUpdate();
+            $versionCount++;
+        } else {
+            $versionCount = $this->getVersionCount();
+        }
+
+        $version->setVersionCount($versionCount);
+        $version->save();
+
+        return $version;
     }
 }

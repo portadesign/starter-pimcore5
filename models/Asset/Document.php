@@ -29,10 +29,10 @@ class Document extends Model\Asset
     /**
      * @var string
      */
-    public $type = 'document';
+    protected $type = 'document';
 
     /**
-     * @params array $params additional parameters (e.g. "versionNote" for the version note)
+     * @param array $params additional parameters (e.g. "versionNote" for the version note)
      *
      * @throws \Exception
      */
@@ -49,17 +49,19 @@ class Document extends Model\Asset
                     $this->setCustomSetting('document_page_count', $pageCount);
                 }
             } catch (\Exception $e) {
+                // nothing to do
             }
-
-            unlink($tmpFile);
         }
 
         parent::update($params);
     }
 
-    public function delete()
+    /**
+     * @inheritdoc
+     */
+    public function delete(bool $isNested = false)
     {
-        parent::delete();
+        parent::delete($isNested);
         $this->clearThumbnails(true);
     }
 

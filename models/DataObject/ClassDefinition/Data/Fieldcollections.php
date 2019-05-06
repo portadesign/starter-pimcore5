@@ -19,10 +19,11 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\Webservice;
 use Pimcore\Tool\Cast;
 
-class Fieldcollections extends Model\DataObject\ClassDefinition\Data
+class Fieldcollections extends Data implements CustomResourcePersistingInterface
 {
     /**
      * Static type of this element
@@ -94,13 +95,13 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return array
      */
     public function getDataForEditmode($data, $object = null, $params = [])
     {
@@ -125,7 +126,8 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
 
                 foreach ($collectionDef->getFieldDefinitions() as $fd) {
                     if (!$fd instanceof CalculatedValue) {
-                        $collectionData[$fd->getName()] = $fd->getDataForEditmode($item->{$fd->getName()}, $object, $params);
+                        $value = $item->{'get' . $fd->getName()}();
+                        $collectionData[$fd->getName()] = $fd->getDataForEditmode($value, $object, $params);
                     }
                 }
 
@@ -144,7 +146,8 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
                 $editmodeData[] = [
                     'data' => $collectionData,
                     'type' => $item->getType(),
-                    'oIndex' => $idx
+                    'oIndex' => $idx,
+                    'title' => $collectionDef->getTitle()
                 ];
             }
         }
@@ -153,7 +156,7 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -196,9 +199,10 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
 
                 $collectionClass = '\\Pimcore\\Model\\DataObject\\Fieldcollection\\Data\\' . ucfirst($collectionRaw['type']);
                 $collection = \Pimcore::getContainer()->get('pimcore.model.factory')->build($collectionClass);
-                $collection->setValues($collectionData);
+                $collection->setObject($object);
                 $collection->setIndex($count);
                 $collection->setFieldname($this->getName());
+                $collection->setValues($collectionData);
 
                 $values[] = $collection;
 
@@ -212,7 +216,7 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param string $data
      * @param null|DataObject\AbstractObject $object
@@ -313,7 +317,7 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @param $object
+     * @param DataObject\Concrete $object
      * @param array $params
      *
      * @return null|DataObject\Fieldcollection
@@ -336,8 +340,9 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
 
     /**
      * @param $object
+     * @param array $params
      */
-    public function delete($object)
+    public function delete($object, $params = [])
     {
         $container = new DataObject\Fieldcollection(null, $this->getName());
         $container->delete($object);
@@ -569,7 +574,11 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
     {
         if (!$omitMandatoryCheck) {
             if ($data instanceof DataObject\Fieldcollection) {
+                $validationExceptions = [];
+
+                $idx = -1;
                 foreach ($data as $item) {
+                    $idx++;
                     if (!$item instanceof DataObject\Fieldcollection\Data\AbstractData) {
                         continue;
                     }
@@ -581,9 +590,22 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
                     }
 
                     foreach ($collectionDef->getFieldDefinitions() as $fd) {
-                        $getter = 'get' . ucfirst($fd->getName());
-                        $fd->checkValidity($item->$getter());
+                        try {
+                            $getter = 'get' . ucfirst($fd->getName());
+                            if (!$fd instanceof CalculatedValue) {
+                                $fd->checkValidity($item->$getter());
+                            }
+                        } catch (Model\Element\ValidationException $ve) {
+                            $ve->addContext($this->getName() . '-' . $idx);
+                            $validationExceptions[] = $ve;
+                        }
                     }
+                }
+
+                if ($validationExceptions) {
+                    $aggregatedExceptions = new Model\Element\ValidationException();
+                    $aggregatedExceptions->setSubItems($validationExceptions);
+                    throw $aggregatedExceptions;
                 }
             }
         }
@@ -603,13 +625,17 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
             throw new \Exception('Field Collections are only valid in Objects');
         }
 
-        $data = $object->{$this->getName()};
-        if ($this->getLazyLoading() and !in_array($this->getName(), $object->getO__loadedLazyFields())) {
+        $data = $object->getObjectVar($this->getName());
+        if ($this->getLazyLoading() && !$object->isLazyKeyLoaded($this->getName())) {
             $data = $this->load($object, ['force' => true]);
+            if ($data instanceof DataObject\DirtyIndicatorInterface) {
+                $data->resetDirtyMap();
+            }
 
             $setter = 'set' . ucfirst($this->getName());
             if (method_exists($object, $setter)) {
                 $object->$setter($data);
+                $this->markLazyloadedFieldAsLoaded($object);
             }
         }
 
@@ -625,9 +651,7 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
      */
     public function preSetData($object, $data, $params = [])
     {
-        if ($this->getLazyLoading() and !in_array($this->getName(), $object->getO__loadedLazyFields())) {
-            $object->addO__loadedLazyField($this->getName());
-        }
+        $this->markLazyloadedFieldAsLoaded($object);
 
         if ($data instanceof DataObject\Fieldcollection) {
             $data->setFieldname($this->getName());
@@ -743,7 +767,7 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
                 foreach ($collectionDef->getFieldDefinitions() as $fd) {
                     $title = !empty($fd->title) ? $fd->title : $fd->getName();
                     $html .= '<tr><td>&nbsp;</td><td>' . $title . '</td><td>';
-                    $html .= $fd->getVersionPreview($item->{$fd->getName()}, $object, $params);
+                    $html .= $fd->getVersionPreview($item->getObjectVar($fd->getName()), $object, $params);
                     $html .= '</td></tr>';
                 }
             }
@@ -841,6 +865,7 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
             foreach ($this->allowedTypes as $allowedType) {
                 $definition = DataObject\Fieldcollection\Definition::getByKey($allowedType);
                 if ($definition) {
+                    $definition->getDao()->createUpdateTable($class);
                     $fieldDefinition = $definition->getFieldDefinitions();
 
                     foreach ($fieldDefinition as $fd) {
@@ -851,6 +876,8 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
                             }
                         }
                     }
+
+                    $definition->getDao()->classSaved($class);
                 }
             }
         }
@@ -938,5 +965,13 @@ class Fieldcollections extends Model\DataObject\ClassDefinition\Data
                 }
             }
         }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function supportsInheritance()
+    {
+        return false;
     }
 }

@@ -21,6 +21,11 @@ use Pimcore\Logger;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\Webservice;
 
+/**
+ * Class Service
+ *
+ * @package Pimcore\Model\DataObject\ClassDefinition
+ */
 class Service
 {
     /**
@@ -33,13 +38,14 @@ class Service
     public static function generateClassDefinitionJson($class)
     {
         $data = Webservice\Data\Mapper::map($class, '\\Pimcore\\Model\\Webservice\\Data\\ClassDefinition\\Out', 'out');
-        unset($data->id);
         unset($data->name);
         unset($data->creationDate);
         unset($data->modificationDate);
         unset($data->userOwner);
         unset($data->userModification);
         unset($data->fieldDefinitions);
+
+        self::removeDynamicOptionsFromLayoutDefinition($data->layoutDefinitions);
 
         //add propertyVisibility to export data
         $data->propertyVisibility = $class->propertyVisibility;
@@ -49,14 +55,31 @@ class Service
         return $json;
     }
 
+    public static function removeDynamicOptionsFromLayoutDefinition(&$layout)
+    {
+        if (method_exists($layout, 'getChilds')) {
+            $children = $layout->getChildren();
+            if (is_array($children)) {
+                foreach ($children as $child) {
+                    if ($child instanceof DataObject\ClassDefinition\Data\Select) {
+                        if ($child->getOptionsProviderClass()) {
+                            $child->options = null;
+                        }
+                    }
+                    self::removeDynamicOptionsFromLayoutDefinition($child);
+                }
+            }
+        }
+    }
+
     /**
-     * @param $class
+     * @param $class DataObject\ClassDefinition
      * @param $json
      * @param bool $throwException
      *
      * @return bool
      */
-    public static function importClassDefinitionFromJson($class, $json, $throwException = false)
+    public static function importClassDefinitionFromJson($class, $json, $throwException = false, $ignoreId = false)
     {
         $userId = 0;
         $user = \Pimcore\Tool\Admin::getCurrentUser();
@@ -76,18 +99,19 @@ class Service
         }
 
         // set properties of class
-        $class->setDescription($importData['description']);
+        if (isset($importData['id']) && $importData['id'] && !$ignoreId) {
+            $class->setId($importData['id']);
+        }
         $class->setModificationDate(time());
         $class->setUserModification($userId);
-        $class->setIcon($importData['icon']);
-        $class->setAllowInherit($importData['allowInherit']);
-        $class->setAllowVariants($importData['allowVariants']);
-        $class->setShowVariants($importData['showVariants']);
-        $class->setParentClass($importData['parentClass']);
-        $class->setUseTraits($importData['useTraits']);
-        $class->setPreviewUrl($importData['previewUrl']);
-        $class->setPropertyVisibility($importData['propertyVisibility']);
-        $class->setLinkGeneratorReference(isset($importData['linkGeneratorReference']) ? $importData['linkGeneratorReference'] : null);
+
+        foreach (['description', 'icon', 'group', 'allowInherit', 'allowVariants', 'showVariants', 'parentClass',
+                    'listingParentClass', 'useTraits', 'listingUseTraits', 'previewUrl', 'propertyVisibility',
+                    'linkGeneratorReference'] as $importPropertyName) {
+            if (isset($importData[$importPropertyName])) {
+                $class->{'set' . $importPropertyName}($importData[$importPropertyName]);
+            }
+        }
 
         $class->save();
 
@@ -145,7 +169,12 @@ class Service
         // this will allow to import the brick on a different instance with identical class names but different class IDs
         if (is_array($objectBrick->classDefinitions)) {
             foreach ($objectBrick->classDefinitions as &$cd) {
-                $class = DataObject\ClassDefinition::getById($cd['classname']);
+                // for compatibility (upgraded pimcore4s that may deliver class ids in $cd['classname'] we need to
+                // get the class by id in order to be able to correctly set the classname for the generated json
+                if (!$class = DataObject\ClassDefinition::getByName($cd['classname'])) {
+                    $class = DataObject\ClassDefinition::getById($cd['classname']);
+                }
+
                 if ($class) {
                     $cd['classname'] = $class->getName();
                 }
@@ -194,6 +223,12 @@ class Service
 
         $objectBrick->setClassDefinitions($toAssignClassDefinitions);
         $objectBrick->setParentClass($importData['parentClass']);
+        if (isset($importData['title'])) {
+            $objectBrick->setTitle($importData['title']);
+        }
+        if (isset($importData['group'])) {
+            $objectBrick->setGroup($importData['group']);
+        }
         $objectBrick->save();
 
         return true;
@@ -246,13 +281,6 @@ class Service
 
                     if ($item instanceof DataObject\ClassDefinition\Data\EncryptedField) {
                         $item->setupDelegate($array);
-                    }
-
-                    if ($insideLocalizedField && $item instanceof DataObject\ClassDefinition\Data\Relations\AbstractRelations) {
-                        if ($item->getLazyLoading()) {
-                            Logger::error('WARNING: lazy loading relations not supported inside localizedfields');
-                            $item->setLazyLoading(false);
-                        }
                     }
                 }
 

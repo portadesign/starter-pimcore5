@@ -18,9 +18,14 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 
-class Checkbox extends Model\DataObject\ClassDefinition\Data
+class Checkbox extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface
 {
+    use Model\DataObject\Traits\SimpleComparisonTrait;
+    use Extension\ColumnType;
+    use Extension\QueryColumnType;
+
     /**
      * Static type of this element
      *
@@ -75,7 +80,7 @@ class Checkbox extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForResource
+     * @see ResourcePersistenceAwareInterface::getDataForResource
      *
      * @param bool $data
      * @param null|DataObject\AbstractObject $object
@@ -85,15 +90,13 @@ class Checkbox extends Model\DataObject\ClassDefinition\Data
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
-        if (is_bool($data)) {
-            $data = (int)$data;
-        }
+        $data = is_null($data) ? $this->getDefaultValue() : $data;
 
-        return $data;
+        return (int)$data;
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataFromResource
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param bool $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -111,7 +114,7 @@ class Checkbox extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForQueryResource
+     * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
      * @param bool $data
      * @param null|DataObject\AbstractObject $object
@@ -125,7 +128,7 @@ class Checkbox extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
      * @param bool $data
      * @param null|DataObject\AbstractObject $object
@@ -139,7 +142,7 @@ class Checkbox extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param bool $data
      * @param null|DataObject\AbstractObject $object
@@ -157,7 +160,7 @@ class Checkbox extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param bool $data
      * @param null|DataObject\AbstractObject $object
@@ -282,7 +285,7 @@ class Checkbox extends Model\DataObject\ClassDefinition\Data
      */
     public function getFilterCondition($value, $operator, $params = [])
     {
-        $params['name']= $this->name;
+        $params['name'] = $this->name;
 
         return $this->getFilterConditionExt(
             $value,
@@ -305,7 +308,7 @@ class Checkbox extends Model\DataObject\ClassDefinition\Data
         $db = \Pimcore\Db::get();
         $name = $params['name'] ? $params['name'] : $this->name;
         $value = $db->quote($value);
-        $key = $db->quoteIdentifier($this->name, $name);
+        $key = $db->quoteIdentifier($this->name);
 
         $brickPrefix = $params['brickType'] ? $db->quoteIdentifier($params['brickType']) . '.' : '';
 

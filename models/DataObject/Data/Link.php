@@ -18,81 +18,89 @@
 namespace Pimcore\Model\DataObject\Data;
 
 use Pimcore\Model\Asset;
+use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\Concrete;
+use Pimcore\Model\DataObject\OwnerAwareFieldInterface;
+use Pimcore\Model\DataObject\Traits\ObjectVarTrait;
+use Pimcore\Model\DataObject\Traits\OwnerAwareFieldTrait;
 use Pimcore\Model\Document;
+use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\Element\Service;
 
-class Link
+class Link implements OwnerAwareFieldInterface
 {
-    /**
-     * @var string
-     */
-    public $text;
+    use OwnerAwareFieldTrait;
+    use ObjectVarTrait;
 
     /**
      * @var string
      */
-    public $internalType;
+    protected $text;
 
     /**
      * @var string
      */
-    public $internal;
+    protected $internalType;
 
     /**
      * @var string
      */
-    public $direct;
+    protected $internal;
 
     /**
      * @var string
      */
-    public $linktype;
+    protected $direct;
 
     /**
      * @var string
      */
-    public $target;
+    protected $linktype;
 
     /**
      * @var string
      */
-    public $parameters;
+    protected $target;
 
     /**
      * @var string
      */
-    public $anchor;
+    protected $parameters;
 
     /**
      * @var string
      */
-    public $title;
+    protected $anchor;
 
     /**
      * @var string
      */
-    public $accesskey;
+    protected $title;
 
     /**
      * @var string
      */
-    public $rel;
+    protected $accesskey;
 
     /**
      * @var string
      */
-    public $tabindex;
+    protected $rel;
 
     /**
      * @var string
      */
-    public $class;
+    protected $tabindex;
 
     /**
      * @var string
      */
-    public $attributes;
+    protected $class;
+
+    /**
+     * @var string
+     */
+    protected $attributes;
 
     /**
      * @return string
@@ -110,6 +118,7 @@ class Link
     public function setText($text)
     {
         $this->text = $text;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -130,6 +139,7 @@ class Link
     public function setInternalType($internalType)
     {
         $this->internalType = $internalType;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -150,9 +160,7 @@ class Link
     public function setInternal($internal)
     {
         $this->internal = $internal;
-        if (!empty($internal)) {
-            $this->setObjectFromId();
-        }
+        $this->markMeDirty();
 
         return $this;
     }
@@ -173,6 +181,7 @@ class Link
     public function setDirect($direct)
     {
         $this->direct = $direct;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -193,6 +202,7 @@ class Link
     public function setLinktype($linktype)
     {
         $this->linktype = $linktype;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -213,6 +223,7 @@ class Link
     public function setTarget($target)
     {
         $this->target = $target;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -233,6 +244,7 @@ class Link
     public function setParameters($parameters)
     {
         $this->parameters = $parameters;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -253,6 +265,7 @@ class Link
     public function setAnchor($anchor)
     {
         $this->anchor = $anchor;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -273,6 +286,7 @@ class Link
     public function setTitle($title)
     {
         $this->title = $title;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -293,6 +307,7 @@ class Link
     public function setAccesskey($accesskey)
     {
         $this->accesskey = $accesskey;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -313,6 +328,7 @@ class Link
     public function setRel($rel)
     {
         $this->rel = $rel;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -333,6 +349,7 @@ class Link
     public function setTabindex($tabindex)
     {
         $this->tabindex = $tabindex;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -343,6 +360,7 @@ class Link
     public function setAttributes($attributes)
     {
         $this->attributes = $attributes;
+        $this->markMeDirty();
     }
 
     /**
@@ -359,6 +377,7 @@ class Link
     public function setClass($class)
     {
         $this->class = $class;
+        $this->markMeDirty();
     }
 
     /**
@@ -406,6 +425,7 @@ class Link
                 }
             }
         }
+        $this->markMeDirty();
 
         return $this;
     }
@@ -462,21 +482,21 @@ class Link
     }
 
     /**
-     * @return Document|Asset|bool
-     *
-     * @todo: $this->object not found in class
+     * @return Document|Asset|DataObject|null
      */
     public function getObject()
     {
-        if ($this->object instanceof Document || $this->object instanceof Asset || $this->object instanceof Concrete) {
-            return $this->object;
-        } else {
-            if ($this->setObjectFromId()) {
-                return $this->object;
-            }
+        $element = null;
+
+        if ($this->internalType == 'document') {
+            $element = Document::getById($this->internal);
+        } elseif ($this->internalType == 'asset') {
+            $element = Asset::getById($this->internal);
+        } elseif ($this->internalType == 'object') {
+            $element = Concrete::getById($this->internal);
         }
 
-        return false;
+        return $element;
     }
 
     /**
@@ -486,27 +506,14 @@ class Link
      */
     public function setObject($object)
     {
-        $this->object = $object;
-
-        return $this;
-    }
-
-    /**
-     * @return Asset|Document
-     *
-     * @todo: $this->object not found in class
-     */
-    public function setObjectFromId()
-    {
-        if ($this->internalType == 'document') {
-            $this->object = Document::getById($this->internal);
-        } elseif ($this->internalType == 'asset') {
-            $this->object = Asset::getById($this->internal);
-        } elseif ($this->internalType == 'object') {
-            $this->object = Concrete::getById($this->internal);
+        if ($object instanceof ElementInterface) {
+            $this->internal = $object->getId();
+            $this->internalType = Service::getElementType($object);
         }
 
-        return $this->object;
+        $this->markMeDirty();
+
+        return $this;
     }
 
     /**
@@ -563,6 +570,7 @@ class Link
                 }
             }
         }
+        $this->markMeDirty();
 
         return $this;
     }

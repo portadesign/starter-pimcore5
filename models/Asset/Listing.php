@@ -22,11 +22,12 @@ use Zend\Paginator\Adapter\AdapterInterface;
 use Zend\Paginator\AdapterAggregateInterface;
 
 /**
- * @method int load()
+ * @method Model\Asset[] load()
  * @method int getTotalCount()
  * @method int getCount()
- * @method int loadIdList()
+ * @method int[] loadIdList()
  * @method \Pimcore\Model\Asset\Listing\Dao getDao()
+ * @method onCreateQuery(callable $callback)
  */
 class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterAggregate, \Iterator, AdapterInterface, AdapterAggregateInterface
 {
@@ -36,34 +37,6 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
      * @var array
      */
     public $assets = null;
-
-    /**
-     * List of valid order keys
-     *
-     * @var array
-     */
-    public $validOrderKeys = [
-        'creationDate',
-        'modificationDate',
-        'id',
-        'filename',
-        'type',
-        'parentId',
-        'path',
-        'mimetype'
-    ];
-
-    /**
-     * Test if the passed key is valid
-     *
-     * @param string $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-    }
 
     /**
      * @return Model\Asset[]

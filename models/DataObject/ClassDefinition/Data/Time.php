@@ -20,6 +20,8 @@ use Pimcore\Model;
 
 class Time extends Model\DataObject\ClassDefinition\Data\Input
 {
+    use Model\DataObject\Traits\SimpleComparisonTrait;
+
     /**
      * Static type of this element
      *
@@ -166,7 +168,7 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
      *
      * @return int
      */
-    protected function toTimestamp($string, $baseTimestamp=null)
+    protected function toTimestamp($string, $baseTimestamp = null)
     {
         if ($baseTimestamp === null) {
             $baseTimestamp = time();

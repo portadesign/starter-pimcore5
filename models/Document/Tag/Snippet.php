@@ -18,11 +18,13 @@
 namespace Pimcore\Model\Document\Tag;
 
 use Pimcore\Cache;
+use Pimcore\FeatureToggles\Features\DebugMode;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Document;
 use Pimcore\Targeting\Document\DocumentTargetingConfigurator;
 use Pimcore\Tool\DeviceDetector;
+use Pimcore\Tool\Frontend;
 
 /**
  * @method \Pimcore\Model\Document\Tag\Dao getDao()
@@ -106,7 +108,7 @@ class Snippet extends Model\Document\Tag
         // TODO inject services via DI when tags are built through container
         $container = \Pimcore::getContainer();
 
-        $tagHandler            = $container->get('pimcore.document.tag.handler');
+        $tagHandler = $container->get('pimcore.document.tag.handler');
         $targetingConfigurator = $container->get(DocumentTargetingConfigurator::class);
 
         if (!$tagHandler->supports($this->view)) {
@@ -142,7 +144,11 @@ class Snippet extends Model\Document\Tag
 
                 // TODO is this enough for cache or should we disable caching completely?
                 if ($this->snippet->getUseTargetGroup()) {
-                    $params['target_group'] = $this->snippet->getUseTargetGroup();
+                    $cacheParams['target_group'] = $this->snippet->getUseTargetGroup();
+                }
+
+                if (Frontend::hasWebpSupport()) {
+                    $cacheParams['webp'] = true;
                 }
 
                 $cacheKey = 'tag_snippet__' . md5(serialize($cacheParams));
@@ -168,7 +174,7 @@ class Snippet extends Model\Document\Tag
         } catch (\Exception $e) {
             Logger::error($e);
 
-            if (\Pimcore::inDebugMode()) {
+            if (\Pimcore::inDebugMode(DebugMode::RENDER_DOCUMENT_TAG_ERRORS)) {
                 return 'ERROR: ' . $e->getMessage() . ' (for details see log files in /var/logs)';
             }
         }

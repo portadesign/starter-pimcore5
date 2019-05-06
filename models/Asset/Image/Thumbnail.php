@@ -91,6 +91,15 @@ class Thumbnail
     {
         $fsPath = $this->getFileSystemPath($deferredAllowed);
         $path = str_replace(PIMCORE_TEMPORARY_DIRECTORY . '/image-thumbnails', '', $fsPath);
+
+        if ($this->getConfig()) {
+            if ($this->useOriginalFile($this->asset->getFilename()) && $this->getConfig()->isSvgTargetFormatPossible()) {
+                // we still generate the raster image, to get the final size of the thumbnail
+                // we use getRealFullPath() here, to avoid double encoding (getFullPath() returns already encoded path)
+                $path = $this->asset->getRealFullPath();
+            }
+        }
+
         $path = urlencode_ignore_slash($path);
 
         $event = new GenericEvent($this, [
@@ -101,6 +110,22 @@ class Thumbnail
         $path = $event->getArgument('frontendPath');
 
         return $path;
+    }
+
+    /**
+     * @param string $filename
+     *
+     * @return bool
+     */
+    protected function useOriginalFile($filename)
+    {
+        if ($this->getConfig()) {
+            if (!$this->getConfig()->isRasterizeSVG() && preg_match("@\.svgz?$@", $filename)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -122,7 +147,7 @@ class Thumbnail
      */
     public function generate($deferredAllowed = true)
     {
-        $errorImage = PIMCORE_WEB_ROOT . '/pimcore/static6/img/filetype-not-supported.svg';
+        $errorImage = PIMCORE_WEB_ROOT . '/bundles/pimcoreadmin/img/filetype-not-supported.svg';
         $deferred = false;
         $generated = false;
 
@@ -341,7 +366,7 @@ class Thumbnail
 
     /**
      * Get generated HTML for displaying the thumbnail image in a HTML document. (XHTML compatible).
-     * Attributes can be added as a parameter. Attributes containing illigal characters are ignored.
+     * Attributes can be added as a parameter. Attributes containing illegal characters are ignored.
      * Width and Height attribute can be overridden. SRC-attribute not.
      * Values of attributes are escaped.
      *
@@ -350,7 +375,7 @@ class Thumbnail
      *
      * @return string IMG-element with at least the attributes src, width, height, alt.
      */
-    public function getHTML($options = [], $removeAttributes = [])
+    public function getHtml($options = [], $removeAttributes = [])
     {
         $image = $this->getAsset();
         $attributes = [];
@@ -449,16 +474,22 @@ class Thumbnail
 
         $path = $this->getPath(true);
         $attributes['src'] = $path;
+        if (isset($options['cacheBuster']) && $options['cacheBuster']) {
+            $attributes['src'] = '/cache-buster-' . $image->getModificationDate() . $attributes['src'];
+        }
 
         $thumbConfig = $this->getConfig();
 
-        if ($this->getConfig() && !$this->getConfig()->hasMedias()) {
+        if ($this->getConfig() && !$this->getConfig()->hasMedias() && !$this->useOriginalFile($path)) {
             // generate the srcset
             $srcSetValues = [];
             foreach ([1, 2] as $highRes) {
                 $thumbConfigRes = clone $thumbConfig;
                 $thumbConfigRes->setHighResolution($highRes);
                 $srcsetEntry = $image->getThumbnail($thumbConfigRes, true) . ' ' . $highRes . 'x';
+                if (isset($options['cacheBuster']) && $options['cacheBuster']) {
+                    $srcsetEntry = '/cache-buster-' . $image->getModificationDate() . $srcsetEntry;
+                }
                 $srcSetValues[] = $srcsetEntry;
             }
             $attributes['srcset'] = implode(', ', $srcSetValues);

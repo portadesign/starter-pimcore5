@@ -23,12 +23,14 @@ use Pimcore\Model\DataObject;
 /**
  * @method \Pimcore\Model\DataObject\Data\ObjectMetadata\Dao getDao()
  */
-class ObjectMetadata extends Model\AbstractModel
+class ObjectMetadata extends Model\AbstractModel implements DataObject\OwnerAwareFieldInterface
 {
+    use DataObject\Traits\OwnerAwareFieldTrait;
+
     /**
-     * @var DataObject\Concrete
+     * @var int
      */
-    protected $object;
+    protected $objectId;
 
     /**
      * @var string
@@ -43,20 +45,38 @@ class ObjectMetadata extends Model\AbstractModel
     /**
      * @var array
      */
-    public $data = [];
+    protected $data = [];
 
     /**
-     * @param $fieldname
+     * @param string $fieldname
      * @param array $columns
      * @param null $object
-     *
-     * @throws \Exception
      */
     public function __construct($fieldname, $columns = [], $object = null)
     {
         $this->fieldname = $fieldname;
-        $this->object = $object;
         $this->columns = $columns;
+        $this->setObject($object);
+    }
+
+    /**
+     * @param DataObject\Concrete $object
+     *
+     * @return $this|void
+     */
+    public function setObject($object)
+    {
+        $this->markMeDirty();
+
+        if (!$object) {
+            $this->setObjectId(null);
+
+            return;
+        }
+
+        $this->objectId = $object->getId();
+
+        return $this;
     }
 
     /**
@@ -83,6 +103,7 @@ class ObjectMetadata extends Model\AbstractModel
             $key = strtolower(substr($name, 3, strlen($name) - 3));
             if (in_array($key, $this->columns)) {
                 $this->data[$key] = $arguments[0];
+                $this->markMeDirty();
             } else {
                 throw new \Exception("Requested data $key not available");
             }
@@ -94,25 +115,27 @@ class ObjectMetadata extends Model\AbstractModel
      * @param string $ownertype
      * @param $ownername
      * @param $position
+     * @param $index
      */
-    public function save($object, $ownertype = 'object', $ownername, $position)
+    public function save($object, $ownertype = 'object', $ownername, $position, $index)
     {
-        $this->getDao()->save($object, $ownertype, $ownername, $position);
+        $this->getDao()->save($object, $ownertype, $ownername, $position, $index);
     }
 
     /**
      * @param DataObject\Concrete $source
-     * @param $destination
+     * @param $destinationId
      * @param $fieldname
      * @param $ownertype
      * @param $ownername
      * @param $position
+     * @param $index
      *
      * @return mixed
      */
-    public function load(DataObject\Concrete $source, $destination, $fieldname, $ownertype, $ownername, $position)
+    public function load(DataObject\Concrete $source, $destinationId, $fieldname, $ownertype, $ownername, $position, $index)
     {
-        return $this->getDao()->load($source, $destination, $fieldname, $ownertype, $ownername, $position);
+        return $this->getDao()->load($source, $destinationId, $fieldname, $ownertype, $ownername, $position, $index);
     }
 
     /**
@@ -123,6 +146,7 @@ class ObjectMetadata extends Model\AbstractModel
     public function setFieldname($fieldname)
     {
         $this->fieldname = $fieldname;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -136,23 +160,18 @@ class ObjectMetadata extends Model\AbstractModel
     }
 
     /**
-     * @param $object
-     *
-     * @return $this
-     */
-    public function setObject($object)
-    {
-        $this->object = $object;
-
-        return $this;
-    }
-
-    /**
      * @return DataObject\Concrete
      */
     public function getObject()
     {
-        return $this->object;
+        if ($this->getObjectId()) {
+            $object = DataObject\Concrete::getById($this->getObjectId());
+            if (!$object) {
+                throw new \Exception('object '  . $this->getObjectId() . ' does not exist anymore');
+            }
+
+            return $object;
+        }
     }
 
     /**
@@ -164,6 +183,8 @@ class ObjectMetadata extends Model\AbstractModel
      */
     public function setElement($element)
     {
+        $this->markMeDirty();
+
         return $this->setObject($element);
     }
 
@@ -183,6 +204,7 @@ class ObjectMetadata extends Model\AbstractModel
     public function setColumns($columns)
     {
         $this->columns = $columns;
+        $this->markMeDirty();
 
         return $this;
     }
@@ -196,10 +218,43 @@ class ObjectMetadata extends Model\AbstractModel
     }
 
     /**
+     * @return array
+     */
+    public function getData(): array
+    {
+        return $this->data;
+    }
+
+    /**
+     * @param array $data
+     */
+    public function setData(array $data): void
+    {
+        $this->data = $data;
+        $this->markMeDirty();
+    }
+
+    /**
      * @return mixed
      */
     public function __toString()
     {
         return $this->getObject()->__toString();
+    }
+
+    /**
+     * @return int
+     */
+    public function getObjectId()
+    {
+        return $this->objectId;
+    }
+
+    /**
+     * @param int|null $objectId
+     */
+    public function setObjectId($objectId)
+    {
+        $this->objectId = $objectId;
     }
 }

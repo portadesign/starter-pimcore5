@@ -20,12 +20,14 @@ use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\Element;
 use Pimcore\Tool\Serialize;
 
-class Block extends Model\DataObject\ClassDefinition\Data
+class Block extends Data implements CustomResourcePersistingInterface, ResourcePersistenceAwareInterface
 {
     use Element\ChildsCompatibilityTrait;
+    use Extension\ColumnType;
 
     /**
      * Static type of this element
@@ -60,11 +62,9 @@ class Block extends Model\DataObject\ClassDefinition\Data
     public $collapsed;
 
     /**
-     * Type for the column to query
-     *
-     * @var string
+     * @var int
      */
-    public $queryColumnType = 'longtext';
+    public $maxItems;
 
     /**
      * Type for the column
@@ -83,7 +83,7 @@ class Block extends Model\DataObject\ClassDefinition\Data
      *
      * @var string
      */
-    public $phpdocType = '\\Pimcore\\Model\\DataObject\\Data\\Block';
+    public $phpdocType = '\\Pimcore\\Model\\DataObject\\Data\\BlockElement[][]';
 
     /**
      * @var array
@@ -108,9 +108,9 @@ class Block extends Model\DataObject\ClassDefinition\Data
     public $fieldDefinitionsCache;
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForResource
+     * @see ResourcePersistenceAwareInterface::getDataForResource
      *
-     * @param string $data
+     * @param array $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
@@ -155,20 +155,20 @@ class Block extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataFromResource
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return string
+     * @return array|null
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
         if ($data) {
             $count = 0;
 
-            $unserializedData = unserialize($data);
+            $unserializedData = Serialize::unserialize($data);
             $result = [];
 
             foreach ($unserializedData as $blockElements) {
@@ -205,6 +205,11 @@ class Block extends Model\DataObject\ClassDefinition\Data
                         }
                     }
                     $blockElement = new DataObject\Data\BlockElement($blockElementRaw['name'], $blockElementRaw['type'], $blockElementRaw['data']);
+
+                    if (isset($params['owner'])) {
+                        $blockElement->setOwner($params['owner'], $params['fieldname'], $params['language']);
+                    }
+
                     $items[$elementName] = $blockElement;
                 }
                 $result[] = $items;
@@ -218,21 +223,7 @@ class Block extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForQueryResource
-     *
-     * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
-     * @param mixed $params
-     *
-     * @return string
-     */
-    public function getDataForQueryResource($data, $object = null, $params = [])
-    {
-        return null;
-    }
-
-    /**
-     * @see DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -278,7 +269,7 @@ class Block extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param array $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -328,7 +319,7 @@ class Block extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param string $data
      * @param null|DataObject\AbstractObject $object
@@ -639,7 +630,7 @@ class Block extends Model\DataObject\ClassDefinition\Data
             $this->fieldDefinitionsCache = $definitions;
         }
 
-        if (isset($context['suppressEnrichment']) && $context['suppressEnrichment']) {
+        if (!\Pimcore::inAdmin() || (isset($context['suppressEnrichment']) && $context['suppressEnrichment'])) {
             return $this->fieldDefinitionsCache;
         }
 
@@ -664,7 +655,7 @@ class Block extends Model\DataObject\ClassDefinition\Data
     {
         $fds = $this->getFieldDefinitions();
         if (isset($fds[$name])) {
-            if (isset($context['suppressEnrichment']) && $context['suppressEnrichment']) {
+            if (!\Pimcore::inAdmin() || (isset($context['suppressEnrichment']) && $context['suppressEnrichment'])) {
                 return $fds[$name];
             }
             $fieldDefinition = $this->doEnrichFieldDefinition($fds[$name], $context);
@@ -675,7 +666,7 @@ class Block extends Model\DataObject\ClassDefinition\Data
         return;
     }
 
-    public function doEnrichFieldDefinition($fieldDefinition, $context = [])
+    protected function doEnrichFieldDefinition($fieldDefinition, $context = [])
     {
         if (method_exists($fieldDefinition, 'enrichFieldDefinition')) {
             $context['containerType'] = 'block';
@@ -870,33 +861,40 @@ class Block extends Model\DataObject\ClassDefinition\Data
      */
     public function preSetData($object, $data, $params = [])
     {
-        if ($object instanceof DataObject\Concrete) {
-            if ($this->getLazyLoading() and !in_array($this->getName(), $object->getO__loadedLazyFields())) {
-                $object->addO__loadedLazyField($this->getName());
+        $this->markLazyloadedFieldAsLoaded($object);
+
+        $lf = $this->getFielddefinition('localizedfields');
+        if ($lf && is_array($data)) {
+            /** @var $item DataObject\Data\BlockElement */
+            foreach ($data as $item) {
+                if (is_array($item)) {
+                    foreach ($item as $itemElement) {
+                        if ($itemElement->getType() == 'localizedfields') {
+                            /** @var $itemElementData DataObject\Localizedfield */
+                            $itemElementData = $itemElement->getData();
+                            $itemElementData->setObject($object);
+
+                            // the localized field needs at least the containerType as this is important
+                            // for lazy loading
+                            $context = $itemElementData->getContext() ? $itemElementData->getContext() : [];
+                            $context['containerType'] = 'block';
+                            $itemElementData->setContext($context);
+                        }
+                    }
+                }
             }
         }
 
         return $data;
     }
 
-//
-//    public function getTableName($container, $params = []) {
-//        $db = Db::get();
-//        $data = null;
-//
-//        if ($container instanceof DataObject\Concrete) {
-//            return "object_store_" . $container->getClassId();
-//        } elseif ($container instanceof DataObject\Fieldcollection\Data\AbstractData) {
-//
-//            //TODO
-//        } elseif ($container instanceof DataObject\Localizedfield) {
-//            //TODO
-//        } elseif ($container instanceof DataObject\Objectbrick\Data\AbstractData) {
-//            //TODO
-//        }
-//
-//
-//    }
+    /**
+     * @param $object
+     * @param array $params
+     */
+    public function save($object, $params = [])
+    {
+    }
 
     /**
      * @param $object
@@ -913,18 +911,16 @@ class Block extends Model\DataObject\ClassDefinition\Data
             if (!method_exists($this, 'getLazyLoading') or !$this->getLazyLoading() or (array_key_exists('force', $params) && $params['force'])) {
                 $data = null;
 
-                $query = 'select ' . $field . ' from object_store_' . $container->getClassId() . ' where oo_id  = ' . $container->getId();
+                $query = 'select ' . $db->quoteIdentifier($field) . ' from object_store_' . $container->getClassId() . ' where oo_id  = ' . $container->getId();
                 $data = $db->fetchOne($query);
                 $data = $this->getDataFromResource($data, $container, $params);
-            } else {
-                return null;
             }
         } elseif ($container instanceof DataObject\Localizedfield) {
             $context = $params['context'];
             $object = $context['object'];
 
             if ($context && $context['containerType'] == 'fieldcollection') {
-                $query = 'select ' . $db->quoteIdentifier($field) . ' from object_collection_' . $context['containerKey'] . '_localized_' . $object->getClassId() . ' where language = ' . $db->quote($params['language']) . ' and  ooo_id  = ' . $object->getId()  . ' and fieldname = ' . $db->quote($context['fieldname']) . ' and `index` =  ' . $context['index'];
+                $query = 'select ' . $db->quoteIdentifier($field) . ' from object_collection_' . $context['containerKey'] . '_localized_' . $object->getClassId() . ' where language = ' . $db->quote($params['language']) . ' and  ooo_id  = ' . $object->getId() . ' and fieldname = ' . $db->quote($context['fieldname']) . ' and `index` =  ' . $context['index'];
             } else {
                 $query = 'select ' . $db->quoteIdentifier($field) . ' from object_localized_data_' . $object->getClassId() . ' where language = ' . $db->quote($params['language']) . ' and  ooo_id  = ' . $object->getId();
             }
@@ -950,12 +946,20 @@ class Block extends Model\DataObject\ClassDefinition\Data
             //TODO index!!!!!!!!!!!!!!
 
             $query = 'select ' . $db->quoteIdentifier($field) . ' from object_collection_' . $collectionType . '_' . $object->getClassId()
-                . ' where  o_id  = ' . $object->getId() . ' and fieldname = ' . $db->quote($fcField) . ' and `index` = '. $context['index'];
+                . ' where  o_id  = ' . $object->getId() . ' and fieldname = ' . $db->quote($fcField) . ' and `index` = ' . $context['index'];
             $data = $db->fetchOne($query);
             $data = $this->getDataFromResource($data, $container, $params);
         }
 
         return $data;
+    }
+
+    /**
+     * @param $object
+     * @param array $params
+     */
+    public function delete($object, $params = [])
+    {
     }
 
     /**
@@ -968,21 +972,22 @@ class Block extends Model\DataObject\ClassDefinition\Data
     {
         $data = null;
         if ($object instanceof DataObject\Concrete) {
-            $data = $object->{$this->getName()};
-            if ($this->getLazyLoading() and !in_array($this->getName(), $object->getO__loadedLazyFields())) {
+            $data = $object->getObjectVar($this->getName());
+            if ($this->getLazyLoading() && !$object->isLazyKeyLoaded($this->getName())) {
                 $data = $this->load($object, ['force' => true]);
 
                 $setter = 'set' . ucfirst($this->getName());
                 if (method_exists($object, $setter)) {
                     $object->$setter($data);
+                    $this->markLazyloadedFieldAsLoaded($object);
                 }
             }
         } elseif ($object instanceof DataObject\Localizedfield) {
             $data = $params['data'];
         } elseif ($object instanceof DataObject\Fieldcollection\Data\AbstractData) {
-            $data = $object->{$this->getName()};
+            $data = $object->getObjectVar($this->getName());
         } elseif ($object instanceof DataObject\Objectbrick\Data\AbstractData) {
-            $data = $object->{$this->getName()};
+            $data = $object->getObjectVar($this->getName());
         }
 
         return is_array($data) ? $data : [];
@@ -994,5 +999,105 @@ class Block extends Model\DataObject\ClassDefinition\Data
     public function isRemoteOwner()
     {
         return false;
+    }
+
+    /**
+     * @return int
+     */
+    public function getMaxItems()
+    {
+        return $this->maxItems;
+    }
+
+    /**
+     * @param int $maxItems
+     */
+    public function setMaxItems($maxItems)
+    {
+        $this->maxItems = $maxItems;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDisallowAddRemove()
+    {
+        return $this->disallowAddRemove;
+    }
+
+    /**
+     * @param bool $disallowAddRemove
+     */
+    public function setDisallowAddRemove($disallowAddRemove)
+    {
+        $this->disallowAddRemove = $disallowAddRemove;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDisallowReorder()
+    {
+        return $this->disallowReorder;
+    }
+
+    /**
+     * @param bool $disallowReorder
+     */
+    public function setDisallowReorder($disallowReorder)
+    {
+        $this->disallowReorder = $disallowReorder;
+    }
+
+    /**
+     * Checks if data is valid for current data field
+     *
+     * @param mixed $data
+     * @param bool $omitMandatoryCheck
+     *
+     * @throws \Exception
+     */
+    public function checkValidity($data, $omitMandatoryCheck = false)
+    {
+        if (!$omitMandatoryCheck) {
+            if (is_array($data)) {
+                $blockDefinitions = $this->getFieldDefinitions();
+
+                $validationExceptions = [];
+
+                $idx = -1;
+                foreach ($data as $item) {
+                    $idx++;
+                    if (!is_array($item)) {
+                        continue;
+                    }
+
+                    foreach ($blockDefinitions as $fd) {
+                        try {
+                            $blockElement = $item[$fd->getName()];
+                            if (!$blockElement) {
+                                if ($fd->getMandatory()) {
+                                    throw new Element\ValidationException('Block element empty [ ' . $fd->getName() . ' ]');
+                                } else {
+                                    continue;
+                                }
+                            }
+
+                            $data = $blockElement->getData();
+                            $fd->checkValidity($data);
+                        } catch (Model\Element\ValidationException $ve) {
+                            $ve->addContext($this->getName() . '-' . $idx);
+                            $validationExceptions[] = $ve;
+                        }
+                    }
+                }
+
+                if ($validationExceptions) {
+                    $aggregatedExceptions = new Model\Element\ValidationException();
+                    $aggregatedExceptions->setSubItems($validationExceptions);
+                    throw $aggregatedExceptions;
+                }
+            }
+        }
     }
 }

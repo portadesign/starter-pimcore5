@@ -17,6 +17,7 @@
 
 namespace Pimcore\Model\Asset;
 
+use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model;
 
@@ -66,14 +67,8 @@ class Dao extends Model\Element\Dao
      */
     public function getByPath($path)
     {
-
-        // check for root node
-        $_path = $path != '/' ? dirname($path) : $path;
-        $_path = str_replace('\\', '/', $_path); // windows patch
-        $_key = basename($path);
-        $_path .= $_path != '/' ? '/' : '';
-
-        $data = $this->db->fetchRow('SELECT id FROM assets WHERE path = ' . $this->db->quote($_path) . ' and `filename` = ' . $this->db->quote($_key));
+        $params = $this->extractKeyAndPath($path);
+        $data = $this->db->fetchRow('SELECT id FROM assets WHERE path = :path AND `filename` = :key', $params);
 
         if ($data['id']) {
             $this->assignVariablesToModel($data);
@@ -96,7 +91,6 @@ class Dao extends Model\Element\Dao
                 'parentId' => $this->model->getParentId()
             ]);
 
-            $date = time();
             $this->model->setId($this->db->lastInsertId());
         } catch (\Exception $e) {
             throw $e;
@@ -113,7 +107,7 @@ class Dao extends Model\Element\Dao
         try {
             $this->model->setModificationDate(time());
 
-            $asset = get_object_vars($this->model);
+            $asset = $this->model->getObjectVars();
 
             foreach ($asset as $key => $value) {
                 if (in_array($key, $this->getValidTableColumns('assets'))) {
@@ -199,7 +193,8 @@ class Dao extends Model\Element\Dao
         }
 
         //update assets child paths
-        $this->db->query('update assets set path = replace(path,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . "), modificationDate = '" . time() . "', userModification = '" . $userId . "' where path like " . $this->db->quote($oldPath . '/%') . ';');
+        // we don't update the modification date here, as this can have side-effects when there's an unpublished version for an element
+        $this->db->query('update assets set path = replace(path,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . "), userModification = '" . $userId . "' where path like " . $this->db->quote($oldPath . '/%') . ';');
 
         //update assets child permission paths
         $this->db->query('update users_workspaces_asset set cpath = replace(cpath,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . ') where cpath like ' . $this->db->quote($oldPath . '/%') . ';');
@@ -290,7 +285,7 @@ class Dao extends Model\Element\Dao
      */
     public function getVersions()
     {
-        $versionIds = $this->db->fetchAll("SELECT id FROM versions WHERE cid = ? AND ctype='asset' ORDER BY `id` DESC", [$this->model->getId()]);
+        $versionIds = $this->db->fetchAll("SELECT id FROM versions WHERE cid = ? AND ctype='asset' ORDER BY `id` ASC", [$this->model->getId()]);
 
         $versions = [];
         foreach ($versionIds as $versionId) {
@@ -329,13 +324,28 @@ class Dao extends Model\Element\Dao
     }
 
     /**
+     * @return int
+     */
+    public function getVersionCountForUpdate(): int
+    {
+        $versionCount = (int) $this->db->fetchOne('SELECT versionCount FROM assets WHERE id = ? FOR UPDATE', $this->model->getId());
+
+        if (!$this->model instanceof Folder) {
+            $versionCount2 = (int) $this->db->fetchOne("SELECT MAX(versionCount) FROM versions WHERE cid = ? AND ctype = 'asset'", $this->model->getId());
+            $versionCount = max($versionCount, $versionCount2);
+        }
+
+        return (int) $versionCount;
+    }
+
+    /**
      * quick test if there are childs
      *
      * @return bool
      */
     public function hasChildren()
     {
-        $c = $this->db->fetchOne('SELECT id FROM assets WHERE parentId = ?', $this->model->getId());
+        $c = $this->db->fetchOne('SELECT id FROM assets WHERE parentId = ? LIMIT 1', $this->model->getId());
 
         return (bool)$c;
     }
@@ -411,7 +421,7 @@ class Dao extends Model\Element\Dao
      *
      * @param bool $force
      *
-     * @return array
+     * @return Model\Version|null
      */
     public function getLatestVersion($force = false)
     {
@@ -425,12 +435,12 @@ class Dao extends Model\Element\Dao
             }
         }
 
-        return;
+        return null;
     }
 
     /**
      * @param $type
-     * @param $user
+     * @param Model\User $user
      *
      * @return bool
      */
@@ -484,8 +494,8 @@ class Dao extends Model\Element\Dao
      */
     public function __isBasedOnLatestData()
     {
-        $currentDataTimestamp = $this->db->fetchOne('SELECT modificationDate from assets WHERE id = ?', $this->model->getId());
-        if ($currentDataTimestamp == $this->model->__getDataVersionTimestamp()) {
+        $data = $this->db->fetchRow('SELECT modificationDate, versionCount from assets WHERE id = ?', $this->model->getId());
+        if ($data['modificationDate'] == $this->model->__getDataVersionTimestamp() && $data['versionCount'] == $this->model->getVersionCount()) {
             return true;
         }
 

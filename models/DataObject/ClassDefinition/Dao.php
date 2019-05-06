@@ -33,11 +33,6 @@ class Dao extends Model\Dao\AbstractDao
     protected $model;
 
     /**
-     * @var array
-     */
-    protected $_sqlChangeLog = [];
-
-    /**
      * @var mixed
      */
     protected $tableDefinitions = null;
@@ -66,20 +61,20 @@ class Dao extends Model\Dao\AbstractDao
         return $id;
     }
 
-    /**
-     * Save object to database
+    /** Updates the class definition
+     * @param bool $isUpdate
      *
-     * @return bool
+     * @return bool|void
      *
-     * @todo: update() or create() don't return anything
+     * @throws \Exception
      */
-    public function save()
+    public function save($isUpdate = true)
     {
-        if ($this->model->getId()) {
+        if (!$this->model->getId() || !$isUpdate) {
+            return $this->create();
+        } else {
             return $this->update();
         }
-
-        return $this->create();
     }
 
     /**
@@ -88,7 +83,7 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function update()
     {
-        $class = get_object_vars($this->model);
+        $class = $this->model->getObjectVars();
         $data = [];
 
         foreach ($class as $key => $value) {
@@ -106,12 +101,12 @@ class Dao extends Model\Dao\AbstractDao
         $objectView = 'object_' . $this->model->getId();
 
         // create object table if not exists
-        $protectedColums = ['oo_id', 'oo_classId', 'oo_className'];
+        $protectedColumns = ['oo_id', 'oo_classId', 'oo_className'];
         $protectedDatastoreColumns = ['oo_id'];
 
         $this->db->query('CREATE TABLE IF NOT EXISTS `' . $objectTable . "` (
 			  `oo_id` int(11) NOT NULL default '0',
-			  `oo_classId` int(11) default '" . $this->model->getId() . "',
+			  `oo_classId` varchar(50) default '" . $this->model->getId() . "',
 			  `oo_className` varchar(255) default '" . $this->model->getName() . "',
 			  PRIMARY KEY  (`oo_id`)
 			) DEFAULT CHARSET=utf8mb4;");
@@ -133,7 +128,7 @@ class Dao extends Model\Dao\AbstractDao
           `ownertype` enum('object','fieldcollection','localizedfield','objectbrick') NOT NULL DEFAULT 'object',
           `ownername` varchar(70) NOT NULL DEFAULT '',
           `position` varchar(70) NOT NULL DEFAULT '0',
-          PRIMARY KEY (`src_id`,`dest_id`,`ownertype`,`ownername`,`fieldname`,`type`,`position`),
+          PRIMARY KEY (`src_id`,`dest_id`,`ownertype`,`ownername`,`fieldname`,`type`,`position`, `index`),
           KEY `index` (`index`),
           KEY `src_id` (`src_id`),
           KEY `dest_id` (`dest_id`),
@@ -143,6 +138,8 @@ class Dao extends Model\Dao\AbstractDao
           KEY `type` (`type`),
           KEY `ownername` (`ownername`)
         ) DEFAULT CHARSET=utf8mb4;");
+
+        $this->handleEncryption($this->model, [$objectTable, $objectDatastoreTable, $objectDatastoreTableRelation]);
 
         $existingColumns = $this->getValidTableColumns($objectTable, false); // no caching of table definition
         $existingDatastoreColumns = $this->getValidTableColumns($objectDatastoreTable, false); // no caching of table definition
@@ -155,43 +152,42 @@ class Dao extends Model\Dao\AbstractDao
         // add non existing columns in the table
         if (is_array($this->model->getFieldDefinitions()) && count($this->model->getFieldDefinitions())) {
             foreach ($this->model->getFieldDefinitions() as $key => $value) {
-
-                // if a datafield requires more than one column in the query table
-                if (is_array($value->getQueryColumnType())) {
-                    foreach ($value->getQueryColumnType() as $fkey => $fvalue) {
-                        $this->addModifyColumn($objectTable, $key . '__' . $fkey, $fvalue, '', 'NULL');
-                        $protectedColums[] = $key . '__' . $fkey;
+                if ($value instanceof DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface || method_exists($value, 'getDataForResource')) {
+                    // if a datafield requires more than one column in the datastore table => only for non-relation types
+                    if (!$value->isRelationType()) {
+                        if (is_array($value->getColumnType())) {
+                            foreach ($value->getColumnType() as $fkey => $fvalue) {
+                                $this->addModifyColumn($objectDatastoreTable, $key . '__' . $fkey, $fvalue, '', 'NULL');
+                                $protectedDatastoreColumns[] = $key . '__' . $fkey;
+                            }
+                        } elseif ($value->getColumnType()) {
+                            $this->addModifyColumn($objectDatastoreTable, $key, $value->getColumnType(), '', 'NULL');
+                            $protectedDatastoreColumns[] = $key;
+                        }
                     }
+
+                    $this->addIndexToField($value, $objectDatastoreTable, 'getColumnType', true);
                 }
 
-                // if a datafield requires more than one column in the datastore table => only for non-relation types
-                if (!$value->isRelationType() && is_array($value->getColumnType())) {
-                    foreach ($value->getColumnType() as $fkey => $fvalue) {
-                        $this->addModifyColumn($objectDatastoreTable, $key . '__' . $fkey, $fvalue, '', 'NULL');
-                        $protectedDatastoreColumns[] = $key . '__' . $fkey;
+                if ($value instanceof DataObject\ClassDefinition\Data\QueryResourcePersistenceAwareInterface || method_exists($value, 'getDataForQueryResource')) {
+                    // if a datafield requires more than one column in the query table
+                    if (is_array($value->getQueryColumnType())) {
+                        foreach ($value->getQueryColumnType() as $fkey => $fvalue) {
+                            $this->addModifyColumn($objectTable, $key . '__' . $fkey, $fvalue, '', 'NULL');
+                            $protectedColumns[] = $key . '__' . $fkey;
+                        }
+                    } elseif ($value->getQueryColumnType()) {
+                        $this->addModifyColumn($objectTable, $key, $value->getQueryColumnType(), '', 'NULL');
+                        $protectedColumns[] = $key;
                     }
-                }
 
-                // everything else
-                //                if (!is_array($value->getQueryColumnType()) && !is_array($value->getColumnType())) {
-                if (!is_array($value->getQueryColumnType()) && $value->getQueryColumnType()) {
-                    $this->addModifyColumn($objectTable, $key, $value->getQueryColumnType(), '', 'NULL');
-                    $protectedColums[] = $key;
+                    $this->addIndexToField($value, $objectTable, 'getQueryColumnType');
                 }
-                if (!is_array($value->getColumnType()) && $value->getColumnType() && !$value->isRelationType()) {
-                    $this->addModifyColumn($objectDatastoreTable, $key, $value->getColumnType(), '', 'NULL');
-                    $protectedDatastoreColumns[] = $key;
-                }
-                //                }
-
-                // add indices
-                $this->addIndexToField($value, $objectTable, 'getQueryColumnType');
-                $this->addIndexToField($value, $objectDatastoreTable, 'getColumnType', true);
             }
         }
 
         // remove unused columns in the table
-        $this->removeUnusedColumns($objectTable, $columnsToRemove, $protectedColums);
+        $this->removeUnusedColumns($objectTable, $columnsToRemove, $protectedColumns);
         $this->removeUnusedColumns($objectDatastoreTable, $datastoreColumnsToRemove, $protectedDatastoreColumns);
 
         // remove / cleanup unused relations
@@ -223,8 +219,8 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function create()
     {
-        $this->db->insert('classes', ['name' => $this->model->getName()]);
-        $this->model->setId($this->db->lastInsertId());
+        $this->db->insert('classes', ['name' => $this->model->getName(), 'id' => $this->model->getId()]);
+//        $this->model->setId($this->db->lastInsertId());
         $this->save();
     }
 

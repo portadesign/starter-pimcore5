@@ -32,7 +32,7 @@ trait Dao
 
         $prefixes = [
             'p_index_' => ['enabled' => $field->getIndex() && ! $field->getUnique(), 'unique' => false],
-            'u_index_' => ['enabled' => $field->getUnique(), 'unique' => true]
+            'u_index_' => ['enabled' => $considerUniqueIndex && $field->getUnique(), 'unique' => true]
 
         ];
 
@@ -56,7 +56,6 @@ trait Dao
                         }
                         $this->db->queryIgnoreError(
                             'ALTER TABLE `'.$table.'` ADD ' . $uniqueStr . 'INDEX `' . $prefix . $indexName.'` ('.$columnName.');',
-                            [],
                             [UniqueConstraintViolationException::class]
                         );
                     }
@@ -73,7 +72,6 @@ trait Dao
                     }
                     $this->db->queryIgnoreError(
                         'ALTER TABLE `'.$table.'` ADD ' . $uniqueStr . 'INDEX `' . $prefix . $indexName.'` ('.$columnName.');',
-                        [],
                         [UniqueConstraintViolationException::class]
                     );
                 }
@@ -134,6 +132,44 @@ trait Dao
                 if (!in_array(strtolower($value), array_map('strtolower', $protectedColumns))) {
                     $this->db->query('ALTER TABLE `' . $table . '` DROP COLUMN `' . $value . '`;');
                 }
+            }
+        }
+    }
+
+    /**
+     * @param DataObject\ClassDefinition $classDefinition
+     * @param array $tables
+     */
+    protected function handleEncryption(DataObject\ClassDefinition $classDefinition, array $tables)
+    {
+        if ($classDefinition->getEncryption()) {
+            $this->encryptTables($tables);
+            $classDefinition->addEncryptedTables($tables);
+        } elseif ($classDefinition->hasEncryptedTables()) {
+            $this->decryptTables($classDefinition, $tables);
+            $classDefinition->removeEncryptedTables($tables);
+        }
+    }
+
+    /**
+     * @param array $tables
+     */
+    protected function encryptTables(array $tables)
+    {
+        foreach ($tables as $table) {
+            $this->db->query('ALTER TABLE ' . $this->db->quoteIdentifier($table) . ' ENCRYPTED=YES;');
+        }
+    }
+
+    /**
+     * @param DataObject\ClassDefinition $classDefinition
+     * @param array $tables
+     */
+    protected function decryptTables(DataObject\ClassDefinition $classDefinition, array $tables)
+    {
+        foreach ($tables as $table) {
+            if ($classDefinition->isEncryptedTable($table)) {
+                $this->db->query('ALTER TABLE ' . $this->db->quoteIdentifier($table) . ' ENCRYPTED=NO;');
             }
         }
     }

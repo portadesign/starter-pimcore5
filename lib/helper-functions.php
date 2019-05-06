@@ -33,7 +33,7 @@ function xmlToArray($file)
  *
  * @return bool|null|string
  */
-function gzcompressfile($source, $level=null, $target = null)
+function gzcompressfile($source, $level = null, $target = null)
 {
     // this is a very memory efficient way of gzipping files
     if ($target) {
@@ -42,8 +42,8 @@ function gzcompressfile($source, $level=null, $target = null)
         $dest = $source.'.gz';
     }
 
-    $mode='wb'.$level;
-    $error=false;
+    $mode = 'wb'.$level;
+    $error = false;
 
     $fp_out = gzopen($dest, $mode);
     $fp_in = fopen($source, 'rb');
@@ -56,7 +56,7 @@ function gzcompressfile($source, $level=null, $target = null)
         fclose($fp_in);
         gzclose($fp_out);
     } else {
-        $error=true;
+        $error = true;
     }
 
     if ($error) {
@@ -147,6 +147,17 @@ function array_htmlspecialchars($array)
     }
 
     return $array;
+}
+
+/**
+ * @param string $needle
+ * @param array $haystack
+ *
+ * @return bool
+ */
+function in_arrayi(string $needle, array $haystack)
+{
+    return in_array(strtolower($needle), array_map('strtolower', $haystack));
 }
 
 /**
@@ -288,10 +299,10 @@ function formatBytes($bytes, $precision = 2)
     $units = ['B', 'KB', 'MB', 'GB', 'TB'];
 
     $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1000));
     $pow = min($pow, count($units) - 1);
 
-    $bytes /= pow(1024, $pow);
+    $bytes /= pow(1000, $pow);
 
     return round($bytes, $precision) . ' ' . $units[$pow];
 }
@@ -554,7 +565,7 @@ function resolvePath($filename)
  */
 function closureHash(Closure $closure)
 {
-    $ref  = new ReflectionFunction($closure);
+    $ref = new ReflectionFunction($closure);
     $file = new SplFileObject($ref->getFileName());
     $file->seek($ref->getStartLine() - 1);
     $content = '';
@@ -597,7 +608,7 @@ function is_dir_empty($dir)
  *
  * @return mixed|string
  */
-function var_export_pretty($var, $indent='')
+function var_export_pretty($var, $indent = '')
 {
     switch (gettype($var)) {
         case 'string':
@@ -624,12 +635,21 @@ function var_export_pretty($var, $indent='')
  *
  * @return string
  */
-function to_php_data_file_format($contents)
+function to_php_data_file_format($contents, $comments = null)
 {
     $contents = var_export_pretty($contents);
-    $contents = "<?php \n\nreturn " . $contents . ";\n";
 
-    return $contents;
+    $export = '<?php ';
+
+    if (!empty($comments)) {
+        $export .= "\n\n";
+        $export .= $comments;
+        $export .= "\n";
+    }
+
+    $export .= "\n\nreturn ".$contents.";\n";
+
+    return $export;
 }
 
 /**
@@ -637,9 +657,28 @@ function to_php_data_file_format($contents)
  */
 function generateRandomSymfonySecret()
 {
-    if (function_exists('openssl_random_pseudo_bytes')) {
-        return hash('sha1', openssl_random_pseudo_bytes(23));
+    return base64_encode(random_bytes(24));
+}
+
+/**
+ * @param array $array
+ * @param string $glue
+ *
+ * @return string
+ */
+function implode_recursive($array, $glue)
+{
+    $ret = '';
+
+    foreach ($array as $item) {
+        if (is_array($item)) {
+            $ret .= implode_recursive($item, $glue) . $glue;
+        } else {
+            $ret .= $item . $glue;
+        }
     }
 
-    return hash('sha1', uniqid(mt_rand(), true));
+    $ret = substr($ret, 0, 0 - strlen($glue));
+
+    return $ret;
 }

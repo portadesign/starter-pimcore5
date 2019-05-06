@@ -3,7 +3,7 @@
  * Pimcore
  *
  * This source file is available under two different licenses:
- * - GNU General Public License version 3 (GPLv3)
+ * - GNU General protected License version 3 (GPLv3)
  * - Pimcore Enterprise License (PEL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
@@ -25,9 +25,12 @@ use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\DataObject\Concrete\Dao getDao()
+ * @method \Pimcore\Model\Version getLatestVersion()
  */
-class Concrete extends AbstractObject
+class Concrete extends AbstractObject implements LazyLoadedFieldsInterface
 {
+    use Model\DataObject\Traits\LazyLoadedRelationTrait;
+
     /**
      * @var array
      */
@@ -36,49 +39,44 @@ class Concrete extends AbstractObject
     /**
      * @var bool
      */
-    public $o_published;
+    protected $o_published;
 
     /**
      * @var ClassDefinition
      */
-    public $o_class;
-
-    /**
-     * @var int
-     */
-    public $o_classId;
+    protected $o_class;
 
     /**
      * @var string
      */
-    public $o_className;
+    protected $o_classId;
+
+    /**
+     * @var string
+     */
+    protected $o_className;
 
     /**
      * @var array
      */
-    public $o_versions = null;
-
-    /**
-     * @var array
-     */
-    public $lazyLoadedFields = [];
-
-    /**
-     * @var array
-     */
-    public $o___loadedLazyFields = [];
+    protected $o_versions = null;
 
     /**
      * Contains all scheduled tasks
      *
      * @var array
      */
-    public $scheduledTasks = null;
+    protected $scheduledTasks = null;
 
     /**
      * @var bool
      */
     protected $omitMandatoryCheck = false;
+
+    /**
+     * @var bool
+     */
+    protected $allLazyKeysMarkedAsLoaded = false;
 
     /**
      * returns the class ID of the current object class
@@ -98,50 +96,6 @@ class Concrete extends AbstractObject
     }
 
     /**
-     * @param  string $fieldName
-     */
-    public function addLazyLoadedField($fieldName)
-    {
-        $this->lazyLoadedFields[]=$fieldName;
-    }
-
-    /**
-     * @return array
-     */
-    public function getLazyLoadedFields()
-    {
-        return (array) $this->lazyLoadedFields;
-    }
-
-    /**
-     * @param array $o___loadedLazyFields
-     *
-     * @return $this
-     */
-    public function setO__loadedLazyFields(array $o___loadedLazyFields)
-    {
-        $this->o___loadedLazyFields = $o___loadedLazyFields;
-
-        return $this;
-    }
-
-    /**
-     * @return array
-     */
-    public function getO__loadedLazyFields()
-    {
-        return $this->o___loadedLazyFields;
-    }
-
-    /**
-     * @param string $o___loadedLazyField
-     */
-    public function addO__loadedLazyField($o___loadedLazyField)
-    {
-        $this->o___loadedLazyFields[] = $o___loadedLazyField;
-    }
-
-    /**
      * @param $isUpdate
      * @param array $params additional parameters (e.g. "versionNote" for the version note)
      *
@@ -150,61 +104,99 @@ class Concrete extends AbstractObject
     protected function update($isUpdate = null, $params = [])
     {
         $fieldDefintions = $this->getClass()->getFieldDefinitions();
+
+        $validationExceptions = [];
+
         foreach ($fieldDefintions as $fd) {
-            $getter = 'get'.ucfirst($fd->getName());
-            $setter = 'set'.ucfirst($fd->getName());
+            try {
+                $getter = 'get' . ucfirst($fd->getName());
+                $setter = 'set' . ucfirst($fd->getName());
 
-            if (method_exists($this, $getter)) {
+                if (method_exists($this, $getter)) {
 
-                //To make sure, inherited values are not set again
-                $inheritedValues = AbstractObject::doGetInheritedValues();
-                AbstractObject::setGetInheritedValues(false);
+                    //To make sure, inherited values are not set again
+                    $inheritedValues = AbstractObject::doGetInheritedValues();
+                    AbstractObject::setGetInheritedValues(false);
 
-                $value = $this->$getter();
+                    $value = $this->$getter();
 
-                if (is_array($value) and ($fd instanceof ClassDefinition\Data\Multihref or $fd instanceof ClassDefinition\Data\Objects)) {
-                    //don't save relations twice
-                    $this->$setter(array_unique($value));
-                }
-                AbstractObject::setGetInheritedValues($inheritedValues);
-
-                $value = $this->$getter();
-                $omitMandatoryCheck = $this->getOmitMandatoryCheck();
-
-                //check throws Exception
-                try {
-                    $fd->checkValidity($value, $omitMandatoryCheck);
-                } catch (\Exception $e) {
-                    if ($this->getClass()->getAllowInherit()) {
-                        //try again with parent data when inheritance in activated
-                        try {
-                            $getInheritedValues = AbstractObject::doGetInheritedValues();
-                            AbstractObject::setGetInheritedValues(true);
-
-                            $value = $this->$getter();
-                            $fd->checkValidity($value, $omitMandatoryCheck);
-
-                            AbstractObject::setGetInheritedValues($getInheritedValues);
-                        } catch (\Exception $e) {
-                            $exceptionClass = get_class($e);
-                            throw new $exceptionClass($e->getMessage() . ' fieldname=' . $fd->getName());
+                    if (is_array($value) and ($fd instanceof ClassDefinition\Data\ManyToManyRelation or $fd instanceof ClassDefinition\Data\ManyToManyObjectRelation)) {
+                        //don't save relations twice, if multiple assignments not allowed
+                        if (!method_exists($fd, 'getAllowMultipleAssignments') || !$fd->getAllowMultipleAssignments()) {
+                            $value = array_unique($value);
                         }
-                    } else {
-                        $exceptionClass = get_class($e);
-                        throw new $exceptionClass($e->getMessage() . ' fieldname=' . $fd->getName());
+                        $this->$setter($value);
+                    }
+                    AbstractObject::setGetInheritedValues($inheritedValues);
+
+                    $value = $this->$getter();
+                    $omitMandatoryCheck = $this->getOmitMandatoryCheck();
+
+                    //check throws Exception
+                    try {
+                        $fd->checkValidity($value, $omitMandatoryCheck);
+                    } catch (\Exception $e) {
+                        if ($this->getClass()->getAllowInherit()) {
+                            //try again with parent data when inheritance is activated
+                            try {
+                                $getInheritedValues = AbstractObject::doGetInheritedValues();
+                                AbstractObject::setGetInheritedValues(true);
+
+                                $value = $this->$getter();
+                                $fd->checkValidity($value, $omitMandatoryCheck);
+
+                                AbstractObject::setGetInheritedValues($getInheritedValues);
+                            } catch (\Exception $e) {
+                                if ($e instanceof Model\Element\ValidationException) {
+                                    throw $e;
+                                }
+                                $exceptionClass = get_class($e);
+                                throw new $exceptionClass($e->getMessage() . ' fieldname=' . $fd->getName(), $e->getCode(), $e->getPrevious());
+                            }
+                        } else {
+                            $exceptionClass = get_class($e);
+                            throw new $exceptionClass($e->getMessage() . ' fieldname=' . $fd->getName(), $e->getCode(), $e);
+                        }
                     }
                 }
+            } catch (Model\Element\ValidationException $ve) {
+                $validationExceptions[] = $ve;
             }
         }
 
-        parent::update($isUpdate, $params);
+        if ($validationExceptions) {
+            $message = 'Validation failed: ';
+            $errors = [];
+            foreach ($validationExceptions as $e) {
+                $errors[] = $e->getMessage();
+            }
+            $message .= implode(' / ', $errors);
+            $aggregatedExceptions = new Model\Element\ValidationException($message);
+            $aggregatedExceptions->setSubItems($validationExceptions);
+            throw $aggregatedExceptions;
+        }
 
-        $this->getDao()->update($isUpdate);
+        $isDirtyDetectionDisabled = self::isDirtyDetectionDisabled();
+        try {
+            $oldVersionCount = $this->getVersionCount();
 
-        // scheduled tasks are saved in $this->saveVersion();
+            parent::update($isUpdate, $params);
 
-        $this->saveVersion(false, false, isset($params['versionNote']) ? $params['versionNote'] : null);
-        $this->saveChildData();
+            $newVersionCount = $this->getVersionCount();
+
+            if (($newVersionCount != $oldVersionCount + 1) || ($this instanceof DirtyIndicatorInterface && $this->isFieldDirty('o_parentId'))) {
+                self::disableDirtyDetection();
+            }
+
+            $this->getDao()->update($isUpdate);
+
+            // scheduled tasks are saved in $this->saveVersion();
+
+            $this->saveVersion(false, false, isset($params['versionNote']) ? $params['versionNote'] : null);
+            $this->saveChildData();
+        } finally {
+            self::setDisableDirtyDetection($isDirtyDetectionDisabled);
+        }
     }
 
     protected function saveChildData()
@@ -231,17 +223,30 @@ class Concrete extends AbstractObject
         }
     }
 
-    public function delete()
+    /**
+     * @inheritdoc
+     */
+    public function delete(bool $isNested = false)
     {
+        $this->beginTransaction();
 
-        // delete all versions
-        foreach ($this->getVersions() as $v) {
-            $v->delete();
+        try {
+            // delete all versions
+            foreach ($this->getVersions() as $v) {
+                $v->delete();
+            }
+
+            $this->getDao()->deleteAllTasks();
+
+            parent::delete(true);
+
+            $this->commit();
+        } catch (\Exception $e) {
+            $this->rollBack();
+            \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::POST_DELETE_FAILURE, new DataObjectEvent($this));
+            Logger::crit($e);
+            throw $e;
         }
-
-        $this->getDao()->deleteAllTasks();
-
-        parent::delete();
     }
 
     /**
@@ -249,53 +254,54 @@ class Concrete extends AbstractObject
      * it is false when the method is called by $this->update()
      *
      * @param bool $setModificationDate
-     * @param bool $callPluginHook
+     * @param bool $saveOnlyVersion
      * @param string $versionNote version note
      *
      * @return Model\Version
      */
-    public function saveVersion($setModificationDate = true, $callPluginHook = true, $versionNote)
+    public function saveVersion($setModificationDate = true, $saveOnlyVersion = true, $versionNote = null)
     {
-        if ($setModificationDate) {
-            $this->setModificationDate(time());
-        }
+        try {
+            if ($setModificationDate) {
+                $this->setModificationDate(time());
+            }
 
-        // hook should be also called if "save only new version" is selected
-        if ($callPluginHook) {
-            \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::PRE_UPDATE, new DataObjectEvent($this, [
-                'saveVersionOnly' => true
+            // hook should be also called if "save only new version" is selected
+            if ($saveOnlyVersion) {
+                \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::PRE_UPDATE, new DataObjectEvent($this, [
+                    'saveVersionOnly' => true
+                ]));
+            }
+
+            // scheduled tasks are saved always, they are not versioned!
+            $this->saveScheduledTasks();
+
+            $version = null;
+
+            // only create a new version if there is at least 1 allowed
+            // or if saveVersion() was called directly (it's a newer version of the object)
+            if (Config::getSystemConfig()->objects->versions->steps
+                || Config::getSystemConfig()->objects->versions->days
+                || $setModificationDate) {
+                $version = $this->doSaveVersion($versionNote, $saveOnlyVersion);
+            }
+
+            // hook should be also called if "save only new version" is selected
+            if ($saveOnlyVersion) {
+                \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::POST_UPDATE, new DataObjectEvent($this, [
+                    'saveVersionOnly' => true
+                ]));
+            }
+
+            return $version;
+        } catch (\Exception $e) {
+            \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::POST_UPDATE_FAILURE, new DataObjectEvent($this, [
+                'saveVersionOnly' => true,
+                'exception' => $e
             ]));
+
+            throw $e;
         }
-
-        // scheduled tasks are saved always, they are not versioned!
-        $this->saveScheduledTasks();
-
-        $version = null;
-
-        // only create a new version if there is at least 1 allowed
-        // or if saveVersion() was called directly (it's a newer version of the object)
-        if (Config::getSystemConfig()->objects->versions->steps
-            || Config::getSystemConfig()->objects->versions->days
-            || $setModificationDate) {
-            // create version
-            $version = new Model\Version();
-            $version->setCid($this->getId());
-            $version->setCtype('object');
-            $version->setDate($this->getModificationDate());
-            $version->setUserId($this->getUserModification());
-            $version->setData($this);
-            $version->setNote($versionNote);
-            $version->save();
-        }
-
-        // hook should be also called if "save only new version" is selected
-        if ($callPluginHook) {
-            \Pimcore::getEventDispatcher()->dispatch(DataObjectEvents::POST_UPDATE, new DataObjectEvent($this, [
-                'saveVersionOnly' => true
-            ]));
-        }
-
-        return $version;
     }
 
     /**
@@ -406,21 +412,21 @@ class Concrete extends AbstractObject
     }
 
     /**
-     * @return int
+     * @return string
      */
     public function getClassId()
     {
-        return (int) $this->o_classId;
+        return $this->o_classId;
     }
 
     /**
-     * @param int $o_classId
+     * @param string $o_classId
      *
      * @return $this
      */
     public function setClassId($o_classId)
     {
-        $this->o_classId = (int) $o_classId;
+        $this->o_classId = $o_classId;
 
         return $this;
     }
@@ -605,7 +611,7 @@ class Concrete extends AbstractObject
 
         if (property_exists($tmpObj, $propertyName)) {
             // check if the given fieldtype is valid for this shorthand
-            $allowedDataTypes = ['input', 'numeric', 'checkbox', 'country', 'date', 'datetime', 'image', 'language', 'multihref', 'multiselect', 'select', 'slider', 'time', 'user', 'email', 'firstname', 'lastname', 'localizedfields'];
+            $allowedDataTypes = ['input', 'numeric', 'checkbox', 'country', 'date', 'datetime', 'image', 'language', 'manyToManyRelation', 'multiselect', 'select', 'slider', 'time', 'user', 'email', 'firstname', 'lastname', 'localizedfields'];
 
             $field = $tmpObj->getClass()->getFieldDefinition($propertyName);
             if (!in_array($field->getFieldType(), $allowedDataTypes)) {
@@ -674,20 +680,86 @@ class Concrete extends AbstractObject
         throw new \Exception('Call to undefined static method ' . $method . ' in class DataObject\\Concrete');
     }
 
+    /**
+     * @return $this
+     *
+     * @throws \Exception
+     */
+    public function save()
+    {
+        $isDirtyDetectionDisabled = AbstractObject::isDirtyDetectionDisabled();
+
+        // if the class is newer then better disable the dirty detection. This should fix issues with the query table if
+        // the inheritance enabled flag has been changed in the meantime
+        if ($this->getClass()->getModificationDate() >= $this->getModificationDate() && $this->getId()) {
+            AbstractObject::disableDirtyDetection();
+        }
+        try {
+            $params = [];
+            if (func_num_args() && is_array(func_get_arg(0))) {
+                $params = func_get_arg(0);
+            }
+
+            parent::save($params);
+            if ($this instanceof DirtyIndicatorInterface) {
+                $this->resetDirtyMap();
+            }
+        } finally {
+            AbstractObject::setDisableDirtyDetection($isDirtyDetectionDisabled);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     * @inheritdoc
+     */
+    public function getLazyLoadedFieldNames(): array
+    {
+        $lazyLoadedFieldNames = [];
+        $fields = $this->getClass()->getFieldDefinitions(['suppressEnrichment' => true]);
+        foreach ($fields as $field) {
+            if (method_exists($field, 'getLazyLoading') && $field->getLazyLoading()) {
+                $lazyLoadedFieldNames[] = $field->getName();
+            }
+        }
+
+        return $lazyLoadedFieldNames;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function isAllLazyKeysMarkedAsLoaded(): bool
+    {
+        if (!$this->getId()) {
+            return true;
+        }
+
+        return $this->allLazyKeysMarkedAsLoaded;
+    }
+
+    public function markAllLazyLoadedKeysAsLoaded()
+    {
+        $this->allLazyKeysMarkedAsLoaded = true;
+    }
+
     public function __sleep()
     {
         $parentVars = parent::__sleep();
 
         $finalVars = [];
-        $lazyLoadedFields = $this->getLazyLoadedFields();
+        $blockedVars = ['loadedLazyKeys', 'allLazyKeysMarkedAsLoaded'];
+
+        if (!isset($this->_fulldump)) {
+            // do not dump lazy loaded fields for caching
+            $lazyLoadedFields = $this->getLazyLoadedFieldNames();
+            $blockedVars = array_merge($lazyLoadedFields, $blockedVars);
+        }
 
         foreach ($parentVars as $key) {
-            if (in_array($key, $lazyLoadedFields)) {
-                // prevent lazyloading properties to go into the cache, only to version and recyclebin, ... (_fulldump)
-                if (isset($this->_fulldump)) {
-                    $finalVars[] = $key;
-                }
-            } else {
+            if (!in_array($key, $blockedVars)) {
                 $finalVars[] = $key;
             }
         }
@@ -703,7 +775,7 @@ class Concrete extends AbstractObject
         // do not use the getter ($this->getLocalizedfields()) as it somehow slows down the process around a sec
         // no clue why this happens
         if (property_exists($this, 'localizedfields') && $this->localizedfields instanceof Localizedfield) {
-            $this->localizedfields->setObject($this);
+            $this->localizedfields->setObject($this, false);
         }
     }
 
@@ -713,5 +785,38 @@ class Concrete extends AbstractObject
     public function __clone()
     {
         parent::__clone();
+    }
+
+    /**
+     * @var bool
+     */
+    protected static $disableLazyLoading = false;
+
+    /**
+     * @internal
+     * Disables lazy loading
+     */
+    public static function disableLazyLoading()
+    {
+        self::$disableLazyLoading = true;
+    }
+
+    /**
+     * @internal
+     * Enables the lazy loading
+     */
+    public static function enableLazyloading()
+    {
+        self::$disableLazyLoading = false;
+    }
+
+    /**
+     * @internal
+     *
+     * @return bool
+     */
+    public static function isLazyLoadingDisabled()
+    {
+        return self::$disableLazyLoading;
     }
 }

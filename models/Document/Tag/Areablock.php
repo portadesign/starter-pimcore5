@@ -188,6 +188,10 @@ class Areablock extends Model\Document\Tag implements BlockInterface
             }
         }
 
+        if ($options['globalParams']) {
+            $params = array_merge($options['globalParams'], (array)$params);
+        }
+
         $info->setParams($params);
 
         if ($this->editmode || !isset($this->currentIndex['hidden']) || !$this->currentIndex['hidden']) {
@@ -262,11 +266,7 @@ class Areablock extends Model\Document\Tag implements BlockInterface
     {
         return [
             'areablock_toolbar' => [
-                'title' => '',
                 'width' => 172,
-                'x' => 20,
-                'y' => 50,
-                'xAlign' => 'left',
                 'buttonWidth' => 168,
                 'buttonMaxCharacters' => 20
             ]
@@ -318,7 +318,7 @@ class Areablock extends Model\Document\Tag implements BlockInterface
         // set name suffix for the whole block element, this will be added to all child elements of the block
         $this->getBlockState()->pushBlock(BlockName::createFromTag($this));
 
-        $attributes      = $this->getEditmodeElementAttributes($options);
+        $attributes = $this->getEditmodeElementAttributes($options);
         $attributeString = HtmlUtils::assembleAttributeString($attributes);
 
         $this->outputEditmode('<div ' . $attributeString . '>');
@@ -345,7 +345,7 @@ class Areablock extends Model\Document\Tag implements BlockInterface
     public function blockStart()
     {
         $attributes = [
-            'data-name'      => $this->getName(),
+            'data-name' => $this->getName(),
             'data-real-name' => $this->getRealName(),
         ];
 
@@ -355,19 +355,21 @@ class Areablock extends Model\Document\Tag implements BlockInterface
         }
 
         $outerAttributes = [
-            'key'  => $this->indices[$this->current]['key'],
+            'key' => $this->indices[$this->current]['key'],
             'type' => $this->indices[$this->current]['type'],
             'data-hidden' => $hidden
         ];
 
-        $attr  = HtmlUtils::assembleAttributeString($attributes);
+        $attr = HtmlUtils::assembleAttributeString($attributes);
         $oAttr = HtmlUtils::assembleAttributeString($outerAttributes);
 
         // outer element
         $this->outputEditmode('<div class="pimcore_area_entry pimcore_block_entry" ' . $oAttr . ' ' . $attr . '>');
 
-        $this->outputEditmode('<div class="pimcore_block_buttons" ' . $attr . '>');
+        $this->outputEditmode('<div class="pimcore_area_buttons" ' . $attr . '>');
+        $this->outputEditmode('<div class="pimcore_area_buttons_inner">');
 
+        $this->outputEditmode('<div class="pimcore_block_plus_up" ' . $attr . '></div>');
         $this->outputEditmode('<div class="pimcore_block_plus" ' . $attr . '></div>');
         $this->outputEditmode('<div class="pimcore_block_minus" ' . $attr . '></div>');
         $this->outputEditmode('<div class="pimcore_block_up" ' . $attr . '></div>');
@@ -376,9 +378,11 @@ class Areablock extends Model\Document\Tag implements BlockInterface
         $this->outputEditmode('<div class="pimcore_block_type" ' . $attr . '></div>');
         $this->outputEditmode('<div class="pimcore_block_options" ' . $attr . '></div>');
         $this->outputEditmode('<div class="pimcore_block_visibility" ' . $attr . '></div>');
+        $this->outputEditmode('<div class="pimcore_block_label" ' . $attr . '></div>');
         $this->outputEditmode('<div class="pimcore_block_clear" ' . $attr . '></div>');
 
-        $this->outputEditmode('</div>'); // .pimcore_block_buttons
+        $this->outputEditmode('</div>'); // .pimcore_area_buttons_inner
+        $this->outputEditmode('</div>'); // .pimcore_area_buttons
     }
 
     /**
@@ -397,59 +401,60 @@ class Areablock extends Model\Document\Tag implements BlockInterface
      */
     public function setOptions($options)
     {
-        $translator = \Pimcore::getContainer()->get('translator');
-
         // we need to set this here otherwise custom areaDir's won't work
         $this->options = $options;
 
-        if (!isset($options['allowed']) || !is_array($options['allowed'])) {
-            $options['allowed'] = [];
-        }
-
-        $availableAreas = $this->getTagHandler()->getAvailableAreablockAreas($this, $options);
-        $availableAreas = $this->sortAvailableAreas($availableAreas, $options);
-
-        $options['types'] = $availableAreas;
-
-        if (isset($options['group']) && is_array($options['group'])) {
-            $groupingareas = [];
-            foreach ($availableAreas as $area) {
-                $groupingareas[$area['type']] = $area['type'];
+        if ($this->getView()) {
+            $translator = \Pimcore::getContainer()->get('translator');
+            if (!isset($options['allowed']) || !is_array($options['allowed'])) {
+                $options['allowed'] = [];
             }
 
-            $groups = [];
-            foreach ($options['group'] as $name => $areas) {
-                $n = $name;
-                if ($this->editmode) {
-                    $n = $translator->trans($name, [], 'admin');
-                }
-                $groups[$n] = $areas;
+            $availableAreas = $this->getTagHandler()->getAvailableAreablockAreas($this, $options);
+            $availableAreas = $this->sortAvailableAreas($availableAreas, $options);
 
-                foreach ($areas as $area) {
-                    unset($groupingareas[$area]);
+            $options['types'] = $availableAreas;
+
+            if (isset($options['group']) && is_array($options['group'])) {
+                $groupingareas = [];
+                foreach ($availableAreas as $area) {
+                    $groupingareas[$area['type']] = $area['type'];
                 }
+
+                $groups = [];
+                foreach ($options['group'] as $name => $areas) {
+                    $n = $name;
+                    if ($this->editmode) {
+                        $n = $translator->trans($name, [], 'admin');
+                    }
+                    $groups[$n] = $areas;
+
+                    foreach ($areas as $area) {
+                        unset($groupingareas[$area]);
+                    }
+                }
+
+                if (count($groupingareas) > 0) {
+                    $uncatAreas = [];
+                    foreach ($groupingareas as $area) {
+                        $uncatAreas[] = $area;
+                    }
+                    $n = 'Uncategorized';
+                    if ($this->editmode) {
+                        $n = $translator->trans($n, [], 'admin');
+                    }
+                    $groups[$n] = $uncatAreas;
+                }
+
+                $options['group'] = $groups;
             }
 
-            if (count($groupingareas) > 0) {
-                $uncatAreas = [];
-                foreach ($groupingareas as $area) {
-                    $uncatAreas[] = $area;
-                }
-                $n = 'Uncategorized';
-                if ($this->editmode) {
-                    $n = $translator->trans($n, [], 'admin');
-                }
-                $groups[$n] = $uncatAreas;
+            if (empty($options['limit'])) {
+                $options['limit'] = 1000000;
             }
 
-            $options['group'] = $groups;
+            $this->options = $options;
         }
-
-        if (empty($options['limit'])) {
-            $options['limit'] = 1000000;
-        }
-
-        $this->options = $options;
 
         return $this;
     }
@@ -475,7 +480,7 @@ class Areablock extends Model\Document\Tag implements BlockInterface
         }
 
         $result = [
-            'name'  => [],
+            'name' => [],
             'index' => []
         ];
 
@@ -699,7 +704,7 @@ class Areablock extends Model\Document\Tag implements BlockInterface
     {
         $document = Model\Document\Page::getById($this->getDocumentId());
 
-        $parentBlockNames   = $this->getParentBlockNames();
+        $parentBlockNames = $this->getParentBlockNames();
         $parentBlockNames[] = $this->getName();
 
         $list = [];

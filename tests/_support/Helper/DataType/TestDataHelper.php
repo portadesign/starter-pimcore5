@@ -3,6 +3,8 @@
 namespace Pimcore\Tests\Helper\DataType;
 
 use Codeception\Module;
+use Pimcore\Cache;
+use Pimcore\Cache\Runtime;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\AbstractObject;
@@ -74,8 +76,8 @@ class TestDataHelper extends Module
      */
     public function assertNumber(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = '123' + $seed;
 
         $this->assertEquals($expected, $value);
@@ -99,8 +101,8 @@ class TestDataHelper extends Module
      */
     public function assertTextarea(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = 'sometext<br>' . $seed;
 
         $this->assertEquals($expected, $value);
@@ -113,7 +115,7 @@ class TestDataHelper extends Module
      */
     public function fillHref(Concrete $object, $field, $seed = 1)
     {
-        $setter  = 'set' . ucfirst($field);
+        $setter = 'set' . ucfirst($field);
         $objects = $this->getObjectList();
         $object->$setter($objects[0]);
     }
@@ -125,9 +127,9 @@ class TestDataHelper extends Module
      */
     public function assertHref(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
-        $objects  = $this->getObjectList();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
+        $objects = $this->getObjectList();
         $expected = $objects[0];
 
         $this->assertNotNull($value);
@@ -142,7 +144,7 @@ class TestDataHelper extends Module
      */
     public function fillMultihref(Concrete $object, $field, $seed = 1)
     {
-        $setter  = 'set' . ucfirst($field);
+        $setter = 'set' . ucfirst($field);
         $objects = $this->getObjectList();
         $objects = array_slice($objects, 0, 4);
 
@@ -156,9 +158,9 @@ class TestDataHelper extends Module
      */
     public function assertMultihref(Concrete $object, $field, $seed = 1)
     {
-        $getter        = 'get' . ucfirst($field);
-        $value         = $object->$getter();
-        $objects       = $this->getObjectList();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
+        $objects = $this->getObjectList();
         $expectedArray = array_slice($objects, 0, 4);
 
         $this->assertCount(count($expectedArray), $value);
@@ -188,8 +190,8 @@ class TestDataHelper extends Module
      */
     public function assertSlider(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = 7 + ($seed % 3);
 
         $this->assertEquals($expected, $value);
@@ -221,8 +223,8 @@ class TestDataHelper extends Module
      */
     public function assertImage(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = Asset::getByPath('/' . static::IMAGE);
 
         foreach ([$value, $expected] as $item) {
@@ -240,20 +242,20 @@ class TestDataHelper extends Module
     {
         $result = [];
 
-        $hotspot1         = new \stdClass();
-        $hotspot1->name   = 'hotspot1';
-        $hotspot1->width  = '10';
+        $hotspot1 = new \stdClass();
+        $hotspot1->name = 'hotspot1';
+        $hotspot1->width = '10';
         $hotspot1->height = '20';
-        $hotspot1->top    = '30';
-        $hotspot1->left   = '40';
-        $result[]        = $hotspot1;
+        $hotspot1->top = '30';
+        $hotspot1->left = '40';
+        $result[] = $hotspot1;
 
         $hotspot2 = clone $hotspot1;
-        $hotspot2->width  = '10';
+        $hotspot2->width = '10';
         $hotspot2->height = '50';
-        $hotspot2->top    = '20';
-        $hotspot2->left   = '40';
-        $result[]        = $hotspot2;
+        $hotspot2->top = '20';
+        $hotspot2->left = '40';
+        $result[] = $hotspot2;
 
         return $result;
     }
@@ -274,7 +276,7 @@ class TestDataHelper extends Module
             $asset->save();
         }
 
-        $hotspots     = $this->createHotspots();
+        $hotspots = $this->createHotspots();
         $hotspotImage = new DataObject\Data\Hotspotimage($asset, $hotspots);
         $object->$setter($hotspotImage);
     }
@@ -286,16 +288,16 @@ class TestDataHelper extends Module
      */
     public function assertHotspotImage(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
+        $getter = 'get' . ucfirst($field);
 
         /** @var DataObject\Data\Hotspotimage $value */
-        $value    = $object->$getter();
+        $value = $object->$getter();
         $hotspots = $value->getHotspots();
 
         $this->assertCount(2, $hotspots);
         $this->assertInstanceOf(DataObject\Data\Hotspotimage::class, $value);
 
-        $asset    = Asset::getByPath('/' . static::HOTSPOT_IMAGE);
+        $asset = Asset::getByPath('/' . static::HOTSPOT_IMAGE);
         $hotspots = $this->createHotspots();
         $expected = new DataObject\Data\Hotspotimage($asset, $hotspots);
 
@@ -321,8 +323,8 @@ class TestDataHelper extends Module
      */
     public function assertLanguage(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = 'de';
 
         $this->assertEquals($expected, $value);
@@ -346,8 +348,8 @@ class TestDataHelper extends Module
      */
     public function assertCountry(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = 'AU';
 
         $this->assertEquals($expected, $value);
@@ -361,7 +363,7 @@ class TestDataHelper extends Module
     public function fillDate(Concrete $object, $field, $seed = 1)
     {
         $setter = 'set' . ucfirst($field);
-        $date   = new \DateTime();
+        $date = new \DateTime();
         $date->setDate(2000, 12, 24);
 
         $object->$setter($date);
@@ -377,7 +379,7 @@ class TestDataHelper extends Module
         $getter = 'get' . ucfirst($field);
 
         /** @var \DateTime $value */
-        $value  = $object->$getter();
+        $value = $object->$getter();
 
         $expected = new \DateTime();
         $expected->setDate(2000, 12, 24);
@@ -406,8 +408,8 @@ class TestDataHelper extends Module
      */
     public function assertSelect(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = 1 + ($seed % 2);
 
         $this->assertEquals($expected, $value);
@@ -431,8 +433,8 @@ class TestDataHelper extends Module
      */
     public function assertMultiSelect(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = ['1', '2'];
 
         $this->assertEquals($expected, $value);
@@ -448,7 +450,7 @@ class TestDataHelper extends Module
         $setter = 'set' . ucfirst($field);
 
         $username = 'unittestdatauser' . $seed;
-        $user     = User::getByName($username);
+        $user = User::getByName($username);
 
         if (!$user) {
             /** @var User $user */
@@ -456,7 +458,7 @@ class TestDataHelper extends Module
                 'parentId' => 0,
                 'username' => $username,
                 'password' => Authentication::getPasswordHash($username, $username),
-                'active'   => true
+                'active' => true
             ]);
 
             $user->setAdmin(true);
@@ -473,9 +475,9 @@ class TestDataHelper extends Module
      */
     public function assertUser(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
-        $user     = User::getByName('unittestdatauser' . $seed);
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
+        $user = User::getByName('unittestdatauser' . $seed);
         $expected = $user->getId();
 
         $this->assertEquals($expected, $value);
@@ -499,8 +501,8 @@ class TestDataHelper extends Module
      */
     public function assertCheckbox(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = ($seed % 2) == true;
 
         $this->assertEquals($expected, $value);
@@ -524,8 +526,8 @@ class TestDataHelper extends Module
      */
     public function assertTime(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = '06:4' . $seed % 10;
 
         $this->assertEquals($expected, $value);
@@ -570,7 +572,7 @@ class TestDataHelper extends Module
     public function assertPassword(Concrete $object, $field, $seed = 1)
     {
         $getter = 'get' . ucfirst($field);
-        $value  = $object->$getter();
+        $value = $object->$getter();
 
         // it is intended that no password is sent
         $this->assertNull($value, 'Password getter is expected to return null');
@@ -594,8 +596,8 @@ class TestDataHelper extends Module
      */
     public function assertCountryMultiSelect(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = ['1', '2'];
 
         $this->assertEquals($expected, $value);
@@ -619,8 +621,8 @@ class TestDataHelper extends Module
      */
     public function assertLanguageMultiSelect(Concrete $object, $field, $seed = 1)
     {
-        $getter   = 'get' . ucfirst($field);
-        $value    = $object->$getter();
+        $getter = 'get' . ucfirst($field);
+        $value = $object->$getter();
         $expected = ['1', '3'];
 
         $this->assertEquals($expected, $value);
@@ -632,8 +634,8 @@ class TestDataHelper extends Module
     protected function getGeopointFixture()
     {
         $longitude = 2.2008440814678;
-        $latitude  = 102.25112915039;
-        $point     = new DataObject\Data\Geopoint($longitude, $latitude);
+        $latitude = 102.25112915039;
+        $point = new DataObject\Data\Geopoint($longitude, $latitude);
 
         return $point;
     }
@@ -659,7 +661,7 @@ class TestDataHelper extends Module
         $getter = 'get' . ucfirst($field);
 
         /** @var DataObject\Data\Geopoint $value */
-        $value  = $object->$getter();
+        $value = $object->$getter();
 
         $this->assertNotNull($value);
         $this->assertInstanceOf(DataObject\Data\Geopoint::class, $value);
@@ -718,8 +720,8 @@ class TestDataHelper extends Module
             return;
         }
 
-        $fd           = $object->getClass()->getFieldDefinition($field);
-        $valueData    = TestHelper::getComparisonDataForField($field, $fd, $object);
+        $fd = $object->getClass()->getFieldDefinition($field);
+        $valueData = TestHelper::getComparisonDataForField($field, $fd, $object);
         $expectedData = TestHelper::getComparisonDataForField($field, $fd, $comparisonObject);
 
         $this->assertEquals($expectedData, $valueData);
@@ -744,7 +746,7 @@ class TestDataHelper extends Module
      */
     public function fillGeopolygon(Concrete $object, $field, $seed = 1)
     {
-        $setter  = 'set' . ucfirst($field);
+        $setter = 'set' . ucfirst($field);
         $object->$setter($this->getGeopolygonFixture());
     }
 
@@ -781,8 +783,8 @@ class TestDataHelper extends Module
             return;
         }
 
-        $fd           = $object->getClass()->getFieldDefinition($field);
-        $valueData    = TestHelper::getComparisonDataForField($field, $fd, $object);
+        $fd = $object->getClass()->getFieldDefinition($field);
+        $valueData = TestHelper::getComparisonDataForField($field, $fd, $object);
         $expectedData = TestHelper::getComparisonDataForField($field, $fd, $comparisonObject);
 
         $this->assertEquals($expectedData, $valueData);
@@ -829,8 +831,8 @@ class TestDataHelper extends Module
             return;
         }
 
-        $fd           = $object->getClass()->getFieldDefinition($field);
-        $valueData    = TestHelper::getComparisonDataForField($field, $fd, $object);
+        $fd = $object->getClass()->getFieldDefinition($field);
+        $valueData = TestHelper::getComparisonDataForField($field, $fd, $object);
         $expectedData = TestHelper::getComparisonDataForField($field, $fd, $comparisonObject);
 
         $this->assertEquals($expectedData, $valueData);
@@ -929,7 +931,7 @@ class TestDataHelper extends Module
         $getter = 'get' . ucfirst($field);
 
         /** @var DataObject\Data\StructuredTable $value */
-        $value  = $object->$getter();
+        $value = $object->$getter();
 
         $this->assertNotNull($value);
         $this->assertInstanceOf(DataObject\Data\StructuredTable::class, $value);
@@ -944,22 +946,22 @@ class TestDataHelper extends Module
             return;
         }
 
-        $fd           = $object->getClass()->getFieldDefinition($field);
-        $valueData    = TestHelper::getComparisonDataForField($field, $fd, $object);
+        $fd = $object->getClass()->getFieldDefinition($field);
+        $valueData = TestHelper::getComparisonDataForField($field, $fd, $object);
         $expectedData = TestHelper::getComparisonDataForField($field, $fd, $comparisonObject);
 
         $this->assertEquals($expectedData, $valueData);
     }
 
     /**
-     * @param Concrete    $object
+     * @param Concrete|DataObject\Fieldcollection\Data\AbstractData|DataObject\Objectbrick\Data\AbstractData    $object
      * @param string      $field
      * @param int         $seed
      * @param string|null $language
      */
-    public function fillObjects(Concrete $object, $field, $seed = 1, $language = null)
+    public function fillObjects($object, $field, $seed = 1, $language = null)
     {
-        $setter  = 'set' . ucfirst($field);
+        $setter = 'set' . ucfirst($field);
         $objects = $this->getObjectList("o_type = 'object'");
 
         if ($language) {
@@ -976,17 +978,18 @@ class TestDataHelper extends Module
     }
 
     /**
-     * @param Concrete      $object
+     * @param Concrete|DataObject\Fieldcollection\Data\AbstractData|DataObject\Objectbrick\Data\AbstractData      $object
      * @param string        $field
      * @param Concrete|null $comparisonObject
      * @param int           $seed
      * @param string|null   $language
      */
-    public function assertObjects(Concrete $object, $field, $seed = 1, $language = null)
+    public function assertObjects($object, $field, $seed = 1, $language = null)
     {
         $getter = 'get' . ucfirst($field);
 
         $objects = $this->getObjectList("o_type = 'object'");
+
         if ($language) {
             if ($language === 'de') {
                 $expectedArray = array_slice($objects, 0, 6);
@@ -996,7 +999,8 @@ class TestDataHelper extends Module
             $value = $object->$getter($language);
         } else {
             $expectedArray = array_slice($objects, 0, 4);
-            $value         = $object->$getter();
+
+            $value = $object->$getter();
         }
 
         $this->assertEquals(
@@ -1060,7 +1064,7 @@ class TestDataHelper extends Module
     public function assertObjectsWithMetadata(Concrete $object, $field, Concrete $comparisonObject = null, $seed = 1)
     {
         $getter = 'get' . ucfirst($field);
-        $value  = $object->$getter();
+        $value = $object->$getter();
 
         $expected = $this->getObjectsWithMetadataFixture($field, $seed);
 
@@ -1071,8 +1075,8 @@ class TestDataHelper extends Module
             return;
         }
 
-        $fd           = $object->getClass()->getFieldDefinition($field);
-        $valueHash    = TestHelper::getComparisonDataForField($field, $fd, $object);
+        $fd = $object->getClass()->getFieldDefinition($field);
+        $valueHash = TestHelper::getComparisonDataForField($field, $fd, $object);
         $expectedHash = TestHelper::getComparisonDataForField($field, $fd, $comparisonObject);
 
         $this->assertEquals($expectedHash, $valueHash);
@@ -1116,6 +1120,11 @@ class TestDataHelper extends Module
         $brick = new DataObject\Objectbrick\Data\UnittestBrick($object);
         $brick->setBrickInput('brickinput' . $seed);
 
+        $emptyObjects = TestHelper::createEmptyObjects('myBrickPrefix', true, 10);
+        $emptyLazyObjects = TestHelper::createEmptyObjects('myLazyBrickPrefix', true, 15);
+        $brick->setBrickRelation($emptyObjects);
+        $brick->setBrickLazyRelation($emptyLazyObjects);
+
         /** @var DataObject\Unittest\Mybricks $objectbricks */
         $objectbricks = $object->$getter();
         $objectbricks->setUnittestBrick($brick);
@@ -1136,11 +1145,31 @@ class TestDataHelper extends Module
         $value = $value->getUnittestBrick();
 
         /** @var DataObject\Objectbrick\Data\UnittestBrick $value */
-        $value = $value->getBrickinput();
+        $inputValue = $value->getBrickinput();
 
-        $expected = 'brickinput' . $seed;
+        $expectedInputValue = 'brickinput' . $seed;
 
-        $this->assertEquals($expected, $value);
+        $this->assertEquals($expectedInputValue, $inputValue);
+
+        $fieldRelation = $value->getBrickRelation();
+        $this->assertEquals(10, count($fieldRelation), 'expected 10 items');
+
+        $fieldLazyRelation = $value->getBrickLazyRelation();
+        $this->assertEquals(15, count($fieldLazyRelation), 'expected 15 items');
+
+        Cache::clearAll();
+        Runtime::clear();
+        $object = AbstractObject::getById($object->getId());
+        $value = $object->$getter();
+        $value = $value->getItems();
+
+        /** @var DataObject\Fieldcollection\Data\Unittestfieldcollection $value */
+        $value = $value[0];
+        $fieldRelation = $value->getBrickRelation();
+        $this->assertEquals(10, count($fieldRelation), 'expected 10 items');
+
+        $fieldLazyRelation = $value->getBrickLazyRelation();
+        $this->assertEquals(15, count($fieldLazyRelation), 'expected 15 items');
     }
 
     /**
@@ -1156,6 +1185,10 @@ class TestDataHelper extends Module
         $fc->setFieldinput1('field1' . $seed);
         $fc->setFieldinput2('field2' . $seed);
 
+        $emptyObjects = TestHelper::createEmptyObjects('myprefix', true, 10);
+        $emptyLazyObjects = TestHelper::createEmptyObjects('myLazyPrefix', true, 15);
+        $fc->setFieldRelation($emptyObjects);
+        $fc->setFieldLazyRelation($emptyLazyObjects);
         $items = new DataObject\Fieldcollection([$fc], $field);
         $object->$setter($items);
     }
@@ -1190,6 +1223,26 @@ class TestDataHelper extends Module
             $value->getFieldinput2(),
             'expected field2' . $seed . ' but was ' . $value->getFieldInput2()
         );
+
+        $fieldRelation = $value->getFieldRelation();
+        $this->assertEquals(10, count($fieldRelation), 'expected 10 items');
+
+        $fieldLazyRelation = $value->getFieldLazyRelation();
+        $this->assertEquals(15, count($fieldLazyRelation), 'expected 15 items');
+
+        Cache::clearAll();
+        Runtime::clear();
+        $object = AbstractObject::getById($object->getId());
+        $value = $object->$getter();
+        $value = $value->getItems();
+
+        /** @var DataObject\Fieldcollection\Data\Unittestfieldcollection $value */
+        $value = $value[0];
+        $fieldRelation = $value->getFieldRelation();
+        $this->assertEquals(10, count($fieldRelation), 'expected 10 items');
+
+        $fieldLazyRelation = $value->getFieldLazyRelation();
+        $this->assertEquals(15, count($fieldLazyRelation), 'expected 15 items');
     }
 
     public function assertElementsEqual(ElementInterface $e1, ElementInterface $e2)

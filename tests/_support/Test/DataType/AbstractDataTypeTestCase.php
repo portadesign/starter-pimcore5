@@ -2,6 +2,8 @@
 
 namespace Pimcore\Tests\Test\DataType;
 
+use Pimcore\Cache;
+use Pimcore\Model\DataObject\AbstractObject;
 use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\DataObject\Unittest;
 use Pimcore\Tests\Helper\DataType\TestDataHelper;
@@ -71,7 +73,7 @@ abstract class AbstractDataTypeTestCase extends TestCase
             $fields = [
                 [
                     'method' => 'fill' . ucfirst($fields),
-                    'field'  => $fields
+                    'field' => $fields
                 ]
             ];
         }
@@ -163,8 +165,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillHotspotImage',
-                'field'     => 'hotspotimage'
+                'method' => 'fillHotspotImage',
+                'field' => 'hotspotimage'
             ]
         ]);
 
@@ -181,8 +183,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillLanguage',
-                'field'     => 'languagex'
+                'method' => 'fillLanguage',
+                'field' => 'languagex'
             ]
         ]);
 
@@ -207,8 +209,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillDate',
-                'field'     => 'datetime'
+                'method' => 'fillDate',
+                'field' => 'datetime'
             ]
         ]);
 
@@ -233,8 +235,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillMultiSelect',
-                'field'     => 'multiselect'
+                'method' => 'fillMultiSelect',
+                'field' => 'multiselect'
             ]
         ]);
 
@@ -273,8 +275,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillMultiSelect',
-                'field'     => 'countries'
+                'method' => 'fillMultiSelect',
+                'field' => 'countries'
             ]
         ]);
 
@@ -285,8 +287,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillMultiSelect',
-                'field'     => 'languages'
+                'method' => 'fillMultiSelect',
+                'field' => 'languages'
             ]
         ]);
 
@@ -297,8 +299,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillGeopoint',
-                'field'     => 'point'
+                'method' => 'fillGeopoint',
+                'field' => 'point'
             ]
         ]);
 
@@ -309,8 +311,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillGeobounds',
-                'field'     => 'bounds'
+                'method' => 'fillGeobounds',
+                'field' => 'bounds'
             ]
         ]);
 
@@ -321,8 +323,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillGeopolygon',
-                'field'     => 'poly'
+                'method' => 'fillGeopolygon',
+                'field' => 'poly'
             ]
         ]);
 
@@ -347,8 +349,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillStructuredTable',
-                'field'     => 'structuredtable'
+                'method' => 'fillStructuredTable',
+                'field' => 'structuredtable'
             ]
         ]);
 
@@ -371,8 +373,8 @@ abstract class AbstractDataTypeTestCase extends TestCase
 
         $this->createTestObject([
             [
-                'method'    => 'fillObjectsWithMetadata',
-                'field'     => 'objectswithmetadata'
+                'method' => 'fillObjectsWithMetadata',
+                'field' => 'objectswithmetadata'
             ]
         ]);
 
@@ -383,13 +385,13 @@ abstract class AbstractDataTypeTestCase extends TestCase
     {
         $this->createTestObject([
             [
-                'method'    => 'fillInput',
-                'field'     => 'linput',
+                'method' => 'fillInput',
+                'field' => 'linput',
                 'arguments' => ['de']
             ],
             [
-                'method'    => 'fillInput',
-                'field'     => 'linput',
+                'method' => 'fillInput',
+                'field' => 'linput',
                 'arguments' => ['en']
             ]
         ]);
@@ -404,13 +406,13 @@ abstract class AbstractDataTypeTestCase extends TestCase
 
         $this->createTestObject([
             [
-                'method'    => 'fillObjects',
-                'field'     => 'lobjects',
+                'method' => 'fillObjects',
+                'field' => 'lobjects',
                 'arguments' => ['de']
             ],
             [
-                'method'    => 'fillObjects',
-                'field'     => 'lobjects',
+                'method' => 'fillObjects',
+                'field' => 'lobjects',
                 'arguments' => ['en']
             ]
         ]);
@@ -419,12 +421,41 @@ abstract class AbstractDataTypeTestCase extends TestCase
         $this->testDataHelper->assertObjects($this->testObject, 'lobjects', $this->seed, 'de');
     }
 
+    public function testLazyLocalizedMultihref()
+    {
+        TestHelper::createEmptyObjects();
+
+        $this->createTestObject([
+            [
+                'method' => 'fillObjects',
+                'field' => 'lmultihrefLazy',
+                'arguments' => ['de']
+            ],
+            [
+                'method' => 'fillObjects',
+                'field' => 'lmultihrefLazy',
+                'arguments' => ['en']
+            ]
+        ]);
+
+        $this->testDataHelper->assertObjects($this->testObject, 'lmultihrefLazy', $this->seed, 'en');
+        $this->testDataHelper->assertObjects($this->testObject, 'lmultihrefLazy', $this->seed, 'de');
+
+        Cache::clearAll();
+        Cache\Runtime::clear();
+
+        $this->testObject = AbstractObject::getById($this->testObject->getId());
+
+        $this->testDataHelper->assertObjects($this->testObject, 'lmultihrefLazy', $this->seed, 'en');
+        $this->testDataHelper->assertObjects($this->testObject, 'lmultihrefLazy', $this->seed, 'de');
+    }
+
     public function testBricks()
     {
         $this->createTestObject([
             [
                 'method' => 'fillBricks',
-                'field'  => 'mybricks'
+                'field' => 'mybricks'
             ]
         ]);
 
@@ -436,7 +467,7 @@ abstract class AbstractDataTypeTestCase extends TestCase
         $this->createTestObject([
             [
                 'method' => 'fillFieldCollection',
-                'field'  => 'myfieldcollection'
+                'field' => 'myfieldcollection'
             ]
         ]);
 

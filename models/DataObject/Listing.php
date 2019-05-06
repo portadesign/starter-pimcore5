@@ -23,11 +23,12 @@ use Zend\Paginator\Adapter\AdapterInterface;
 use Zend\Paginator\AdapterAggregateInterface;
 
 /**
- * @method int load()
+ * @method Model\DataObject[] load()
  * @method int getTotalCount()
  * @method int getCount()
- * @method int loadIdList()
+ * @method int[] loadIdList()
  * @method \Pimcore\Model\DataObject\Listing\Dao getDao()
+ * @method onCreateQuery(callable $callback)
  */
 class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterAggregate, \Iterator, AdapterInterface, AdapterAggregateInterface
 {
@@ -47,32 +48,6 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     public $objectTypes = [AbstractObject::OBJECT_TYPE_OBJECT, AbstractObject::OBJECT_TYPE_FOLDER];
 
     /**
-     * @var array
-     */
-    public $validOrderKeys = [
-        'o_creationDate',
-        'o_modificationDate',
-        'o_id',
-        'o_key',
-        'o_index'
-    ];
-
-    /**
-     * @param string $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-        //TODO: ???
-        /*if(in_array($key,$this->validOrderKeys)) {
-              return true;
-          }
-          return false;*/
-    }
-
-    /**
      * @return array
      */
     public function getObjects()
@@ -85,7 +60,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     }
 
     /**
-     * @param string $objects
+     * @param array $objects
      *
      * @return $this
      */
@@ -107,7 +82,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     /**
      * @param $unpublished
      *
-     * @return bool
+     * @return $this
      */
     public function setUnpublished($unpublished)
     {
@@ -203,7 +178,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
      * @param int $offset
      * @param int $itemCountPerPage
      *
-     * @return array
+     * @return Model\DataObject[]
      */
     public function getItems($offset, $itemCountPerPage)
     {
@@ -253,7 +228,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     }
 
     /**
-     * @return mixed|void
+     * @return mixed|null
      */
     public function next()
     {

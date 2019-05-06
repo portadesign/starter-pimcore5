@@ -118,6 +118,7 @@ class Processor
 
             if (!is_dir(dirname($fsPath))) {
                 File::mkdir(dirname($fsPath));
+                @chmod($thumbDir, File::getDefaultMode());
             }
 
             if (is_file($fsPath)) {
@@ -125,7 +126,7 @@ class Processor
             }
 
             $converter = \Pimcore\Video::getInstance();
-            $converter->load($asset->getFileSystemPath());
+            $converter->load($asset->getFileSystemPath(), ['asset' => $asset]);
             $converter->setAudioBitrate($config->getAudioBitrate());
             $converter->setVideoBitrate($config->getVideoBitrate());
             $converter->setFormat($format);
@@ -203,6 +204,7 @@ class Processor
                 $success = $converter->save();
                 Logger::info('finished video ' . $converter->getFormat() . ' to ' . $converter->getDestinationFile());
 
+                File::mkdir(dirname($converter->getStorageFile()));
                 File::rename($converter->getDestinationFile(), $converter->getStorageFile());
 
                 // set proper permissions

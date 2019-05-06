@@ -17,9 +17,14 @@
 
 namespace Pimcore\Model\DataObject\Concrete;
 
+use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data\CustomResourcePersistingInterface;
+use Pimcore\Model\DataObject\ClassDefinition\Data\QueryResourcePersistenceAwareInterface;
+use Pimcore\Model\DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface;
+use Pimcore\Tool;
 
 /**
  * @property \Pimcore\Model\DataObject\Concrete $model
@@ -100,7 +105,7 @@ class Dao extends Model\DataObject\AbstractObject\Dao
             $src = 'dest_id';
         }
 
-        $relations = $this->db->fetchAll('SELECT r.' . $dest . ' as dest_id, r.' . $dest . ' as id, r.type, o.o_className as subtype, concat(o.o_path ,o.o_key) as path , r.index
+        $relations = $this->db->fetchAll('SELECT r.' . $dest . ' as dest_id, r.' . $dest . ' as id, r.type, o.o_className as subtype, o.o_published as published, concat(o.o_path ,o.o_key) as path , r.index
             FROM objects o, object_relations_' . $classId . " r
             WHERE r.fieldname= ?
             AND r.ownertype = 'object'
@@ -108,7 +113,7 @@ class Dao extends Model\DataObject\AbstractObject\Dao
             AND o.o_id = r.' . $dest . "
             AND r.type='object'
 
-            UNION SELECT r." . $dest . ' as dest_id, r.' . $dest . ' as id, r.type,  a.type as subtype,  concat(a.path,a.filename) as path, r.index
+            UNION SELECT r." . $dest . ' as dest_id, r.' . $dest . ' as id, r.type,  a.type as subtype, "null" as published, concat(a.path,a.filename) as path, r.index
             FROM assets a, object_relations_' . $classId . " r
             WHERE r.fieldname= ?
             AND r.ownertype = 'object'
@@ -116,7 +121,7 @@ class Dao extends Model\DataObject\AbstractObject\Dao
             AND a.id = r.' . $dest . "
             AND r.type='asset'
 
-            UNION SELECT r." . $dest . ' as dest_id, r.' . $dest . ' as id, r.type, d.type as subtype, concat(d.path,d.key) as path, r.index
+            UNION SELECT r." . $dest . ' as dest_id, r.' . $dest . ' as id, r.type, d.type as subtype, d.published as published, concat(d.path,d.key) as path, r.index
             FROM documents d, object_relations_' . $classId . " r
             WHERE r.fieldname= ?
             AND r.ownertype = 'object'
@@ -142,20 +147,27 @@ class Dao extends Model\DataObject\AbstractObject\Dao
 
         $fieldDefinitions = $this->model->getClass()->getFieldDefinitions(['object' => $this->model]);
         foreach ($fieldDefinitions as $key => $value) {
-            if (method_exists($value, 'load')) {
+            if ($value instanceof CustomResourcePersistingInterface || method_exists($value, 'load')) {
+                if (!$value instanceof CustomResourcePersistingInterface) {
+                    Tool::triggerMissingInterfaceDeprecation(get_class($value), 'load', CustomResourcePersistingInterface::class);
+                }
                 // datafield has it's own loader
                 $value = $value->load($this->model);
                 if ($value === 0 || !empty($value)) {
                     $this->model->setValue($key, $value);
                 }
-            } else {
+            }
+            if ($value instanceof ResourcePersistenceAwareInterface || method_exists($value, 'getDataFromResource')) {
+                if (!$value instanceof ResourcePersistenceAwareInterface) {
+                    Tool::triggerMissingInterfaceDeprecation(get_class($value), 'getDataFromResource', ResourcePersistenceAwareInterface::class);
+                }
                 // if a datafield requires more than one field
                 if (is_array($value->getColumnType())) {
                     $multidata = [];
                     foreach ($value->getColumnType() as $fkey => $fvalue) {
                         $multidata[$key . '__' . $fkey] = $data[$key . '__' . $fkey];
                     }
-                    $this->model->setValue($key, $this->model->getClass()->getFieldDefinition($key)->getDataFromResource($multidata));
+                    $this->model->setValue($key, $value->getDataFromResource($multidata));
                 } else {
                     $this->model->setValue($key, $value->getDataFromResource($data[$key], $this->model));
                 }
@@ -175,11 +187,21 @@ class Dao extends Model\DataObject\AbstractObject\Dao
         // get fields which shouldn't be updated
         $fieldDefinitions = $this->model->getClass()->getFieldDefinitions();
         $untouchable = [];
+        $db = Db::get();
+
         foreach ($fieldDefinitions as $key => $fd) {
             if (method_exists($fd, 'getLazyLoading') && $fd->getLazyLoading()) {
-                if (!in_array($key, $this->model->getLazyLoadedFields())) {
+                if (!$this->model->isLazyKeyLoaded($key) || $fd instanceof DataObject\ClassDefinition\Data\ReverseManyToManyObjectRelation) {
                     //this is a relation subject to lazy loading - it has not been loaded
                     $untouchable[] = $key;
+                }
+            }
+
+            if (!DataObject\AbstractObject::isDirtyDetectionDisabled() && $fd->supportsDirtyDetection()) {
+                if ($this->model instanceof DataObject\DirtyIndicatorInterface && !$this->model->isFieldDirty($key)) {
+                    if (!in_array($key, $untouchable)) {
+                        $untouchable[] = $key;
+                    }
                 }
             }
         }
@@ -187,13 +209,16 @@ class Dao extends Model\DataObject\AbstractObject\Dao
         // empty relation table except the untouchable fields (eg. lazy loading fields)
         if (count($untouchable) > 0) {
             $untouchables = "'" . implode("','", $untouchable) . "'";
-            $this->db->deleteWhere('object_relations_' . $this->model->getClassId(), $this->db->quoteInto('src_id = ? AND fieldname not in (' . $untouchables . ") AND ownertype = 'object'", $this->model->getId()));
+            $condition = $this->db->quoteInto('src_id = ? AND fieldname not in (' . $untouchables . ") AND ownertype = 'object'", $this->model->getId());
         } else {
-            $this->db->delete('object_relations_' . $this->model->getClassId(), [
-                'src_id' => $this->model->getId(),
-                'ownertype' => 'object'
-            ]);
+            $condition = 'src_id = ' . $db->quote($this->model->getId()) . ' AND ownertype = "object"';
         }
+
+        if (!DataObject\AbstractObject::isDirtyDetectionDisabled()) {
+            $condition = '(' . $condition . ' AND ownerType != "localizedfield" AND ownerType != "fieldcollection")';
+        }
+
+        $this->db->deleteWhere('object_relations_' . $this->model->getClassId(), $condition);
 
         $inheritedValues = DataObject\AbstractObject::doGetInheritedValues();
         DataObject\AbstractObject::setGetInheritedValues(false);
@@ -203,10 +228,25 @@ class Dao extends Model\DataObject\AbstractObject\Dao
         foreach ($fieldDefinitions as $key => $fd) {
             $getter = 'get' . ucfirst($key);
 
-            if (method_exists($fd, 'save')) {
-                // for fieldtypes which have their own save algorithm eg. fieldcollections, objects, multihref, ...
-                $fd->save($this->model);
-            } elseif ($fd->getColumnType()) {
+            if ($fd instanceof CustomResourcePersistingInterface || method_exists($fd, 'save')) {
+                if (!$fd instanceof CustomResourcePersistingInterface) {
+                    Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'save', CustomResourcePersistingInterface::class);
+                }
+                // for fieldtypes which have their own save algorithm eg. fieldcollections, relational data-types, ...
+                $saveParams = ['isUntouchable' => in_array($fd->getName(), $untouchable),
+                               'isUpdate' => $isUpdate,
+                                'context' => [
+                                    'containerType' => 'object'
+                                ]];
+                if ($this->model instanceof DataObject\DirtyIndicatorInterface) {
+                    $saveParams['newParent'] = $this->model->isFieldDirty('o_parentId');
+                }
+                $fd->save($this->model, $saveParams);
+            }
+            if ($fd instanceof ResourcePersistenceAwareInterface || method_exists($fd, 'getDataForResource')) {
+                if (!$fd instanceof ResourcePersistenceAwareInterface) {
+                    Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'getDataForResource', ResourcePersistenceAwareInterface::class);
+                }
                 // pimcore saves the values with getDataForResource
                 if (is_array($fd->getColumnType())) {
                     $insertDataArray = $fd->getDataForResource($this->model->$getter(), $this->model);
@@ -243,9 +283,12 @@ class Dao extends Model\DataObject\AbstractObject\Dao
         }
 
         foreach ($fieldDefinitions as $key => $fd) {
-            if ($fd->getQueryColumnType()) {
+            if ($fd instanceof QueryResourcePersistenceAwareInterface || method_exists($fd, 'getDataForQueryResource')) {
+                if (!$fd instanceof QueryResourcePersistenceAwareInterface) {
+                    Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'getDataForQueryResource', QueryResourcePersistenceAwareInterface::class);
+                }
                 //exclude untouchables if value is not an array - this means data has not been loaded
-                if (!(in_array($key, $untouchable) and !is_array($this->model->$key))) {
+                if (!in_array($key, $untouchable)) {
                     $method = 'get' . $key;
                     $fieldValue = $this->model->$method();
                     $insertData = $fd->getDataForQueryResource($fieldValue, $this->model);
@@ -273,7 +316,7 @@ class Dao extends Model\DataObject\AbstractObject\Dao
                         }
                     }
 
-                    if ($inheritanceEnabled && $fd->getFieldType() != 'calculatedValue') {
+                    if ($inheritanceEnabled && $fd->supportsInheritance()) {
                         //get changed fields for inheritance
                         if ($fd->isRelationType()) {
                             if (is_array($insertData)) {
@@ -345,7 +388,10 @@ class Dao extends Model\DataObject\AbstractObject\Dao
 
         // delete fields wich have their own delete algorithm
         foreach ($this->model->getClass()->getFieldDefinitions() as $fd) {
-            if (method_exists($fd, 'delete')) {
+            if ($fd instanceof CustomResourcePersistingInterface || method_exists($fd, 'delete')) {
+                if (!$fd instanceof CustomResourcePersistingInterface) {
+                    Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'delete', CustomResourcePersistingInterface::class);
+                }
                 $fd->delete($this->model);
             }
         }
@@ -360,7 +406,7 @@ class Dao extends Model\DataObject\AbstractObject\Dao
      */
     public function getVersions()
     {
-        $versionIds = $this->db->fetchCol("SELECT id FROM versions WHERE cid = ? AND ctype='object' ORDER BY `id` DESC", $this->model->getId());
+        $versionIds = $this->db->fetchCol("SELECT id FROM versions WHERE cid = ? AND ctype='object' ORDER BY `id` ASC", $this->model->getId());
 
         $versions = [];
         foreach ($versionIds as $versionId) {

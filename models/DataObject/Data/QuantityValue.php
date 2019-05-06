@@ -16,30 +16,34 @@
 
 namespace Pimcore\Model\DataObject\Data;
 
+use Pimcore\Model\DataObject\OwnerAwareFieldInterface;
 use Pimcore\Model\DataObject\QuantityValue\Unit;
+use Pimcore\Model\DataObject\Traits\OwnerAwareFieldTrait;
 
-class QuantityValue
+class QuantityValue implements OwnerAwareFieldInterface
 {
+    use OwnerAwareFieldTrait;
+
     /**
      * @var float | string
      */
-    public $value;
+    protected $value;
 
     /**
      * @var int
      */
-    public $unitId;
+    protected $unitId;
 
     /**
      * @var \Pimcore\Model\DataObject\QuantityValue\Unit
      */
-    public $unit;
+    protected $unit;
 
     /**
      * QuantityValue constructor.
      *
      * @param null $value
-     * @param null $unitId
+     * @param int|Unit|null $unitId
      */
     public function __construct($value = null, $unitId = null)
     {
@@ -47,9 +51,13 @@ class QuantityValue
         $this->unitId = $unitId;
         $this->unit = '';
 
-        if ($unitId) {
+        if ($unitId instanceof Unit) {
+            $this->unit = $unitId;
+            $this->unitId = $this->unit->getId();
+        } elseif ($unitId) {
             $this->unit = Unit::getById($this->unitId);
         }
+        $this->markMeDirty();
     }
 
     /**
@@ -59,6 +67,7 @@ class QuantityValue
     {
         $this->unitId = $unitId;
         $this->unit = null;
+        $this->markMeDirty();
     }
 
     /**
@@ -87,6 +96,7 @@ class QuantityValue
     public function setValue($value)
     {
         $this->value = $value;
+        $this->markMeDirty();
     }
 
     /**
@@ -118,6 +128,6 @@ class QuantityValue
             $value .= ' ' . $this->getUnit()->getAbbreviation();
         }
 
-        return $value;
+        return $value ? $value : '';
     }
 }

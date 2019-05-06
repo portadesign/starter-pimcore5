@@ -29,7 +29,7 @@ class TargetGroup extends Model\DataObject\ClassDefinition\Data\Select
     public $fieldtype = 'targetGroup';
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromResource
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -51,6 +51,8 @@ class TargetGroup extends Model\DataObject\ClassDefinition\Data\Select
     }
 
     /**
+     * @see ResourcePersistenceAwareInterface::getDataForResource
+     *
      * @param string $data
      * @param null $object
      * @param mixed $params
@@ -83,7 +85,7 @@ class TargetGroup extends Model\DataObject\ClassDefinition\Data\Select
         foreach ($targetGroups as $targetGroup) {
             $options[] = [
                 'value' => $targetGroup->getId(),
-                'key'   => $targetGroup->getName()
+                'key' => $targetGroup->getName()
             ];
         }
 

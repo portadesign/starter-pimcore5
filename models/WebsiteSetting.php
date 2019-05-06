@@ -14,52 +14,55 @@
 
 namespace Pimcore\Model;
 
-use Pimcore\Logger;
+use Pimcore\Model\Element\ElementInterface;
+use Pimcore\Model\Element\Service;
 
 /**
  * @method \Pimcore\Model\WebsiteSetting\Dao getDao()
+ * @method void save()
+ * @method void delete()
  */
 class WebsiteSetting extends AbstractModel
 {
     /**
      * @var int
      */
-    public $id;
+    protected $id;
 
     /**
      * @var string
      */
-    public $name;
+    protected $name;
 
     /**
      * @var string
      */
-    public $language;
+    protected $language;
 
     /**
-     * @var
+     * @var string
      */
-    public $type;
+    protected $type;
 
     /**
-     * @var
+     * @var mixed
      */
-    public $data;
+    protected $data;
 
     /**
-     * @var
+     * @var int
      */
-    public $siteId;
+    protected $siteId;
 
     /**
-     * @var
+     * @var int
      */
-    public $creationDate;
+    protected $creationDate;
 
     /**
-     * @var
+     * @var int
      */
-    public $modificationDate;
+    protected $modificationDate;
 
     /**
      * this is a small per request cache to know which website setting is which is, this info is used in self::getByName()
@@ -94,9 +97,9 @@ class WebsiteSetting extends AbstractModel
 
     /**
      * @param string $name name of the config
-     * @param null $siteId site ID
-     * @param null $language language, if property cannot be found the value of property without language is returned
-     * @param null $fallbackLanguage fallback language
+     * @param int|null $siteId site ID
+     * @param string|null $language language, if property cannot be found the value of property without language is returned
+     * @param string|null $fallbackLanguage fallback language
      *
      * @return null|WebsiteSetting
      */
@@ -115,8 +118,6 @@ class WebsiteSetting extends AbstractModel
         try {
             $setting->getDao()->getByName($name, $siteId, $language);
         } catch (\Exception $e) {
-            Logger::warning($e->getMessage());
-
             if ($language != $fallbackLanguage) {
                 $result = self::getByName($name, $siteId, $fallbackLanguage, $fallbackLanguage);
 
@@ -178,7 +179,7 @@ class WebsiteSetting extends AbstractModel
     }
 
     /**
-     * @param $creationDate
+     * @param int $creationDate
      *
      * @return $this
      */
@@ -190,7 +191,7 @@ class WebsiteSetting extends AbstractModel
     }
 
     /**
-     * @return mixed
+     * @return int
      */
     public function getCreationDate()
     {
@@ -198,12 +199,17 @@ class WebsiteSetting extends AbstractModel
     }
 
     /**
-     * @param $data
+     * @param mixed $data
      *
      * @return $this
      */
     public function setData($data)
     {
+        if ($data instanceof ElementInterface) {
+            $this->setType(Service::getElementType($data));
+            $data = $data->getId();
+        }
+
         $this->data = $data;
 
         return $this;
@@ -214,11 +220,16 @@ class WebsiteSetting extends AbstractModel
      */
     public function getData()
     {
+        // lazy-load data of type asset, document, object
+        if (in_array($this->getType(), ['document', 'asset', 'object']) && !$this->data instanceof ElementInterface && is_numeric($this->data)) {
+            return Element\Service::getElementById($this->getType(), $this->data);
+        }
+
         return $this->data;
     }
 
     /**
-     * @param $modificationDate
+     * @param int $modificationDate
      *
      * @return $this
      */
@@ -230,7 +241,7 @@ class WebsiteSetting extends AbstractModel
     }
 
     /**
-     * @return mixed
+     * @return int
      */
     public function getModificationDate()
     {
@@ -238,7 +249,7 @@ class WebsiteSetting extends AbstractModel
     }
 
     /**
-     * @param $siteId
+     * @param int $siteId
      *
      * @return $this
      */
@@ -250,7 +261,7 @@ class WebsiteSetting extends AbstractModel
     }
 
     /**
-     * @return mixed
+     * @return int
      */
     public function getSiteId()
     {
@@ -258,7 +269,7 @@ class WebsiteSetting extends AbstractModel
     }
 
     /**
-     * @param $type
+     * @param string $type
      *
      * @return $this
      */
@@ -270,7 +281,7 @@ class WebsiteSetting extends AbstractModel
     }
 
     /**
-     * @return mixed
+     * @return string
      */
     public function getType()
     {

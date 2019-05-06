@@ -21,6 +21,9 @@ use Pimcore\Model;
 use Pimcore\Model\Schedule\Maintenance\Job;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @deprecated Usage of Manager\Procedural is deprecated since Pimcore 5.7 and will be removed in 6.0. Please use Tagged Services now for Maintenance tasks
+ */
 class Procedural
 {
     /**
@@ -60,7 +63,12 @@ class Procedural
     public function __construct(string $pidFileName, LoggerInterface $logger)
     {
         $this->pidFileName = $pidFileName;
-        $this->logger      = $logger;
+        $this->logger = $logger;
+
+        trigger_error(
+            'Usage of Manager\Procedural is deprecated since Pimcore 5.7 and will be removed in 6.0. Please use Tagged Services now for Maintenance tasks',
+            E_USER_DEPRECATED
+        );
     }
 
     /**
@@ -155,7 +163,7 @@ class Procedural
                 ]);
             } catch (\Exception $e) {
                 $this->logger->error('Failed to execute job with ID {id}: {exception}', [
-                    'id'        => $job->getId(),
+                    'id' => $job->getId(),
                     'exception' => $e
                 ]);
             }
@@ -194,5 +202,15 @@ class Procedural
     public function getForce(): bool
     {
         return $this->force;
+    }
+
+    /**
+     * returns all registered Jobs. this is for BC reasons.
+     *
+     * @return Job[]
+     */
+    public function getJobs()
+    {
+        return $this->jobs;
     }
 }

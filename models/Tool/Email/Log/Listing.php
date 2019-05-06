@@ -21,6 +21,7 @@ use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\Tool\Email\Log\Listing\Dao getDao()
+ * @method Model\Tool\Email\Log[] load()
  */
 class Listing extends Model\Listing\AbstractListing
 {
@@ -30,20 +31,6 @@ class Listing extends Model\Listing\AbstractListing
      * @var array
      */
     public $emailLogs = [];
-
-    /**
-     * Tests if the given key is an valid order key to sort the results
-     *
-     * @todo remove the dummy-always-true rule
-     *
-     * @param mixed $key
-     *
-     * @return bool
-     */
-    public function isValidOrderKey($key)
-    {
-        return true;
-    }
 
     /**
      * Returns a list of EmailLog entries

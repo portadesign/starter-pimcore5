@@ -19,9 +19,14 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
+use Pimcore\Tool\Serialize;
 
-class Video extends Model\DataObject\ClassDefinition\Data
+class Video extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface
 {
+    use Extension\ColumnType;
+    use Extension\QueryColumnType;
+
     /**
      * Static type of this element
      *
@@ -103,9 +108,9 @@ class Video extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForResource
+     * @see ResourcePersistenceAwareInterface::getDataForResource
      *
-     * @param Asset $data
+     * @param DataObject\Data\Video $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
@@ -113,8 +118,10 @@ class Video extends Model\DataObject\ClassDefinition\Data
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
-        if ($data) {
+        if ($data instanceof DataObject\Data\Video) {
             $data = clone $data;
+            $data->setOwner(null, '');
+
             if ($data->getData() instanceof Asset) {
                 $data->setData($data->getData()->getId());
             }
@@ -122,29 +129,29 @@ class Video extends Model\DataObject\ClassDefinition\Data
                 $data->setPoster($data->getPoster()->getId());
             }
 
-            $data = object2array($data);
+            $data = object2array($data->getObjectVars());
 
-            return serialize($data);
+            return Serialize::serialize($data);
         }
 
         return null;
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataFromResource
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param int $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return Asset
+     * @return DataObject\Data\Video|null
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
         if ($data) {
-            $raw = unserialize($data);
+            $raw = Serialize::unserialize($data);
 
-            if ($raw['type'] == 'asset') {
+            if ($raw['type'] === 'asset') {
                 if ($asset = Asset::getById($raw['data'])) {
                     $raw['data'] = $asset;
                 }
@@ -158,6 +165,9 @@ class Video extends Model\DataObject\ClassDefinition\Data
 
             if ($raw['data']) {
                 $video = new DataObject\Data\Video();
+                if (isset($params['owner'])) {
+                    $video->setOwner($params['owner'], $params['fieldname'], $params['language']);
+                }
                 $video->setData($raw['data']);
                 $video->setType($raw['type']);
                 $video->setPoster($raw['poster']);
@@ -172,9 +182,9 @@ class Video extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForQueryResource
+     * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
-     * @param Asset $data
+     * @param DataObject\Data\Video $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
@@ -186,13 +196,13 @@ class Video extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
-     * @param Asset $data
+     * @param DataObject\Data\Video $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return int
+     * @return DataObject\Data\Video
      */
     public function getDataForEditmode($data, $object = null, $params = [])
     {
@@ -204,20 +214,20 @@ class Video extends Model\DataObject\ClassDefinition\Data
             if ($data->getPoster() instanceof Asset) {
                 $data->setPoster($data->getPoster()->getFullpath());
             }
-            $data = object2array($data);
+            $data = object2array($data->getObjectVars());
         }
 
         return $data;
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param int $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return Asset
+     * @return DataObject\Data\Video|null
      */
     public function getDataFromEditmode($data, $object = null, $params = [])
     {
@@ -256,7 +266,7 @@ class Video extends Model\DataObject\ClassDefinition\Data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
      *
-     * @return Asset
+     * @return DataObject\Data\Video
      */
     public function getDataFromGridEditor($data, $object = null, $params = [])
     {
@@ -264,7 +274,7 @@ class Video extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @param $data
+     * @param DataObject\Data\Video $data
      * @param null $object
      * @param mixed $params
      *
@@ -286,7 +296,7 @@ class Video extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param Asset\Image $data
      * @param null|DataObject\AbstractObject $object
@@ -442,7 +452,7 @@ class Video extends Model\DataObject\ClassDefinition\Data
     {
         $data = $this->getDataFromObjectParam($object, $params);
         if ($data) {
-            return  $this->getDataForResource($data, $params);
+            return $this->getDataForResource($data, $object, $params);
         }
     }
 
@@ -458,8 +468,64 @@ class Video extends Model\DataObject\ClassDefinition\Data
      */
     public function getFromWebserviceImport($value, $relatedObject = null, $params = [], $idMapper = null)
     {
+        if (is_string($value)) {
+            if (! strlen($value)) {
+                return null;
+            }
+            $data = Serialize::unserialize($value);
+            if ($data === false) {
+                throw new \Exception('cannot get object video data from web service import - value cannot be decoded');
+            }
+            if (is_array($data)) {
+                if (isset($data['type']) && isset($data['data'])) {
+                    if (in_array($data['type'], ['youtube', 'vimeo', 'dailymotion'])) {
+                        return $this->getDataFromEditmode($data, $relatedObject, $params);
+                    } elseif ($data['type'] === 'asset') {
+                        $video = new DataObject\Data\Video();
+                        $video->setType($data['type']);
+                        $video->setTitle($data['title']);
+                        $video->setDescription($data['description']);
+                        if (is_int($id = $data['data'])) {
+                            if ($idMapper) {
+                                $id = $idMapper->getMappedId('asset', $id);
+                            }
+                            if ($asset = Asset::getById($id)) {
+                                $video->setData($asset);
+                            } else {
+                                if ($idMapper && $idMapper->ignoreMappingFailures()) {
+                                    $idMapper->recordMappingFailure('object', $relatedObject->getId(), 'asset', $data['data']);
+                                } else {
+                                    throw new \Exception('cannot get object video data from web service import - referencing unknown asset with [ '.$data['data'].' ]');
+                                }
+                            }
+                        }
+                        if (is_int($id = $data['poster'])) {
+                            if ($idMapper) {
+                                $id = $idMapper->getMappedId('asset', $id);
+                            }
+                            if ($poster = Asset::getById($id)) {
+                                $video->setPoster($poster);
+                            } else {
+                                if ($idMapper && $idMapper->ignoreMappingFailures()) {
+                                    $idMapper->recordMappingFailure('object', $relatedObject->getId(), 'asset', $data['poster']);
+                                } else {
+                                    throw new \Exception('cannot get object video data from web service import - referencing unknown asset with [ '.$data['poster'].' ]');
+                                }
+                            }
+                        }
 
-        // @TODO
+                        return $video;
+                    } else {
+                        throw new \Exception('cannot get object video data from web service import - type [ '.$data['type'].' ] is not implemented');
+                    }
+                }
+            } else {
+                throw new \Exception('cannot get object video data from web service import - value decoded into invalid type');
+            }
+        } elseif ($value) {
+            throw new \Exception('cannot get object video data from web service import - unexpected value');
+        }
+
         return null;
     }
 

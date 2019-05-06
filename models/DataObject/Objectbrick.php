@@ -17,27 +17,30 @@
 
 namespace Pimcore\Model\DataObject;
 
+use Pimcore\Logger;
 use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\DataObject\Objectbrick\Dao getDao()
  */
-class Objectbrick extends Model\AbstractModel
+class Objectbrick extends Model\AbstractModel implements DirtyIndicatorInterface
 {
+    use Model\DataObject\Traits\DirtyIndicatorTrait;
+
     /**
      * @var array
      */
-    public $items = [];
+    protected $items = [];
 
     /**
      * @var string
      */
-    public $fieldname;
+    protected $fieldname;
 
     /**
      * @var Concrete
      */
-    public $object;
+    protected $object;
 
     /**
      * @var array
@@ -76,7 +79,7 @@ class Objectbrick extends Model\AbstractModel
             return $values;
         } else {
             if (empty($this->items)) {
-                foreach (get_object_vars($this) as $var) {
+                foreach ($this->getObjectVars() as $var) {
                     if ($var instanceof Objectbrick\Data\AbstractData) {
                         $this->items[] = $var;
                     }
@@ -95,6 +98,7 @@ class Objectbrick extends Model\AbstractModel
     public function setItems($items)
     {
         $this->items = $items;
+        $this->markFieldDirty('_self', true);
 
         return $this;
     }
@@ -155,8 +159,9 @@ class Objectbrick extends Model\AbstractModel
 
     /**
      * @param Concrete $object
+     * @param array $params
      */
-    public function save($object)
+    public function save($object, $params = [])
     {
         // set the current object again, this is necessary because the related object in $this->object can change (eg. clone & copy & paste, etc.)
         $this->setObject($object);
@@ -189,12 +194,12 @@ class Objectbrick extends Model\AbstractModel
                         $brickType = '\\Pimcore\\Model\\DataObject\\Objectbrick\\Data\\' . ucfirst($parentBrick->getType());
                         $brick = new $brickType($object);
                         $brick->setFieldname($this->getFieldname());
-                        $brick->save($object);
+                        $brick->save($object, $params);
                         $this->$setter($brick);
                     }
                 } else {
                     $brick->setFieldname($this->getFieldname());
-                    $brick->save($object);
+                    $brick->save($object, $params);
                 }
             } else {
                 if ($brick == null) {
@@ -213,7 +218,7 @@ class Objectbrick extends Model\AbstractModel
                         $brickType = '\\Pimcore\\Model\\DataObject\\Objectbrick\\Data\\' . ucfirst($parentBrick->getType());
                         $brick = new $brickType($object);
                         $brick->setFieldname($this->getFieldname());
-                        $brick->save($object);
+                        $brick->save($object, $params);
                     }
                 }
             }
@@ -221,7 +226,7 @@ class Objectbrick extends Model\AbstractModel
     }
 
     /**
-     * @return AbstractObject
+     * @return Concrete
      */
     public function getObject()
     {
@@ -263,5 +268,107 @@ class Objectbrick extends Model\AbstractModel
         }
 
         $this->getDao()->delete($object);
+    }
+
+    public function __wakeup()
+    {
+        // sanity check, remove data requiring non-existing (deleted) brick definitions
+
+        if (is_array($this->brickGetters)) {
+            foreach ($this->brickGetters as $brickGetter) {
+                if (isset($this->$brickGetter) && $this->$brickGetter instanceof  \__PHP_Incomplete_Class) {
+                    $this->$brickGetter = null;
+                    Logger::error('brick ' . $brickGetter . ' does not exist anymore');
+                }
+            }
+        }
+
+        if (is_array($this->items)) {
+            foreach ($this->items as $key => $item) {
+                if ($item instanceof \__PHP_Incomplete_Class) {
+                    unset($this->items[$key]);
+                    Logger::error('brick ' . $brickGetter . ' does not exist anymore');
+                }
+            }
+        }
+    }
+
+    /**
+     * @param string $fieldName
+     *
+     * @return mixed
+     */
+    public function get($fieldName)
+    {
+        return $this->{'get'.ucfirst($fieldName)}();
+    }
+
+    /**
+     * @param string $fieldName
+     * @param $value
+     *
+     * @return mixed
+     */
+    public function set($fieldName, $value)
+    {
+        return $this->{'set'.ucfirst($fieldName)}($value);
+    }
+
+    /** @internal
+     * @param $brick
+     * @param $brickField
+     * @param $field
+     *
+     * @throws \Exception
+     */
+    public function loadLazyField($brick, $brickField, $field)
+    {
+        $item = $this->get($brick);
+        if ($item && !$item->isLazyKeyLoaded($field)) {
+            $brickDef = Model\DataObject\Objectbrick\Definition::getByKey($brick);
+            /** @var $fieldDef Model\DataObject\ClassDefinition\Data\CustomResourcePersistingInterface */
+            $fieldDef = $brickDef->getFieldDefinition($field);
+            $context = [];
+            $context['object'] = $this->object;
+            $context['containerType'] = 'objectbrick';
+            $context['containerKey'] = $brick;
+            $context['brickField'] = $brickField;
+            $context['fieldname'] = $field;
+            $params['context'] = $context;
+
+            $isDirtyDetectionDisabled = AbstractObject::isDirtyDetectionDisabled();
+            AbstractObject::disableDirtyDetection();
+            $data = $fieldDef->load($this->$brick, $params);
+            AbstractObject::setDisableDirtyDetection($isDirtyDetectionDisabled);
+
+            $item->setObjectVar($field, $data);
+            $item->markLazyKeyAsLoaded($field);
+        }
+    }
+
+    /**
+     * @internal
+     */
+    public function loadLazyData()
+    {
+        $allowedBrickTypes = $this->getAllowedBrickTypes();
+        if (is_array($allowedBrickTypes)) {
+            foreach ($allowedBrickTypes as $allowedBrickType) {
+                $brickGetter = 'get' . ucfirst($allowedBrickType);
+                $brickData = $this->$brickGetter();
+                if ($brickData) {
+                    $brickDef = Model\DataObject\Objectbrick\Definition::getByKey($allowedBrickType);
+                    $fds = $brickDef->getFieldDefinitions();
+                    /** @var $fd Model\DataObject\ClassDefinition\Data */
+                    foreach ($fds as $fd) {
+                        $fieldGetter = 'get' . ucfirst($fd->getName());
+                        $fieldValue = $brickData->$fieldGetter();
+                        if ($fieldValue instanceof Localizedfield) {
+                            $fieldValue->loadLazyData();
+                        }
+                    }
+                }
+            }
+        }
     }
 }

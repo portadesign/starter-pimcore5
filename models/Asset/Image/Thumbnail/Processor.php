@@ -21,6 +21,7 @@ use Pimcore\File;
 use Pimcore\Logger;
 use Pimcore\Model\Asset;
 use Pimcore\Model\Tool\TmpStore;
+use Pimcore\Tool\Frontend;
 
 class Processor
 {
@@ -92,7 +93,7 @@ class Processor
     public static function process(Asset $asset, Config $config, $fileSystemPath = null, $deferred = false, $returnAbsolutePath = false, &$generated = false)
     {
         $generated = false;
-        $errorImage = PIMCORE_WEB_ROOT . '/pimcore/static6/img/filetype-not-supported.svg';
+        $errorImage = PIMCORE_WEB_ROOT . '/bundles/pimcoreadmin/img/filetype-not-supported.svg';
         $format = strtolower($config->getFormat());
         $contentOptimizedFormat = false;
 
@@ -111,7 +112,7 @@ class Processor
         if ($format == 'print') {
             $format = self::getAllowedFormat($fileExt, ['svg', 'jpeg', 'png', 'tiff'], 'png');
 
-            if (($format == 'tiff' || $format == 'svg') && \Pimcore\Tool::isFrontentRequestByAdmin()) {
+            if (($format == 'tiff') && \Pimcore\Tool::isFrontentRequestByAdmin()) {
                 // return a webformat in admin -> tiff cannot be displayed in browser
                 $format = 'png';
                 $deferred = false; // deferred is default, but it's not possible when using isFrontentRequestByAdmin()
@@ -127,7 +128,7 @@ class Processor
                     }
                 }
             } elseif ($format == 'svg') {
-                return self::returnPath($fileSystemPath, $returnAbsolutePath);
+                return $asset->getFullPath();
             }
         } elseif ($format == 'tiff') {
             if (\Pimcore\Tool::isFrontentRequestByAdmin()) {
@@ -135,6 +136,12 @@ class Processor
                 $format = 'png';
                 $deferred = false; // deferred is default, but it's not possible when using isFrontentRequestByAdmin()
             }
+        }
+
+        $image = Asset\Image::getImageTransformInstance();
+
+        if ($contentOptimizedFormat && Frontend::hasWebpSupport() && $image->supportsFormat('webp')) {
+            $format = 'webp';
         }
 
         $thumbDir = $asset->getImageThumbnailSavePath() . '/image-thumb__' . $asset->getId() . '__' . $config->getName();
@@ -187,14 +194,11 @@ class Processor
         }
 
         // transform image
-        $image = Asset\Image::getImageTransformInstance();
         $image->setPreserveColor($config->isPreserveColor());
         $image->setPreserveMetaData($config->isPreserveMetaData());
-        if (!$image->load($fileSystemPath)) {
+        if (!$image->load($fileSystemPath, ['asset' => $asset])) {
             return self::returnPath($errorImage, $returnAbsolutePath);
         }
-
-        $image->setUseContentOptimizedFormat($contentOptimizedFormat);
 
         $startTime = microtime(true);
 
@@ -275,58 +279,78 @@ class Processor
             foreach ($transformations as $transformation) {
                 if (!empty($transformation)) {
                     $arguments = [];
-                    $mapping = self::$argumentMapping[$transformation['method']];
 
-                    if (is_array($transformation['arguments'])) {
-                        foreach ($transformation['arguments'] as $key => $value) {
-                            $position = array_search($key, $mapping);
-                            if ($position !== false) {
+                    if (is_string($transformation['method'])) {
+                        $mapping = self::$argumentMapping[$transformation['method']];
+                        if (is_array($transformation['arguments'])) {
+                            foreach ($transformation['arguments'] as $key => $value) {
+                                $position = array_search($key, $mapping);
+                                if ($position !== false) {
 
-                                // high res calculations if enabled
-                                if (!in_array($transformation['method'], ['cropPercent']) && in_array($key, ['width', 'height', 'x', 'y'])) {
-                                    if ($highResFactor && $highResFactor > 1) {
-                                        $value *= $highResFactor;
-                                        $value = (int) ceil($value);
+                                    // high res calculations if enabled
+                                    if (!in_array($transformation['method'], ['cropPercent']) && in_array($key,
+                                            ['width', 'height', 'x', 'y'])) {
+                                        if ($highResFactor && $highResFactor > 1) {
+                                            $value *= $highResFactor;
+                                            $value = (int)ceil($value);
 
-                                        if (!isset($transformation['arguments']['forceResize']) || !$transformation['arguments']['forceResize']) {
-                                            // check if source image is big enough otherwise adjust the high-res factor
-                                            if (in_array($key, ['width', 'x'])) {
-                                                if ($sourceImageWidth < $value) {
-                                                    $highResFactor = $calculateMaxFactor(
-                                                        $highResFactor,
-                                                        $sourceImageWidth,
-                                                        $value
-                                                    );
-                                                    goto prepareTransformations;
-                                                }
-                                            } elseif (in_array($key, ['height', 'y'])) {
-                                                if ($sourceImageHeight < $value) {
-                                                    $highResFactor = $calculateMaxFactor(
-                                                        $highResFactor,
-                                                        $sourceImageHeight,
-                                                        $value
-                                                    );
-                                                    goto prepareTransformations;
+                                            if (!isset($transformation['arguments']['forceResize']) || !$transformation['arguments']['forceResize']) {
+                                                // check if source image is big enough otherwise adjust the high-res factor
+                                                if (in_array($key, ['width', 'x'])) {
+                                                    if ($sourceImageWidth < $value) {
+                                                        $highResFactor = $calculateMaxFactor(
+                                                            $highResFactor,
+                                                            $sourceImageWidth,
+                                                            $value
+                                                        );
+                                                        goto prepareTransformations;
+                                                    }
+                                                } elseif (in_array($key, ['height', 'y'])) {
+                                                    if ($sourceImageHeight < $value) {
+                                                        $highResFactor = $calculateMaxFactor(
+                                                            $highResFactor,
+                                                            $sourceImageHeight,
+                                                            $value
+                                                        );
+                                                        goto prepareTransformations;
+                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                }
 
-                                $arguments[$position] = $value;
+                                    // inject the focal point
+                                    if ($transformation['method'] == 'cover' && $key == 'positioning' && $asset->getCustomSetting('focalPointX')) {
+                                        $value = [
+                                            'x' => $asset->getCustomSetting('focalPointX'),
+                                            'y' => $asset->getCustomSetting('focalPointY')
+                                        ];
+                                    }
+
+                                    $arguments[$position] = $value;
+                                }
                             }
                         }
                     }
 
                     ksort($arguments);
-                    if (method_exists($image, $transformation['method'])) {
+                    if (!is_string($transformation['method']) && is_callable($transformation['method'])) {
+                        $transformation['method']($image);
+                    } elseif (method_exists($image, $transformation['method'])) {
                         call_user_func_array([$image, $transformation['method']], $arguments);
                     }
                 }
             }
         }
 
-        $image->save($fsPath, $format, $config->getQuality());
+        if ($contentOptimizedFormat && !Frontend::hasWebpSupport()) {
+            $format = $image->getContentOptimizedFormat();
+        }
+
+        $tmpFsPath = preg_replace('@\.([\w]+)$@', uniqid('.tmp-', true) . '.$1', $fsPath);
+        $image->save($tmpFsPath, $format, $config->getQuality());
+        @rename($tmpFsPath, $fsPath); // atomic rename to avoid race conditions
+
         $generated = true;
 
         if ($contentOptimizedFormat) {
@@ -364,24 +388,5 @@ class Processor
         }
 
         return $path;
-    }
-
-    public static function processOptimizeQueue()
-    {
-        $ids = TmpStore::getIdsByTag('image-optimize-queue');
-
-        // id = path of image relative to PIMCORE_TEMPORARY_DIRECTORY
-        foreach ($ids as $id) {
-            $file = PIMCORE_TEMPORARY_DIRECTORY . '/' . $id;
-            if (file_exists($file)) {
-                $originalFilesize = filesize($file);
-                \Pimcore\Image\Optimizer::optimize($file);
-                Logger::debug('Optimized image: ' . $file . ' saved ' . formatBytes($originalFilesize - filesize($file)));
-            } else {
-                Logger::debug('Skip optimizing of ' . $file . " because it doesn't exist anymore");
-            }
-
-            TmpStore::delete($id);
-        }
     }
 }

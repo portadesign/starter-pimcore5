@@ -10,6 +10,7 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\PriceSystem\AttributePriceSystem;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PriceSystem\Price;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PriceSystem\TaxManagement\TaxEntry;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\PricingManager;
+use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\PricingManagerLocator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Type\Decimal;
 use Pimcore\Model\DataObject\OnlineShopTaxClass;
 use Pimcore\Tests\Test\EcommerceTestCase;
@@ -39,9 +40,15 @@ class ProductTaxManagementTest extends EcommerceTestCase
         $taxClass->setTaxEntries($taxEntries);
         $taxClass->setTaxEntryCombinationType($combinationType);
 
-        $pricingManager = new PricingManager([], [], $this->buildSession());
+        $environment = $this->buildEnvironment();
 
-        $priceSystem = Stub::construct(AttributePriceSystem::class, [$pricingManager, $this->buildEnvironment()], [
+        $pricingManagers = Stub::make(PricingManagerLocator::class, [
+            'getPricingManager' => function () {
+                return new PricingManager([], [], $this->buildSession());
+            }
+        ]);
+
+        $priceSystem = Stub::construct(AttributePriceSystem::class, [$pricingManagers, $environment], [
             'getTaxClassForProduct' => function () use ($taxClass) {
                 return $taxClass;
             },
@@ -72,7 +79,7 @@ class ProductTaxManagementTest extends EcommerceTestCase
     public function testPriceWithoutTaxEntries()
     {
         $product = $this->setUpProduct(100);
-        $price   = $product->getOSPrice();
+        $price = $product->getOSPrice();
 
         $this->assertSame('100.0000', $price->getAmount()->asString(), 'Get Price Amount without any tax entries');
         $this->assertSame('100.0000', $price->getNetAmount()->asString(), 'Get net amount without any tax entries');
@@ -82,7 +89,7 @@ class ProductTaxManagementTest extends EcommerceTestCase
     public function testPriceWithTaxEntriesCombine()
     {
         $product = $this->setUpProduct(100, [1 => 10, 2 => 15], TaxEntry::CALCULATION_MODE_COMBINE);
-        $price   = $product->getOSPrice();
+        $price = $product->getOSPrice();
 
         $this->assertSame('100.0000', $price->getGrossAmount()->asString(), 'Get gross amount with tax 10% + 15% combine');
         $this->assertSame('80.0000', $price->getNetAmount()->asString(), 'Get net amount 10% + 15% combine');
@@ -91,7 +98,7 @@ class ProductTaxManagementTest extends EcommerceTestCase
     public function testPriceWithTaxEntriesOneAfterAnother()
     {
         $product = $this->setUpProduct(100, [1 => 10, 2 => 15], TaxEntry::CALCULATION_MODE_ONE_AFTER_ANOTHER);
-        $price   = $product->getOSPrice();
+        $price = $product->getOSPrice();
 
         $this->assertSame('100.0000', $price->getGrossAmount()->asString(), 'Get gross amount with tax 10% + 15% one-after-another');
         $this->assertSame('79.0514', $price->getNetAmount()->asString(), 'Get net amount 10% + 15% one-after-another');

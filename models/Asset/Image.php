@@ -28,45 +28,52 @@ use Symfony\Component\EventDispatcher\GenericEvent;
  */
 class Image extends Model\Asset
 {
+    use Model\Asset\MetaData\EmbeddedMetaDataTrait;
+
     /**
      * @var string
      */
-    public $type = 'image';
+    protected $type = 'image';
 
     /**
-     * @params array $params additional parameters (e.g. "versionNote" for the version note)
+     * @param array $params additional parameters (e.g. "versionNote" for the version note)
      *
      * @throws \Exception
      */
     protected function update($params = [])
     {
+        if ($this->getDataChanged() || !$this->getCustomSetting('imageDimensionsCalculated') || !$this->getCustomSetting('embeddedMetaDataExtracted')) {
+            // save the current data into a tmp file to calculate the dimensions, otherwise updates wouldn't be updated
+            // because the file is written in parent::update();
+            $tmpFile = $this->getTemporaryFile();
 
-        // only do this if the file exists and contains data
-        if ($this->getDataChanged() || !$this->getCustomSetting('imageDimensionsCalculated')) {
-            try {
-                // save the current data into a tmp file to calculate the dimensions, otherwise updates wouldn't be updated
-                // because the file is written in parent::update();
-                $tmpFile = $this->getTemporaryFile();
-                $dimensions = $this->getDimensions($tmpFile, true);
-                unlink($tmpFile);
+            if ($this->getDataChanged() || !$this->getCustomSetting('imageDimensionsCalculated')) {
+                // getDimensions() might fail, so assume `false` first
+                $imageDimensionsCalculated = false;
 
-                if ($dimensions && $dimensions['width']) {
-                    $this->setCustomSetting('imageWidth', $dimensions['width']);
-                    $this->setCustomSetting('imageHeight', $dimensions['height']);
+                try {
+                    $dimensions = $this->getDimensions($tmpFile, true);
+                    if ($dimensions && $dimensions['width']) {
+                        $this->setCustomSetting('imageWidth', $dimensions['width']);
+                        $this->setCustomSetting('imageHeight', $dimensions['height']);
+                        $imageDimensionsCalculated = true;
+                    }
+                } catch (\Exception $e) {
+                    Logger::error('Problem getting the dimensions of the image with ID ' . $this->getId());
                 }
-            } catch (\Exception $e) {
-                Logger::error('Problem getting the dimensions of the image with ID ' . $this->getId());
+
+                // this is to be downward compatible so that the controller can check if the dimensions are already calculated
+                // and also to just do the calculation once, because the calculation can fail, an then the controller tries to
+                // calculate the dimensions on every request an also will create a version, ...
+                $this->setCustomSetting('imageDimensionsCalculated', $imageDimensionsCalculated);
             }
 
-            // this is to be downward compatible so that the controller can check if the dimensions are already calculated
-            // and also to just do the calculation once, because the calculation can fail, an then the controller tries to
-            // calculate the dimensions on every request an also will create a version, ...
-            $this->setCustomSetting('imageDimensionsCalculated', true);
+            $this->handleEmbeddedMetaData(true, $tmpFile);
         }
 
-        parent::update($params);
-
         $this->clearThumbnails();
+
+        parent::update($params);
 
         // now directly create "system" thumbnails (eg. for the tree, ...)
         if ($this->getDataChanged()) {
@@ -86,6 +93,67 @@ class Image extends Model\Asset
         }
     }
 
+    protected function postPersistData()
+    {
+        $this->detectFocalPoint();
+    }
+
+    public function detectFocalPoint()
+    {
+        $config = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['focal_point_detection'];
+
+        if (!$config['enabled']) {
+            return false;
+        }
+
+        $facedetectBin = \Pimcore\Tool\Console::getExecutable('facedetect');
+        if ($facedetectBin) {
+            $faceCoordinates = [];
+            $thumbnail = $this->getThumbnail(Image\Thumbnail\Config::getPreviewConfig());
+            $image = $thumbnail->getFileSystemPath();
+            $imageWidth = $thumbnail->getWidth();
+            $imageHeight = $thumbnail->getHeight();
+
+            $result = \Pimcore\Tool\Console::exec($facedetectBin . ' ' . escapeshellarg($image));
+            if (strpos($result, "\n")) {
+                $faces = explode("\n", trim($result));
+                $xPoints = [];
+                $yPoints = [];
+
+                foreach ($faces as $coordinates) {
+                    list($x, $y, $width, $height) = explode(' ', $coordinates);
+
+                    // percentages
+                    $Px = $x / $imageWidth * 100;
+                    $Py = $y / $imageHeight * 100;
+                    $Pw = $width / $imageWidth * 100;
+                    $Ph = $height / $imageHeight * 100;
+
+                    $faceCoordinates[] = [
+                        'x' => $Px,
+                        'y' => $Py,
+                        'width' => $Pw,
+                        'height' => $Ph
+                    ];
+
+                    // focal point calculation
+                    $xPoints[] = ($Px + $Px + $Pw) / 2;
+                    $yPoints[] = ($Py + + $Py + $Ph) / 2;
+                }
+
+                $this->setCustomSetting('faceCoordinates', $faceCoordinates);
+
+                if (!$this->getCustomSetting('focalPointX')) {
+                    $focalPointX = array_sum($xPoints) / count($xPoints);
+                    $focalPointY = array_sum($yPoints) / count($yPoints);
+
+                    $this->setCustomSetting('focalPointX', $focalPointX);
+                    $this->setCustomSetting('focalPointY', $focalPointY);
+                }
+            }
+        }
+    }
+
     /**
      * @param null|string $generator
      *
@@ -95,12 +163,20 @@ class Image extends Model\Asset
      */
     public function generateLowQualityPreview($generator = null)
     {
-        $sqipBin = \Pimcore\Tool\Console::getExecutable('sqip');
+        $config = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['low_quality_image_preview'];
+
+        if (!$config['enabled']) {
+            return false;
+        }
+
         if (!$generator) {
+            $generator = $config['generator'];
+        }
+
+        if (!$generator) {
+            $sqipBin = \Pimcore\Tool\Console::getExecutable('sqip');
             if ($sqipBin) {
                 $generator = 'sqip';
-            } elseif (class_exists('Imagick')) {
-                $generator = 'imagick';
             }
         }
 
@@ -111,15 +187,20 @@ class Image extends Model\Asset
             $sqipConfig->setFormat('png');
             $pngPath = $this->getThumbnail($sqipConfig)->getFileSystemPath();
             $svgPath = $this->getLowQualityPreviewFileSystemPath();
-            \Pimcore\Tool\Console::exec($sqipBin . ' -o ' . $svgPath . ' '. $pngPath);
+            \Pimcore\Tool\Console::exec($sqipBin . ' -o ' . escapeshellarg($svgPath) . ' '. escapeshellarg($pngPath));
             unlink($pngPath);
 
-            $svgData = file_get_contents($svgPath);
-            $svgData = str_replace('<svg', '<svg preserveAspectRatio="xMidYMid slice"', $svgData);
-            File::put($svgPath, $svgData);
+            if (file_exists($svgPath)) {
+                $svgData = file_get_contents($svgPath);
+                $svgData = str_replace('<svg', '<svg preserveAspectRatio="xMidYMid slice"', $svgData);
+                File::put($svgPath, $svgData);
 
-            return $svgPath;
-        } elseif ($generator == 'imagick') {
+                return $svgPath;
+            }
+        }
+
+        // fallback
+        if (class_exists('Imagick')) {
             // Imagick fallback
             $path = $this->getThumbnail(Image\Thumbnail\Config::getPreviewConfig())->getFileSystemPath();
             $imagick = new \Imagick($path);
@@ -127,8 +208,14 @@ class Image extends Model\Asset
             $imagick->setOption('jpeg:extent', '1kb');
             $width = $imagick->getImageWidth();
             $height = $imagick->getImageHeight();
-            $imageBase64 = base64_encode($imagick->getImageBlob());
+
+            // we can't use getImageBlob() here, because of a bug in combination with jpeg:extent
+            // http://www.imagemagick.org/discourse-server/viewtopic.php?f=3&t=24366
+            $tmpFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/image-optimize-' . uniqid() . '.jpg';
+            $imagick->writeImage($tmpFile);
+            $imageBase64 = base64_encode(file_get_contents($tmpFile));
             $imagick->destroy();
+            unlink($tmpFile);
 
             $svg = <<<EOT
 <?xml version="1.0" encoding="utf-8"?>
@@ -144,6 +231,8 @@ class Image extends Model\Asset
 EOT;
 
             File::put($this->getLowQualityPreviewFileSystemPath(), $svg);
+
+            return $this->getLowQualityPreviewFileSystemPath();
         }
 
         return false;
@@ -173,15 +262,18 @@ EOT;
      */
     public function getLowQualityPreviewFileSystemPath()
     {
-        $path = $this->getThumbnail(Image\Thumbnail\Config::getPreviewConfig())->getFileSystemPath();
+        $path = $this->getThumbnail(Image\Thumbnail\Config::getPreviewConfig())->getFileSystemPath(true);
         $svgPath = preg_replace("/\.p?jpe?g$/", '-low-quality-preview.svg', $path);
 
         return $svgPath;
     }
 
-    public function delete()
+    /**
+     * @inheritdoc
+     */
+    public function delete(bool $isNested = false)
     {
-        parent::delete();
+        parent::delete($isNested);
         $this->clearThumbnails(true);
     }
 
@@ -203,7 +295,7 @@ EOT;
      */
     public function clearThumbnail($name)
     {
-        $dir = $this->getImageThumbnailSavePath() . '/thumb__' . $name;
+        $dir = $this->getImageThumbnailSavePath() . '/image-thumb__' . $this->getId() . '__' . $name;
         if (is_dir($dir)) {
             recursiveDelete($dir);
         }
@@ -324,7 +416,7 @@ EOT;
         if (!$dimensions) {
             $image = self::getImageTransformInstance();
 
-            $status = $image->load($path, ['preserveColor' => true]);
+            $status = $image->load($path, ['preserveColor' => true, 'asset' => $this]);
             if ($status === false) {
                 return;
             }
@@ -373,6 +465,24 @@ EOT;
         $dimensions = $this->getDimensions();
 
         return $dimensions['height'];
+    }
+
+    /**
+     * @param string $key
+     * @param mixed $value
+     *
+     * @return Model\Asset
+     */
+    public function setCustomSetting($key, $value)
+    {
+        if (in_array($key, ['focalPointX', 'focalPointY'])) {
+            // if the focal point changes we need to clean all thumbnails on save
+            if ($this->getCustomSetting($key) != $value) {
+                $this->setDataChanged();
+            }
+        }
+
+        return parent::setCustomSetting($key, $value);
     }
 
     /**
@@ -460,179 +570,5 @@ EOT;
         }
 
         return $isAnimated;
-    }
-
-    /**
-     * @return array
-     */
-    public function getEXIFData()
-    {
-        $data = [];
-
-        if (function_exists('exif_read_data') && is_file($this->getFileSystemPath())) {
-            $supportedTypes = [IMAGETYPE_JPEG, IMAGETYPE_TIFF_II, IMAGETYPE_TIFF_MM];
-
-            if (in_array(@exif_imagetype($this->getFileSystemPath()), $supportedTypes)) {
-                $exif = @exif_read_data($this->getFileSystemPath());
-                if (is_array($exif)) {
-                    foreach ($exif as $name => $value) {
-                        if ((is_string($value) && strlen($value) < 50) || is_numeric($value)) {
-                            $data[$name] = \ForceUTF8\Encoding::toUTF8($value);
-                        }
-                    }
-                }
-            }
-        }
-
-        return $data;
-    }
-
-    /**
-     * @return array
-     */
-    public function getIPTCData()
-    {
-        $data = [];
-
-        if (is_file($this->getFileSystemPath())) {
-            $result = getimagesize($this->getFileSystemPath(), $info);
-            if ($result) {
-                $mapping = [
-                    '1#000' => 'EnvelopeRecordVersion',
-                    '1#005' => 'Destination',
-                    '1#020' => 'FileFormat',
-                    '1#022' => 'FileVersion',
-                    '1#030' => 'ServiceIdentifier',
-                    '1#040' => 'EnvelopeNumber',
-                    '1#050' => 'ProductID',
-                    '1#060' => 'EnvelopePriority',
-                    '1#070' => 'DateSent',
-                    '1#080' => 'TimeSent',
-                    '1#090' => 'CodedCharacterSet',
-                    '1#100' => 'UniqueObjectName',
-                    '1#120' => 'ARMIdentifier',
-                    '1#122' => 'ARMVersion',
-                    '2#000' => 'ApplicationRecordVersion',
-                    '2#003' => 'ObjectTypeReference',
-                    '2#004' => 'ObjectAttributeReference',
-                    '2#005' => 'ObjectName',
-                    '2#007' => 'EditStatus',
-                    '2#008' => 'EditorialUpdate',
-                    '2#010' => 'Urgency',
-                    '2#012' => 'SubjectReference',
-                    '2#015' => 'Category',
-                    '2#020' => 'SupplementalCategories',
-                    '2#022' => 'FixtureIdentifier',
-                    '2#025' => 'Keywords',
-                    '2#026' => 'ContentLocationCode',
-                    '2#027' => 'ContentLocationName',
-                    '2#030' => 'ReleaseDate',
-                    '2#035' => 'ReleaseTime',
-                    '2#037' => 'ExpirationDate',
-                    '2#038' => 'ExpirationTime',
-                    '2#040' => 'SpecialInstructions',
-                    '2#042' => 'ActionAdvised',
-                    '2#045' => 'ReferenceService',
-                    '2#047' => 'ReferenceDate',
-                    '2#050' => 'ReferenceNumber',
-                    '2#055' => 'DateCreated',
-                    '2#060' => 'TimeCreated',
-                    '2#062' => 'DigitalCreationDate',
-                    '2#063' => 'DigitalCreationTime',
-                    '2#065' => 'OriginatingProgram',
-                    '2#070' => 'ProgramVersion',
-                    '2#075' => 'ObjectCycle',
-                    '2#080' => 'By-line',
-                    '2#085' => 'By-lineTitle',
-                    '2#090' => 'City',
-                    '2#092' => 'Sub-location',
-                    '2#095' => 'Province-State',
-                    '2#100' => 'Country-PrimaryLocationCode',
-                    '2#101' => 'Country-PrimaryLocationName',
-                    '2#103' => 'OriginalTransmissionReference',
-                    '2#105' => 'Headline',
-                    '2#110' => 'Credit',
-                    '2#115' => 'Source',
-                    '2#116' => 'CopyrightNotice',
-                    '2#118' => 'Contact',
-                    '2#120' => 'Caption-Abstract',
-                    '2#121' => 'LocalCaption',
-                    '2#122' => 'Writer-Editor',
-                    '2#125' => 'RasterizedCaption',
-                    '2#130' => 'ImageType',
-                    '2#131' => 'ImageOrientation',
-                    '2#135' => 'LanguageIdentifier',
-                    '2#150' => 'AudioType',
-                    '2#151' => 'AudioSamplingRate',
-                    '2#152' => 'AudioSamplingResolution',
-                    '2#153' => 'AudioDuration',
-                    '2#154' => 'AudioOutcue',
-                    '2#184' => 'JobID',
-                    '2#185' => 'MasterDocumentID',
-                    '2#186' => 'ShortDocumentID',
-                    '2#187' => 'UniqueDocumentID',
-                    '2#188' => 'OwnerID',
-                    '2#200' => 'ObjectPreviewFileFormat',
-                    '2#201' => 'ObjectPreviewFileVersion',
-                    '2#202' => 'ObjectPreviewData',
-                    '2#221' => 'Prefs',
-                    '2#225' => 'ClassifyState',
-                    '2#228' => 'SimilarityIndex',
-                    '2#230' => 'DocumentNotes',
-                    '2#231' => 'DocumentHistory',
-                    '2#232' => 'ExifCameraInfo',
-                    '2#255' => 'CatalogSets',
-                    '3#000' => 'NewsPhotoVersion',
-                    '3#010' => 'IPTCPictureNumber',
-                    '3#020' => 'IPTCImageWidth',
-                    '3#030' => 'IPTCImageHeight',
-                    '3#040' => 'IPTCPixelWidth',
-                    '3#050' => 'IPTCPixelHeight',
-                    '3#055' => 'SupplementalType',
-                    '3#060' => 'ColorRepresentation',
-                    '3#064' => 'InterchangeColorSpace',
-                    '3#065' => 'ColorSequence',
-                    '3#066' => 'ICC_Profile',
-                    '3#070' => 'ColorCalibrationMatrix',
-                    '3#080' => 'LookupTable',
-                    '3#084' => 'NumIndexEntries',
-                    '3#085' => 'ColorPalette',
-                    '3#086' => 'IPTCBitsPerSample',
-                    '3#090' => 'SampleStructure',
-                    '3#100' => 'ScanningDirection',
-                    '3#102' => 'IPTCImageRotation',
-                    '3#110' => 'DataCompressionMethod',
-                    '3#120' => 'QuantizationMethod',
-                    '3#125' => 'EndPoints',
-                    '3#130' => 'ExcursionTolerance',
-                    '3#135' => 'BitsPerComponent',
-                    '3#140' => 'MaximumDensityRange',
-                    '3#145' => 'GammaCompensatedValue',
-                    '7#010' => 'SizeMode',
-                    '7#020' => 'MaxSubfileSize',
-                    '7#090' => 'ObjectSizeAnnounced',
-                    '7#095' => 'MaximumObjectSize',
-                    '8#010' => 'SubFile',
-                    '9#010' => 'ConfirmedObjectSize',
-                ];
-
-                if ($info && isset($info['APP13'])) {
-                    $iptcRaw = iptcparse($info['APP13']);
-                    if (is_array($iptcRaw)) {
-                        foreach ($iptcRaw as $key => $value) {
-                            if (is_array($value) && count($value) === 1) {
-                                $value = $value[0];
-                            }
-
-                            if (isset($mapping[$key])) {
-                                $data[$mapping[$key]] = \ForceUTF8\Encoding::toUTF8($value);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return $data;
     }
 }

@@ -17,6 +17,7 @@
 
 namespace Pimcore\Model\Webservice;
 
+use Carbon\Carbon;
 use Pimcore\Model;
 use Pimcore\Model\Element;
 use Pimcore\Model\Webservice;
@@ -61,12 +62,32 @@ abstract class Data
                 }
             }
         }
+
+        if ($object instanceof Element\ElementInterface) {
+            // add notes and events
+            $list = new Element\Note\Listing();
+
+            $cid = $object->getId();
+            $ctype = Element\Service::getElementType($object);
+            $condition = '(cid = ' . $list->quote($cid) . ' AND ctype = ' . $list->quote($ctype) . ')';
+            $list->setCondition($condition);
+
+            $list = $list->load();
+
+            $noteList = [];
+            if (is_array($list)) {
+                foreach ($list as $note) {
+                    $noteList[] = Element\Service::getNoteData($note);
+                }
+            }
+            $this->notes = $noteList;
+        }
     }
 
     /**
-     * @param $value
+     * @param array $value
      *
-     * @return array
+     * @return \Pimcore\Model\Property[]
      */
     private function mapProperties($value)
     {
@@ -78,7 +99,8 @@ abstract class Data
                     $newProperty = new Model\Property();
                     $vars = get_object_vars($property);
                     foreach ($vars as $varName => $varValue) {
-                        $newProperty->$varName = $property->$varName;
+                        $method = 'set' . ucfirst($varName);
+                        $newProperty->$method($property->$varName);
                     }
                     $result[] = $newProperty;
                 } else {
@@ -102,7 +124,7 @@ abstract class Data
     {
         $keys = get_object_vars($this);
         foreach ($keys as $key => $value) {
-            $method = 'set' . $key;
+            $method = 'set' . ucfirst($key);
             if (method_exists($object, $method)) {
                 if ($object instanceof Element\ElementInterface && $key == 'properties') {
                     $value = $this->mapProperties($value);
@@ -142,7 +164,7 @@ abstract class Data
                         }
                     }
                 } elseif ($type == 'date') {
-                    $dat = new \Pimcore\Date(strtotime($propertyWs['data']));
+                    $dat = Carbon::createFromTimestamp(strtotime($propertyWs['data']));
                 } else {
                     $dat = $propertyWs['data'];
                 }

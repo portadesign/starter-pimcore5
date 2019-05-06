@@ -60,17 +60,8 @@ class Dao extends Model\Element\Dao
      */
     public function getByPath($path)
     {
-
-        // check for root node
-        $_path = $path != '/' ? dirname($path) : $path;
-        $_path = str_replace('\\', '/', $_path); // windows patch
-        $_key = basename($path);
-        $_path .= $_path != '/' ? '/' : '';
-
-        $data = $this->db->fetchRow('SELECT id FROM documents WHERE path = :path AND `key` = :key', [
-            'path' => $_path,
-            'key'  => $_key
-        ]);
+        $params = $this->extractKeyAndPath($path);
+        $data = $this->db->fetchRow('SELECT id FROM documents WHERE path = :path AND `key` = :key', $params);
 
         if ($data['id']) {
             $this->assignVariablesToModel($data);
@@ -130,7 +121,7 @@ class Dao extends Model\Element\Dao
 
             $this->model->setModificationDate(time());
 
-            $document = get_object_vars($this->model);
+            $document = $this->model->getObjectVars();
 
             $dataDocument = [];
             $dataTypeSpecific = [];
@@ -228,7 +219,8 @@ class Dao extends Model\Element\Dao
         }
 
         //update documents child paths
-        $this->db->query('update documents set path = replace(path,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . "), modificationDate = '" . time() . "', userModification = '" . $userId . "' where path like " . $this->db->quote($oldPath . '/%') . ';');
+        // we don't update the modification date here, as this can have side-effects when there's an unpublished version for an element
+        $this->db->query('update documents set path = replace(path,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . "), userModification = '" . $userId . "' where path like " . $this->db->quote($oldPath . '/%') . ';');
 
         //update documents child permission paths
         $this->db->query('update users_workspaces_document set cpath = replace(cpath,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . ') where cpath like ' . $this->db->quote($oldPath . '/%') . ';');
@@ -254,6 +246,21 @@ class Dao extends Model\Element\Dao
         }
 
         return $path;
+    }
+
+    /**
+     * @return int
+     */
+    public function getVersionCountForUpdate(): int
+    {
+        $versionCount = (int) $this->db->fetchOne('SELECT versionCount FROM documents WHERE id = ? FOR UPDATE', $this->model->getId());
+
+        if ($this->model instanceof PageSnippet) {
+            $versionCount2 = (int) $this->db->fetchOne("SELECT MAX(versionCount) FROM versions WHERE cid = ? AND ctype = 'document'", $this->model->getId());
+            $versionCount = max($versionCount, $versionCount2);
+        }
+
+        return (int) $versionCount;
     }
 
     /**
@@ -342,13 +349,23 @@ class Dao extends Model\Element\Dao
     }
 
     /**
-     * Checks if there are children.
+     * Quick check if there are children.
+     *
+     * @param bool $unpublished
      *
      * @return bool
      */
-    public function hasChildren()
+    public function hasChildren($unpublished = false)
     {
-        $c = $this->db->fetchOne('SELECT id FROM documents WHERE parentId = ? LIMIT 1', $this->model->getId());
+        $sql = 'SELECT id FROM documents WHERE parentId = ?';
+
+        if (Model\Document::doHideUnpublished() && !$unpublished) {
+            $sql .= ' AND published = 1';
+        }
+
+        $sql .= ' LIMIT 1';
+
+        $c = $this->db->fetchOne($sql, $this->model->getId());
 
         return (bool)$c;
     }
@@ -531,8 +548,8 @@ class Dao extends Model\Element\Dao
      */
     public function __isBasedOnLatestData()
     {
-        $currentDataTimestamp = $this->db->fetchOne('SELECT modificationDate from documents WHERE id = ?', $this->model->getId());
-        if ($currentDataTimestamp == $this->model->__getDataVersionTimestamp()) {
+        $data = $this->db->fetchRow('SELECT modificationDate,versionCount from documents WHERE id = ?', $this->model->getId());
+        if ($data['modificationDate'] == $this->model->__getDataVersionTimestamp() && $data['versionCount'] == $this->model->getVersionCount()) {
             return true;
         }
 

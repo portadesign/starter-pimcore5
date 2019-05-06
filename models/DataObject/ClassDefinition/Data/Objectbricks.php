@@ -19,10 +19,11 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\Webservice;
 use Pimcore\Tool;
 
-class Objectbricks extends Model\DataObject\ClassDefinition\Data
+class Objectbricks extends Data implements CustomResourcePersistingInterface
 {
     /**
      * Static type of this element
@@ -69,16 +70,15 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getDataForEditmode
+     * @see Data::getDataForEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
      * @param mixed $params
-     * @param $objectFromVersion
      *
      * @return string
      */
-    public function getDataForEditmode($data, $object = null, $params = [], $objectFromVersion = null)
+    public function getDataForEditmode($data, $object = null, $params = [])
     {
         $editmodeData = [];
 
@@ -87,7 +87,16 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
 
             foreach ($allowedBrickTypes as $allowedBrickType) {
                 $getter = 'get' . ucfirst($allowedBrickType);
-                $editmodeData[] = $this->doGetDataForEditmode($getter, $data, $params, $allowedBrickType, $objectFromVersion);
+                $params = [
+                    'objectFromVersion' => $params['objectFromVersion'],
+                    'context' => [
+                        'containerType' => 'objectbrick',
+                        'containerKey' => $allowedBrickType],
+                        'fieldname' => $this->getName()
+
+                ];
+
+                $editmodeData[] = $this->doGetDataForEditmode($getter, $data, $params, $allowedBrickType);
             }
         }
 
@@ -99,19 +108,19 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
      * @param $data
      * @param $params
      * @param $allowedBrickType
-     * @param $objectFromVersion
      * @param int $level
      *
      * @return array
      */
-    private function doGetDataForEditmode($getter, $data, $params, $allowedBrickType, $objectFromVersion, $level = 0)
+    private function doGetDataForEditmode($getter, $data, $params, $allowedBrickType, $level = 0)
     {
         $parent = DataObject\Service::hasInheritableParentObject($data->getObject());
+        /** @var $item DataObject\Objectbrick\Definition */
         $item = $data->$getter();
         if (!$item && !empty($parent)) {
             $data = $parent->{'get' . ucfirst($this->getName())}();
 
-            return $this->doGetDataForEditmode($getter, $data, $params, $allowedBrickType, $objectFromVersion, $level + 1);
+            return $this->doGetDataForEditmode($getter, $data, $params, $allowedBrickType, $level + 1);
         }
 
         if (!$item instanceof DataObject\Objectbrick\Data\AbstractData) {
@@ -130,7 +139,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
         $inherited = false;
         foreach ($collectionDef->getFieldDefinitions() as $fd) {
             if (!$fd instanceof CalculatedValue) {
-                $fieldData = $this->getDataForField($item, $fd->getName(), $fd, $level, $data->getObject(), $getter, $objectFromVersion); //$fd->getDataForEditmode($item->{$fd->getName()});
+                $fieldData = $this->getDataForField($item, $fd->getName(), $fd, $level, $data->getObject(), $getter, $params);
                 $brickData[$fd->getName()] = $fieldData->objectData;
             }
 
@@ -152,11 +161,14 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
             }
         }
 
+        $brickDefinition = DataObject\Objectbrick\Definition::getByKey($allowedBrickType);
+
         $editmodeDataItem = [
             'data' => $brickData,
             'type' => $item->getType(),
             'metaData' => $brickMetaData,
-            'inherited' => $inherited
+            'inherited' => $inherited,
+            'title' => $brickDefinition->getTitle()
         ];
 
         return $editmodeDataItem;
@@ -171,21 +183,21 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
      * @param $level
      * @param $baseObject
      * @param $getter
-     * @param $objectFromVersion
+     * @param $params
      *
      * @return mixed
      */
-    private function getDataForField($item, $key, $fielddefinition, $level, $baseObject, $getter, $objectFromVersion)
+    private function getDataForField($item, $key, $fielddefinition, $level, $baseObject, $getter, $params)
     {
         $result = new \stdClass();
         $parent = DataObject\Service::hasInheritableParentObject($baseObject);
         $valueGetter = 'get' . ucfirst($key);
 
         // relations but not for objectsMetadata, because they have additional data which cannot be loaded directly from the DB
-        if (!$objectFromVersion && method_exists($fielddefinition, 'getLazyLoading')
+        if (!$params['objectFromVersion'] && method_exists($fielddefinition, 'getLazyLoading')
             && $fielddefinition->getLazyLoading()
-            && !$fielddefinition instanceof DataObject\ClassDefinition\Data\ObjectsMetadata
-            && !$fielddefinition instanceof DataObject\ClassDefinition\Data\MultihrefMetadata
+            && !$fielddefinition instanceof DataObject\ClassDefinition\Data\AdvancedManyToManyObjectRelation
+            && !$fielddefinition instanceof DataObject\ClassDefinition\Data\AdvancedManyToManyRelation
             && !$fielddefinition instanceof DataObject\ClassDefinition\Data\Block) {
 
             //lazy loading data is fetched from DB differently, so that not every relation object is instantiated
@@ -202,7 +214,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
                 if (!empty($parentItem)) {
                     $parentItem = $parentItem->$getter();
                     if ($parentItem) {
-                        return $this->getDataForField($parentItem, $key, $fielddefinition, $level + 1, $parent, $getter, $objectFromVersion);
+                        return $this->getDataForField($parentItem, $key, $fielddefinition, $level + 1, $parent, $getter, $params);
                     }
                 }
             }
@@ -212,10 +224,10 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
                 $data = $relations[0];
             } else {
                 foreach ($relations as $rel) {
-                    if ($fielddefinition instanceof DataObject\ClassDefinition\Data\Objects) {
-                        $data[] = [$rel['id'], $rel['path'], $rel['subtype']];
+                    if ($fielddefinition instanceof DataObject\ClassDefinition\Data\ManyToManyObjectRelation) {
+                        $data[] = ['id' => $rel['id'], 'fullpath' => $rel['path'], 'subtype' => $rel['subtype'], 'published' => ($rel['published'] ? true : false)];
                     } else {
-                        $data[] = [$rel['id'], $rel['path'], $rel['type'], $rel['subtype']];
+                        $data[] = ['id' => $rel['id'], 'fullpath' => $rel['path'],  'type' => $rel['type'], 'subtype' => $rel['subtype'], 'published' => ($rel['published'] ? true : false)];
                     }
                 }
             }
@@ -226,7 +238,8 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
             $editmodeValue = null;
             if (!empty($item)) {
                 $fieldValue = $item->$valueGetter();
-                $editmodeValue = $fielddefinition->getDataForEditmode($fieldValue, $baseObject);
+
+                $editmodeValue = $fielddefinition->getDataForEditmode($fieldValue, $baseObject, $params);
             }
             if ($fielddefinition->isEmpty($fieldValue) && !empty($parent)) {
                 $backup = DataObject\AbstractObject::getGetInheritedValues();
@@ -234,7 +247,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
                 $parentItem = $parent->{'get' . ucfirst($this->getName())}()->$getter();
                 DataObject\AbstractObject::setGetInheritedValues($backup);
                 if (!empty($parentItem)) {
-                    return $this->getDataForField($parentItem, $key, $fielddefinition, $level + 1, $parent, $getter, $objectFromVersion);
+                    return $this->getDataForField($parentItem, $key, $fielddefinition, $level + 1, $parent, $getter, $params);
                 }
             }
             $result->objectData = $editmodeValue;
@@ -246,7 +259,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see Model\DataObject\ClassDefinition\Data::getDataFromEditmode
+     * @see Data::getDataFromEditmode
      *
      * @param string $data
      * @param null|Model\DataObject\AbstractObject $object
@@ -277,16 +290,25 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
                     $brick = new $brickClass($object);
                 }
 
+                $brick->setFieldname($this->getName());
+
                 if ($collectionRaw['data'] == 'deleted') {
                     $brick->setDoDelete(true);
                 } else {
                     foreach ($collectionDef->getFieldDefinitions() as $fd) {
                         if (array_key_exists($fd->getName(), $collectionRaw['data'])) {
-                            $collectionData[$fd->getName()] = $fd->getDataFromEditmode($collectionRaw['data'][$fd->getName()], $object);
+                            $collectionData[$fd->getName()] =
+                                $fd->getDataFromEditmode($collectionRaw['data'][$fd->getName()], $object,
+                                    [
+                                        'context' => [
+                                            'containerType' => 'objectbrick',
+                                            'containerKey' => $collectionRaw['type'],
+                                            'fieldname' => $this->getName()
+                                        ]
+                                    ]);
                         }
                     }
                     $brick->setValues($collectionData);
-                    $brick->setFieldname($this->getName());
 
                     $setter = 'set' . ucfirst($collectionRaw['type']);
                     $container->$setter($brick);
@@ -298,7 +320,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
     }
 
     /**
-     * @see DataObject\ClassDefinition\Data::getVersionPreview
+     * @see Data::getVersionPreview
      *
      * @param string $data
      * @param null|DataObject\AbstractObject $object
@@ -379,7 +401,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
     {
         $container = $this->getDataFromObjectParam($object);
         if ($container instanceof DataObject\Objectbrick) {
-            $container->save($object);
+            $container->save($object, $params);
         }
     }
 
@@ -405,8 +427,9 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
 
     /**
      * @param $object
+     * @param array $params
      */
-    public function delete($object)
+    public function delete($object, $params = [])
     {
         $container = $this->load($object);
         if ($container) {
@@ -462,6 +485,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
         $wsData = [];
 
         if ($data instanceof DataObject\Objectbrick) {
+            $data = $data->getObjectVars();
             foreach ($data as $item) {
                 if (!$item instanceof DataObject\Objectbrick\Data\AbstractData) {
                     continue;
@@ -710,6 +734,8 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
     {
         if (!$omitMandatoryCheck) {
             if ($data instanceof DataObject\Objectbrick) {
+                $validationExceptions = [];
+
                 $items = $data->getItems();
                 foreach ($items as $item) {
                     if ($item->getDoDelete()) {
@@ -732,10 +758,21 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
                     }
 
                     foreach ($collectionDef->getFieldDefinitions() as $fd) {
-                        $key = $fd->getName();
-                        $getter = 'get' . ucfirst($key);
-                        $fd->checkValidity($item->$getter());
+                        try {
+                            $key = $fd->getName();
+                            $getter = 'get' . ucfirst($key);
+                            $fd->checkValidity($item->$getter());
+                        } catch (Model\Element\ValidationException $ve) {
+                            $ve->addContext($this->getName());
+                            $validationExceptions[] = $ve;
+                        }
                     }
+                }
+
+                if ($validationExceptions) {
+                    $aggregatedExceptions = new Model\Element\ValidationException();
+                    $aggregatedExceptions->setSubItems($validationExceptions);
+                    throw $aggregatedExceptions;
                 }
             }
         }
@@ -760,15 +797,15 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
      * @param $level
      * @param $baseObject
      * @param $getter
-     * @param $objectFromVersion
+     * @param $params
      *
      * @return mixed
      */
-    private function getDiffDataForField($item, $key, $fielddefinition, $level, $baseObject, $getter, $objectFromVersion)
+    private function getDiffDataForField($item, $key, $fielddefinition, $level, $baseObject, $getter, $params = [])
     {
         $valueGetter = 'get' . ucfirst($key);
 
-        $value = $fielddefinition->getDiffDataForEditmode($item->$valueGetter(), $baseObject);
+        $value = $fielddefinition->getDiffDataForEditmode($item->$valueGetter(), $baseObject, $params);
 
         return $value;
     }
@@ -776,12 +813,12 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
     /**
      * @param $data
      * @param $getter
-     * @param $objectFromVersion
+     * @param $params
      * @param int $level
      *
      * @return array
      */
-    private function doGetDiffDataForEditmode($data, $getter, $objectFromVersion, $level = 0)
+    private function doGetDiffDataForEditmode($data, $getter, $params = [], $level = 0)
     {
         $parent = DataObject\Service::hasInheritableParentObject($data->getObject());
         $item = $data->$getter();
@@ -789,7 +826,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
         if (!$item && !empty($parent)) {
             $data = $parent->{'get' . ucfirst($this->getName())}();
 
-            return $this->doGetDiffDataForEditmode($data, $getter, $objectFromVersion, $level + 1);
+            return $this->doGetDiffDataForEditmode($data, $getter, $params, $level + 1);
         }
 
         if (!$item instanceof DataObject\Objectbrick\Data\AbstractData) {
@@ -805,7 +842,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
         $result = [];
 
         foreach ($collectionDef->getFieldDefinitions() as $fd) {
-            $fieldData = $this->getDiffDataForField($item, $fd->getName(), $fd, $level, $data->getObject(), $getter, $objectFromVersion); //$fd->getDataForEditmode($item->{$fd->getName()});
+            $fieldData = $this->getDiffDataForField($item, $fd->getName(), $fd, $level, $data->getObject(), $getter, $params = []);
 
             $diffdata = [];
 
@@ -839,11 +876,10 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
      * @param mixed $data
      * @param null $object
      * @param mixed $params
-     * @param null $objectFromVersion
      *
      * @return array|null
      */
-    public function getDiffDataForEditMode($data, $object = null, $params = [], $objectFromVersion = null)
+    public function getDiffDataForEditMode($data, $object = null, $params = [])
     {
         $editmodeData = [];
 
@@ -851,7 +887,7 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
             $getters = $data->getBrickGetters();
 
             foreach ($getters as $getter) {
-                $brickdata = $this->doGetDiffDataForEditmode($data, $getter, $objectFromVersion);
+                $brickdata = $this->doGetDiffDataForEditmode($data, $getter, $params);
                 if ($brickdata) {
                     foreach ($brickdata as $item) {
                         $editmodeData[] = $item;
@@ -998,13 +1034,19 @@ class Objectbricks extends Model\DataObject\ClassDefinition\Data
 
                 //TODO: Shouldn't this moved inside the try block?
                 if ($definition) {
+                    $definition->getDao()->createUpdateTable($class);
                     $fieldDefinition = $definition->getFieldDefinitions();
 
                     foreach ($fieldDefinition as $fd) {
                         if (method_exists($fd, 'classSaved')) {
-                            $fd->classSaved($class);
+                            if (!$fd instanceof Localizedfields) {
+                                // defer creation
+                                $fd->classSaved($class);
+                            }
                         }
                     }
+
+                    $definition->getDao()->classSaved($class);
                 }
             }
         }

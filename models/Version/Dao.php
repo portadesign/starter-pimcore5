@@ -50,7 +50,7 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function save()
     {
-        $version = get_object_vars($this->model);
+        $version = $this->model->getObjectVars();
 
         foreach ($version as $key => $value) {
             if (in_array($key, $this->getValidTableColumns('versions'))) {
@@ -143,6 +143,34 @@ class Dao extends Model\Dao\AbstractDao
     }
 
     /**
+     * @param string $hash
+     *
+     * @return string
+     */
+    public function getBinaryFileIdForHash(string $hash): ?string
+    {
+        $hash = $this->db->fetchOne('SELECT IFNULL(binaryFileId, id) FROM versions WHERE binaryFileHash = ? AND cid = ? ORDER BY id ASC LIMIT 1', [$hash, $this->model->getCid()]);
+        if (!$hash) {
+            $hash = null;
+        }
+
+        return $hash;
+    }
+
+    /**
+     * @param string|null $hash
+     *
+     * @return bool
+     */
+    public function isBinaryHashInUse(?string $hash): bool
+    {
+        $count = $this->db->fetchOne('SELECT count(*) FROM versions WHERE binaryFileHash = ? AND cid = ?', [$hash, $this->model->getCid()]);
+        $returnValue = ($count > 1);
+
+        return $returnValue;
+    }
+
+    /**
      * @param $elementTypes
      * @param array $ignoreIds
      *
@@ -162,7 +190,7 @@ class Dao extends Model\Dao\AbstractDao
             $count = 0;
             $stop = false;
             foreach ($elementTypes as $elementType) {
-                if ($elementType['days'] > 0) {
+                if (isset($elementType['days']) && $elementType['days'] > 0) {
                     // by days
                     $deadline = time() - ($elementType['days'] * 86400);
                     $tmpVersionIds = $this->db->fetchCol('SELECT id FROM versions as a WHERE (ctype = ? AND date < ?) AND NOT public AND id NOT IN (' . $ignoreIdsList . ')', [$elementType['elementType'], $deadline]);

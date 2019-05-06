@@ -107,7 +107,7 @@ class Dao extends Model\Dao\AbstractDao
             }
 
             $data = [];
-            $dataRaw = get_object_vars($this->model);
+            $dataRaw = $this->model->getObjectVars();
             foreach ($dataRaw as $key => $value) {
                 if (in_array($key, $this->getValidTableColumns('users'))) {
                     if (is_bool($value)) {
@@ -117,6 +117,8 @@ class Dao extends Model\Dao\AbstractDao
                         if (is_array($value)) {
                             $value = implode(',', $value);
                         }
+                    } elseif (in_array($key, ['twoFactorAuthentication'])) {
+                        $value = json_encode($value);
                     }
                     $data[$key] = $value;
                 }
@@ -137,5 +139,18 @@ class Dao extends Model\Dao\AbstractDao
         Logger::debug('delete user with ID: ' . $userId);
 
         $this->db->delete('users', ['id' => $userId]);
+    }
+
+    /**
+     * @throws \Exception
+     */
+    public function setLastLoginDate()
+    {
+        try {
+            $data['lastLogin'] = (new \Datetime())->getTimestamp();
+            $this->db->update('users', $data, ['id' => $this->model->getId()]);
+        } catch (\Exception $e) {
+            throw $e;
+        }
     }
 }

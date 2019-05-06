@@ -110,7 +110,7 @@ class Service extends Model\Element\Service
         $source->getProperties();
 
         $new = Element\Service::cloneMe($source);
-        $new->id = null;
+        $new->setId(null);
 
         if ($new instanceof Asset\Folder) {
             $new->setChildren(null);
@@ -193,7 +193,7 @@ class Service extends Model\Element\Service
         try {
             $asset = new Asset();
 
-            if (\Pimcore\Tool::isValidPath($path)) {
+            if (self::isValidPath($path, 'asset')) {
                 $asset->getDao()->getByPath($path);
 
                 return true;
@@ -350,7 +350,7 @@ class Service extends Model\Element\Service
             if ($item->getType() == 'folder') {
                 $key = $key . '_' . $nr;
             } else {
-                $keypart  = substr($key, 0, strrpos($key, '.'));
+                $keypart = substr($key, 0, strrpos($key, '.'));
                 $extension = str_replace($keypart, '', $key);
                 $key = $keypart . '_' . $nr . $extension;
             }

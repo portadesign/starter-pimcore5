@@ -63,9 +63,9 @@ class Dao extends Model\Dao\PhpArrayTable
         $this->model->setModificationDate($ts);
 
         try {
-            $dataRaw = get_object_vars($this->model);
+            $dataRaw = $this->model->getObjectVars();
             $data = [];
-            $allowedProperties = ['name', 'description', 'items',
+            $allowedProperties = ['name', 'description', 'group', 'items',
                 'videoBitrate', 'audioBitrate', 'creationDate', 'modificationDate'];
 
             foreach ($dataRaw as $key => $value) {
@@ -73,7 +73,9 @@ class Dao extends Model\Dao\PhpArrayTable
                     $data[$key] = $value;
                 }
             }
+
             $this->db->insertOrUpdate($data, $this->model->getName());
+            $this->autoClearTempFiles();
         } catch (\Exception $e) {
             throw $e;
         }
@@ -85,5 +87,14 @@ class Dao extends Model\Dao\PhpArrayTable
     public function delete()
     {
         $this->db->delete($this->model->getName());
+        $this->autoClearTempFiles();
+    }
+
+    protected function autoClearTempFiles()
+    {
+        $enabled = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['video']['thumbnails']['auto_clear_temp_files'];
+        if ($enabled) {
+            $this->model->clearTempFiles();
+        }
     }
 }

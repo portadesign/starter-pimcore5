@@ -18,6 +18,9 @@
 namespace Pimcore\Model\DataObject\Fieldcollection\Data;
 
 use Pimcore\Model;
+use Pimcore\Model\DataObject\ClassDefinition\Data\CustomResourcePersistingInterface;
+use Pimcore\Model\DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface;
+use Pimcore\Tool;
 
 /**
  * @property \Pimcore\Model\DataObject\Fieldcollection\Data\AbstractData $model
@@ -26,10 +29,12 @@ class Dao extends Model\Dao\AbstractDao
 {
     /**
      * @param Model\DataObject\Concrete $object
+     * @param array $params
+     * @param $saveRelationalData
      *
      * @throws \Exception
      */
-    public function save(Model\DataObject\Concrete $object)
+    public function save(Model\DataObject\Concrete $object, $params = [], $saveRelationalData = true)
     {
         $tableName = $this->model->getDefinition()->getTableName($object->getClass());
         $data = [
@@ -39,24 +44,39 @@ class Dao extends Model\Dao\AbstractDao
         ];
 
         try {
+            /** @var $fd Model\DataObject\ClassDefinition\Data */
             foreach ($this->model->getDefinition()->getFieldDefinitions() as $fd) {
                 $getter = 'get' . ucfirst($fd->getName());
 
-                if (method_exists($fd, 'save')) {
-                    // for fieldtypes which have their own save algorithm eg. objects, multihref, ...
+                if ($fd instanceof CustomResourcePersistingInterface || method_exists($fd, 'save')) {
+                    if (!$fd instanceof CustomResourcePersistingInterface) {
+                        Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'save', CustomResourcePersistingInterface::class);
+                    }
+                    if (!$fd instanceof Model\DataObject\ClassDefinition\Data\Localizedfields && $fd->supportsDirtyDetection() && !$saveRelationalData) {
+                        continue;
+                    }
+
+                    // for fieldtypes which have their own save algorithm eg. relational data types, ...
                     $index = $this->model->getIndex();
-                    $fd->save(
-                        $this->model,
-                        [
-                            'context' => [
-                                'containerType' => 'fieldcollection',
-                                'containerKey' => $this->model->getType(),
-                                'fieldname' =>  $this->model->getFieldname(),
-                                'index' => $index
-                            ]
+                    $params = array_merge($params, [
+                        'saveRelationalData' => $saveRelationalData,
+                        'context' => [
+                            'containerType' => 'fieldcollection',
+                            'containerKey' => $this->model->getType(),
+                            'fieldname' => $this->model->getFieldname(),
+                            'index' => $index
                         ]
+                    ]);
+
+                    $fd->save(
+                        $this->model, $params
+
                     );
-                } elseif ($fd->getColumnType()) {
+                }
+                if ($fd instanceof ResourcePersistenceAwareInterface || method_exists($fd, 'getDataForResource')) {
+                    if (!$fd instanceof ResourcePersistenceAwareInterface) {
+                        Tool::triggerMissingInterfaceDeprecation(get_class($fd), 'getDataForResource', ResourcePersistenceAwareInterface::class);
+                    }
                     if (is_array($fd->getColumnType())) {
                         $insertDataArray = $fd->getDataForResource($this->model->$getter(), $object, [
                             'context' => $this->model //\Pimcore\Model\DataObject\Fieldcollection\Data\Dao
