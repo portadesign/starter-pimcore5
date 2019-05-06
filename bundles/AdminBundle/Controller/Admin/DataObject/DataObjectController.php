@@ -2241,4 +2241,27 @@ class DataObjectController extends ElementControllerBase implements EventedContr
     {
         // nothing to do
     }
+
+	/**
+     * @Route("/get-object-url")
+     *
+     * @param Request $request
+     *
+     * @return JsonResponse
+     */
+    public function getObjectUrlAction(Request $request)
+    {
+        $object = DataObject\Concrete::getById($request->get('id'));
+        if (!$object || !method_exists($object, 'getUrl')) {
+            return $this->adminJson(['success' => 'true','url' => false]);
+        }
+        $language = $request->get('language');
+        if (!$language) {
+            $language = Tool::getDefaultLanguage();
+        }
+
+        \Pimcore\Cache\Runtime::set('routesSwitchEditmode', true);
+
+        return $this->adminJson(['success' => 'true','url' => $object->getUrl($language)]);
+    }
 }
