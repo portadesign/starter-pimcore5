@@ -869,9 +869,23 @@ class SettingsController extends AdminController
             } elseif ($request->get('xaction') == 'update') {
                 // save routes
                 $route = Staticroute::getById($data['id']);
+
+                if ($data["basePage"]) {
+                    if ($doc = Document::getByPath($data["basePage"])) {
+                        $data["basePage"] = $doc->getId();
+                    }
+                }
+
                 $route->setValues($data);
 
                 $route->save();
+
+				$basePage = $route->getBasePage();
+                if (is_numeric($basePage)) {
+                    if ($doc = Document::getById(intval($basePage))) {
+                        $route->setBasePage($doc->getRealFullPath());
+                    }
+                }
 
                 return $this->adminJson(['data' => $route, 'success' => true]);
             } elseif ($request->get('xaction') == 'create') {
@@ -879,9 +893,23 @@ class SettingsController extends AdminController
 
                 // save route
                 $route = new Staticroute();
+
+				if ($data["basePage"]) {
+                    if ($doc = Document::getByPath($data["basePage"])) {
+                        $data["basePage"] = $doc->getId();
+                    }
+                }
+
                 $route->setValues($data);
 
                 $route->save();
+
+				$basePage = $route->getBasePage();
+                if (is_numeric($basePage)) {
+                    if ($doc = Document::getById(intval($basePage))) {
+                        $route->setBasePage($doc->getRealFullPath());
+                    }
+                }
 
                 return $this->adminJson(['data' => $route, 'success' => true]);
             }
@@ -911,6 +939,13 @@ class SettingsController extends AdminController
             $routes = [];
             /** @var $route Staticroute */
             foreach ($list->getRoutes() as $route) {
+				if ($basePage = $route->getBasePage()) {
+                    if (is_numeric($basePage)) {
+                        if ($doc = Document::getById(intval($basePage))) {
+                            $route->setBasePage($doc->getRealFullPath());
+                        }
+                    }
+                }
                 if (is_array($route->getSiteId())) {
                     $route = json_encode($route);
                     $route = json_decode($route, true);
