@@ -2410,6 +2410,36 @@ class AssetController extends ElementControllerBase implements EventedController
         return $this->adminJson(['success' => 'true', 'text' => $text]);
     }
 
+	/**
+     * @Route("/get-image-metadata")
+     *
+     * @param Request $request
+     *
+     * @return JsonResponse
+     */
+    public function getImageMetadataAction(Request $request)
+    {
+        $asset = Asset\Image::getById($request->get('id'));
+        if (!$asset) {
+            return $this->adminJson(['success' => 'true','metadata' => []]);
+        }
+        $language = $request->get('language');
+        if (!$language) {
+            $language = Tool::getDefaultLanguage();
+        }
+        $metadata = array();
+        $allowed = array('title', 'alt');
+        foreach ($allowed as $name) {
+            $value = $asset->getMetadata($name, $language);
+            // only string values for now
+            if (!is_string($value)) {
+                continue;
+            }
+            $metadata[$name] = $value;
+        }
+        return $this->adminJson(['success' => 'true','metadata' => $metadata]);
+    }
+
     /**
      * @param FilterControllerEvent $event
      */
