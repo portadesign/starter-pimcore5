@@ -1,32 +1,17 @@
 {
   "name": "pimcore/pimcore",
   "type": "library",
-  "description": "Content & Product Management Framework (CMS/PIM/E-Commerce)",
-  "keywords": [
-    "CMS",
-    "PIM",
-    "DAM",
-    "E-Commerce",
-    "RAD",
-    "Product Information Management"
-  ],
-  "homepage": "http://www.pimcore.org/",
-  "license": "GPL-3.0-or-later",
+  "description": "Private composer package of our customized pimcore fork",
   "authors": [
     {
-      "name": "pimcore Team",
-      "email": "info@pimcore.com",
-      "homepage": "http://www.pimcore.org/",
-      "role": "Developer"
+		"name": "Martin Kuric",
+		"email": "martin.kuric@portadesign.cz"
+    },
+	{
+		"name": "Andrea Navratilova",
+		"email": "andrea.navratilova@portadesign.cz"
     }
   ],
-  "support": {
-    "issues": "https://github.com/pimcore/pimcore/issues",
-    "wiki": "https://pimcore.com/docs/5.0.x/index.html",
-    "source": "https://github.com/pimcore/pimcore",
-    "forum": "https://groups.google.com/forum/#!forum/pimcore",
-    "docs": "https://pimcore.com/docs/5.0.x/index.html"
-  },
   "require": {
     "php": ">=7.1",
     "ext-SimpleXML": "*",
