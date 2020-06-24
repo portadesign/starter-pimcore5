@@ -55,7 +55,7 @@ pimcore.settings.email.blacklist = Class.create({
     getRowEditor:function () {
 
         var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize();
-        var url ='/admin/email/blacklist?';
+        var url = Routing.generate('pimcore_admin_email_blacklist');
 
         this.store = pimcore.helpers.grid.buildDefaultStore(
             url,
@@ -134,7 +134,7 @@ pimcore.settings.email.blacklist = Class.create({
         });
 
         var toolbar = Ext.create('Ext.Toolbar', {
-            cls: 'main-toolbar',
+            cls: 'pimcore_main_toolbar',
             items: [
                 {
                     text:t('add'),

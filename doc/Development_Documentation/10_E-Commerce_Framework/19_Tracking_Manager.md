@@ -5,6 +5,7 @@ different tracker implementations, it supports different tracking services.
 
 Current implementations of trackers are
 
+* **Google Tag Manager (GTM)**: `\\Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\Tracker\GoogleTagManager`
 * **Google Analytics Classic**: `\Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\Tracker\Analytics\Ecommerce`
 * **Google Analytics Universal**: `\Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\Tracker\Analytics\UniversalEcommerce`
 * **Google Analytics Enhanced E-Commerce**: `\Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\Tracker\Analytics\EnhancedEcommerce`
@@ -173,13 +174,13 @@ Define a custom item builder:
 ```php
 <?php
 
-use Pimcore\Bundle\EcommerceFrameworkBundle\Model\IProduct;
+use Pimcore\Bundle\EcommerceFrameworkBundle\Model\ProductInterface;
 
 class TrackingItemBuilder extends \Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\TrackingItemBuilder
 {
     private static $impressionPosition = 0;
     
-    public function buildProductImpressionItem(IProduct $product)
+    public function buildProductImpressionItem(ProductInterface $product)
     {
         $item = parent::buildProductImpressionItem($product);
 

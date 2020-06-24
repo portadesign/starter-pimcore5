@@ -20,14 +20,14 @@ use Pimcore\Model;
 use Zend\Paginator\Adapter\AdapterInterface;
 use Zend\Paginator\AdapterAggregateInterface;
 
-class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterAggregate, \Iterator, AdapterInterface, AdapterAggregateInterface
+class Cse implements \Iterator, AdapterInterface, AdapterAggregateInterface
 {
     /**
-     * @param $query
+     * @param string $query
      * @param int $offset
      * @param int $perPage
      * @param array $config
-     * @param null $facet
+     * @param string|null $facet
      *
      * @return Cse
      */
@@ -60,6 +60,10 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
             // determine language
             $language = \Pimcore::getContainer()->get('pimcore.locale')->findLocale();
 
+            if ($position = strpos($language, '_')) {
+                $language = substr($language, 0, $position);
+            }
+
             if (!array_key_exists('hl', $config) && !empty($language)) {
                 $config['hl'] = $language;
             }
@@ -77,6 +81,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
                 }
 
                 $config['num'] = $perPage;
+                $config['q'] = $query;
 
                 $cacheKey = 'google_cse_' . md5($query . serialize($config));
 
@@ -85,7 +90,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
                     $result = \Pimcore\Cache\Runtime::get($cacheKey);
                 } else {
                     if (!$result = Cache::load($cacheKey)) {
-                        $result = $search->cse->listCse($query, $config);
+                        $result = $search->cse->listCse($config);
                         Cache::save($result, $cacheKey, ['google_cse'], 3600, 999);
                         \Pimcore\Cache\Runtime::set($cacheKey, $result);
                     }
@@ -103,7 +108,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @var array
+     * @var Item[]
      */
     public $results = [];
 
@@ -157,6 +162,8 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
      */
     public function readGoogleResponse(\Google_Service_Customsearch_Search $googleResponse)
     {
+        $items = [];
+
         $this->setRaw($googleResponse);
 
         // set search results
@@ -223,7 +230,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @param $offset
+     * @param int $offset
      *
      * @return $this
      */
@@ -243,7 +250,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @param $raw
+     * @param array $raw
      *
      * @return $this
      */
@@ -263,7 +270,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @param $total
+     * @param int $total
      *
      * @return $this
      */
@@ -283,7 +290,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @param $perPage
+     * @param int $perPage
      *
      * @return $this
      */
@@ -303,7 +310,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @param $config
+     * @param array $config
      *
      * @return $this
      */
@@ -323,7 +330,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @param $query
+     * @param string $query
      *
      * @return $this
      */
@@ -343,7 +350,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @param $results
+     * @param Item[] $results
      *
      * @return $this
      */
@@ -357,7 +364,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     /**
      * @param bool $retry
      *
-     * @return array
+     * @return Item[]
      */
     public function getResults($retry = true)
     {
@@ -369,7 +376,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @param $facets
+     * @param array $facets
      *
      * @return $this
      */
@@ -389,7 +396,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * Methods for \Zend_Paginator_Adapter_Interface | AdapterInterface
+     * Methods for AdapterInterface
      */
 
     /**
@@ -419,7 +426,7 @@ class Cse implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterA
     }
 
     /**
-     * @return $this|\Zend_Paginator_Adapter_Interface | AdapterInterface
+     * @return self
      */
     public function getPaginatorAdapter()
     {

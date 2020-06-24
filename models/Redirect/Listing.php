@@ -22,33 +22,38 @@ use Pimcore\Model;
 /**
  * @method \Pimcore\Model\Redirect\Listing\Dao getDao()
  * @method Model\Redirect[] load()
+ * @method Model\Redirect current()
+ * @method int getTotalCount()
  */
 class Listing extends Model\Listing\AbstractListing
 {
     /**
-     * Contains the results of the list. They are all an instance of Staticroute
+     * @var array|null
      *
-     * @var array
+     * @deprecated use getter/setter methods or $this->data
      */
-    public $redirects = [];
+    protected $redirects = null;
+
+    public function __construct()
+    {
+        $this->redirects = & $this->data;
+    }
 
     /**
-     * @return array
+     * @return Model\Redirect[]
      */
     public function getRedirects()
     {
-        return $this->redirects;
+        return $this->getData();
     }
 
     /**
      * @param array $redirects
      *
-     * @return $this
+     * @return static
      */
     public function setRedirects($redirects)
     {
-        $this->redirects = $redirects;
-
-        return $this;
+        return $this->setData($redirects);
     }
 }

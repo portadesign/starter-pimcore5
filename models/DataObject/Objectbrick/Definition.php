@@ -17,6 +17,7 @@
 
 namespace Pimcore\Model\DataObject\Objectbrick;
 
+use Pimcore\Cache;
 use Pimcore\Cache\Runtime;
 use Pimcore\File;
 use Pimcore\Logger;
@@ -26,10 +27,13 @@ use Pimcore\Tool;
 
 /**
  * @method \Pimcore\Model\DataObject\Objectbrick\Definition\Dao getDao()
+ * @method string getTableName(DataObject\ClassDefinition $class, $query)
  */
 class Definition extends Model\DataObject\Fieldcollection\Definition
 {
     use Model\DataObject\ClassDefinition\Helper\VarExport;
+
+    use DataObject\Traits\FieldcollectionObjectbrickDefinitionTrait;
 
     /**
      * @var array
@@ -42,17 +46,7 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
     private $oldClassDefinitions = [];
 
     /**
-     * @var string
-     */
-    public $title;
-
-    /**
-     * @var string
-     */
-    public $group;
-
-    /**
-     * @param $classDefinitions
+     * @param array $classDefinitions
      *
      * @return $this
      */
@@ -74,11 +68,9 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
     /**
      * @static
      *
-     * @throws \Exception
+     * @param string $key
      *
-     * @param $key
-     *
-     * @return self
+     * @return self|null
      */
     public static function getByKey($key)
     {
@@ -104,7 +96,7 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
             return $brick;
         }
 
-        throw new \Exception('Object-Brick with key: ' . $key . ' does not exist.');
+        return null;
     }
 
     /**
@@ -161,9 +153,16 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
             throw new \Exception('A object-brick needs a key to be saved!');
         }
 
-        $this->checkTablenames();
+        if (!preg_match('/[a-zA-Z]+[a-zA-Z0-9]+/', $this->getKey())) {
+            throw new \Exception(sprintf('Invalid key for object-brick: %s', $this->getKey()));
+        }
 
-        $definitionFile = $this->getDefinitionFile();
+        if ($this->getParentClass() && !preg_match('/^[a-zA-Z_\x7f-\xff\\\][a-zA-Z0-9_\x7f-\xff\\\]*$/', $this->getParentClass())) {
+            throw new \Exception(sprintf('Invalid parentClass value for class definition: %s',
+                $this->getParentClass()));
+        }
+
+        $this->checkTablenames();
 
         $newClassDefinitions = [];
         $classDefinitionsToDelete = [];
@@ -178,11 +177,30 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
 
         $this->classDefinitions = $newClassDefinitions;
 
+        $this->generateClassFiles($saveDefinitionFile);
+
+        $cacheKey = 'objectbrick_' . $this->getKey();
+        // for localized fields getting a fresh copy
+        Runtime::set($cacheKey, $this);
+
+        $this->createContainerClasses();
+        $this->updateDatabase();
+    }
+
+    /**
+     * @param bool $generateDefinitionFile
+     *
+     * @throws \Exception
+     */
+    public function generateClassFiles($generateDefinitionFile = true)
+    {
+        $definitionFile = $this->getDefinitionFile();
+
         $infoDocBlock = $this->getInfoDocBlock();
 
-        $this->cleanupOldFiles($definitionFile);
+        if ($generateDefinitionFile) {
+            $this->cleanupOldFiles($definitionFile);
 
-        if ($saveDefinitionFile) {
             $clone = clone $this;
             $clone->setDao(null);
             unset($clone->oldClassDefinitions);
@@ -216,14 +234,21 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         $cd .= "\n\n";
         $cd .= 'namespace Pimcore\\Model\\DataObject\\Objectbrick\\Data;';
         $cd .= "\n\n";
-        $cd .= 'use Pimcore\\Model\\DataObject;';
-        $cd .= "\n\n";
 
-        $cd .= 'class ' . ucfirst($this->getKey()) . ' extends ' . $extendClass . ' implements \\Pimcore\\Model\\DataObject\\DirtyIndicatorInterface {';
-        $cd .= "\n\n";
+        $useParts = [
+            'Pimcore\Model\DataObject',
+            'Pimcore\Model\DataObject\Exception\InheritanceParentNotFoundException',
+            'Pimcore\Model\DataObject\PreGetValueHookInterface'
+        ];
 
-        $cd .= "\n\n";
-        $cd .= 'use \\Pimcore\\Model\\DataObject\\Traits\\DirtyIndicatorTrait;';
+        $cd .= DataObject\ClassDefinition\Service::buildUseCode($useParts);
+
+        $cd .= "\n";
+
+        $implementsParts = [];
+        $implements = DataObject\ClassDefinition\Service::buildImplementsInterfacesCode($implementsParts, $this->getImplementsInterfaces());
+
+        $cd .= 'class ' . ucfirst($this->getKey()) . ' extends ' . $extendClass . $implements .' {';
         $cd .= "\n\n";
 
         $cd .= 'protected $type = "' . $this->getKey() . "\";\n";
@@ -250,12 +275,17 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
 
         if (is_array($this->getFieldDefinitions()) && count($this->getFieldDefinitions())) {
             foreach ($this->getFieldDefinitions() as $key => $def) {
-
-                /**
-                 * @var $def DataObject\ClassDefinition\Data
-                 */
                 $cd .= $def->getGetterCodeObjectbrick($this);
+
+                if ($def instanceof DataObject\ClassDefinition\Data\Localizedfields) {
+                    $cd .= $def->getGetterCode($this);
+                }
+
                 $cd .= $def->getSetterCodeObjectbrick($this);
+
+                if ($def instanceof DataObject\ClassDefinition\Data\Localizedfields) {
+                    $cd .= $def->getSetterCode($this);
+                }
             }
         }
 
@@ -263,16 +293,10 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         $cd .= "\n";
 
         File::putPhpFile($this->getPhpClassFile(), $cd);
-        $cacheKey = 'objectbrick_' . $this->getKey();
-        // for localized fields getting a fresh copy
-        Runtime::set($cacheKey, $this);
-
-        $this->createContainerClasses();
-        $this->updateDatabase();
     }
 
     /**
-     * @param $definitions
+     * @param array $definitions
      *
      * @return array
      */
@@ -286,8 +310,10 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         return $result;
     }
 
-    /** Returns a list of classes which need to be "rebuild" because they are affected of changes.
-     * @param $oldObject
+    /**
+     * Returns a list of classes which need to be "rebuild" because they are affected of changes.
+     *
+     * @param self $oldObject
      *
      * @return array
      */
@@ -313,7 +339,7 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
     }
 
     /**
-     * @param $serializedFilename
+     * @param string $serializedFilename
      */
     private function cleanupOldFiles($serializedFilename)
     {
@@ -416,8 +442,6 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
 
     /**
      * @throws \Exception
-     *
-     * @todo: creates a PHP-Dock with "@return void" (line 351)
      */
     private function createContainerClasses()
     {
@@ -430,7 +454,7 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
                 $class = DataObject\ClassDefinition::getByName($cl['classname']);
 
                 $fd = $class->getFieldDefinition($cl['fieldname']);
-                if (!$fd) {
+                if (!$fd instanceof DataObject\ClassDefinition\Data\Objectbricks) {
                     throw new \Exception('Could not resolve field definition for ' . $cl['fieldname']);
                 }
 
@@ -448,6 +472,8 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
                 if (array_diff($new, $old) || array_diff($old, $new)) {
                     $class->save();
                 } else {
+                    // still, the brick fields definitions could have changed.
+                    Cache::clearTag('class_'.$class->getId());
                     Logger::debug('Objectbrick ' . $this->getKey() . ', no change for class ' . $class->getName());
                 }
             }
@@ -482,11 +508,12 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
                 $cd .= "\n\n";
                 $cd .= 'namespace ' . $namespace . ';';
                 $cd .= "\n\n";
+                $cd .= 'use Pimcore\Model\DataObject\Exception\InheritanceParentNotFoundException;';
+                $cd .= "\n\n";
                 $cd .= 'class ' . $className . ' extends \\Pimcore\\Model\\DataObject\\Objectbrick {';
                 $cd .= "\n\n";
 
-                $cd .= "\n\n";
-                $cd .= 'protected $brickGetters = array(' . "'" . implode("','", $brickKeys) . "');\n";
+                $cd .= 'protected $brickGetters = [' . "'" . implode("','", $brickKeys) . "'];\n";
                 $cd .= "\n\n";
 
                 foreach ($brickKeys as $brickKey) {
@@ -499,10 +526,22 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
 
                     if ($class->getAllowInherit()) {
                         $cd .= "\t" . 'if(!$this->' . $brickKey . ' && \\Pimcore\\Model\\DataObject\\AbstractObject::doGetInheritedValues($this->getObject())) { ' . "\n";
-                        $cd .= "\t\t" . '$brick = $this->getObject()->getValueFromParent("' . $fieldname . '");' . "\n";
-                        $cd .= "\t\t" . 'if(!empty($brick)) {' . "\n";
-                        $cd .= "\t\t\t" . 'return $this->getObject()->getValueFromParent("' . $fieldname . '")->get' . ucfirst($brickKey) . "(); \n";
-                        $cd .= "\t\t" . "}\n";
+                        $cd .= "\t\t" . 'try {' . "\n";
+                        $cd .= "\t\t\t" . '$brickContainer = $this->getObject()->getValueFromParent("' . $fieldname . '");' . "\n";
+                        $cd .= "\t\t\t" . 'if(!empty($brickContainer)) {' . "\n";
+                        $cd .= "\t\t\t\t" . '//check if parent object has brick, and if so, create an empty brick to enable inheritance' . "\n";
+                        $cd .= "\t\t\t\t" . '$parentBrick = $this->getObject()->getValueFromParent("' . $fieldname . '")->get' . ucfirst($brickKey) . "(); \n";
+                        $cd .= "\t\t\t\t" . 'if (!empty($parentBrick)) {' . "\n";
+                        $cd .= "\t\t\t\t\t" . '$brickType = "\\\Pimcore\\\Model\\\DataObject\\\Objectbrick\\\Data\\\" . ucfirst($parentBrick->getType());' . "\n";
+                        $cd .= "\t\t\t\t\t" . '$brick = new $brickType($this->getObject());' . "\n";
+                        $cd .= "\t\t\t\t\t" . '$brick->setFieldname("' . $fieldname . '");' . "\n";
+                        $cd .= "\t\t\t\t\t" . '$this->set'. ucfirst($brickKey) . '($brick);' . "\n";
+                        $cd .= "\t\t\t\t\t" . 'return $brick;' . "\n";
+                        $cd .= "\t\t\t\t" . '}' . "\n";
+                        $cd .= "\t\t\t" . "}\n";
+                        $cd .= "\t\t" . '} catch (InheritanceParentNotFoundException $e) {' . "\n";
+                        $cd .= "\t\t\t" . '// no data from parent available, continue ... ' . "\n";
+                        $cd .= "\t\t" . '}' . "\n";
                         $cd .= "\t" . "}\n";
                     }
                     $cd .= '   return $this->' . $brickKey . "; \n";
@@ -534,8 +573,8 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
     }
 
     /**
-     * @param $classname
-     * @param $fieldname
+     * @param string $classname
+     * @param string $fieldname
      *
      * @return string
      */
@@ -545,8 +584,8 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
     }
 
     /**
-     * @param $classname
-     * @param $fieldname
+     * @param string $classname
+     * @param string $fieldname
      *
      * @return string
      */
@@ -556,7 +595,7 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
     }
 
     /**
-     * @param $classname
+     * @param string $classname
      *
      * @return string
      */
@@ -646,21 +685,5 @@ class Definition extends Model\DataObject\Fieldcollection\Definition
         $classFile = $classFolder . '/' . ucfirst($this->getKey()) . '.php';
 
         return $classFile;
-    }
-
-    /**
-     * @return string
-     */
-    public function getTitle()
-    {
-        return $this->title;
-    }
-
-    /**
-     * @param string $title
-     */
-    public function setTitle($title)
-    {
-        $this->title = $title;
     }
 }

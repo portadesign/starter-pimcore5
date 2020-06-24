@@ -22,35 +22,39 @@ use Pimcore\Model;
 /**
  * @method Model\Element\Note\Listing\Dao getDao()
  * @method Model\Element\Note[] load()
+ * @method Model\Element\Note current()
  * @method int[] loadIdList()
  * @method int getTotalCount()
  */
 class Listing extends Model\Listing\AbstractListing
 {
     /**
-     * Contains the results of the list. They are all an instance of Staticroute
+     * @var Model\Element\Note[]|null
      *
-     * @var array
+     * @deprecated use getter/setter methods or $this->data
      */
-    public $notes = [];
+    protected $notes = null;
 
-    /**
-     * @param $notes
-     *
-     * @return $this
-     */
-    public function setNotes($notes)
+    public function __construct()
     {
-        $this->notes = $notes;
-
-        return $this;
+        $this->notes = & $this->data;
     }
 
     /**
-     * @return array
+     * @param Model\Element\Note[]|null $notes
+     *
+     * @return static
+     */
+    public function setNotes($notes)
+    {
+        return $this->setData($notes);
+    }
+
+    /**
+     * @return Model\Element\Note[]
      */
     public function getNotes()
     {
-        return $this->notes;
+        return $this->getData();
     }
 }

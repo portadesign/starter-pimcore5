@@ -26,7 +26,7 @@ pimcore.element.tag.assignment = Class.create({
             var gridStore = Ext.create("Ext.data.Store", {
                 proxy: {
                     type: 'ajax',
-                    url: '/admin/tags/load-tags-for-element',
+                    url: Routing.generate('pimcore_admin_tags_loadtagsforelement'),
                     extraParams: {
                         assignmentCId: this.element.id,
                         assignmentCType: this.elementType
@@ -54,7 +54,7 @@ pimcore.element.tag.assignment = Class.create({
                     gridStore.add(record);
 
                     Ext.Ajax.request({
-                        url: "/admin/tags/add-tag-to-element",
+                        url: Routing.generate('pimcore_admin_tags_addtagtoelement'),
                         method: 'PUT',
                         params: {
                             assignmentElementId: this.element.id,
@@ -72,9 +72,11 @@ pimcore.element.tag.assignment = Class.create({
             }.bind(this, gridStore));
 
             this.grid = Ext.create('Ext.grid.Panel', {
+                title: t('assigned_tags'),
+                region: 'west',
+                width: 460,
                 trackMouseOver: true,
                 store: gridStore,
-                region: 'center',
                 columnLines: true,
                 stripeRows: true,
                 columns: {
@@ -105,22 +107,7 @@ pimcore.element.tag.assignment = Class.create({
                             }]
                         }
                     ]
-                }
-
-            });
-
-            var treePanel = Ext.create("Ext.Panel", {
-                items: [tree.getLayout()],
-                layout: "border",
-                region: 'center'
-            });
-
-            var gridPanel = Ext.create("Ext.Panel", {
-                title: t('assigned_tags'),
-                items: [this.grid],
-                layout: "border",
-                region: 'west',
-                width: 460,
+                },
                 buttons: [{
                     text: t("apply_tags"),
                     iconCls: "pimcore_icon_apply",
@@ -130,6 +117,13 @@ pimcore.element.tag.assignment = Class.create({
                     iconCls: "pimcore_icon_apply",
                     handler: this.prepareBatchUpdate.bind(this, true)
                 }]
+
+            });
+
+            var treePanel = Ext.create("Ext.Panel", {
+                items: [tree.getLayout()],
+                layout: "border",
+                region: 'center'
             });
 
             this.layout = Ext.create("Ext.Panel", {
@@ -137,9 +131,9 @@ pimcore.element.tag.assignment = Class.create({
                     tooltip: t('tags')
                 },
                 region: "center",
-                iconCls: "pimcore_icon_element_tags",
+                iconCls: "pimcore_material_icon_tags pimcore_material_icon",
                 layout: 'border',
-                items: [gridPanel, treePanel],
+                items: [this.grid, treePanel],
                 listeners: {
                     activate: function () {
                         gridStore.load();
@@ -153,7 +147,7 @@ pimcore.element.tag.assignment = Class.create({
 
     removeTagFromElement: function(tagId) {
         Ext.Ajax.request({
-            url: "/admin/tags/remove-tag-from-element",
+            url: Routing.generate('pimcore_admin_tags_removetagfromelement'),
             method: 'DELETE',
             params: {
                 assignmentElementId: this.element.id,
@@ -166,7 +160,7 @@ pimcore.element.tag.assignment = Class.create({
 
     prepareBatchUpdate: function(removeAndApply) {
         Ext.Ajax.request({
-            url: "/admin/tags/get-batch-assignment-jobs",
+            url: Routing.generate('pimcore_admin_tags_getbatchassignmentjobs'),
             params: {
                 elementId: this.element.id,
                 elementType: this.elementType
@@ -194,7 +188,7 @@ pimcore.element.tag.assignment = Class.create({
 
                     for (var i=0; i<responseJson.idLists.length; i++) {
                         jobs.push({
-                            url: "/admin/tags/do-batch-assignment",
+                            url: Routing.generate('pimcore_admin_tags_dobatchassignment'),
                             method: 'PUT',
                             params: array_merge(params, {
                                 childrenIds: Ext.encode(responseJson.idLists[i])
@@ -210,12 +204,12 @@ pimcore.element.tag.assignment = Class.create({
                         this.progressBarWin = new Ext.Window({
                             title: t("batch_assignment"),
                             layout:'fit',
-                            width:500,
+                            width:200,
                             bodyStyle: "padding: 10px;",
                             closable:false,
                             plain: true,
-                            modal: true,
-                            items: [this.progressBar]
+                            items: [this.progressBar],
+                            listeners: pimcore.helpers.getProgressWindowListeners()
                         });
 
                         this.progressBarWin.show();

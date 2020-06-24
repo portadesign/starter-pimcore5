@@ -82,7 +82,7 @@ pimcore.object.helpers.edit = {
                 forceLayout: true,
                 monitorResize: true,
                 bodyStyle: "padding: 10px",
-                border: true,
+                border: false,
                 defaults: {
                     width: "auto"
                 },
@@ -102,7 +102,7 @@ pimcore.object.helpers.edit = {
                 activeTab: 0,
                 monitorResize: true,
                 deferredRender: true,
-                border: true,
+                border: false,
                 bodyStyle: "padding: 10px",
                 forceLayout: true,
                 hideMode: "offsets",
@@ -127,13 +127,13 @@ pimcore.object.helpers.edit = {
         };
 
         var validKeys = ["xtype","title","layout","icon","items","region","width","height","name","text","html","handler",
-            "labelWidth", "fieldLabel", "collapsible","collapsed","bodyStyle","listeners"];
+            "labelWidth", "fieldLabel", "collapsible","collapsed","bodyStyle","listeners", "border", "tabPosition"];
 
         var tmpItems;
 
         // translate title
         if(typeof l.title != "undefined") {
-            l.title = ts(l.title);
+            l.title = t(l.title);
         }
 
         if (l.datatype == "layout") {
@@ -215,7 +215,7 @@ pimcore.object.helpers.edit = {
                     if(l[configKeys[u]]) {
                         //if (typeof l[configKeys[u]] != "undefined") {
                         if(configKeys[u] == "html"){
-                            newConfig[configKeys[u]] = l["renderingClass"] ? l[configKeys[u]] : ts(l[configKeys[u]]);
+                            newConfig[configKeys[u]] = l["renderingClass"] ? l[configKeys[u]] : t(l[configKeys[u]]);
                         } else {
                             newConfig[configKeys[u]] = l[configKeys[u]];
                         }
@@ -223,9 +223,9 @@ pimcore.object.helpers.edit = {
                 }
             }
 
-            if (l.fieldtype == "iframe") {
-                var iframe = new pimcore.object.layout.iframe(l, context);
-                newConfig = iframe.getLayout();
+            if (pimcore.object.layout[l.fieldtype] !== undefined) {
+                var layout = new pimcore.object.layout[l.fieldtype](l, context);
+                newConfig = layout.getLayout();
             } else {
                 newConfig = Object.assign(xTypeLayoutMapping[l.fieldtype] || {}, newConfig);
                 if (typeof newConfig.labelWidth != "undefined") {
@@ -292,16 +292,31 @@ pimcore.object.helpers.edit = {
                     l.title += ' <span style="color:red;">*</span>';
                 }
                 if(l.tooltip) {
-                    l.title += ' <span class="pimcore_object_label_icon pimcore_icon_info"></span>';
+                    l.title += ' <span class="pimcore_object_label_icon pimcore_icon_gray_info"></span>';
                 }
 
                 var field = new pimcore.object.tags[l.fieldtype](data, l);
 
+                let applyDefaults = false;
+                if (context && context['applyDefaults']) {
+                    applyDefaults = true;
+                }
                 field.setObject(this.object);
                 field.updateContext(context);
+
                 field.setName(l.name);
                 field.setTitle(l.titleOriginal);
+
+                if (applyDefaults && typeof field["applyDefaultValue"] !== "undefined") {
+                    field.applyDefaultValue();
+                }
                 field.setInitialData(data);
+
+
+                if (typeof field["finishSetup"] !== "undefined") {
+                    field.finishSetup();
+                }
+
 
                 if (typeof l.labelWidth != "undefined") {
                     field.labelWidth = l.labelWidth;
@@ -386,16 +401,22 @@ pimcore.object.helpers.edit = {
                                 }
                             }
 
-
                             // apply tooltips
                             if(field.tooltip) {
                                 try {
+                                    var tooltipHtml = field.tooltip;
+
+                                    // classification-store tooltips are already translated
+                                    if (context.type != "classificationstore") {
+                                        tooltipHtml = t(tooltipHtml);
+                                    }
+
                                     new Ext.ToolTip({
                                         target: el,
-                                        title: field.title,
-                                        html: nl2br(ts(field.tooltip)),
+                                        html: nl2br(tooltipHtml),
                                         trackMouse:true,
-                                        showDelay: 200
+                                        showDelay: 200,
+                                        dismissDelay: 0
                                     });
                                 } catch (e6) {
                                     console.log(e6);

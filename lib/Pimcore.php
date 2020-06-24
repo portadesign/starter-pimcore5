@@ -12,15 +12,7 @@
  * @license    http://www.pimcore.org/license     GPLv3 and PEL
  */
 use Pimcore\Cache;
-use Pimcore\Config;
-use Pimcore\FeatureToggles\Feature;
-use Pimcore\FeatureToggles\FeatureManager;
-use Pimcore\FeatureToggles\FeatureManagerInterface;
-use Pimcore\FeatureToggles\Features\DebugMode;
-use Pimcore\FeatureToggles\Features\DevMode;
-use Pimcore\FeatureToggles\FeatureState;
 use Pimcore\File;
-use Pimcore\Logger;
 use Pimcore\Model;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpKernel\KernelInterface;
@@ -28,19 +20,29 @@ use Symfony\Component\HttpKernel\KernelInterface;
 class Pimcore
 {
     /**
-     * @var bool
+     * @var bool|null
      */
     public static $adminMode;
 
     /**
-     * @var FeatureManagerInterface
+     * @var bool|null
      */
-    private static $featureManager;
+    protected static $debugMode;
+
+    /**
+     * @var bool|null
+     */
+    protected static $devMode;
 
     /**
      * @var bool
      */
     private static $inShutdown = false;
+
+    /**
+     * @var bool
+     */
+    private static $shutdownEnabled = true;
 
     /**
      * @var KernelInterface
@@ -53,118 +55,59 @@ class Pimcore
     private static $autoloader;
 
     /**
-     * @static
-     *
-     * @return \Pimcore\Config\Config|null
-     */
-    public static function initConfiguration()
-    {
-        $conf = null;
-
-        // init configuration
-        try {
-            $conf = Config::getSystemConfig(true);
-
-            // set timezone
-            if ($conf instanceof \Pimcore\Config\Config) {
-                if ($conf->general->timezone) {
-                    date_default_timezone_set($conf->general->timezone);
-                }
-            }
-
-            if (!defined('PIMCORE_DEVMODE')) {
-                define('PIMCORE_DEVMODE', (bool) $conf->general->devmode);
-            }
-        } catch (\Exception $e) {
-            $m = "Couldn't load system configuration";
-            Logger::err($m);
-
-            if (!defined('PIMCORE_DEVMODE')) {
-                define('PIMCORE_DEVMODE', false);
-            }
-        }
-
-        $debug = self::inDebugMode();
-        if (!defined('PIMCORE_DEBUG')) {
-            define('PIMCORE_DEBUG', $debug);
-        }
-
-        // custom error logging when debug flag is set
-        if (self::inDebugMode(DebugMode::ERROR_REPORTING)) {
-            error_reporting(E_ALL & ~E_NOTICE);
-        }
-
-        return $conf;
-    }
-
-    public static function setFeatureManager(FeatureManagerInterface $featureManager)
-    {
-        self::$featureManager = $featureManager;
-    }
-
-    public static function getFeatureManager(): FeatureManagerInterface
-    {
-        if (null === static::$featureManager) {
-            $featureManager = new FeatureManager(null, [
-                DebugMode::getDefaultInitializer(),
-                DevMode::getDefaultInitializer()
-            ]);
-
-            static::$featureManager = $featureManager;
-        }
-
-        return static::$featureManager;
-    }
-
-    public static function isFeatureEnabled(Feature $feature): bool
-    {
-        return static::getFeatureManager()->isEnabled($feature);
-    }
-
-    /**
-     * @param DebugMode|int|null $flag
-     *
      * @return bool
      */
-    public static function inDebugMode($flag = null): bool
+    public static function inDebugMode(): bool
     {
-        if (is_int($flag)) {
-            $flag = new DebugMode($flag);
-        }
-
-        if (null !== $flag && !$flag instanceof DebugMode) {
-            throw new \InvalidArgumentException(sprintf('Flag must be an integer or an instance of %s', DebugMode::class));
-        }
-
-        return static::getFeatureManager()->isEnabled($flag ?? DebugMode::ALL());
+        return (bool) self::$debugMode;
     }
 
     /**
-     * @param DevMode|int|null $flag
+     * @internal
      *
-     * @return bool
+     * @return bool|null
      */
-    public static function inDevMode($flag = null): bool
+    public static function getDebugMode(): ?bool
     {
-        if (is_int($flag)) {
-            $flag = new DevMode($flag);
-        }
-
-        if (null !== $flag && !$flag instanceof DevMode) {
-            throw new \InvalidArgumentException(sprintf('Flag must be an integer or an instance of %s', DevMode::class));
-        }
-
-        return static::getFeatureManager()->isEnabled($flag ?? DevMode::ALL());
+        return self::$debugMode;
     }
 
     /**
-     * Sets debug mode (overrides the PIMCORE_DEBUG constant and the debug mode from config)
+     * @internal
      *
      * @param bool $debugMode
      */
-    public static function setDebugMode(bool $debugMode = true)
+    public static function setDebugMode(bool $debugMode): void
     {
-        self::getFeatureManager()->setState(FeatureState::fromFeature($debugMode ? DebugMode::ALL() : DebugMode::NONE()));
+        self::$debugMode = $debugMode;
+    }
+
+    /**
+     * @return bool
+     */
+    public static function inDevMode(): bool
+    {
+        return (bool) self::$devMode;
+    }
+
+    /**
+     * @internal
+     *
+     * @return bool|null
+     */
+    public static function getDevMode(): ?bool
+    {
+        return self::$devMode;
+    }
+
+    /**
+     * @internal
+     *
+     * @param bool $devMode
+     */
+    public static function setDevMode(bool $devMode): void
+    {
+        self::$devMode = $devMode;
     }
 
     /**
@@ -218,7 +161,7 @@ class Pimcore
     }
 
     /**
-     * @return object|\Symfony\Component\EventDispatcher\ContainerAwareEventDispatcher
+     * @return \Symfony\Component\EventDispatcher\EventDispatcherInterface
      */
     public static function getEventDispatcher()
     {
@@ -297,43 +240,6 @@ class Pimcore
         self::$autoloader = $autoloader;
     }
 
-    /** Add $keepItems to the list of items which are protected from garbage collection.
-     * @param $keepItems
-     *
-     * @deprecated
-     */
-    public static function addToGloballyProtectedItems($keepItems)
-    {
-        if (is_string($keepItems)) {
-            $keepItems = [$keepItems];
-        }
-        if (is_array($keepItems)) {
-            $longRunningHelper = self::getContainer()->get(\Pimcore\Helper\LongRunningHelper::class);
-            $longRunningHelper->addPimcoreRuntimeCacheProtectedItems($keepItems);
-        } else {
-            throw new \InvalidArgumentException('keepItems must be an instance of array');
-        }
-    }
-
-    /** Items to be deleted.
-     * @param $deleteItems
-     *
-     * @deprecated
-     */
-    public static function removeFromGloballyProtectedItems($deleteItems)
-    {
-        if (is_string($deleteItems)) {
-            $deleteItems = [$deleteItems];
-        }
-
-        if (is_array($deleteItems)) {
-            $longRunningHelper = self::getContainer()->get(\Pimcore\Helper\LongRunningHelper::class);
-            $longRunningHelper->removePimcoreRuntimeCacheProtectedItems($deleteItems);
-        } else {
-            throw new \InvalidArgumentException('deleteItems must be an instance of array');
-        }
-    }
-
     /**
      * Forces a garbage collection.
      *
@@ -361,23 +267,43 @@ class Pimcore
         // set inShutdown to true so that the output-buffer knows that he is allowed to send the headers
         self::$inShutdown = true;
 
-        // write and clean up cache
-        if (php_sapi_name() != 'cli') {
-            Cache::shutdown();
+        if (self::getContainer() === null) {
+            return;
         }
 
-        // release all open locks from this process
-        Model\Tool\Lock::releaseAll();
+        if (self::$shutdownEnabled && self::isInstalled()) {
+            // write and clean up cache
+            Cache::shutdown();
+
+            // release all open locks from this process
+            Model\Tool\Lock::releaseAll();
+        }
+    }
+
+    /**
+     * @internal
+     */
+    public static function disableShutdown()
+    {
+        self::$shutdownEnabled = false;
+    }
+
+    /**
+     * @internal
+     */
+    public static function enableShutdown()
+    {
+        self::$shutdownEnabled = true;
     }
 
     public static function disableMinifyJs(): bool
     {
-        if (self::inDevMode(DevMode::UNMINIFIED_JS)) {
+        if (self::inDevMode()) {
             return true;
         }
 
         // magic parameter for debugging ExtJS stuff
-        if (array_key_exists('unminified_js', $_REQUEST) && self::inDebugMode(DebugMode::MAGIC_PARAMS)) {
+        if (array_key_exists('unminified_js', $_REQUEST) && self::inDebugMode()) {
             return true;
         }
 
@@ -387,7 +313,7 @@ class Pimcore
     public static function initLogger()
     {
         // special request log -> if parameter pimcore_log is set
-        if (array_key_exists('pimcore_log', $_REQUEST) && self::inDebugMode(DebugMode::MAGIC_PARAMS)) {
+        if (array_key_exists('pimcore_log', $_REQUEST) && self::inDebugMode()) {
             $requestLogName = date('Y-m-d_H-i-s');
             if (!empty($_REQUEST['pimcore_log'])) {
                 // slashed are not allowed, replace them with hyphens
@@ -415,30 +341,5 @@ class Pimcore
                 }
             }
         }
-    }
-
-    /**
-     * @return bool
-     */
-    public static function isLegacyModeAvailable()
-    {
-        return class_exists('Pimcore\\Legacy');
-    }
-
-    /**
-     * @param $name
-     * @param $arguments
-     *
-     * @return mixed
-     *
-     * @throws Exception
-     */
-    public static function __callStatic($name, $arguments)
-    {
-        if (self::isLegacyModeAvailable()) {
-            return forward_static_call_array('Pimcore\\Legacy::' . $name, $arguments);
-        }
-
-        throw new \Exception('Call to undefined static method ' . $name . ' on class Pimcore');
     }
 }

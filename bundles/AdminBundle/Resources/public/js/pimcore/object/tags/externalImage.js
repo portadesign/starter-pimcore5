@@ -28,7 +28,7 @@ pimcore.object.tags.externalImage = Class.create(pimcore.object.tags.abstract, {
 
     getGridColumnConfig: function(field) {
 
-        return {text: ts(field.label), width: 100, sortable: false, dataIndex: field.key,
+        return {text: t(field.label), width: 100, sortable: false, dataIndex: field.key,
             getEditor:this.getWindowCellEditor.bind(this, field),
             renderer: function (key, value, metaData, record) {
                                     this.applyPermissionStyle(key, value, metaData, record);
@@ -46,7 +46,6 @@ pimcore.object.tags.externalImage = Class.create(pimcore.object.tags.abstract, {
 
     getWrappingEl:function () {
         return this.inputField.getEl();
-
     },
 
     getLayoutEdit: function () {
@@ -62,7 +61,6 @@ pimcore.object.tags.externalImage = Class.create(pimcore.object.tags.abstract, {
             this.fieldConfig.inputWidth = 300;
         }
 
-
         var conf = {
             width: intval(this.fieldConfig.previewWidth),
             height: intval(this.fieldConfig.previewHeight),
@@ -72,7 +70,6 @@ pimcore.object.tags.externalImage = Class.create(pimcore.object.tags.abstract, {
         };
 
         this.inputField =  new Ext.form.field.Text({
-            xtype: "textfield",
             fieldLabel: "URL",
             name: "icon",
             width: this.fieldConfig.inputWidth,
@@ -87,7 +84,6 @@ pimcore.object.tags.externalImage = Class.create(pimcore.object.tags.abstract, {
         });
 
         this.deleteButton = new Ext.Button({
-            xtype: "button",
             iconCls: "pimcore_icon_delete",
             handler: this.empty.bind(this),
             style: "margin-left: 5px",
@@ -156,11 +152,7 @@ pimcore.object.tags.externalImage = Class.create(pimcore.object.tags.abstract, {
 
     updateImage: function () {
 
-        // 5px padding (-10)
         var body = this.getBody();
-        var width = body.getWidth()-10;
-        var height = body.getHeight()-10;
-
         var path = this.inputField.getValue();
 
         body = body.down('.x-autocontainer-innerCt');
@@ -230,14 +222,6 @@ pimcore.object.tags.externalImage = Class.create(pimcore.object.tags.abstract, {
     getName: function () {
         return this.fieldConfig.name;
     },
-
-    isInvalidMandatory: function () {
-        if (this.getValue()) {
-            return false;
-        }
-        return true;
-    }
-    ,
 
     isDirty: function() {
         return this.inputField.isDirty();

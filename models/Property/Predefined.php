@@ -20,7 +20,9 @@ namespace Pimcore\Model\Property;
 use Pimcore\Model;
 
 /**
- * @method \Pimcore\Model\Property\Predefined\Dao getDao()
+ * @method Predefined\Dao getDao()
+ * @method void save()
+ * @method void delete()
  */
 class Predefined extends Model\AbstractModel
 {
@@ -82,25 +84,24 @@ class Predefined extends Model\AbstractModel
     /**
      * @param int $id
      *
-     * @return self
+     * @return self|null
      */
     public static function getById($id)
     {
         try {
             $property = new self();
-            $property->setId($id);
-            $property->getDao()->getById();
+            $property->getDao()->getById($id);
+
+            return $property;
         } catch (\Exception $e) {
             return null;
         }
-
-        return $property;
     }
 
     /**
      * @param string $key
      *
-     * @return self
+     * @return self|null
      */
     public static function getByKey($key)
     {
@@ -114,9 +115,7 @@ class Predefined extends Model\AbstractModel
         } catch (\Exception $e) {
             try {
                 $property = new self();
-                $property->setKey($key);
-                $property->getDao()->getByKey();
-
+                $property->getDao()->getByKey($key);
                 \Pimcore\Cache\Runtime::set($cacheKey, $property);
             } catch (\Exception $e) {
                 return null;
@@ -278,7 +277,7 @@ class Predefined extends Model\AbstractModel
     }
 
     /**
-     * @return string
+     * @return bool
      */
     public function getInheritable()
     {
@@ -286,7 +285,7 @@ class Predefined extends Model\AbstractModel
     }
 
     /**
-     * @param string $inheritable
+     * @param bool $inheritable
      *
      * @return $this
      */
@@ -319,6 +318,8 @@ class Predefined extends Model\AbstractModel
 
     /**
      * @param int $creationDate
+     *
+     * @return self
      */
     public function setCreationDate($creationDate)
     {
@@ -337,6 +338,8 @@ class Predefined extends Model\AbstractModel
 
     /**
      * @param int $modificationDate
+     *
+     * @return self
      */
     public function setModificationDate($modificationDate)
     {

@@ -30,7 +30,7 @@ pimcore.extensionmanager.admin = Class.create({
             this.panel = new Ext.Panel({
                 id: "pimcore_extensionmanager_admin",
                 title: t("manage_extensions"),
-                iconCls: "pimcore_icon_plugin pimcore_icon_overlay_edit",
+                iconCls: "pimcore_icon_plugin",
                 border: false,
                 layout: "fit",
                 closable:true,
@@ -52,10 +52,6 @@ pimcore.extensionmanager.admin = Class.create({
         return this.panel;
     },
 
-    isLegacyType: function (type) {
-        return Ext.Array.contains(['plugin', 'brick'], type);
-    },
-
     getExtensionId: function (record) {
         var extensionId = record.get('extensionId');
         if (extensionId) {
@@ -63,14 +59,6 @@ pimcore.extensionmanager.admin = Class.create({
         }
 
         return record.get('id');
-    },
-
-    getExtensionType: function (record) {
-        if (this.isLegacyType(record.get('type'))) {
-            return 'legacy';
-        }
-
-        return null;
     },
 
     getGrid: function () {
@@ -82,11 +70,11 @@ pimcore.extensionmanager.admin = Class.create({
                 extend: 'Ext.data.Model',
                 fields: [
                     "id", "extensionId", "type", "name", "description", "installed", "installable", "uninstallable", "active",
-                    "configuration", "updateable", "canChangeState", "version", "priority", "environments"
+                    "configuration", "canChangeState", "version", "priority", "environments"
                 ],
                 proxy: {
                     type: 'ajax',
-                    url: '/admin/extensionmanager/admin/extensions',
+                    url: Routing.generate('pimcore_admin_extensionmanager_extensionmanager_getextensions'),
                     reader: {
                         type: 'json',
                         rootProperty: 'extensions'
@@ -121,7 +109,7 @@ pimcore.extensionmanager.admin = Class.create({
         this.store.load();
 
         var toolbar = Ext.create('Ext.Toolbar', {
-            cls: 'main-toolbar',
+            cls: 'pimcore_main_toolbar',
             items: [
                 {
                     text: t("refresh"),
@@ -139,7 +127,7 @@ pimcore.extensionmanager.admin = Class.create({
                                 self.panel.setLoading(true);
 
                                 Ext.Ajax.request({
-                                    url: '/admin/settings/clear-cache',
+                                    url: Routing.generate('pimcore_admin_settings_clearcache'),
                                     method: 'DELETE',
                                     params: {
                                         only_symfony_cache: true
@@ -265,13 +253,12 @@ pimcore.extensionmanager.admin = Class.create({
                         this.panel.setLoading(true);
 
                         Ext.Ajax.request({
-                            url: '/admin/extensionmanager/admin/toggle-extension-state',
+                            url: Routing.generate('pimcore_admin_extensionmanager_extensionmanager_toggleextensionstate'),
                             method: 'PUT',
                             params: {
                                 method: method,
                                 id: self.getExtensionId(rec),
-                                type: rec.get("type"),
-                                extensionType: self.getExtensionType(rec)
+                                type: rec.get("type")
                             },
                             success: handleSuccess,
                             failure: handleFailure
@@ -298,11 +285,11 @@ pimcore.extensionmanager.admin = Class.create({
                     handler: function (grid, rowIndex) {
                         var rec = grid.getStore().getAt(rowIndex);
 
-                        var method = false;
+                        var route = false;
                         if (rec.get('installable')) {
-                            method = 'install';
+                            route = 'pimcore_admin_extensionmanager_extensionmanager_install';
                         } else if (rec.get('uninstallable')) {
-                            method = 'uninstall';
+                            route = 'pimcore_admin_extensionmanager_extensionmanager_uninstall';
                         } else {
                             return;
                         }
@@ -310,54 +297,11 @@ pimcore.extensionmanager.admin = Class.create({
                         this.panel.setLoading(true);
 
                         Ext.Ajax.request({
-                            url: '/admin/extensionmanager/admin/' + method,
+                            url: Routing.generate(route),
                             method: 'POST',
                             params: {
                                 id: self.getExtensionId(rec),
-                                type: rec.get("type"),
-                                extensionType: self.getExtensionType(rec)
-                            },
-                            success: handleSuccess,
-                            failure: handleFailure
-                        });
-                    }.bind(this)
-                }]
-            },
-            {
-                text: t('update'),
-                menuText: t('update'),
-                xtype: 'actioncolumn',
-                width: 100,
-                items: [{
-                    tooltip: t('update'),
-                    getClass: function (v, meta, rec) {
-                        if (rec.get('updateable')) {
-                            return 'pimcore_action_column pimcore_icon_add';
-                        }
-
-                        return '';
-                    },
-                    handler: function (grid, rowIndex) {
-                        var rec = grid.getStore().getAt(rowIndex);
-
-                        // legacy types can't be updated
-                        if (self.isLegacyType(rec.get('type'))) {
-                            return;
-                        }
-
-                        if (!rec.get('updateable')) {
-                            return;
-                        }
-
-                        this.panel.setLoading(true);
-
-                        Ext.Ajax.request({
-                            url: '/admin/extensionmanager/admin/update',
-                            method: 'POST',
-                            params: {
-                                id: self.getExtensionId(rec),
-                                type: rec.get("type"),
-                                extensionType: self.getExtensionType(rec)
+                                type: rec.get("type")
                             },
                             success: handleSuccess,
                             failure: handleFailure
@@ -373,7 +317,6 @@ pimcore.extensionmanager.admin = Class.create({
                 items: [{
                     tooltip: t('configure'),
                     getClass: function (v, meta, rec) {
-                        var klass = "pimcore_action_column ";
                         if (rec.get('active') && rec.get('installed')) {
                             if (rec.get("configuration")) {
                                 return "pimcore_action_column pimcore_icon_edit";
@@ -384,7 +327,6 @@ pimcore.extensionmanager.admin = Class.create({
                     },
                     handler: function (grid, rowIndex) {
                         var rec = grid.getStore().getAt(rowIndex);
-                        var id = rec.get("id");
                         var type = rec.get("type");
 
                         var iframeSrc = rec.get("configuration");
@@ -470,7 +412,7 @@ pimcore.extensionmanager.admin = Class.create({
             maxHeight: 500,
             html: message,
             autoScroll: true,
-            bodyStyle: "padding: 10px; background:#fff;",
+            bodyStyle: "padding: 10px;",
             buttonAlign: "center",
             shadow: false,
             closable: false,

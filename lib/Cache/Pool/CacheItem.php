@@ -17,16 +17,20 @@ namespace Pimcore\Cache\Pool;
 use Cache\TagInterop\TaggableCacheItemInterface;
 use Pimcore\Cache\Pool\Exception\InvalidArgumentException;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
-class CacheItem implements PimcoreCacheItemInterface
+class CacheItem implements PimcoreCacheItemInterface, ItemInterface
 {
+    private const METADATA_EXPIRY_OFFSET = 1527506807;
     protected $key;
     protected $value;
     protected $isHit;
     protected $expiry;
     protected $defaultLifetime;
+    protected $metadata = [];
     protected $previousTags = [];
     protected $tags = [];
+    protected $newMetadata = [];
 
     /**
      * @param string $key
@@ -98,6 +102,44 @@ class CacheItem implements PimcoreCacheItemInterface
     /**
      * {@inheritdoc}
      */
+    public function tag($tags): ItemInterface
+    {
+        if (!isset($this->isTaggable) || !$this->isTaggable) {
+            throw new \LogicException(sprintf('Cache item "%s" comes from a non tag-aware pool: you cannot tag it.', $this->key));
+        }
+        if (!\is_iterable($tags)) {
+            $tags = [$tags];
+        }
+        foreach ($tags as $tag) {
+            if (!\is_string($tag)) {
+                throw new InvalidArgumentException(sprintf('Cache tag must be string, "%s" given', \is_object($tag) ? \get_class($tag) : \gettype($tag)));
+            }
+            if (isset($this->newMetadata[self::METADATA_TAGS][$tag])) {
+                continue;
+            }
+            if ('' === $tag) {
+                throw new InvalidArgumentException('Cache tag length must be greater than zero');
+            }
+            if (false !== strpbrk($tag, '{}()/\@:')) {
+                throw new InvalidArgumentException(sprintf('Cache tag "%s" contains reserved characters {}()/\@:', $tag));
+            }
+            $this->newMetadata[self::METADATA_TAGS][$tag] = $tag;
+        }
+
+        return $this;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getMetadata(): array
+    {
+        return $this->metadata;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public function expiresAt($expiration)
     {
         if (null === $expiration) {
@@ -145,7 +187,7 @@ class CacheItem implements PimcoreCacheItemInterface
      *
      * @param string[] $tags An array of tags
      *
-     * @throws \Psr\Cache\InvalidArgumentException When a tag is not valid.
+     * @throws InvalidArgumentException When a tag is not valid.
      *
      * @return TaggableCacheItemInterface
      */
@@ -229,10 +271,10 @@ class CacheItem implements PimcoreCacheItemInterface
      * @internal
      *
      * @param LoggerInterface $logger
-     * @param $message
+     * @param string $message
      * @param array $context
      */
-    public static function log(LoggerInterface $logger = null, $message, $context = [])
+    public static function log(LoggerInterface $logger, $message, $context = [])
     {
         if ($logger) {
             $logger->warning($message, $context);

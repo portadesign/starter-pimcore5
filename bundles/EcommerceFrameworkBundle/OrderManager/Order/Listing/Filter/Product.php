@@ -14,10 +14,10 @@
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\Order\Listing\Filter;
 
-use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\IOrderList;
-use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\IOrderListFilter;
+use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\OrderListFilterInterface;
+use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\OrderListInterface;
 
-class Product implements IOrderListFilter
+class Product implements OrderListFilterInterface
 {
     /**
      * @var \Pimcore\Model\DataObject\Concrete
@@ -33,14 +33,15 @@ class Product implements IOrderListFilter
     }
 
     /**
-     * @param IOrderList $orderList
+     * @param OrderListInterface $orderList
      *
-     * @return IOrderListFilter
+     * @return OrderListFilterInterface
      */
-    public function apply(IOrderList $orderList)
+    public function apply(OrderListInterface $orderList)
     {
+        $db = \Pimcore\Db::get();
         $ids = [
-            $this->product->getId()
+            $db->quote($this->product->getId())
         ];
 
         $variants = $this->product->getChildren([
@@ -49,10 +50,10 @@ class Product implements IOrderListFilter
 
         /** @var \Pimcore\Model\DataObject\Concrete $variant */
         foreach ($variants as $variant) {
-            $ids[] = $variant->getId();
+            $ids[] = $db->quote($variant->getId());
         }
 
-        $orderList->addCondition('orderItem.product__id IN (?)', $ids);
+        $orderList->addCondition('orderItem.product__id IN (' . implode(',', $ids) . ')');
 
         return $this;
     }

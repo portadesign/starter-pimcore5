@@ -49,7 +49,7 @@ class WorkflowController extends AdminController implements EventedControllerInt
     /**
      * Returns a JSON of the available workflow actions to the admin panel
      *
-     * @Route("/get-workflow-form")
+     * @Route("/get-workflow-form", name="pimcore_admin_workflow_getworkflowform")
      *
      * @param Request $request
      *
@@ -76,9 +76,6 @@ class WorkflowController extends AdminController implements EventedControllerInt
                 ];
 
                 $enabledTransitions = $workflow->getEnabledTransitions($this->element);
-                /**
-                 * @var Transition $transition
-                 */
                 $transition = null;
                 foreach ($enabledTransitions as $_transition) {
                     if ($_transition->getName() === $request->get('transitionName')) {
@@ -86,7 +83,7 @@ class WorkflowController extends AdminController implements EventedControllerInt
                     }
                 }
 
-                if (empty($transition)) {
+                if (!$transition instanceof Transition) {
                     $wfConfig['message'] = sprintf('transition %s currently not allowed', (string) $request->get('transitionName'));
                 } else {
                     $wfConfig['notes_required'] = $transition->getNotesCommentRequired();
@@ -101,7 +98,7 @@ class WorkflowController extends AdminController implements EventedControllerInt
     }
 
     /**
-     * @Route("/submit-workflow-transition", methods={"POST"})
+     * @Route("/submit-workflow-transition", name="pimcore_admin_workflow_submitworkflowtransition", methods={"POST"})
      *
      * @param Request $request
      *
@@ -153,7 +150,7 @@ class WorkflowController extends AdminController implements EventedControllerInt
     }
 
     /**
-     * @Route("/submit-global-action", methods={"POST"})
+     * @Route("/submit-global-action", name="pimcore_admin_workflow_submitglobal", methods={"POST"})
      *
      * @param Request $request
      *
@@ -199,7 +196,7 @@ class WorkflowController extends AdminController implements EventedControllerInt
     /**
      * Returns the JSON needed by the workflow elements detail tab store
      *
-     * @Route("/get-workflow-details")
+     * @Route("/get-workflow-details", name="pimcore_admin_workflow_getworkflowdetailsstore")
      *
      * @param Request $request
      * @param Manager $workflowManager
@@ -217,6 +214,7 @@ class WorkflowController extends AdminController implements EventedControllerInt
         foreach ($workflowManager->getAllWorkflowsForSubject($this->element) as $workflow) {
             $workflowConfig = $workflowManager->getWorkflowConfig($workflow->getName());
 
+            $svg = null;
             $msg = '';
             try {
                 $svg = $this->getWorkflowSvg($workflow);
@@ -277,6 +275,8 @@ class WorkflowController extends AdminController implements EventedControllerInt
     /**
      * @param Workflow $workflow
      *
+     * @return string
+     *
      * @throws \Exception
      */
     private function getWorkflowSvg(Workflow $workflow)
@@ -323,11 +323,11 @@ class WorkflowController extends AdminController implements EventedControllerInt
         }
 
         //TODO move this maybe to a service method, since this is also used in DataObjectController and DocumentControllers
-        if ($element instanceof Document) {
+        if ($element instanceof Document\PageSnippet) {
             $latestVersion = $element->getLatestVersion();
             if ($latestVersion) {
                 $latestDoc = $latestVersion->loadData();
-                if ($latestDoc instanceof Document) {
+                if ($latestDoc instanceof Document\PageSnippet) {
                     $element = $latestDoc;
                     $element->setModificationDate($element->getModificationDate());
                 }

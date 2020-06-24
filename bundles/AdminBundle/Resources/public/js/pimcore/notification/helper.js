@@ -13,12 +13,29 @@
 pimcore.registerNS("pimcore.notification.helper.x");
 
 pimcore.notification.helper.updateCount = function (count) {
+
+    var currentValue = Ext.get("notification_value").getHtml();
+    if(currentValue > count) {
+        return;
+    }
+
     if (count > 0) {
         Ext.get("notification_value").show();
         Ext.fly('notification_value').update(count);
     } else {
         Ext.get("notification_value").hide();
     }
+};
+
+pimcore.notification.helper.incrementCount = function () {
+    var value = Ext.get("notification_value").getHtml();
+    if(value) {
+        value++;
+    } else {
+        value = 1;
+    }
+
+    pimcore.notification.helper.updateCount(value);
 };
 
 pimcore.notification.helper.showNotifications = function (notifications) {
@@ -74,7 +91,7 @@ pimcore.notification.helper.showNotifications = function (notifications) {
 
 pimcore.notification.helper.markAsRead = function (id, callback) {
     Ext.Ajax.request({
-        url: "/admin/notification/mark-as-read?id=" + id,
+        url: Routing.generate('pimcore_admin_notification_markasread', {id: id}),
         success: function (response) {
             if (callback) {
                 callback();
@@ -95,7 +112,7 @@ pimcore.notification.helper.openLinkedElement = function (row) {
 
 pimcore.notification.helper.openDetails = function (id, callback) {
     Ext.Ajax.request({
-        url: "/admin/notification/find?id=" + id,
+        url: Routing.generate('pimcore_admin_notification_find', {id: id}),
         success: function (response) {
             response = Ext.decode(response.responseText);
             if (!response.success) {
@@ -124,13 +141,9 @@ pimcore.notification.helper.openDetailsWindow = function (id, title, message, ty
         scrollable: true,
         closable: true,
         maximizable: true,
-        bodyStyle: "background:#fff;",
         bodyPadding: "10px",
         autoClose: false,
         listeners: {
-            focusleave: function () {
-                this.close();
-            },
             afterrender: function () {
                 pimcore.notification.helper.markAsRead(id, callback);
             }
@@ -142,7 +155,7 @@ pimcore.notification.helper.openDetailsWindow = function (id, title, message, ty
 
 pimcore.notification.helper.delete = function (id, callback) {
     Ext.Ajax.request({
-        url: "/admin/notification/delete?id=" + id,
+        url: Routing.generate('pimcore_admin_notification_delete', {id: id}),
         success: function (response) {
             if (callback) {
                 callback();
@@ -153,7 +166,7 @@ pimcore.notification.helper.delete = function (id, callback) {
 
 pimcore.notification.helper.deleteAll = function (callback) {
     Ext.Ajax.request({
-        url: "/admin/notification/delete-all",
+        url: Routing.generate('pimcore_admin_notification_deleteall'),
         success: function (response) {
             if (callback) {
                 callback();
@@ -162,16 +175,26 @@ pimcore.notification.helper.deleteAll = function (callback) {
     });
 };
 
+pimcore.notification.helper.setLastUpdateTimestamp = function () {
+    this.lastUpdateTimestamp = parseInt(new Date().getTime() / 1000, 10);
+};
+pimcore.notification.helper.setLastUpdateTimestamp();
+
 pimcore.notification.helper.updateFromServer = function () {
     var user = pimcore.globalmanager.get("user");
-    if (user.isAllowed("notifications")) {
+    if (!document.hidden && user.isAllowed("notifications")) {
         Ext.Ajax.request({
-            url: "/admin/notification/find-last-unread?interval=" + 30,
+            url: Routing.generate('pimcore_admin_notification_findlastunread'),
+            params: {
+                lastUpdate: this.lastUpdateTimestamp
+            },
             success: function (response) {
                 var data = Ext.decode(response.responseText);
                 pimcore.notification.helper.updateCount(data.unread);
                 pimcore.notification.helper.showNotifications(data.data);
             }
         });
+
+        pimcore.notification.helper.setLastUpdateTimestamp();
     }
 };

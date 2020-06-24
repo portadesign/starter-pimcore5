@@ -64,7 +64,7 @@ pimcore.notification.panel = Class.create({
     getGrid: function () {
         var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize();
         this.store = pimcore.helpers.grid.buildDefaultStore(
-            '/admin/notification/find-all?',
+            Routing.generate('pimcore_admin_notification_findall'),
             ["id", "title", "sender", "date", "read"],
             itemsPerPage
         );
@@ -146,7 +146,7 @@ pimcore.notification.panel = Class.create({
         this.pagingtoolbar = pimcore.helpers.grid.buildDefaultPagingToolbar(this.store);
 
         var toolbar = Ext.create('Ext.Toolbar', {
-            cls: 'main-toolbar',
+            cls: 'pimcore_main_toolbar',
             items: [
                 {
                     text: t("delete_all"),

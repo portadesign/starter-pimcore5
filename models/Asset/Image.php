@@ -95,15 +95,49 @@ class Image extends Model\Asset
 
     protected function postPersistData()
     {
-        $this->detectFocalPoint();
+        if (!isset($this->customSettings['disableImageFeatureAutoDetection'])) {
+            $this->detectFaces();
+        }
+
+        if (!isset($this->customSettings['disableFocalPointDetection'])) {
+            $this->detectFocalPoint();
+        }
     }
 
     public function detectFocalPoint()
     {
+        if ($this->getCustomSetting('focalPointX') && $this->getCustomSetting('focalPointY')) {
+            return;
+        }
+
+        if ($faceCordintates = $this->getCustomSetting('faceCoordinates')) {
+            $xPoints = [];
+            $yPoints = [];
+
+            foreach ($faceCordintates as $fc) {
+                // focal point calculation
+                $xPoints[] = ($fc['x'] + $fc['x'] + $fc['width']) / 2;
+                $yPoints[] = ($fc['y'] + $fc['y'] + $fc['height']) / 2;
+            }
+
+            $focalPointX = array_sum($xPoints) / count($xPoints);
+            $focalPointY = array_sum($yPoints) / count($yPoints);
+
+            $this->setCustomSetting('focalPointX', $focalPointX);
+            $this->setCustomSetting('focalPointY', $focalPointY);
+        }
+    }
+
+    public function detectFaces()
+    {
+        if ($this->getCustomSetting('faceCoordinates')) {
+            return;
+        }
+
         $config = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['focal_point_detection'];
 
         if (!$config['enabled']) {
-            return false;
+            return;
         }
 
         $facedetectBin = \Pimcore\Tool\Console::getExecutable('facedetect');
@@ -117,8 +151,6 @@ class Image extends Model\Asset
             $result = \Pimcore\Tool\Console::exec($facedetectBin . ' ' . escapeshellarg($image));
             if (strpos($result, "\n")) {
                 $faces = explode("\n", trim($result));
-                $xPoints = [];
-                $yPoints = [];
 
                 foreach ($faces as $coordinates) {
                     list($x, $y, $width, $height) = explode(' ', $coordinates);
@@ -133,23 +165,11 @@ class Image extends Model\Asset
                         'x' => $Px,
                         'y' => $Py,
                         'width' => $Pw,
-                        'height' => $Ph
+                        'height' => $Ph,
                     ];
-
-                    // focal point calculation
-                    $xPoints[] = ($Px + $Px + $Pw) / 2;
-                    $yPoints[] = ($Py + + $Py + $Ph) / 2;
                 }
 
                 $this->setCustomSetting('faceCoordinates', $faceCoordinates);
-
-                if (!$this->getCustomSetting('focalPointX')) {
-                    $focalPointX = array_sum($xPoints) / count($xPoints);
-                    $focalPointY = array_sum($yPoints) / count($yPoints);
-
-                    $this->setCustomSetting('focalPointX', $focalPointX);
-                    $this->setCustomSetting('focalPointY', $focalPointY);
-                }
             }
         }
     }
@@ -164,6 +184,7 @@ class Image extends Model\Asset
     public function generateLowQualityPreview($generator = null)
     {
         $config = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['low_quality_image_preview'];
+        $sqipBin = null;
 
         if (!$config['enabled']) {
             return false;
@@ -249,7 +270,7 @@ EOT;
 
         $event = new GenericEvent($this, [
             'filesystemPath' => $fsPath,
-            'frontendPath' => $path
+            'frontendPath' => $path,
         ]);
         \Pimcore::getEventDispatcher()->dispatch(FrontendEvents::ASSET_IMAGE_THUMBNAIL, $event);
         $path = $event->getArgument('frontendPath');
@@ -269,6 +290,20 @@ EOT;
     }
 
     /**
+     * @return string|null
+     */
+    public function getLowQualityPreviewDataUri(): ?string
+    {
+        $file = $this->getLowQualityPreviewFileSystemPath();
+        $dataUri = null;
+        if (file_exists($file)) {
+            $dataUri = 'data:image/svg+xml;base64,' . base64_encode(file_get_contents($file));
+        }
+
+        return $dataUri;
+    }
+
+    /**
      * @inheritdoc
      */
     public function delete(bool $isNested = false)
@@ -282,16 +317,20 @@ EOT;
      */
     public function clearThumbnails($force = false)
     {
-        if ($this->getDataChanged() || $force) {
-            $files = glob($this->getImageThumbnailSavePath() . '/image-thumb__' . $this->getId() . '__*');
-            foreach ($files as $file) {
-                recursiveDelete($file);
+        if (($this->getDataChanged() || $force) && is_dir($this->getImageThumbnailSavePath())) {
+            $directoryIterator = new \DirectoryIterator($this->getImageThumbnailSavePath());
+            $filterIterator = new \CallbackFilterIterator($directoryIterator, function (\SplFileInfo $fileInfo) {
+                return strpos($fileInfo->getFilename(), 'image-thumb__' . $this->getId()) === 0;
+            });
+            /** @var \SplFileInfo $fileInfo */
+            foreach ($filterIterator as $fileInfo) {
+                recursiveDelete($fileInfo->getPathname());
             }
         }
     }
 
     /**
-     * @param $name
+     * @param string $name
      */
     public function clearThumbnail($name)
     {
@@ -304,9 +343,9 @@ EOT;
     /**
      * Legacy method for backwards compatibility. Use getThumbnail($config)->getConfig() instead.
      *
-     * @param mixed $config
+     * @param string|array|Image\Thumbnail\Config $config
      *
-     * @return Image\Thumbnail|bool
+     * @return Image\Thumbnail\Config
      */
     public function getThumbnailConfig($config)
     {
@@ -318,7 +357,7 @@ EOT;
     /**
      * Returns a path to a given thumbnail or an thumbnail configuration.
      *
-     * @param null $config
+     * @param string|array|Image\Thumbnail\Config $config
      * @param bool $deferred
      *
      * @return Image\Thumbnail
@@ -375,10 +414,10 @@ EOT;
     }
 
     /**
-     * @param null $path
+     * @param string|null $path
      * @param bool $force
      *
-     * @return array
+     * @return array|null
      *
      * @throws \Exception
      */
@@ -391,7 +430,7 @@ EOT;
             if ($width && $height) {
                 return [
                     'width' => $width,
-                    'height' => $height
+                    'height' => $height,
                 ];
             }
         }
@@ -405,10 +444,10 @@ EOT;
         //try to get the dimensions with getimagesize because it is much faster than e.g. the Imagick-Adapter
         if (is_readable($path)) {
             $imageSize = getimagesize($path);
-            if ($imageSize[0] && $imageSize[1]) {
+            if ($imageSize && $imageSize[0] && $imageSize[1]) {
                 $dimensions = [
                     'width' => $imageSize[0],
-                    'height' => $imageSize[1]
+                    'height' => $imageSize[1],
                 ];
             }
         }
@@ -418,12 +457,12 @@ EOT;
 
             $status = $image->load($path, ['preserveColor' => true, 'asset' => $this]);
             if ($status === false) {
-                return;
+                return null;
             }
 
             $dimensions = [
                 'width' => $image->getWidth(),
-                'height' => $image->getHeight()
+                'height' => $image->getHeight(),
             ];
         }
 
@@ -437,11 +476,20 @@ EOT;
                         // flip height & width
                         $dimensions = [
                             'width' => $dimensions['height'],
-                            'height' => $dimensions['width']
+                            'height' => $dimensions['width'],
                         ];
                     }
                 }
             }
+        }
+
+        if (($width = $dimensions['width']) && ($height = $dimensions['height'])) {
+            // persist dimensions to database
+            $this->setCustomSetting('imageDimensionsCalculated', true);
+            $this->setCustomSetting('imageWidth', $width);
+            $this->setCustomSetting('imageHeight', $height);
+            $this->getDao()->updateCustomSettings();
+            $this->clearDependentCache();
         }
 
         return $dimensions;

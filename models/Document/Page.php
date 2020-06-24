@@ -17,28 +17,15 @@
 
 namespace Pimcore\Model\Document;
 
-use Pimcore\Logger;
-use Pimcore\Model\Document\Targeting\TargetingDocumentInterface;
 use Pimcore\Model\Redirect;
 use Pimcore\Model\Site;
 use Pimcore\Model\Tool\Targeting\TargetGroup;
-use Pimcore\Tool\Frontend;
 
 /**
  * @method \Pimcore\Model\Document\Page\Dao getDao()
  */
 class Page extends TargetingDocument
 {
-    /**
-     * @deprecated Will be removed in Pimcore 6.
-     */
-    const PERSONA_ELEMENT_PREFIX_PREFIXPART = TargetingDocumentInterface::TARGET_GROUP_ELEMENT_PREFIX;
-
-    /**
-     * @deprecated Will be removed in Pimcore 6.
-     */
-    const PERSONA_ELEMENT_PREFIX_SUFFIXPART = TargetingDocumentInterface::TARGET_GROUP_ELEMENT_SUFFIX;
-
     /**
      * Contains the title of the page (meta-title)
      *
@@ -66,7 +53,7 @@ class Page extends TargetingDocument
     protected $type = 'page';
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $prettyUrl;
 
@@ -103,85 +90,11 @@ class Page extends TargetingDocument
     }
 
     /**
-     * @param array $params additional parameters (e.g. "versionNote" for the version note)
-     *
-     * @throws \Exception
-     */
-    protected function update($params = [])
-    {
-        $oldPath = $this->getDao()->getCurrentFullPath();
-
-        parent::update($params);
-
-        $config = \Pimcore\Config::getSystemConfig();
-        if ($oldPath && $config->documents->createredirectwhenmoved && $oldPath != $this->getRealFullPath()) {
-            // create redirect for old path
-            $redirect = new Redirect();
-            $redirect->setType(Redirect::TYPE_PATH);
-            $redirect->setRegex(true);
-            $redirect->setTarget($this->getId());
-            $redirect->setSource('@' . $oldPath . '/?@');
-            $redirect->setStatusCode(301);
-            $redirect->setExpiry(time() + 86400 * 60); // this entry is removed automatically after 60 days
-
-            $site = Frontend::getSiteForDocument($this);
-            if ($site) {
-                $redirect->setSourceSite($site->getId());
-                $oldPath = preg_replace('@^' . preg_quote($site->getRootPath()) . '@', '', $oldPath);
-                $redirect->setSource('@' . $oldPath . '/?@');
-            }
-
-            $redirect->save();
-        }
-    }
-
-    /**
-     * getProperty method should be used instead
-     *
-     * @deprecated
-     *
-     * @return string
-     */
-    public function getName()
-    {
-        return $this->getProperty('navigation_name');
-    }
-
-    /**
-     * setProperty method should be used instead
-     *
-     * @deprecated
-     *
-     * @param string $name
-     *
-     * @return $this
-     */
-    public function setName($name)
-    {
-        $this->setProperty('navigation_name', 'text', $name, false);
-
-        return $this;
-    }
-
-    /**
      * @return string
      */
     public function getDescription()
     {
         return $this->description;
-    }
-
-    /**
-     * @deprecated
-     *
-     * @return string
-     */
-    public function getKeywords()
-    {
-        // keywords are not supported anymore
-        Logger::info('getKeywords() is deprecated and will be removed in the future!');
-
-        return '';
     }
 
     /**
@@ -205,21 +118,6 @@ class Page extends TargetingDocument
     }
 
     /**
-     * @deprecated
-     *
-     * @param string $keywords
-     *
-     * @return $this
-     */
-    public function setKeywords($keywords)
-    {
-        // keywords are not supported anymore
-        Logger::info('setKeywords() is deprecated and will be removed in the future!');
-
-        return $this;
-    }
-
-    /**
      * @param string $title
      *
      * @return $this
@@ -232,7 +130,7 @@ class Page extends TargetingDocument
     }
 
     /**
-     * @param $metaData
+     * @param array $metaData
      *
      * @return $this
      */
@@ -251,9 +149,12 @@ class Page extends TargetingDocument
         return $this->metaData;
     }
 
-    public function getFullPath()
+    /**
+     * @inheritDoc
+     */
+    public function getFullPath(bool $force = false)
     {
-        $path = parent::getFullPath();
+        $path = parent::getFullPath($force);
 
         // do not use pretty url's when in admin, the current document is wrapped by a hardlink or this document isn't in the current site
         if (!\Pimcore::inAdmin() && !($this instanceof Hardlink\Wrapper\WrapperInterface) && \Pimcore\Tool\Frontend::isDocumentInCurrentSite($this)) {
@@ -268,7 +169,7 @@ class Page extends TargetingDocument
     }
 
     /**
-     * @param $prettyUrl
+     * @param string $prettyUrl
      *
      * @return $this
      */
@@ -283,7 +184,7 @@ class Page extends TargetingDocument
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getPrettyUrl()
     {
@@ -366,58 +267,6 @@ class Page extends TargetingDocument
         $targetGroups = array_filter($targetGroups);
 
         return $targetGroups;
-    }
-
-    /**
-     * @deprecated Use setTargetGroupIds instead. Will be removed in Pimcore 6.
-     *
-     * @param string $personas
-     */
-    public function setPersonas($personas)
-    {
-        $this->setTargetGroupIds((array)$personas);
-    }
-
-    /**
-     * @deprecated Use getTargetGroupIds instead. Will be removed in Pimcore 6.
-     *
-     * @return string
-     */
-    public function getPersonas()
-    {
-        return $this->getTargetGroupIds();
-    }
-
-    /**
-     * @deprecated Use getTargetGroupElementPrefix instead. Will be removed in Pimcore 6.
-     */
-    public function getPersonaElementPrefix($personaId = null)
-    {
-        return $this->getTargetGroupElementPrefix(null !== $personaId ? (int)$personaId : null);
-    }
-
-    /**
-     * @deprecated Use getTargetGroupElementName instead. Will be removed in Pimcore 6.
-     */
-    public function getPersonaElementName($name)
-    {
-        return $this->getTargetGroupElementName((string)$name);
-    }
-
-    /**
-     * @deprecated Use setUseTargetGroup instead. Will be removed in Pimcore 6.
-     */
-    public function setUsePersona($usePersona)
-    {
-        $this->setUseTargetGroup(null !== $usePersona ? (int)$usePersona : null);
-    }
-
-    /**
-     * @deprecated Use getUseTargetGroup instead. Will be removed in Pimcore 6.
-     */
-    public function getUsePersona()
-    {
-        return $this->getUseTargetGroup();
     }
 
     /**

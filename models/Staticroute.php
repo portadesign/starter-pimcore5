@@ -18,11 +18,12 @@
 namespace Pimcore\Model;
 
 use Pimcore\Event\FrontendEvents;
-use Pimcore\Logger;
 use Symfony\Component\EventDispatcher\GenericEvent;
 
 /**
- * @method \Pimcore\Model\Staticroute\Dao getDao()
+ * @method Staticroute\Dao getDao()
+ * @method void save()
+ * @method void delete()
  */
 class Staticroute extends AbstractModel
 {
@@ -77,14 +78,14 @@ class Staticroute extends AbstractModel
     public $siteId;
 
     /**
+     * @var array
+     */
+    public $methods;
+
+    /**
      * @var int
      */
     public $priority = 1;
-
-    /**
-     * @var bool
-     */
-    public $legacy = false;
 
     /**
      * @var int
@@ -121,7 +122,7 @@ class Staticroute extends AbstractModel
     /**
      * @static
      *
-     * @param $route
+     * @param Staticroute $route
      */
     public static function setCurrentRoute($route)
     {
@@ -141,7 +142,7 @@ class Staticroute extends AbstractModel
     /**
      * @param int $id
      *
-     * @return Staticroute
+     * @return self|null
      */
     public static function getById($id)
     {
@@ -159,8 +160,6 @@ class Staticroute extends AbstractModel
                 $route->getDao()->getById();
                 \Pimcore\Cache\Runtime::set($cacheKey, $route);
             } catch (\Exception $e) {
-                Logger::error($e);
-
                 return null;
             }
         }
@@ -170,9 +169,9 @@ class Staticroute extends AbstractModel
 
     /**
      * @param string $name
-     * @param null $siteId
+     * @param int|null $siteId
      *
-     * @return Staticroute
+     * @return self|null
      */
     public static function getByName($name, $siteId = null)
     {
@@ -189,8 +188,6 @@ class Staticroute extends AbstractModel
         try {
             $route->getDao()->getByName($name, $siteId);
         } catch (\Exception $e) {
-            Logger::warn($e);
-
             return null;
         }
 
@@ -201,10 +198,12 @@ class Staticroute extends AbstractModel
 
             return self::getById($route->getId());
         }
+
+        return null;
     }
 
     /**
-     * @return Staticroute
+     * @return self
      */
     public static function create()
     {
@@ -395,22 +394,6 @@ class Staticroute extends AbstractModel
     }
 
     /**
-     * @return bool
-     */
-    public function getLegacy()
-    {
-        return $this->legacy;
-    }
-
-    /**
-     * @param bool $legacy
-     */
-    public function setLegacy($legacy)
-    {
-        $this->legacy = (bool)$legacy;
-    }
-
-    /**
      * @param string $name
      *
      * @return $this
@@ -471,13 +454,9 @@ class Staticroute extends AbstractModel
             if ($siteId < 1) {
                 continue;
             }
-            try {
-                $site = Site::getById($siteId);
-                if ($site) {
-                    $result[] = $siteId;
-                }
-            } catch (\Exception $e) {
-                // cleanup
+
+            if ($site = Site::getById($siteId)) {
+                $result[] = $siteId;
             }
         }
 
@@ -723,7 +702,36 @@ class Staticroute extends AbstractModel
     }
 
     /**
-     * @param $modificationDate
+     * @return array
+     */
+    public function getMethods()
+    {
+        if ($this->methods && !is_array($this->methods)) {
+            $this->methods = explode(',', $this->methods);
+        }
+
+        return $this->methods;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return $this
+     */
+    public function setMethods($methods)
+    {
+        if (!is_array($methods)) {
+            $methods = strlen($methods) ? explode(',', $methods) : [];
+            $methods = array_map('trim', $methods);
+        }
+
+        $this->methods = $methods;
+
+        return $this;
+    }
+
+    /**
+     * @param int $modificationDate
      *
      * @return $this
      */
@@ -743,7 +751,7 @@ class Staticroute extends AbstractModel
     }
 
     /**
-     * @param $creationDate
+     * @param int $creationDate
      *
      * @return $this
      */

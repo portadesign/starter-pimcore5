@@ -20,6 +20,7 @@ namespace Pimcore\Model\Tool;
 use Pimcore\Model;
 
 /**
+ * @method \Pimcore\Model\Tool\Lock\Dao getById(string $key)
  * @method \Pimcore\Model\Tool\Lock\Dao getDao()
  */
 class Lock extends Model\AbstractModel
@@ -93,10 +94,10 @@ class Lock extends Model\AbstractModel
     }
 
     /**
-     * @param $key
+     * @param string $key
      * @param int $expire
      *
-     * @return mixed
+     * @return bool
      */
     public static function isLocked($key, $expire = 120)
     {
@@ -106,7 +107,7 @@ class Lock extends Model\AbstractModel
     }
 
     /**
-     * @param $key
+     * @param string $key
      *
      * @return Lock
      */

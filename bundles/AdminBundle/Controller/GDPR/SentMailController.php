@@ -43,8 +43,11 @@ class SentMailController extends \Pimcore\Bundle\AdminBundle\Controller\AdminCon
     }
 
     /**
+     * @Route("/export", name="pimcore_admin_gdpr_sentmail_exportdataobject", methods={"GET"})
+     *
      * @param Request $request
-     * @Route("/export", methods={"GET"})
+     *
+     * @return JsonResponse
      */
     public function exportDataObjectAction(Request $request)
     {

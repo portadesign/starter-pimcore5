@@ -15,13 +15,13 @@
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\Order;
 
 use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\AbstractOrderList;
-use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\IOrderList;
-use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\IOrderListFilter;
+use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\OrderListFilterInterface;
+use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\OrderListInterface;
 use Pimcore\Db;
 use Pimcore\Model\DataObject\OnlineShopOrder;
 use Pimcore\Model\DataObject\OnlineShopOrderItem;
 
-class Listing extends AbstractOrderList implements IOrderList
+class Listing extends AbstractOrderList implements OrderListInterface
 {
     /**
      * @var Db\ZendCompatibility\QueryBuilder
@@ -29,7 +29,7 @@ class Listing extends AbstractOrderList implements IOrderList
     protected $query;
 
     /**
-     * @var IOrderListFilter[]
+     * @var OrderListFilterInterface[]
      */
     protected $filter = [];
 
@@ -39,9 +39,14 @@ class Listing extends AbstractOrderList implements IOrderList
     protected $useSubItems = false;
 
     /**
+     * @var null|string[]
+     */
+    protected $availableFilterValues = null;
+
+    /**
      * @param string $type
      *
-     * @return IOrderList
+     * @return OrderListInterface
      */
     public function setListType($type)
     {
@@ -149,6 +154,25 @@ class Listing extends AbstractOrderList implements IOrderList
 
     /**
      * @return $this
+     *
+     */
+    public function joinPriceModifications()
+    {
+        $joins = $this->getQuery()->getPart(Db\ZendCompatibility\QueryBuilder::FROM);
+
+        if (!array_key_exists('OrderPriceModifications', $joins)) {
+            $this->getQuery()->joinLeft(
+                ['OrderPriceModifications' => 'object_collection_OrderPriceModifications_' . OnlineShopOrder::classId()],
+                'OrderPriceModifications.o_id = order.oo_id AND OrderPriceModifications.fieldname = "priceModifications"',
+                ''
+            );
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return $this
      */
     public function joinPaymentInfo()
     {
@@ -202,7 +226,7 @@ class Listing extends AbstractOrderList implements IOrderList
     }
 
     /**
-     * @param int $classId
+     * @param string $classId
      *
      * @return $this
      */
@@ -212,7 +236,7 @@ class Listing extends AbstractOrderList implements IOrderList
 
         if (!array_key_exists('product', $joins)) {
             $this->getQuery()->join(
-                ['product' => 'object_query_' . (int)$classId],
+                ['product' => 'object_query_' . $classId],
                 'product.oo_id = orderItem.product__id',
                 ''
             );
@@ -316,24 +340,28 @@ SUBQUERY
     }
 
     /**
-     * @param $field
+     * @param string $field
      *
      * @return $this
      */
     public function addSelectField($field)
     {
         $this->getQuery()->columns($field);
+
+        return $this;
     }
 
     /**
-     * @param IOrderListFilter $filter
+     * @param OrderListFilterInterface $filter
      *
      * @return $this
      */
-    public function addFilter(IOrderListFilter $filter)
+    public function addFilter(OrderListFilterInterface $filter)
     {
         $this->filter[] = $filter;
         $filter->apply($this);
+
+        return $this;
     }
 
     /**

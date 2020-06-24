@@ -58,7 +58,7 @@ pimcore.object.klass = Class.create({
                 autoSync: true,
                 proxy: {
                     type: 'ajax',
-                    url: '/admin/class/get-tree',
+                    url: Routing.generate('pimcore_admin_dataobject_class_gettree'),
                     reader: {
                         type: 'json'
 
@@ -86,6 +86,7 @@ pimcore.object.klass = Class.create({
                 listeners: this.getTreeNodeListeners(),
                 rootVisible: false,
                 tbar: {
+                    cls: 'pimcore_toolbar_border_bottom',
                     items: [
                         {
                             text: t("add"),
@@ -106,7 +107,7 @@ pimcore.object.klass = Class.create({
 
     suggestIdentifier: function() {
         Ext.Ajax.request({
-            url: "/admin/class/suggest-class-identifier",
+            url: Routing.generate('pimcore_admin_dataobject_class_suggestclassidentifier'),
             params: {
             },
             success: function (response) {
@@ -171,7 +172,7 @@ pimcore.object.klass = Class.create({
 
         if (id && id.length > 0) {
             Ext.Ajax.request({
-                url: "/admin/class/get",
+                url: Routing.generate('pimcore_admin_dataobject_class_get'),
                 params: {
                     id: id
                 },
@@ -276,16 +277,19 @@ pimcore.object.klass = Class.create({
 
     addClassComplete: function (className, classIdentifier, classes) {
 
-        var classNameRegresult = className.match(/[a-zA-Z][a-zA-Z0-9]+/);
+        var classNameRegresult = className.match(/[a-zA-Z][a-zA-Z0-9_]+/);
+        var underscoresRegresult = className.match(/^(query|store|relations)_[^_]+$/);
 
-        if (className.length <= 2 || classNameRegresult != className
+        if (className.length <= 2 || classNameRegresult != className ||underscoresRegresult
             || in_array(className.toLowerCase(), this.forbiddennames)) {
             Ext.Msg.alert(' ', t('invalid_class_name'));
             return false;
         }
 
-        var classIdentifierRegresult = classIdentifier.match(/[a-zA-Z0-9]+/);
-        if (classIdentifier.length < 1 || classIdentifierRegresult != classIdentifier) {
+        var classIdentifierRegresult = classIdentifier.match(/[a-zA-Z0-9][a-zA-Z0-9_]*/);
+        var underscoresRegresult = classIdentifier.match(/^(query|store|relations)_[^_]+$/);
+
+        if (classIdentifier.length < 1 || classIdentifierRegresult != classIdentifier || underscoresRegresult) {
             Ext.Msg.alert(' ', t('invalid_identifier'));
             return false;
         }
@@ -296,7 +300,7 @@ pimcore.object.klass = Class.create({
         }
 
         Ext.Ajax.request({
-            url: "/admin/class/add",
+            url: Routing.generate('pimcore_admin_dataobject_class_add'),
             method: "POST",
             params: {
                 className: className,
@@ -323,10 +327,10 @@ pimcore.object.klass = Class.create({
 
     deleteClass: function (tree, record) {
 
-        Ext.Msg.confirm(t('delete'), t('delete_message'), function (btn) {
+        Ext.Msg.confirm(t('delete'), sprintf(t('delete_class_message'), record.data.text), function (btn) {
             if (btn == 'yes') {
                 Ext.Ajax.request({
-                    url: "/admin/class/delete",
+                    url: Routing.generate('pimcore_admin_dataobject_class_delete'),
                     method: 'DELETE',
                     params: {
                         id: record.data.id

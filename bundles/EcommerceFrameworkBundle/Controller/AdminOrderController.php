@@ -14,26 +14,31 @@
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\Controller;
 
+use GuzzleHttp\ClientInterface;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
 use Pimcore\Bundle\AdminBundle\Security\User\TokenStorageUserResolver;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Factory;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\AbstractOrder;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\AbstractOrderItem;
-use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\IOrderManager;
 use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\Order\Listing\Filter\OrderDateTime;
 use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\Order\Listing\Filter\OrderSearch;
 use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\Order\Listing\Filter\ProductType;
-use Pimcore\Controller\Configuration\TemplatePhp;
+use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\OrderManagerInterface;
+use Pimcore\Cache;
 use Pimcore\Controller\EventedControllerInterface;
+use Pimcore\Controller\TemplateControllerInterface;
 use Pimcore\Controller\Traits\TemplateControllerTrait;
 use Pimcore\Localization\IntlFormatter;
+use Pimcore\Localization\LocaleServiceInterface;
 use Pimcore\Model\DataObject\AbstractObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data\ManyToOneRelation;
 use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\DataObject\Localizedfield;
 use Pimcore\Model\DataObject\OnlineShopOrder;
 use Pimcore\Model\DataObject\OnlineShopOrderItem;
 use Pimcore\Model\User;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
 use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
 use Symfony\Component\Routing\Annotation\Route;
@@ -44,12 +49,12 @@ use Zend\Paginator\Paginator;
  *
  * @Route("/admin-order")
  */
-class AdminOrderController extends AdminController implements EventedControllerInterface
+class AdminOrderController extends AdminController implements EventedControllerInterface, TemplateControllerInterface
 {
     use TemplateControllerTrait;
 
     /**
-     * @var IOrderManager
+     * @var OrderManagerInterface
      */
     protected $orderManager;
 
@@ -71,21 +76,27 @@ class AdminOrderController extends AdminController implements EventedControllerI
         Localizedfield::setGetFallbackValues(true);
 
         $this->orderManager = Factory::getInstance()->getOrderManager();
+
+        // enable view auto-rendering
+        $this->setViewAutoRender($event->getRequest(), true, 'twig');
     }
 
     /**
-     * @param FilterResponseEvent $event
+     * @inheritDoc
      */
     public function onKernelResponse(FilterResponseEvent $event)
     {
-        // nothing to do
     }
 
     /**
      * @Route("/list", name="pimcore_ecommerce_backend_admin-order_list", methods={"GET"})
-     * @TemplatePhp()
+     *
+     * @param Request $request
+     * @param IntlFormatter $formatter
+     *
+     * @return array
      */
-    public function listAction(Request $request)
+    public function listAction(Request $request, IntlFormatter $formatter)
     {
         // create new order list
         $list = $this->orderManager->createOrderList();
@@ -130,7 +141,7 @@ class AdminOrderController extends AdminController implements EventedControllerI
         if ($request->query->has('from') === false && $request->query->has('till') === false) {
             // als default, nehmen wir den ersten des aktuellen monats
             $from = new \DateTime('first day of this month');
-            $request->query->set('from', $from->format('d.m.Y'));
+            $request->query->set('from', $from->format('Y-m-d'));
         }
 
         $filterDate = new OrderDateTime();
@@ -150,6 +161,18 @@ class AdminOrderController extends AdminController implements EventedControllerI
         }
         $list->addFilter($filterDate);
 
+        if (!empty($request->get('pricingRule'))) {
+            $pricingRuleId = $request->get('pricingRule');
+
+            //apply filter on PricingRule(OrderItem)
+            $list->joinPricingRule();
+            $list->getQuery()->where('pricingRule.ruleId = ?', $pricingRuleId);
+
+            //apply filter on PriceModifications
+            $list->joinPriceModifications();
+            $list->getQuery()->orWhere('OrderPriceModifications.pricingRuleId = ?', $pricingRuleId);
+        }
+
         // set default order
         $list->setOrder('order.orderDate desc');
 
@@ -158,16 +181,31 @@ class AdminOrderController extends AdminController implements EventedControllerI
         $paginator->setItemCountPerPage(10);
         $paginator->setCurrentPageNumber($request->get('page', 1));
 
-        return ['paginator' => $paginator];
+        return [
+            'paginator' => $paginator,
+            'pimcoreUser' => \Pimcore\Tool\Admin::getCurrentUser(),
+            'listPricingRule' => new \Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\Rule\Listing(),
+            'defaultCurrency' => Factory::getInstance()->getEnvironment()->getDefaultCurrency(),
+            'formatter' => $formatter,
+        ];
     }
 
     /**
      * @Route("/detail", name="pimcore_ecommerce_backend_admin-order_detail", methods={"GET"})
-     * @TemplatePhp()
+     *
+     * @param Request $request
+     * @param ClientInterface $client
+     * @param IntlFormatter $formatter
+     * @param LocaleServiceInterface $localeService
+     *
+     * @return array
      */
-    public function detailAction(Request $request)
-    {
-        $dateFormatter = $this->get('pimcore.locale.intl_formatter');
+    public function detailAction(
+        Request $request,
+        ClientInterface $client,
+        IntlFormatter $formatter,
+        LocaleServiceInterface $localeService
+    ) {
         $pimcoreSymfonyConfig = $this->getParameter('pimcore.config');
 
         // init
@@ -180,7 +218,7 @@ class AdminOrderController extends AdminController implements EventedControllerI
          *
          * @return string
          */
-        $geoPoint = function (array $address) use ($pimcoreSymfonyConfig) {
+        $geoPoint = function (array $address) use ($pimcoreSymfonyConfig, $client) {
             $baseUrl = $pimcoreSymfonyConfig['maps']['geocoding_url_template'];
             $url = str_replace(
                 '{q}',
@@ -194,7 +232,6 @@ class AdminOrderController extends AdminController implements EventedControllerI
             );
 
             $json = null;
-            $client = \Pimcore::getContainer()->get('pimcore.http_client');
             try {
                 $response = $client->request('GET', $url);
                 if ($response->getStatusCode() < 300) {
@@ -210,21 +247,39 @@ class AdminOrderController extends AdminController implements EventedControllerI
             return $json;
         };
 
-        // get geo point
-        $geoAddressInvoice = $geoPoint([$order->getCustomerStreet(), $order->getCustomerZip(), $order->getCustomerCity(), $order->getCustomerCountry()]);
+        // get geo points
+        $invoiceAddressCacheKey = 'pimcore_order_invoice_address_' . $order->getId();
+        if (!$geoAddressInvoice = Cache::load($invoiceAddressCacheKey)) {
+            $geoAddressInvoice = $geoPoint([$order->getCustomerStreet(), $order->getCustomerZip(), $order->getCustomerCity(), $order->getCustomerCountry()]);
+            Cache::save(
+                $geoAddressInvoice,
+                $invoiceAddressCacheKey,
+                [ 'object_' . $order->getId() ]
+            );
+        }
+
+        $geoAddressDelivery = null;
         if ($order->getDeliveryStreet() && $order->getDeliveryZip()) {
-            $geoAddressDelivery = $geoPoint([$order->getDeliveryStreet(), $order->getDeliveryZip(), $order->getDeliveryCity(), $order->getDeliveryCountry()]);
+            $deliveryAddressCacheKey = 'pimcore_order_delivery_address_' . $order->getId();
+            if (!$geoAddressDelivery = Cache::load($deliveryAddressCacheKey)) {
+                $geoAddressDelivery = $geoPoint([$order->getDeliveryStreet(), $order->getDeliveryZip(), $order->getDeliveryCity(), $order->getDeliveryCountry()]);
+                Cache::save(
+                    $geoAddressDelivery,
+                    $deliveryAddressCacheKey,
+                    [ 'object_' . $order->getId() ]
+                );
+            }
         }
 
         // get customer info
+        $arrCustomerAccount = [];
         if ($order->getCustomer()) {
             // init
-            $arrCustomerAccount = [];
             $customer = $order->getCustomer();
 
             // register
             $register = \DateTime::createFromFormat('U', $order->getCreationDate());
-            $arrCustomerAccount['created'] = $dateFormatter->formatDateTime($register, IntlFormatter::DATE_MEDIUM);
+            $arrCustomerAccount['created'] = $formatter->formatDateTime($register, IntlFormatter::DATE_MEDIUM);
 
             // mail
             if (method_exists($customer, 'getEMail')) {
@@ -235,9 +290,10 @@ class AdminOrderController extends AdminController implements EventedControllerI
             $addOrderCount = function () use ($customer, &$arrCustomerAccount) {
                 $order = new OnlineShopOrder();
                 $field = $order->getClass()->getFieldDefinition('customer');
-                if ($field instanceof \Pimcore\Model\DataObject\ClassDefinition\Data\Href) {
-                    if (count($field->getClasses()) == 1) {
-                        $class = 'Pimcore\Model\DataObject\\' . reset($field->getClasses())['classes'];
+                if ($field instanceof ManyToOneRelation) {
+                    $classes = $field->getClasses();
+                    if (count($classes) === 1) {
+                        $class = 'Pimcore\Model\DataObject\\' . reset($classes)['classes'];
                         /* @var \Pimcore\Model\DataObject\Concrete $class */
 
                         $orderList = $this->orderManager->createOrderList();
@@ -254,17 +310,19 @@ class AdminOrderController extends AdminController implements EventedControllerI
 
         // create timeline
         $arrIcons = [
-            'itemChangeAmount' => 'glyphicon glyphicon-pencil', 'itemCancel' => 'glyphicon glyphicon-remove', 'itemComplaint' => 'glyphicon glyphicon-alert'
+            'itemChangeAmount' => 'fa fa-pen', 'itemCancel' => 'fa fa-times', 'itemComplaint' => 'fa fa-exclamation-triangle'
         ];
 
         $arrContext = [
-            'itemChangeAmount' => 'default', 'itemCancel' => 'danger', 'itemComplaint' => 'warning'
+            'itemChangeAmount' => 'secondary', 'itemCancel' => 'danger', 'itemComplaint' => 'warning'
         ];
 
         $arrTimeline = [];
         $date = new \DateTime();
         foreach ($orderAgent->getFullChangeLog() as $note) {
             /* @var \Pimcore\Model\Element\Note $note */
+
+            $quantity = null;
 
             // get avatar
             $user = User::getById($note->getUser());
@@ -273,7 +331,7 @@ class AdminOrderController extends AdminController implements EventedControllerI
 
             // group events
             $date->setTimestamp($note->getDate());
-            $group = $dateFormatter->formatDateTime($date, IntlFormatter::DATE_MEDIUM);
+            $group = $formatter->formatDateTime($date, IntlFormatter::DATE_MEDIUM);
 
             // load reference
             $reference = Concrete::getById($note->getCid());
@@ -282,25 +340,43 @@ class AdminOrderController extends AdminController implements EventedControllerI
                 : null
             ;
 
+            if (isset($note->getData()['quantity'])) {
+                $quantity = $note->getData()['quantity']['data'];
+            } elseif (isset($note->getData()['amount.new'])) {
+                $quantity = $note->getData()['amount.new']['data'];
+            }
+
             // add
             $arrTimeline[$group][] = [
-                'icon' => $arrIcons[$note->getTitle()], 'context' => $arrContext[$note->getTitle()] ?: 'default', 'type' => $note->getTitle(), 'date' => $dateFormatter->formatDateTime($date->setTimestamp($note->getDate()), IntlFormatter::DATETIME_MEDIUM), 'avatar' => $avatar, 'user' => $user ? $user->getName() : null, 'message' => $note->getData()['message']['data'], 'title' => $title ?: $note->getTitle()
+                'icon' => $arrIcons[$note->getTitle()],
+                'context' => $arrContext[$note->getTitle()] ?: 'default',
+                'type' => $note->getTitle(),
+                'date' => $formatter->formatDateTime($date->setTimestamp($note->getDate()), IntlFormatter::DATETIME_MEDIUM),
+                'avatar' => $avatar,
+                'user' => $user ? $user->getName() : null,
+                'message' => $note->getData()['message']['data'],
+                'title' => $title ?: $note->getTitle(),
+                'quantity' => $quantity
             ];
         }
 
         return [
+            'pimcoreUser' => \Pimcore\Tool\Admin::getCurrentUser(),
             'orderAgent' => $orderAgent,
             'timeLine' => $arrTimeline,
             'geoAddressInvoice' => $geoAddressInvoice,
             'arrCustomerAccount' => $arrCustomerAccount,
             'geoAddressDelivery' => $geoAddressDelivery,
-            'pimcoreSymfonyConfig' => $pimcoreSymfonyConfig
+            'pimcoreSymfonyConfig' => $pimcoreSymfonyConfig,
+            'formatter' => $formatter,
+            'locale' => $localeService,
         ];
     }
 
     /**
      * @Route("/item-cancel", name="pimcore_ecommerce_backend_admin-order_item-cancel", methods={"GET", "POST"})
-     * @TemplatePhp()
+     *
+     * @return array|Response
      */
     public function itemCancelAction(Request $request)
     {
@@ -332,7 +408,8 @@ class AdminOrderController extends AdminController implements EventedControllerI
 
     /**
      * @Route("/item-edit", name="pimcore_ecommerce_backend_admin-order_item-edit", methods={"GET", "POST"})
-     * @TemplatePhp()
+     *
+     * @return array|Response
      */
     public function itemEditAction(Request $request)
     {
@@ -363,7 +440,8 @@ class AdminOrderController extends AdminController implements EventedControllerI
 
     /**
      * @Route("/item-complaint", name="pimcore_ecommerce_backend_admin-order_item-complaint", methods={"GET", "POST"})
-     * @TemplatePhp()
+     *
+     * @return array|Response
      */
     public function itemComplaintAction(Request $request)
     {

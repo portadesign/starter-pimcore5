@@ -26,7 +26,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
 use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\Translation\TranslatorInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @Route("/portal")
@@ -50,7 +50,7 @@ class PortalController extends AdminController implements EventedControllerInter
 
     /**
      * @param Request $request
-     * @param $config
+     * @param array $config
      */
     protected function saveConfiguration(Request $request, $config)
     {
@@ -58,7 +58,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/dashboard-list", methods={"GET"})
+     * @Route("/dashboard-list", name="pimcore_admin_portal_dashboardlist", methods={"GET"})
      *
      * @param Request $request
      *
@@ -79,7 +79,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/create-dashboard", methods={"POST"})
+     * @Route("/create-dashboard", name="pimcore_admin_portal_createdashboard", methods={"POST"})
      *
      * @param Request $request
      *
@@ -102,7 +102,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/delete-dashboard", methods={"DELETE"})
+     * @Route("/delete-dashboard", name="pimcore_admin_portal_deletedashboard", methods={"DELETE"})
      *
      * @param Request $request
      *
@@ -117,7 +117,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/get-configuration", methods={"GET"})
+     * @Route("/get-configuration", name="pimcore_admin_portal_getconfiguration", methods={"GET"})
      *
      * @param Request $request
      *
@@ -129,7 +129,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/remove-widget", methods={"DELETE"})
+     * @Route("/remove-widget", name="pimcore_admin_portal_removewidget", methods={"DELETE"})
      *
      * @param Request $request
      *
@@ -157,7 +157,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/add-widget", methods={"POST"})
+     * @Route("/add-widget", name="pimcore_admin_portal_addwidget", methods={"POST"})
      *
      * @param Request $request
      *
@@ -183,7 +183,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/reorder-widget", methods={"PUT"})
+     * @Route("/reorder-widget", name="pimcore_admin_portal_reorderwidget", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -194,6 +194,7 @@ class PortalController extends AdminController implements EventedControllerInter
         $config = $this->getCurrentConfiguration($request);
         $newConfig = [[], []];
         $colCount = 0;
+        $toMove = null;
 
         foreach ($config['positions'] as $col) {
             foreach ($col as $row) {
@@ -215,7 +216,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/update-portlet-config", methods={"PUT"})
+     * @Route("/update-portlet-config", name="pimcore_admin_portal_updateportletconfig", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -242,7 +243,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/portlet-modified-documents", methods={"GET"})
+     * @Route("/portlet-modified-documents", name="pimcore_admin_portal_portletmodifieddocuments", methods={"GET"})
      *
      * @param Request $request
      *
@@ -278,7 +279,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/portlet-modified-assets", methods={"GET"})
+     * @Route("/portlet-modified-assets", name="pimcore_admin_portal_portletmodifiedassets", methods={"GET"})
      *
      * @param Request $request
      *
@@ -314,7 +315,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/portlet-modified-objects", methods={"GET"})
+     * @Route("/portlet-modified-objects", name="pimcore_admin_portal_portletmodifiedobjects", methods={"GET"})
      *
      * @param Request $request
      *
@@ -350,7 +351,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/portlet-modification-statistics", methods={"GET"})
+     * @Route("/portlet-modification-statistics", name="pimcore_admin_portal_portletmodificationstatistics", methods={"GET"})
      *
      * @param Request $request
      *
@@ -392,7 +393,7 @@ class PortalController extends AdminController implements EventedControllerInter
     }
 
     /**
-     * @Route("/portlet-analytics-sites", methods={"GET"})
+     * @Route("/portlet-analytics-sites", name="pimcore_admin_portal_portletanalyticssites", methods={"GET"})
      *
      * @param TranslatorInterface $translator
      * @param SiteConfigProvider $siteConfigProvider

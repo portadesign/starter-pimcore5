@@ -65,6 +65,7 @@ pimcore.settings.translation.word = Class.create({
         this.component = Ext.create('Ext.grid.Panel', {
             store: this.exportStore,
             autoHeight: true,
+            border: true,
             style: "margin-bottom: 10px",
             selModel: Ext.create('Ext.selection.RowModel', {}),
             columns: {
@@ -97,8 +98,8 @@ pimcore.settings.translation.word = Class.create({
             tbar: [
                 {
                     xtype: "tbspacer",
-                    width: 20,
-                    height: 16,
+                    width: 24,
+                    height: 24,
                     cls: "pimcore_icon_droptarget"
                 },
                 t("elements_to_export"),
@@ -238,7 +239,7 @@ pimcore.settings.translation.word = Class.create({
         }
 
         Ext.Ajax.request({
-            url: "/admin/translation/content-export-jobs",
+            url: Routing.generate('pimcore_admin_translation_contentexportjobs'),
             method: 'POST',
             params: {
                 source: this.exportSourceLanguageSelector.getValue(),
@@ -255,12 +256,12 @@ pimcore.settings.translation.word = Class.create({
                 this.exportProgressWin = new Ext.Window({
                     title: t("export"),
                     layout:'fit',
-                    width:500,
+                    width:200,
                     bodyStyle: "padding: 10px;",
                     closable:false,
                     plain: true,
-                    modal: true,
-                    items: [this.exportProgressbar]
+                    items: [this.exportProgressbar],
+                    listeners: pimcore.helpers.getProgressWindowListeners()
                 });
 
                 this.exportProgressWin.show();
@@ -275,7 +276,7 @@ pimcore.settings.translation.word = Class.create({
                         this.exportProgressbar = null;
                         this.exportProgressWin = null;
 
-                        pimcore.helpers.download('/admin/translation/word-export-download?id='+ id);
+                        pimcore.helpers.download(Routing.generate('pimcore_admin_translation_wordexportdownload', {id: id}));
                     }.bind(this, res.id),
                     update: function (currentStep, steps, percent) {
                         if(this.exportProgressbar) {

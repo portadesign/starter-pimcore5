@@ -55,7 +55,7 @@ pimcore.settings.httpErrorLog = Class.create({
     getGrid: function () {
 
         var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize();
-        var url = '/admin/misc/http-error-log?';
+        var url = Routing.generate('pimcore_admin_misc_httperrorlog');
 
         this.store = pimcore.helpers.grid.buildDefaultStore(
             url,
@@ -125,15 +125,16 @@ pimcore.settings.httpErrorLog = Class.create({
             listeners: {
                 "rowdblclick": function (grid, record, tr, rowIndex, e, eOpts ) {
                     var data = grid.getStore().getAt(rowIndex);
+                    var path = Routing.generate('pimcore_admin_misc_httperrorlogdetail', {
+                        uri: data.get("uri"),
+                    });
                     var win = new Ext.Window({
                         closable: true,
                         width: 810,
                         autoDestroy: true,
                         height: 430,
                         modal: true,
-                        bodyStyle: "background:#fff;",
-                        html: '<iframe src="/admin/misc/http-error-log-detail?uri=' + encodeURIComponent(data.get("uri"))
-                                + '" frameborder="0" width="100%" height="390"></iframe>'
+                        html: '<iframe src="' + path + '" frameborder="0" width="100%" height="390"></iframe>'
                     });
                     win.show();
                 }
@@ -141,42 +142,45 @@ pimcore.settings.httpErrorLog = Class.create({
             viewConfig: {
                 forceFit: true
             },
-            tbar: [{
-                text: t("refresh"),
-                iconCls: "pimcore_icon_reload",
-                handler: this.reload.bind(this)
-            }, "-",{
-                text: t("group_by_path"),
-                pressed: true,
-                iconCls: "pimcore_icon_groupby",
-                enableToggle: true,
-                handler: function (button) {
-                    this.store.getProxy().extraParams.group = button.pressed ? 1 : 0;
-                    this.store.load();
-                }.bind(this)
-            }, "-",{
-                text: t('flush'),
-                handler: function () {
-                    Ext.Ajax.request({
-                        url: "/admin/misc/http-error-log-flush",
-                        method: "DELETE",
-                        success: function () {
-                            var proxy = this.store.getProxy();
-                            proxy.extraParams.filter = this.filterField.getValue();
-                            this.store.load();
-                        }.bind(this)
-                    });
-                }.bind(this),
-                iconCls: "pimcore_icon_flush_recyclebin"
-            }, "-", {
-                text: t("errors_from_the_last_7_days"),
-                xtype: "tbtext"
-            }, '-',"->",{
-              text: t("filter") + "/" + t("search"),
-              xtype: "tbtext",
-              style: "margin: 0 10px 0 0;"
-            },
-            this.filterField]
+            tbar: {
+                cls: 'pimcore_main_toolbar',
+                items: [{
+                    text: t("refresh"),
+                    iconCls: "pimcore_icon_reload",
+                    handler: this.reload.bind(this)
+                }, "-",{
+                    text: t("group_by_path"),
+                    pressed: true,
+                    iconCls: "pimcore_icon_groupby",
+                    enableToggle: true,
+                    handler: function (button) {
+                        this.store.getProxy().extraParams.group = button.pressed ? 1 : 0;
+                        this.store.load();
+                    }.bind(this)
+                }, "-",{
+                    text: t('flush'),
+                    handler: function () {
+                        Ext.Ajax.request({
+                            url: Routing.generate('pimcore_admin_misc_httperrorlogflush'),
+                            method: "DELETE",
+                            success: function () {
+                                var proxy = this.store.getProxy();
+                                proxy.extraParams.filter = this.filterField.getValue();
+                                this.store.load();
+                            }.bind(this)
+                        });
+                    }.bind(this),
+                    iconCls: "pimcore_icon_flush_recyclebin"
+                }, "-", {
+                    text: t("errors_from_the_last_7_days"),
+                    xtype: "tbtext"
+                }, '-',"->",{
+                    text: t("filter") + "/" + t("search"),
+                    xtype: "tbtext",
+                    style: "margin: 0 10px 0 0;"
+                },
+                this.filterField]
+            }
         });
 
         return this.grid;

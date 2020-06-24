@@ -57,14 +57,41 @@ pimcore.object.classes.data.checkbox = Class.create(pimcore.object.classes.data.
     },
 
     getSpecificPanelItems: function (datax, inEncryptedField) {
+
+        var defaultValueData = [["empty", t("null")], [0, t("false")], [1, t("true")]];
+
+        var defaultField = new Ext.form.ComboBox({
+            mode: 'local',
+            autoSelect: true,
+            forceSelection: true,
+            editable: false,
+            fieldLabel: t("default_value"),
+            name: "defaultValue",
+            value: datax.defaultValue === null ? "empty" : datax.defaultValue,
+            store: new Ext.data.ArrayStore({
+                fields: [
+                    'id',
+                    'label'
+                ],
+                data: defaultValueData
+            }),
+            triggerAction: 'all',
+            valueField: 'id',
+            displayField: 'label',
+            disabled: this.isInCustomLayoutEditor()
+        });
+
         return [
+            defaultField,
             {
-                xtype: "checkbox",
-                fieldLabel: t("default_value"),
-                name: "defaultValue",
-                checked: datax.defaultValue,
-                disabled: this.isInCustomLayoutEditor()
-            }, {
+                xtype: 'textfield',
+                width: 600,
+                fieldLabel: t("default_value_generator"),
+                labelWidth: 140,
+                name: 'defaultValueGenerator',
+                value: datax.defaultValueGenerator
+            },
+            {
             xtype: "displayfield",
             hideLabel:true,
             html:'<span class="object_field_setting_warning">' +t('default_value_warning')+'</span>'
@@ -79,8 +106,8 @@ pimcore.object.classes.data.checkbox = Class.create(pimcore.object.classes.data.
             }
             Ext.apply(this.datax,
                 {
-                    defaultValue: source.datax.defaultValue
-
+                    defaultValue: source.datax.defaultValue,
+                    defaultValueGenerator: source.datax.defaultValueGenerator
                 });
         }
     }

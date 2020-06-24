@@ -124,7 +124,7 @@ pimcore.document.newsletters.sendingPanel = Class.create({
                     iconCls: "pimcore_icon_stop",
                     handler: function() {
                         Ext.Ajax.request({
-                            url: "/admin/newsletter/stop-send",
+                            url: Routing.generate('pimcore_admin_document_newsletter_stopsend'),
                             method: "POST",
                             params: {id: this.document.id}
                         });
@@ -138,7 +138,7 @@ pimcore.document.newsletters.sendingPanel = Class.create({
                 title: t('newsletter_sendingPanel'),
                 border: false,
                 autoScroll: true,
-                iconCls: "pimcore_icon_newsletter",
+                iconCls: "pimcore_material_icon_email pimcore_material_icon",
                 items: [
                     this.dirtyWarning,
                     {
@@ -171,8 +171,6 @@ pimcore.document.newsletters.sendingPanel = Class.create({
 
     send: function() {
 
-        var fieldValues = this.layout.getForm().getFieldValues();
-
         var params = {
             id: this.document.id,
             adapterParams: Ext.encode(this.currentSourceAdapter.getValues()),
@@ -180,7 +178,7 @@ pimcore.document.newsletters.sendingPanel = Class.create({
         };
 
         Ext.Ajax.request({
-            url: "/admin/newsletter/calculate",
+            url: Routing.generate('pimcore_admin_document_newsletter_calculate'),
             method: "post",
             params: params,
             success: function(response) {
@@ -188,11 +186,11 @@ pimcore.document.newsletters.sendingPanel = Class.create({
 
                 if(res.success) {
                     var msg = t("do_you_really_want_to_send_the_newsletter_to_all_recipients") + '.<br>' + t("recipients") + ': ' + res.count;
-                    Ext.MessageBox.confirm(t("are_you_sure"), msg, function (buttonValue, params) {
+                    Ext.MessageBox.confirm(t("are_you_sure"), msg, function (buttonValue) {
 
                         if (buttonValue == "yes") {
                             Ext.Ajax.request({
-                                url: "/admin/newsletter/send",
+                                url: Routing.generate('pimcore_admin_document_newsletter_send'),
                                 method: "post",
                                 params: params,
                                 success: function (response) {
@@ -220,7 +218,7 @@ pimcore.document.newsletters.sendingPanel = Class.create({
                     var message = (res.message ? res.message : t("newsletter_send_error"));
                     Ext.MessageBox.alert(t("error"), message)
                 }
-            }
+            }.bind(this)
         });
 
     },
@@ -237,7 +235,7 @@ pimcore.document.newsletters.sendingPanel = Class.create({
         };
 
         Ext.Ajax.request({
-            url: "/admin/newsletter/send-test",
+            url: Routing.generate('pimcore_admin_document_newsletter_sendtest'),
             method: "post",
             params: params,
             success: function(response) {
@@ -256,7 +254,7 @@ pimcore.document.newsletters.sendingPanel = Class.create({
 
     checkForActiveSendingProcess: function() {
         Ext.Ajax.request({
-            url: "/admin/newsletter/get-send-status",
+            url: Routing.generate('pimcore_admin_document_newsletter_getsendstatus'),
             params: {id: this.document.id},
             success: function(response) {
                 var result = Ext.decode(response.responseText);

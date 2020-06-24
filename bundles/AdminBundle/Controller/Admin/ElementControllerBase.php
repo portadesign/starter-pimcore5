@@ -30,12 +30,11 @@ use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\Element\Service;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
 
 class ElementControllerBase extends AdminController
 {
     /**
-     * @param $element
+     * @param ElementInterface $element
      *
      * @return array
      */
@@ -45,8 +44,6 @@ class ElementControllerBase extends AdminController
     }
 
     /**
-     * @Route("/tree-get-root", methods={"GET"})
-     *
      * @param Request $request
      *
      * @return JsonResponse
@@ -62,6 +59,7 @@ class ElementControllerBase extends AdminController
         }
 
         if (in_array($type, $allowedTypes)) {
+            /** @var Document|Asset|AbstractObject $root */
             $root = Service::getElementById($type, $id);
             if ($root->isAllowed('list')) {
                 return $this->adminJson($this->getTreeNodeConfig($root));
@@ -72,8 +70,6 @@ class ElementControllerBase extends AdminController
     }
 
     /**
-     * @Route("/delete-info", methods={"GET"})
-     *
      * @param Request $request
      *
      * @return JsonResponse
@@ -83,7 +79,6 @@ class ElementControllerBase extends AdminController
         $hasDependency = false;
         $errors = false;
         $deleteJobs = [];
-        $recycleJobs = [];
         $itemResults = [];
 
         $totalChilds = 0;
@@ -98,7 +93,10 @@ class ElementControllerBase extends AdminController
                 if (!$element) {
                     continue;
                 }
-                $hasDependency = $element->getDependencies()->isRequired();
+
+                if (!$hasDependency) {
+                    $hasDependency = $element->getDependencies()->isRequired();
+                }
             } catch (\Exception $e) {
                 Logger::err('failed to access element with id: ' . $id);
                 continue;
@@ -143,8 +141,8 @@ class ElementControllerBase extends AdminController
                     'allowed' => true,
                 ];
 
-                $recycleJobs[] = [[
-                    'url' => '/admin/recyclebin/add',
+                $deleteJobs[] = [[
+                    'url' => $this->generateUrl('pimcore_admin_recyclebin_add'),
                     'method' => 'POST',
                     'params' => [
                         'type' => $type,
@@ -157,7 +155,6 @@ class ElementControllerBase extends AdminController
                     $hasDependency = $hasChilds;
                 }
 
-                $childs = 0;
                 if ($hasChilds) {
                     // get amount of childs
                     $listClass = '\Pimcore\Model\\' . Service::getBaseClassNameForElement($element) . '\Listing';
@@ -171,7 +168,7 @@ class ElementControllerBase extends AdminController
                         $deleteObjectsPerRequest = 5;
                         for ($i = 0; $i < ceil($childs / $deleteObjectsPerRequest); $i++) {
                             $deleteJobs[] = [[
-                                'url' => '/admin/' . $type . '/delete',
+                                'url' => $this->get('router')->getContext()->getBaseUrl() . '/admin/' . $type . '/delete',
                                 'method' => 'DELETE',
                                 'params' => [
                                     'step' => $i,
@@ -186,7 +183,7 @@ class ElementControllerBase extends AdminController
 
                 // the asset itself is the last one
                 $deleteJobs[] = [[
-                    'url' => '/admin/' . $type . '/delete',
+                    'url' => $this->get('router')->getContext()->getBaseUrl() . '/admin/' . $type . '/delete',
                     'method' => 'DELETE',
                     'params' => [
                         'id' => $element->getId()
@@ -198,14 +195,12 @@ class ElementControllerBase extends AdminController
         // get the element key in case of just one
         $elementKey = false;
         if (count($ids) === 1) {
-            $element = Service::getElementById($type, $id)->getKey();
+            $element = Service::getElementById($type, $ids[0]);
 
             if ($element instanceof ElementInterface) {
                 $elementKey = $element->getKey();
             }
         }
-
-        $deleteJobs = array_merge($recycleJobs, $deleteJobs);
 
         return $this->adminJson([
             'hasDependencies' => $hasDependency,

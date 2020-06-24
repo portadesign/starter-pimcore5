@@ -14,10 +14,13 @@ pimcore.registerNS("pimcore.notification.modal");
 
 pimcore.notification.modal = Class.create({
 
-    initialize: function (object) {
+    initialize: function (elementData) {
         this.elementData = {};
 
         this.getWindow().show();
+        if(elementData) {
+            this.addDataBySharedElementData(elementData);
+        }
     },
 
     getWindow: function () {
@@ -25,7 +28,7 @@ pimcore.notification.modal = Class.create({
             var recipientStore = Ext.create("Ext.data.JsonStore", {
                 proxy: {
                     type: "ajax",
-                    url: "/admin/notification/recipients"
+                    url: Routing.generate('pimcore_admin_notification_recipients')
                 }
             });
             recipientStore.load();
@@ -65,7 +68,7 @@ pimcore.notification.modal = Class.create({
                     style: "margin-left: 5px",
                     handler: this.empty.bind(this)
                 }
-            ]
+            ];
             var elementContainer = Ext.create('Ext.form.FieldContainer', {
                 fieldLabel: t("attachment"),
                 labelWidth: 100,
@@ -117,7 +120,7 @@ pimcore.notification.modal = Class.create({
                 border: false,
                 frame: false,
                 bodyStyle: "padding:10px",
-                url: "/admin/notification/send",
+                url: Routing.generate('pimcore_admin_notification_send'),
                 items: items,
                 defaults: {labelWidth: 100},
                 collapsible: false,
@@ -226,11 +229,20 @@ pimcore.notification.modal = Class.create({
         this.component.setValue(data.fullpath);
     },
 
+    addDataBySharedElementData: function (elementData) {
+        this.elementData = elementData;
+        this.dataChanged = true;
+        this.component.removeCls("strikeThrough");
+        if (elementData.published === false) {
+            this.component.addCls("strikeThrough");
+        }
+        this.component.setValue(elementData.path);
+    },
+
     openSearchEditor: function () {
         var allowedTypes = ['object', 'asset', 'document'];
         var allowedSpecific = {};
         var allowedSubtypes = {};
-        var i;
 
         allowedSubtypes.object = ["object", "variant"];
 

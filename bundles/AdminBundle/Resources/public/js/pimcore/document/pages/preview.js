@@ -51,15 +51,16 @@ pimcore.document.pages.preview = Class.create({
                     handler: this.setMode.bind(this, {device: "phone", width: 375, height: 667})
                 },{
                     text: t("phone"),
-                    iconCls: "pimcore_icon_tv",
+                    iconCls: "pimcore_icon_mobile_landscape",
                     handler: this.setMode.bind(this, {device: "phone", width: 667, height: 375})
                 }, "-", {
                     text: t("qr_codes"),
                     iconCls: "pimcore_icon_qrcode",
                     handler: function () {
-                        var codeUrl = "/admin/reports/qrcode/code?documentId=" + this.page.id;
+                        var codeUrl = Routing.generate('pimcore_admin_reports_qrcode_code', {documentId: this.page.id});
+
                         var download = function () {
-                            var codeUrl = "/admin/reports/qrcode/code?documentId=" + this.page.id + "&download=true";
+                            var codeUrl = Routing.generate('pimcore_admin_reports_qrcode_code', {documentId: this.page.id, download: true});
                             pimcore.helpers.download(codeUrl);
                         };
 
@@ -174,7 +175,7 @@ pimcore.document.pages.preview = Class.create({
                 layout: "border",
                 tbar: tbar,
                 height: 200,
-                iconCls: "pimcore_icon_preview",
+                iconCls: "pimcore_material_icon_devices pimcore_material_icon",
                 bodyCls: "pimcore_preview_body",
                 items: [this.framePanel, this.timeSelectPanel]
             });

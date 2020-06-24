@@ -35,7 +35,7 @@ pimcore.asset.document = Class.create(pimcore.asset.asset, {
         }
 
         this.tagAssignment = new pimcore.element.tag.assignment(this, "asset");
-        this.metadata = new pimcore.asset.metadata(this);
+        this.metadata = new pimcore.asset.metadata.grid(this);
         this.workflows = new pimcore.element.workflows(this, "asset");
 
         this.getData();
@@ -95,16 +95,17 @@ pimcore.asset.document = Class.create(pimcore.asset.asset, {
 
         if (!this.editPanel) {
             var frameId = 'asset_document_edit_' + this.id;
+            var date = new Date();
 
             var content = '<iframe src="'
-                + pimcore.helpers.addCsrfTokenToUrl('/admin/asset/get-preview-document?id=' + this.id)
+                + Routing.generate('pimcore_admin_asset_getpreviewdocument', {id: this.id, '_dc': date.getTime()})
                 + '" frameborder="0" style="width: 100%;" id="' + frameId + '"></iframe>';
 
             this.editPanel = new Ext.Panel({
                 title: t("preview"),
                 bodyCls: "pimcore_overflow_scrolling",
                 html: content,
-                iconCls: "pimcore_icon_preview"
+                iconCls: "pimcore_material_icon_devices pimcore_material_icon"
             });
 
             this.editPanel.on("resize", function (el, width, height, rWidth, rHeight) {

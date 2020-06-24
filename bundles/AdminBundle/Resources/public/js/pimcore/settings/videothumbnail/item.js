@@ -85,12 +85,15 @@ pimcore.settings.videothumbnail.item = Class.create({
             title: this.data.name,
             id: "pimcore_videothumbnail_panel_" + this.data.name,
             labelWidth: 150,
+            defaults: {
+                renderer: Ext.util.Format.htmlEncode
+            },
             items: [{
                 xtype: "panel",
                 autoHeight: true,
                 border: false,
                 loader: {
-                    url: "/admin/settings/video-thumbnail-adapter-check",
+                    url: Routing.generate('pimcore_admin_settings_videothumbnailadaptercheck'),
                     autoLoad: true
                 }
             }, {
@@ -99,7 +102,7 @@ pimcore.settings.videothumbnail.item = Class.create({
                 value: this.data.name,
                 fieldLabel: t("name"),
                 width: 450,
-                disabled: true
+                readOnly: true
             }, {
                 xtype: "textarea",
                 name: "description",
@@ -184,7 +187,7 @@ pimcore.settings.videothumbnail.item = Class.create({
 
         var m = Ext.encode(this.panel.getForm().getFieldValues());
         Ext.Ajax.request({
-            url: "/admin/settings/video-thumbnail-update",
+            url: Routing.generate('pimcore_admin_settings_videothumbnailupdate'),
             method: "PUT",
             params: {
                 configuration: m,

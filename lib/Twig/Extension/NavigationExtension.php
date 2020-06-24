@@ -21,8 +21,10 @@ use Pimcore\Model\Document;
 use Pimcore\Navigation\Container;
 use Pimcore\Navigation\Renderer\RendererInterface;
 use Pimcore\Templating\Helper\Navigation;
+use Twig\Extension\AbstractExtension;
+use Twig\TwigFunction;
 
-class NavigationExtension extends \Twig_Extension
+class NavigationExtension extends AbstractExtension
 {
     /**
      * @var Navigation
@@ -40,11 +42,11 @@ class NavigationExtension extends \Twig_Extension
     public function getFunctions(): array
     {
         return [
-            new \Twig_Function('pimcore_build_nav', [$this, 'buildNavigation']),
-            new \Twig_Function('pimcore_render_nav', [$this, 'render'], [
+            new TwigFunction('pimcore_build_nav', [$this, 'buildNavigation']),
+            new TwigFunction('pimcore_render_nav', [$this, 'render'], [
                 'is_safe' => ['html']
             ]),
-            new \Twig_Function('pimcore_nav_renderer', [$this, 'getRenderer']),
+            new TwigFunction('pimcore_nav_renderer', [$this, 'getRenderer']),
         ];
     }
 
@@ -55,26 +57,34 @@ class NavigationExtension extends \Twig_Extension
      * with a callback, build the navigation externally, pass it to the
      * view and just call render through the extension.
      *
-     * @param Document $activeDocument
+     * @param mixed $params config array or active document (legacy mode)
      * @param Document|null $navigationRootDocument
      * @param string|null $htmlMenuPrefix
      * @param bool|string $cache
      *
      * @return Container
+     *
+     * @throws \Exception
      */
     public function buildNavigation(
-        Document $activeDocument,
+        $params = null,
         Document $navigationRootDocument = null,
         string $htmlMenuPrefix = null,
         $cache = true
     ): Container {
-        return $this->navigationHelper->buildNavigation(
-            $activeDocument,
-            $navigationRootDocument,
-            $htmlMenuPrefix,
-            null,
-            $cache
-        );
+        if (is_array($params)) {
+            // using param configuration
+            return $this->navigationHelper->build($params);
+        } else {
+            // using deprecated argument configuration ($params = navigation root document)
+            return $this->navigationHelper->buildNavigation(
+                $params,
+                $navigationRootDocument,
+                $htmlMenuPrefix,
+                null,
+                $cache
+            );
+        }
     }
 
     /**
@@ -95,7 +105,7 @@ class NavigationExtension extends \Twig_Extension
      * @param Container $container
      * @param string $rendererName
      * @param string|null $renderMethod     Optional render method to use (e.g. menu -> renderMenu)
-     * @param array $rendererArguments      Option arguments to pass to the render method after the container
+     * @param array<int, mixed> $rendererArguments      Option arguments to pass to the render method after the container
      *
      * @return string
      */

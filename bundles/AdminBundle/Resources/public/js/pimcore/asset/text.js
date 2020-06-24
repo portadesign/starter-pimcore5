@@ -35,7 +35,7 @@ pimcore.asset.text = Class.create(pimcore.asset.asset, {
         }
 
         this.tagAssignment = new pimcore.element.tag.assignment(this, "asset");
-        this.metadata = new pimcore.asset.metadata(this);
+        this.metadata = new pimcore.asset.metadata.grid(this);
         this.workflows = new pimcore.element.workflows(this, "asset");
 
         this.getData();
@@ -114,7 +114,7 @@ pimcore.asset.text = Class.create(pimcore.asset.asset, {
                     title: t("preview"),
                     html: t("preview_not_available"),
                     bodyCls: "pimcore_panel_body_centered",
-                    iconCls: "pimcore_icon_preview"
+                    iconCls: "pimcore_material_icon_devices pimcore_material_icon"
                 });
             }
         }

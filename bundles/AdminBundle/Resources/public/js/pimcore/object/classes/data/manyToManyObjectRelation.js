@@ -32,10 +32,6 @@ pimcore.object.classes.data.manyToManyObjectRelation = Class.create(pimcore.obje
 
         this.initData(initData);
 
-        if (typeof this.datax.lazyLoading == "undefined") {
-            this.datax.lazyLoading = true;
-        }
-
         pimcore.helpers.sanitizeAllowedTypes(this.datax, "classes");
 
         // overwrite default settings
@@ -54,7 +50,7 @@ pimcore.object.classes.data.manyToManyObjectRelation = Class.create(pimcore.obje
     },
 
     getIconClass: function () {
-        return "pimcore_icon_objects";
+        return "pimcore_icon_manyToManyObjectRelation";
     },
 
     getLayout: function ($super) {
@@ -86,27 +82,6 @@ pimcore.object.classes.data.manyToManyObjectRelation = Class.create(pimcore.obje
                 minValue: 0
             },
             {
-                xtype: "checkbox",
-                fieldLabel: t("lazy_loading"),
-                name: "lazyLoading",
-                checked: this.datax.lazyLoading && !this.lazyLoadingNotPossible(),
-                disabled: this.isInCustomLayoutEditor() || this.lazyLoadingNotPossible()
-            },
-            {
-                xtype: "displayfield",
-                hideLabel: true,
-                value: t('lazy_loading_description'),
-                cls: "pimcore_extra_label_bottom",
-                style: "padding-bottom:0;"
-            },
-            {
-                xtype: "displayfield",
-                hideLabel: true,
-                value: t('lazy_loading_warning_block'),
-                cls: "pimcore_extra_label_bottom",
-                style: "color:red; font-weight: bold;"
-            },
-            {
                 xtype: 'textfield',
                 width: 600,
                 fieldLabel: t("path_formatter_service"),
@@ -129,7 +104,7 @@ pimcore.object.classes.data.manyToManyObjectRelation = Class.create(pimcore.obje
         var classesStore = new Ext.data.Store({
             proxy: {
                 type: 'ajax',
-                url: '/admin/class/get-tree'
+                url: Routing.generate('pimcore_admin_dataobject_class_gettree')
             },
             autoDestroy: true,
             fields: ["text"]
@@ -167,7 +142,7 @@ pimcore.object.classes.data.manyToManyObjectRelation = Class.create(pimcore.obje
         this.fieldStore = new Ext.data.Store({
             proxy: {
                 type: 'ajax',
-                url: '/admin/object-helper/get-available-visible-vields',
+                url: Routing.generate('pimcore_admin_dataobject_dataobjecthelper_getavailablevisiblefields'),
                 extraParams: {
                     // no_brick_columns: "true",
                     // gridtype: 'all',
@@ -207,6 +182,12 @@ pimcore.object.classes.data.manyToManyObjectRelation = Class.create(pimcore.obje
         if(this.context == 'class') {
             this.specificPanel.add({
                 xtype: "checkbox",
+                boxLabel: t("allow_to_create_new_object"),
+                name: "allowToCreateNewObject",
+                value: this.datax.allowToCreateNewObject
+            });
+            this.specificPanel.add({
+                xtype: "checkbox",
                 boxLabel: t("enable_admin_async_load"),
                 name: "optimizedAdminLoading",
                 value: this.datax.optimizedAdminLoading
@@ -234,13 +215,16 @@ pimcore.object.classes.data.manyToManyObjectRelation = Class.create(pimcore.obje
                     maxItems: source.datax.maxItems,
                     relationType: source.datax.relationType,
                     remoteOwner: source.datax.remoteOwner,
-                    lazyLoading: source.datax.lazyLoading,
-                    classes: source.datax.classes
+                    classes: source.datax.classes,
+                    visibleFields: source.datax.visibleFields,
+                    optimizedAdminLoading: source.datax.optimizedAdminLoading,
+                    pathFormatterClass: source.datax.pathFormatterClass,
+                    allowToCreateNewObject: source.datax.allowToCreateNewObject
                 });
         }
     }
 
 });
 
-// @TODO BC layer, to be removed in v6.0
+// @TODO BC layer, to be removed in v7.0
 pimcore.object.classes.data.objects = pimcore.object.classes.data.manyToManyObjectRelation;

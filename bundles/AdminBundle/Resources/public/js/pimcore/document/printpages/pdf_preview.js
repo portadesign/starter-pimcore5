@@ -33,7 +33,7 @@ pimcore.document.printpages.pdfpreview = Class.create({
 
             this.generateButton = new Ext.Button({
                 text: t("web2print_generate_pdf"),
-                iconCls: "pimcore_icon_pdf",
+                iconCls: "pimcore_material_icon_pdf pimcore_material_icon",
                 style: "float: right;  margin-top: 10px",
                 disabled: !this.page.data.published,
                 handler: this.generatePdf.bind(this)
@@ -59,7 +59,7 @@ pimcore.document.printpages.pdfpreview = Class.create({
                     iconCls: "pimcore_icon_cancel",
                     handler: function() {
                         Ext.Ajax.request({
-                            url: "/admin/printpage/cancel-generation",
+                            url: Routing.generate('pimcore_admin_document_printpage_cancelgeneration'),
                             method: 'DELETE',
                             params: {id: this.page.id},
                             success: function(response) {
@@ -89,7 +89,8 @@ pimcore.document.printpages.pdfpreview = Class.create({
                 style: "float: right; margin-top: 10px",
                 handler: function () {
                     var date = new Date();
-                    pimcore.helpers.download("/admin/printpage/pdf-download?download=1&id=" + this.page.id + "&time=" + date.getTime());
+                    var url = Routing.generate('pimcore_admin_document_printpage_pdfdownload', {id: this.page.id, download: 1, time: date.getTime()});
+                    pimcore.helpers.download(url);
                 }.bind(this)
             });
             this.generatedDateField = new Ext.form.TextField({
@@ -127,7 +128,7 @@ pimcore.document.printpages.pdfpreview = Class.create({
                 title: t('web2print_preview_pdf'),
                 layout: "border",
                 autoScroll: false,
-                iconCls: "pimcore_icon_pdf",
+                iconCls: "pimcore_material_icon_pdf pimcore_material_icon",
                 items: [{
                     region: "center",
                     hideMode: "offsets",
@@ -150,9 +151,7 @@ pimcore.document.printpages.pdfpreview = Class.create({
             this.layout.on("resize", this.onLayoutResize.bind(this));
             this.layout.on("activate", this.refresh.bind(this));
             this.layout.on("afterrender", function () {
-
-                // unfortunately we have to do this in jQuery, because Ext doesn'T offer this functionality
-                jQuery("#" + this.iframeName).on("load", function () {
+                Ext.get(this.iframeName).on('load', function() {
                     // this is to hide the mask if edit/startup.js isn't executed (eg. in case an error is shown)
                     // otherwise edit/startup.js will disable the loading mask
                     if(!this["frame"]) {
@@ -176,7 +175,7 @@ pimcore.document.printpages.pdfpreview = Class.create({
 
         this.processingOptionsStore = new Ext.data.JsonStore({
             proxy: {
-                url: '/admin/printpage/get-processing-options',
+                url: Routing.generate('pimcore_admin_document_printcontainer_getprocessingoptions'),
                 type: 'ajax',
                 reader: {
                     type: 'json',
@@ -342,9 +341,9 @@ pimcore.document.printpages.pdfpreview = Class.create({
         params.id = this.page.id;
 
         Ext.Ajax.request({
-            url: "/admin/printpage/start-pdf-generation",
+            url: Routing.generate('pimcore_admin_document_printpage_startpdfgeneration'),
             method: 'POST',
-            params: params,
+            jsonData: params,
             success: function(response) {
                 result = Ext.decode(response.responseText);
                 if(result.success) {
@@ -373,8 +372,7 @@ pimcore.document.printpages.pdfpreview = Class.create({
 
     loadCurrentPreview: function () {
         var date = new Date();
-        var url = "/admin/printpage/pdf-download?id=" + this.page.id + "&time=" + date.getTime();
-        url = pimcore.helpers.addCsrfTokenToUrl(url);
+        var url = Routing.generate('pimcore_admin_document_printpage_pdfdownload', {id: this.page.id, time: date.getTime()});
 
         try {
             Ext.get(this.iframeName).dom.src = url;
@@ -394,7 +392,7 @@ pimcore.document.printpages.pdfpreview = Class.create({
 
     checkForActiveGenerateProcess: function() {
         Ext.Ajax.request({
-            url: "/admin/printpage/active-generate-process",
+            url: Routing.generate('pimcore_admin_document_printpage_activegenerateprocess'),
             method: 'POST',
             params: {id: this.page.id},
             success: function(response) {
@@ -432,7 +430,7 @@ pimcore.document.printpages.pdfpreview = Class.create({
 
     checkPdfDirtyState: function() {
         Ext.Ajax.request({
-            url: "/admin/printpage/check-pdf-dirty",
+            url: Routing.generate('pimcore_admin_document_printpage_checkpdfdirty'),
             params: {id: this.page.id},
             success: function(response) {
                 result = Ext.decode(response.responseText);

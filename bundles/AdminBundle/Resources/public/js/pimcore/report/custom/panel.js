@@ -39,7 +39,7 @@ pimcore.report.custom.panel = Class.create({
                 autoSync: true,
                 proxy: {
                     type: 'ajax',
-                    url: '/admin/reports/custom-report/tree',
+                    url: Routing.generate('pimcore_admin_reports_customreport_tree'),
                     reader: {
                         type: 'json'
                     }
@@ -64,6 +64,7 @@ pimcore.report.custom.panel = Class.create({
                 rootVisible: false,
                 listeners: this.getTreeNodeListeners(),
                 tbar: {
+                    cls: 'pimcore_toolbar_border_bottom',
                     items: [
                         {
                             text: t("add"),
@@ -120,7 +121,7 @@ pimcore.report.custom.panel = Class.create({
         }
 
         Ext.Ajax.request({
-            url: "/admin/reports/custom-report/get",
+            url: Routing.generate('pimcore_admin_reports_customreport_get'),
             params: {
                 name: id
             },
@@ -174,7 +175,7 @@ pimcore.report.custom.panel = Class.create({
             }
 
             Ext.Ajax.request({
-                url: "/admin/reports/custom-report/add",
+                url: Routing.generate('pimcore_admin_reports_customreport_add'),
                 method: 'POST',
                 params: {
                     name: value
@@ -204,7 +205,7 @@ pimcore.report.custom.panel = Class.create({
 
     deleteField: function (tree, record) {
         Ext.Ajax.request({
-            url: "/admin/reports/custom-report/delete",
+            url: Routing.generate('pimcore_admin_reports_customreport_delete'),
             method: 'DELETE',
             params: {
                 name: record.data.id
@@ -224,7 +225,7 @@ pimcore.report.custom.panel = Class.create({
     doCloneField: function (tree, record, button, value) {
         if (button == "ok") {
             Ext.Ajax.request({
-                url: "/admin/reports/custom-report/clone",
+                url: Routing.generate('pimcore_admin_reports_customreport_clone'),
                 method: 'POST',
                 params: {
                     name: record.data.id,

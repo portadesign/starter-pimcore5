@@ -29,7 +29,7 @@ use Symfony\Component\Routing\Annotation\Route;
 class TagsController extends AdminController
 {
     /**
-     * @Route("/add", methods={"POST"})
+     * @Route("/add", name="pimcore_admin_tags_add", methods={"POST"})
      *
      * @param Request $request
      *
@@ -46,7 +46,7 @@ class TagsController extends AdminController
     }
 
     /**
-     * @Route("/delete", methods={"DELETE"})
+     * @Route("/delete", name="pimcore_admin_tags_delete", methods={"DELETE"})
      *
      * @param Request $request
      *
@@ -67,7 +67,7 @@ class TagsController extends AdminController
     }
 
     /**
-     * @Route("/update", methods={"PUT"})
+     * @Route("/update", name="pimcore_admin_tags_update", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -96,7 +96,7 @@ class TagsController extends AdminController
     }
 
     /**
-     * @Route("/tree-get-children-by-id", methods={"GET"})
+     * @Route("/tree-get-children-by-id", name="pimcore_admin_tags_treegetchildrenbyid", methods={"GET"})
      *
      * @param Request $request
      *
@@ -108,6 +108,7 @@ class TagsController extends AdminController
         $assginmentCId = intval($request->get('assignmentCId'));
         $assginmentCType = strip_tags($request->get('assignmentCType'));
 
+        $recursiveChildren = false;
         $assignedTagIds = [];
         if ($assginmentCId && $assginmentCType) {
             $assignedTags = Tag::getTagsForElement($assginmentCType, $assginmentCId);
@@ -125,9 +126,29 @@ class TagsController extends AdminController
         }
         $tagList->setOrderKey('name');
 
+        if (!empty($request->get('filter'))) {
+            $filterIds = [0];
+            $filterTagList = new Tag\Listing();
+            $filterTagList->setCondition('`name` LIKE '. $filterTagList->quote('%'. $request->get('filter') .'%'));
+            foreach ($filterTagList->load() as $filterTag) {
+                if ($parentId = $filterTag->getParentId() == 0) {
+                    $filterIds[] = $filterTag->getId();
+                } else {
+                    $ids = explode('/', $filterTag->getIdPath());
+                    if (isset($ids[1])) {
+                        $filterIds[] = intval($ids[1]);
+                    }
+                }
+            }
+
+            $filterIds = array_unique(array_values($filterIds));
+            $tagList->setCondition('id IN('.implode(',', $filterIds).')');
+            $recursiveChildren = true;
+        }
+
         $tags = [];
         foreach ($tagList->load() as $tag) {
-            $tags[] = $this->convertTagToArray($tag, $showSelection, $assignedTagIds, true);
+            $tags[] = $this->convertTagToArray($tag, $showSelection, $assignedTagIds, true, $recursiveChildren);
         }
 
         return $this->adminJson($tags);
@@ -135,13 +156,14 @@ class TagsController extends AdminController
 
     /**
      * @param Tag $tag
-     * @param $showSelection
-     * @param $assignedTagIds
+     * @param bool $showSelection
+     * @param array $assignedTagIds
      * @param bool $loadChildren
+     * @param bool $recursiveChildren
      *
      * @return array
      */
-    protected function convertTagToArray(Tag $tag, $showSelection, $assignedTagIds, $loadChildren = false)
+    protected function convertTagToArray(Tag $tag, $showSelection, $assignedTagIds, $loadChildren = false, $recursiveChildren = false)
     {
         $tagArray = [
             'id' => $tag->getId(),
@@ -161,8 +183,9 @@ class TagsController extends AdminController
 
         if ($loadChildren) {
             $children = $tag->getChildren();
+            $loadChildren = $recursiveChildren ?? false;
             foreach ($children as $child) {
-                $tagArray['children'][] = $this->convertTagToArray($child, $showSelection, $assignedTagIds);
+                $tagArray['children'][] = $this->convertTagToArray($child, $showSelection, $assignedTagIds, $loadChildren, $recursiveChildren);
             }
         }
 
@@ -170,7 +193,7 @@ class TagsController extends AdminController
     }
 
     /**
-     * @Route("/load-tags-for-element", methods={"GET"})
+     * @Route("/load-tags-for-element", name="pimcore_admin_tags_loadtagsforelement", methods={"GET"})
      *
      * @param Request $request
      *
@@ -194,7 +217,7 @@ class TagsController extends AdminController
     }
 
     /**
-     * @Route("/add-tag-to-element", methods={"PUT"})
+     * @Route("/add-tag-to-element", name="pimcore_admin_tags_addtagtoelement", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -217,7 +240,7 @@ class TagsController extends AdminController
     }
 
     /**
-     * @Route("/remove-tag-from-element", methods={"DELETE"})
+     * @Route("/remove-tag-from-element", name="pimcore_admin_tags_removetagfromelement", methods={"DELETE"})
      *
      * @param Request $request
      *
@@ -240,7 +263,7 @@ class TagsController extends AdminController
     }
 
     /**
-     * @Route("/get-batch-assignment-jobs", methods={"GET"})
+     * @Route("/get-batch-assignment-jobs", name="pimcore_admin_tags_getbatchassignmentjobs", methods={"GET"})
      *
      * @param Request $request
      * @param EventDispatcherInterface $eventDispatcher
@@ -311,6 +334,7 @@ class TagsController extends AdminController
             'context' => []
         ]);
         $eventDispatcher->dispatch(AdminEvents::OBJECT_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+        /** @var \Pimcore\Model\DataObject\Listing $childsList */
         $childsList = $beforeListLoadEvent->getArgument('list');
 
         return $childsList->loadIdList();
@@ -342,6 +366,7 @@ class TagsController extends AdminController
             'context' => []
         ]);
         $eventDispatcher->dispatch(AdminEvents::ASSET_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+        /** @var \Pimcore\Model\Asset\Listing $childsList */
         $childsList = $beforeListLoadEvent->getArgument('list');
 
         return $childsList->loadIdList();
@@ -373,13 +398,14 @@ class TagsController extends AdminController
             'context' => []
         ]);
         $eventDispatcher->dispatch(AdminEvents::DOCUMENT_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+        /** @var \Pimcore\Model\Document\Listing $childsList */
         $childsList = $beforeListLoadEvent->getArgument('list');
 
         return $childsList->loadIdList();
     }
 
     /**
-     * @Route("/do-batch-assignment", methods={"PUT"})
+     * @Route("/do-batch-assignment", name="pimcore_admin_tags_dobatchassignment", methods={"PUT"})
      *
      * @param Request $request
      *

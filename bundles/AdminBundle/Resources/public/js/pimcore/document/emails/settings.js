@@ -24,7 +24,7 @@ pimcore.document.emails.settings = Class.create(pimcore.document.settings_abstra
                 bodyStyle:'padding:0 10px 0 10px;',
                 border: false,
                 autoScroll: true,
-                iconCls: "pimcore_icon_settings",
+                iconCls: "pimcore_material_icon_settings pimcore_material_icon",
                 items: [
                     {
                         xtype:'fieldset',
@@ -79,22 +79,6 @@ pimcore.document.emails.settings = Class.create(pimcore.document.settings_abstra
         }
 
         return this.layout;
-    },
-
-    getValues: function () {
-
-        if (!this.layout.rendered) {
-            throw "settings not available";
-        }
-
-        var fields = ["controller","action","template"];
-        var form = this.getLayout().getForm();
-        var element = null;
-
-        // get values
-        var settings = this.getLayout().getForm().getFieldValues();
-
-        return settings;
     }
 
 });

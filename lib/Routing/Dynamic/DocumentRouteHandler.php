@@ -62,21 +62,29 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
     private $directRouteDocumentTypes = ['page', 'snippet', 'email', 'newsletter', 'printpage', 'printcontainer'];
 
     /**
+     * @var Config
+     */
+    private $config;
+
+    /**
      * @param Document\Service $documentService
      * @param SiteResolver $siteResolver
      * @param RequestHelper $requestHelper
      * @param ConfigNormalizer $configNormalizer
+     * @param Config $config
      */
     public function __construct(
         Document\Service $documentService,
         SiteResolver $siteResolver,
         RequestHelper $requestHelper,
-        ConfigNormalizer $configNormalizer
+        ConfigNormalizer $configNormalizer,
+        Config $config
     ) {
         $this->documentService = $documentService;
         $this->siteResolver = $siteResolver;
         $this->requestHelper = $requestHelper;
         $this->configNormalizer = $configNormalizer;
+        $this->config = $config;
     }
 
     public function setForceHandleUnpublishedDocuments(bool $handle)
@@ -110,7 +118,7 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
         if (preg_match('/^document_(\d+)$/', $name, $match)) {
             $document = Document::getById($match[1]);
 
-            if ($this->isDirectRouteDocument($document) && $this->isDocumentSupported($document)) {
+            if ($this->isDirectRouteDocument($document)) {
                 return $this->buildRouteForDocument($document);
             }
         }
@@ -143,7 +151,7 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
             }
         }
 
-        // check for a parent hardlink with childs
+        // check for a parent hardlink with children
         if (!$document instanceof Document) {
             $hardlinkedParentDocument = $this->documentService->getNearestDocumentByPath($context->getPath(), true);
             if ($hardlinkedParentDocument instanceof Document\Hardlink) {
@@ -179,12 +187,8 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
             }
         }
 
-        // check if document should be handled (not legacy)
-        if (!$this->isDocumentSupported($document)) {
-            return null;
-        }
-
         $route = new DocumentRoute($document->getFullPath());
+        $route->setOption('utf8', true);
 
         // coming from matching -> set route path the currently matched one
         if (null !== $context) {
@@ -215,7 +219,7 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
      */
     private function handleLinkDocument(Document\Link $document, DocumentRoute $route)
     {
-        $route->setDefault('_controller', 'FrameworkBundle:Redirect:urlRedirect');
+        $route->setDefault('_controller', 'Symfony\Bundle\FrameworkBundle\Controller\RedirectController::urlRedirectAction');
         $route->setDefault('path', $document->getHref());
         $route->setDefault('permanent', true);
 
@@ -296,13 +300,9 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
         // use $originalPath because of the sites
         // only do redirecting with GET requests
         if ($context->getRequest()->getMethod() === 'GET') {
-            $config = Config::getSystemConfig();
-
-            if ($config->documents->allowtrailingslash) {
-                if ($config->documents->allowtrailingslash === 'no') {
-                    if ($redirectTargetUrl !== '/' && substr($redirectTargetUrl, -1) === '/') {
-                        $redirectTargetUrl = rtrim($redirectTargetUrl, '/');
-                    }
+            if (($this->config['documents']['allow_trailing_slash'] ?? null) === 'no') {
+                if ($redirectTargetUrl !== '/' && substr($redirectTargetUrl, -1) === '/') {
+                    $redirectTargetUrl = rtrim($redirectTargetUrl, '/');
                 }
             }
 
@@ -313,12 +313,14 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
         }
 
         if (null !== $redirectTargetUrl && $redirectTargetUrl !== $context->getOriginalPath()) {
-            $route->setDefault('_controller', 'FrameworkBundle:Redirect:urlRedirect');
+            $route->setDefault('_controller', 'Symfony\Bundle\FrameworkBundle\Controller\RedirectController::urlRedirectAction');
             $route->setDefault('path', $redirectTargetUrl);
             $route->setDefault('permanent', true);
 
             return $route;
         }
+
+        return null;
     }
 
     /**
@@ -350,7 +352,7 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
     /**
      * Check if document is can be used to generate a route
      *
-     * @param $document
+     * @param Document\PageSnippet $document
      *
      * @return bool
      */
@@ -363,15 +365,5 @@ class DocumentRouteHandler implements DynamicRouteHandlerInterface
         }
 
         return false;
-    }
-
-    /**
-     * @param Document $document
-     *
-     * @return bool
-     */
-    private function isDocumentSupported(Document $document)
-    {
-        return !$document->doRenderWithLegacyStack();
     }
 }

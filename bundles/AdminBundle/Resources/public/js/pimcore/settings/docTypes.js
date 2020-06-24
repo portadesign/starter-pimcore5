@@ -56,13 +56,6 @@ pimcore.settings.document.doctypes = Class.create({
 
         this.store = pimcore.globalmanager.get("document_types_store");
 
-        var legacyCheck = new Ext.grid.column.Check({
-            text: t("legacy_mode"),
-            dataIndex: "legacy",
-            hidden: !pimcore.settings.isLegacyModeAvailable,
-            width: 90
-        });
-
         var typesColumns = [
             {
                 text: t("name"),
@@ -88,7 +81,7 @@ pimcore.settings.document.doctypes = Class.create({
                         autoDestroy: true,
                         proxy: {
                             type: 'ajax',
-                            url: "/admin/misc/get-available-modules",
+                            url: Routing.generate('pimcore_admin_misc_getavailablemodules'),
                             reader: {
                                 type: 'json',
                                 rootProperty: 'data'
@@ -110,7 +103,7 @@ pimcore.settings.document.doctypes = Class.create({
                         autoDestroy: true,
                         proxy: {
                             type: 'ajax',
-                            url: "/admin/misc/get-available-controllers",
+                            url: Routing.generate('pimcore_admin_misc_getavailablecontrollers'),
                             reader: {
                                 type: 'json',
                                 rootProperty: 'data'
@@ -151,7 +144,7 @@ pimcore.settings.document.doctypes = Class.create({
                         autoDestroy: true,
                         proxy: {
                             type: 'ajax',
-                            url: "/admin/misc/get-available-actions",
+                            url: Routing.generate('pimcore_admin_misc_getavailableactions'),
                             reader: {
                                 type: 'json',
                                 rootProperty: 'data'
@@ -193,7 +186,7 @@ pimcore.settings.document.doctypes = Class.create({
                         autoDestroy: true,
                         proxy: {
                             type: 'ajax',
-                            url: "/admin/misc/get-available-templates",
+                            url: Routing.generate('pimcore_admin_misc_getavailabletemplates'),
                             reader: {
                                 type: 'json',
                                 rootProperty: 'data'
@@ -243,7 +236,6 @@ pimcore.settings.document.doctypes = Class.create({
                     triggerAction: "all"
                 })
             },
-            legacyCheck,
             {
                 text: t("creationDate"),
                 sortable: true,
@@ -318,7 +310,12 @@ pimcore.settings.document.doctypes = Class.create({
             autoScroll: true,
             bodyCls: "pimcore_editable_grid",
             store: this.store,
-            columns: typesColumns,
+            columns: {
+                items: typesColumns,
+                defaults: {
+                    renderer: Ext.util.Format.htmlEncode
+                },
+            },
             columnLines: true,
             trackMouseOver: true,
             stripeRows: true,
@@ -326,13 +323,16 @@ pimcore.settings.document.doctypes = Class.create({
             plugins: [
                 this.cellEditing
             ],
-            tbar: [
-                {
-                    text: t('add'),
-                    handler: this.onAdd.bind(this),
-                    iconCls: "pimcore_icon_add"
-                }
-            ],
+            tbar: {
+                cls: 'pimcore_main_toolbar',
+                items: [
+                    {
+                        text: t('add'),
+                        handler: this.onAdd.bind(this),
+                        iconCls: "pimcore_icon_add"
+                    }
+                ]
+            },
             viewConfig: {
                 forceFit: true
             }

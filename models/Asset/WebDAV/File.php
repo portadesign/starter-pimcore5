@@ -31,7 +31,7 @@ class File extends DAV\File
     private $asset;
 
     /**
-     * @param $asset
+     * @param Asset $asset
      */
     public function __construct($asset)
     {
@@ -83,14 +83,14 @@ class File extends DAV\File
             // for details see Asset\WebDAV\Tree::move()
             $log = Asset\WebDAV\Service::getDeleteLog();
 
-            $this->asset->_fulldump = true;
+            $this->asset->setInDumpState(true);
             $log[$this->asset->getRealFullPath()] = [
                 'id' => $this->asset->getId(),
                 'timestamp' => time(),
                 'data' => \Pimcore\Tool\Serialize::serialize($this->asset)
             ];
 
-            unset($this->asset->_fulldump);
+            $this->asset->setInDumpState(false);
 
             Asset\WebDAV\Service::saveDeleteLog($log);
         } else {
@@ -111,6 +111,8 @@ class File extends DAV\File
      *
      * @throws DAV\Exception\Forbidden
      * @throws \Exception
+     *
+     * @return null
      */
     public function put($data)
     {
@@ -128,9 +130,11 @@ class File extends DAV\File
 
             fclose($file);
             unlink($tmpFile);
-        } else {
-            throw new DAV\Exception\Forbidden();
+
+            return null;
         }
+
+        throw new DAV\Exception\Forbidden();
     }
 
     /**

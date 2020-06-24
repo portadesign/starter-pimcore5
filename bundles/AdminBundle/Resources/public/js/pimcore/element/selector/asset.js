@@ -21,7 +21,7 @@ pimcore.element.selector.asset = Class.create(pimcore.element.selector.abstract,
             pageSize: 50,
             proxy : {
                 type: 'ajax',
-                url: '/admin/search/search/find',
+                url: Routing.generate('pimcore_admin_searchadmin_search_find'),
                 reader: {
                     type: 'json',
                     rootProperty: 'data'
@@ -156,7 +156,6 @@ pimcore.element.selector.asset = Class.create(pimcore.element.selector.abstract,
                 listeners: {
                     rowcontextmenu: function (grid, record, tr, rowIndex, e, eOpts ) {
                         var menu = new Ext.menu.Menu();
-                        var data = grid.getStore().getAt(rowIndex);
 
                         menu.add(new Ext.menu.Item({
                             text: t('remove'),
@@ -190,20 +189,29 @@ pimcore.element.selector.asset = Class.create(pimcore.element.selector.abstract,
             var columns = [
                 {text: t("type"), width: 40, sortable: true, dataIndex: 'subtype',
                     renderer: function (value, metaData, record, rowIndex, colIndex, store) {
-                        return '<div style="height: 16px;" class="pimcore_icon_asset  pimcore_icon_'
+                        return '<div style="height: 16px;" class="pimcore_icon_'
                             + value + '" name="' + t(record.data.subtype) + '">&nbsp;</div>';
                     }
                 },
                 {text: 'ID', width: 40, sortable: true, dataIndex: 'id', hidden: true},
                 {text: t("path"), flex: 200, sortable: true, dataIndex: 'fullpath', renderer: Ext.util.Format.htmlEncode},
-                {text: t("filename"), width: 200, sortable: true, dataIndex: 'filename', hidden: true, renderer: Ext.util.Format.htmlEncode},
+                {text: t("filename"), width: 200, sortable: false, dataIndex: 'filename', hidden: true, renderer: Ext.util.Format.htmlEncode},
                 {text: t("preview"), width: 150, sortable: false, dataIndex: 'subtype',
                     renderer: function (value, metaData, record, rowIndex, colIndex, store) {
                         if(record.data.subtype == "image") {
+                            var route = 'pimcore_admin_asset_getimagethumbnail';
+                            var params = {
+                                id: record.data.id,
+                                width: 100,
+                                height: 100,
+                                cover: true,
+                                aspectratio: true
+                            };
+
+                            var uri = Routing.generate(route, params);
+
                             return '<div name="' + t(record.data.subtype)
-                                + '"><img src="/admin/asset/get-image-thumbnail?id='
-                                + record.data.id
-                                + '&width=100&height=100&cover=true&aspectratio=true" /></div>';
+                                + '"><img src="'+uri+'" /></div>';
                         }
                     }
                 }
@@ -265,5 +273,6 @@ pimcore.element.selector.asset = Class.create(pimcore.element.selector.abstract,
         }
 
         this.pagingtoolbar.moveFirst();
+        this.updateTabTitle(formValues.query);
     }
 });

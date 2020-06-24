@@ -68,7 +68,7 @@ pimcore.object.tags.wysiwyg = Class.create(pimcore.object.tags.abstract, {
         }.bind(this, field.key);
 
         return {
-            text: ts(field.label), sortable: true, dataIndex: field.key, renderer: renderer,
+            text: t(field.label), sortable: true, dataIndex: field.key, renderer: renderer,
             getEditor: this.getWindowCellEditor.bind(this, field)
         };
     },
@@ -91,6 +91,7 @@ pimcore.object.tags.wysiwyg = Class.create(pimcore.object.tags.abstract, {
             title: this.fieldConfig.title,
             html: html,
             border: true,
+            bodyStyle: 'background: #fff',
             style: "margin-bottom: 10px",
             manageHeight: false,
             cls: "object_field"
@@ -158,7 +159,13 @@ pimcore.object.tags.wysiwyg = Class.create(pimcore.object.tags.abstract, {
         var eConfig = {
             width: this.fieldConfig.width,
             height: this.fieldConfig.height,
-            language: pimcore.settings["language"]
+            language: pimcore.settings["language"],
+            resize_enabled: false,
+            entities: false,
+            entities_greek: false,
+            entities_latin: false,
+            extraAllowedContent: "*[pimcore_type,pimcore_id]",
+            baseFloatZIndex: 40000 // prevent that the editor gets displayed behind the grid cell editor window
         };
 
         eConfig.toolbarGroups = [
@@ -173,14 +180,6 @@ pimcore.object.tags.wysiwyg = Class.create(pimcore.object.tags.abstract, {
             { name: 'tools', groups: ['colors', 'tools', 'cleanup', 'mode', 'others'] }
         ];
 
-        //prevent override important settings!
-        eConfig.resize_enabled = false;
-        eConfig.entities = false;
-        eConfig.entities_greek = false;
-        eConfig.entities_latin = false;
-        eConfig.extraAllowedContent = "*[pimcore_type,pimcore_id]";
-        eConfig.baseFloatZIndex = 40000;   // prevent that the editor gets displayed behind the grid cell editor window
-
         if(eConfig.hasOwnProperty('removePlugins'))
             eConfig.removePlugins += ",tableresize";
         else
@@ -193,13 +192,13 @@ pimcore.object.tags.wysiwyg = Class.create(pimcore.object.tags.abstract, {
             eConfig.height = this.fieldConfig.height;
         }
 
+        if(typeof(pimcore.object.tags.wysiwyg.defaultEditorConfig) == 'object'){
+            eConfig = mergeObject(eConfig, pimcore.object.tags.wysiwyg.defaultEditorConfig);
+        }
+
         if(this.fieldConfig.toolbarConfig) {
             var elementCustomConfig = Ext.decode(this.fieldConfig.toolbarConfig);
             eConfig = mergeObject(eConfig, elementCustomConfig);
-        }
-
-        if(typeof(pimcore.object.tags.wysiwyg.defaultEditorConfig) == 'object'){
-            eConfig = mergeObject(eConfig, pimcore.object.tags.wysiwyg.defaultEditorConfig);
         }
 
         try {
@@ -216,6 +215,18 @@ pimcore.object.tags.wysiwyg = Class.create(pimcore.object.tags.abstract, {
                     urlField.getParent().getParent().getParent().show();
                 }
             });
+
+            // force paste dialog to prevent security message on various browsers
+            this.ckeditor.on('beforeCommandExec', function(event) {
+                if (event.data.name === 'paste') {
+                    event.editor._.forcePasteDialog = true;
+                }
+
+                if (event.data.name === 'pastetext' && event.data.commandData.from === 'keystrokeHandler') {
+                    event.cancel();
+                }
+            });
+
         } catch (e) {
             console.log(e);
         }
@@ -286,7 +297,7 @@ pimcore.object.tags.wysiwyg = Class.create(pimcore.object.tags.abstract, {
                 // converted by the pimcore thumbnailing service so that they can be displayed in the editor
                 var defaultWidth = 600;
                 var additionalAttributes = "";
-                uri = "/admin/asset/get-image-thumbnail?id=" + id + "&width=" + defaultWidth + "&aspectratio=true";
+                uri = Routing.generate('pimcore_admin_asset_getimagethumbnail', {id: id, width: defaultWidth, aspectration: true});
 
                 if(typeof node.data.imageWidth != "undefined") {
                     if(node.data.imageWidth < defaultWidth
@@ -384,8 +395,9 @@ pimcore.object.tags.wysiwyg = Class.create(pimcore.object.tags.abstract, {
     },
 
     getWindowCellEditor: function (field, record) {
-        return new pimcore.object.helpers.gridCellEditor({
-                fieldInfo: field
+        return new pimcore.element.helpers.gridCellEditor({
+                fieldInfo: field,
+                elementType: "object"
             }
         );
     },

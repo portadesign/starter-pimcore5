@@ -49,8 +49,7 @@ class Xliff12Escaper
             $parts = explode('>', $match);
             $parts[0] .= '>';
             foreach ($parts as $part) {
-                $part = trim($part);
-                if (!empty($part)) {
+                if (!empty(trim($part))) {
                     if (preg_match("/<([a-z0-9\/]+)/", $part, $tag)) {
                         $tagName = str_replace('/', '', $tag[1]);
                         if (in_array($tagName, self::SELFCLOSING_TAGS)) {
@@ -90,12 +89,9 @@ class Xliff12Escaper
      */
     public function unescapeXliff(string $content): string
     {
-        $content = preg_replace("/<\/?(target|mrk)([^>.]+)?>/i", '', $content);
-        // we have to do this again but with html entities because of CDATA content
-        $content = preg_replace("/&lt;\/?(target|mrk)((?!&gt;).)*&gt;/i", '', $content);
+        $content = $this->parseInnerXml($content);
 
         if (preg_match("/<\/?(bpt|ept)/", $content)) {
-            include_once(PIMCORE_PATH . '/lib/simple_html_dom.php');
             $xml = str_get_html($content);
             if ($xml) {
                 $els = $xml->find('bpt,ept,ph');
@@ -106,6 +102,23 @@ class Xliff12Escaper
             }
             $content = $xml->save();
         }
+
+        return $content;
+    }
+
+    private function parseInnerXml(string $content)
+    {
+        $node = simplexml_load_string($content, null, LIBXML_NOCDATA);
+
+        if (empty($node->children())) {
+            return (string) $node;
+        }
+
+        $content = $node->asXml();
+
+        $content = preg_replace("/<\/?(target|mrk)([^>.]+)?>/i", '', $content);
+        // we have to do this again but with html entities because of CDATA content
+        $content = preg_replace("/&lt;\/?(target|mrk)((?!&gt;).)*&gt;/i", '', $content);
 
         return $content;
     }

@@ -17,12 +17,22 @@
 
 namespace Pimcore\Model;
 
-use Pimcore\Config;
+use DeepCopy\DeepCopy;
 use Pimcore\Event\Model\VersionEvent;
 use Pimcore\Event\VersionEvents;
 use Pimcore\File;
 use Pimcore\Logger;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\DataObject\Concrete;
+use Pimcore\Model\Element\ElementDescriptor;
+use Pimcore\Model\Element\ElementDumpStateInterface;
+use Pimcore\Model\Element\ElementInterface;
+use Pimcore\Model\Element\Service;
+use Pimcore\Model\Version\MarshalMatcher;
+use Pimcore\Model\Version\PimcoreClassDefinitionMatcher;
+use Pimcore\Model\Version\PimcoreClassDefinitionReplaceFilter;
+use Pimcore\Model\Version\SetDumpStateFilter;
+use Pimcore\Model\Version\UnmarshalMatcher;
 use Pimcore\Tool\Serialize;
 
 /**
@@ -108,14 +118,21 @@ class Version extends AbstractModel
     /**
      * @param int $id
      *
-     * @return Version
+     * @return Version|null
      */
     public static function getById($id)
     {
-        $version = self::getModelFactory()->build(Version::class);
-        $version->getDao()->getById($id);
+        try {
+            /**
+             * @var self $version
+             */
+            $version = self::getModelFactory()->build(Version::class);
+            $version->getDao()->getById($id);
 
-        return $version;
+            return $version;
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /**
@@ -168,20 +185,22 @@ class Version extends AbstractModel
         if (is_object($data) or is_array($data)) {
 
             // this is because of lazy loaded element inside documents and objects (eg: relational data-types, fieldcollections, ...)
+            $fromRuntime = null;
+            $cacheKey = null;
             if ($data instanceof Element\ElementInterface) {
                 Element\Service::loadAllFields($data);
             }
 
             $this->setSerialized(true);
 
-            $data->_fulldump = true;
-            $dataString = Serialize::serialize($data);
+            $condensedData = $this->marshalData($data);
+
+            $dataString = Serialize::serialize($condensedData);
 
             // revert all changed made by __sleep()
             if (method_exists($data, '__wakeup')) {
                 $data->__wakeup();
             }
-            unset($data->_fulldump);
         } else {
             $dataString = $data;
         }
@@ -198,6 +217,7 @@ class Version extends AbstractModel
 
         // check if directory exists
         $saveDir = dirname($this->getFilePath());
+
         if (!is_dir($saveDir)) {
             File::mkdir($saveDir);
         }
@@ -233,6 +253,100 @@ class Version extends AbstractModel
     }
 
     /**
+     * @param ElementInterface $data
+     *
+     * @return mixed
+     */
+    public function marshalData($data)
+    {
+        $sourceType = Service::getType($data);
+        $sourceId = $data->getId();
+
+        $copier = new DeepCopy();
+        $copier->skipUncloneable(true);
+        $copier->addTypeFilter(
+            new \DeepCopy\TypeFilter\ReplaceFilter(
+                function ($currentValue) {
+                    if ($currentValue instanceof ElementInterface) {
+                        $elementType = Service::getType($currentValue);
+                        $descriptor = new ElementDescriptor($elementType, $currentValue->getId());
+
+                        return $descriptor;
+                    }
+
+                    return $currentValue;
+                }
+            ),
+            new MarshalMatcher($sourceType, $sourceId)
+        );
+
+        if ($data instanceof Concrete) {
+            $copier->addFilter(
+                new PimcoreClassDefinitionReplaceFilter(
+                    function (Concrete $object, Data $fieldDefinition, $property, $currentValue) {
+                        if ($fieldDefinition instanceof Data\CustomVersionMarshalInterface) {
+                            return $fieldDefinition->marshalVersion($object, $currentValue);
+                        }
+
+                        return $currentValue;
+                    }
+                ),
+                new PimcoreClassDefinitionMatcher(Data\CustomVersionMarshalInterface::class)
+            );
+        }
+
+        $copier->addFilter(new \DeepCopy\Filter\Doctrine\DoctrineCollectionFilter(), new \DeepCopy\Matcher\PropertyTypeMatcher('Doctrine\Common\Collections\Collection'));
+        $copier->addFilter(new \DeepCopy\Filter\SetNullFilter(), new \DeepCopy\Matcher\PropertyTypeMatcher('Pimcore\Templating\Model\ViewModelInterface'));
+        $copier->addFilter(new \DeepCopy\Filter\SetNullFilter(), new \DeepCopy\Matcher\PropertyTypeMatcher('Psr\Container\ContainerInterface'));
+        $copier->addFilter(new SetDumpStateFilter(true), new \DeepCopy\Matcher\PropertyMatcher(ElementDumpStateInterface::class, ElementDumpStateInterface::DUMP_STATE_PROPERTY_NAME));
+        $copier->addFilter(new \DeepCopy\Filter\SetNullFilter(), new \DeepCopy\Matcher\PropertyTypeMatcher('Pimcore\Model\DataObject\ClassDefinition'));
+        $newData = $copier->copy($data);
+
+        return $newData;
+    }
+
+    /**
+     * @param ElementInterface $data
+     *
+     * @return mixed
+     */
+    public function unmarshalData($data)
+    {
+        $copier = new DeepCopy();
+        $copier->addTypeFilter(
+            new \DeepCopy\TypeFilter\ReplaceFilter(
+                function ($currentValue) {
+                    if ($currentValue instanceof ElementDescriptor) {
+                        $value = Service::getElementById($currentValue->getType(), $currentValue->getId());
+
+                        return $value;
+                    }
+
+                    return $currentValue;
+                }
+            ),
+            new UnmarshalMatcher()
+        );
+
+        if ($data instanceof Concrete) {
+            $copier->addFilter(
+                new PimcoreClassDefinitionReplaceFilter(
+                    function (Concrete $object, Data $fieldDefinition, $property, $currentValue) {
+                        if ($fieldDefinition instanceof Data\CustomVersionMarshalInterface) {
+                            return $fieldDefinition->unmarshalVersion($object, $currentValue);
+                        }
+
+                        return $currentValue;
+                    }
+                ),
+                new PimcoreClassDefinitionMatcher(Data\CustomVersionMarshalInterface::class)
+            );
+        }
+
+        return $copier->copy($data);
+    }
+
+    /**
      * Delete this Version
      */
     public function delete()
@@ -261,12 +375,15 @@ class Version extends AbstractModel
     /**
      * Object
      *
+     * @param bool $renewReferences
+     *
      * @return mixed
      */
-    public function loadData()
+    public function loadData($renewReferences = true)
     {
         $data = null;
         $zipped = false;
+        $filePath = null;
 
         // check both the legacy file path and the new structure
         foreach ([$this->getFilePath(), $this->getLegacyFilePath()] as $path) {
@@ -302,6 +419,8 @@ class Version extends AbstractModel
 
                 return;
             }
+
+            $data = $this->unmarshalData($data);
         }
 
         if ($data instanceof Concrete) {
@@ -309,14 +428,17 @@ class Version extends AbstractModel
         }
 
         if ($data instanceof Asset && file_exists($this->getBinaryFilePath())) {
-            $binaryHandle = fopen($this->getBinaryFilePath(), 'r+', false, File::getContext());
+            $binaryHandle = fopen($this->getBinaryFilePath(), 'rb', false, File::getContext());
             $data->setStream($binaryHandle);
-        } elseif ($data instanceof Asset && $data->data) {
+        } elseif ($data instanceof Asset && $data->getObjectVar('data')) {
             // this is for backward compatibility
-            $data->setData($data->data);
+            $data->setData($data->getObjectVar('data'));
         }
 
-        $data = Element\Service::renewReferences($data);
+        if ($renewReferences) {
+            $data = Element\Service::renewReferences($data);
+        }
+
         $this->setData($data);
 
         return $data;
@@ -367,40 +489,6 @@ class Version extends AbstractModel
     }
 
     /**
-     * the cleanup is now done in the maintenance see self::maintenanceCleanUp()
-     *
-     * @deprecated
-     */
-    public function cleanHistory()
-    {
-        if ($this->getCtype() == 'document') {
-            $conf = Config::getSystemConfig()->documents->versions;
-        } elseif ($this->getCtype() == 'asset') {
-            $conf = Config::getSystemConfig()->assets->versions;
-        } elseif ($this->getCtype() == 'object') {
-            $conf = Config::getSystemConfig()->objects->versions;
-        } else {
-            return;
-        }
-
-        $days = [];
-        $steps = [];
-
-        if (intval($conf->days) > 0) {
-            $days = $this->getDao()->getOutdatedVersionsDays($conf->days);
-        } else {
-            $steps = $this->getDao()->getOutdatedVersionsSteps(intval($conf->steps));
-        }
-
-        $versions = array_merge($days, $steps);
-
-        foreach ($versions as $id) {
-            $version = Version::getById($id);
-            $version->delete();
-        }
-    }
-
-    /**
      * @return int
      */
     public function getCid()
@@ -441,7 +529,7 @@ class Version extends AbstractModel
     }
 
     /**
-     * @param $cid
+     * @param int $cid
      *
      * @return $this
      */

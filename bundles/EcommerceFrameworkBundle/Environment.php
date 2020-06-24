@@ -19,7 +19,7 @@ use Pimcore\Localization\LocaleServiceInterface;
 use Pimcore\Tool;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class Environment implements IEnvironment
+class Environment implements EnvironmentInterface
 {
     const USER_ID_NOT_SET = -1;
 
@@ -174,7 +174,7 @@ class Environment implements IEnvironment
         $this->load();
 
         $this->customItems = null;
-        $this->userId = null;
+        $this->userId = self::USER_ID_NOT_SET;
         $this->currentAssortmentTenant = null;
         $this->currentAssortmentSubTenant = null;
         $this->currentCheckoutTenant = null;
@@ -243,6 +243,14 @@ class Environment implements IEnvironment
     }
 
     /**
+     * @param Currency $currency
+     */
+    public function setDefaultCurrency(Currency $currency)
+    {
+        $this->defaultCurrency = $currency;
+    }
+
+    /**
      * @return Currency
      */
     public function getDefaultCurrency()
@@ -273,7 +281,7 @@ class Environment implements IEnvironment
     /**
      * sets current assortment tenant which is used for indexing and product lists
      *
-     * @param $tenant string
+     * @param string $tenant
      */
     public function setCurrentAssortmentTenant($tenant)
     {
@@ -297,7 +305,7 @@ class Environment implements IEnvironment
     /**
      * sets current assortment sub tenant which is used for indexing and product lists
      *
-     * @param $subTenant mixed
+     * @param mixed $subTenant
      *
      * @return mixed
      */

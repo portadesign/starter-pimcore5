@@ -43,13 +43,18 @@ pimcore.asset.versions = Class.create({
 
             this.store = new Ext.data.Store({
                 model: modelName,
-                sorters: [{
-                    property: 'id',
-                    direction: 'DESC'
-                }],
+                sorters: [
+                    {
+                        property: 'versionCount',
+                        direction: 'DESC'
+                    },
+                    {
+                        property: 'id',
+                        direction: 'DESC'
+                    }],
                 proxy: {
                     type: 'ajax',
-                    url: "/admin/element/get-versions",
+                    url: Routing.generate('pimcore_admin_element_getversions'),
                     extraParams: {
                         id: this.asset.id,
                         elementType: "asset"
@@ -128,7 +133,7 @@ pimcore.asset.versions = Class.create({
                 bodyStyle:'padding:20px 5px 20px 5px;',
                 border: false,
                 layout: "border",
-                iconCls: "pimcore_icon_versions",
+                iconCls: "pimcore_material_icon_versions pimcore_material_icon",
                 items: [grid,preview]
             });
 
@@ -148,8 +153,7 @@ pimcore.asset.versions = Class.create({
         var data = grid.getStore().getAt(rowIndex).data;
 
         var versionId = data.id;
-        var url = "/admin/asset/show-version?id=" + versionId;
-        url = pimcore.helpers.addCsrfTokenToUrl(url);
+        var url = Routing.generate('pimcore_admin_asset_showversion', {id: versionId});
         Ext.get(this.frameId).dom.src = url;
     },
 
@@ -187,7 +191,7 @@ pimcore.asset.versions = Class.create({
         var versionId = data.id;
 
         Ext.Ajax.request({
-            url: "/admin/element/delete-version",
+            url: Routing.generate('pimcore_admin_element_deleteversion'),
             method: 'DELETE',
             params: {id: versionId}
         });
@@ -203,13 +207,13 @@ pimcore.asset.versions = Class.create({
             Ext.Msg.confirm(t('clear_all'), t('clear_version_message'), function(btn){
                 if (btn == 'yes'){
                     var modificationDate = this.asset.data.modificationDate;
-                    
+
                     Ext.Ajax.request({
-                        url: "/admin/element/delete-all-versions",
+                        url: Routing.generate('pimcore_admin_element_deleteallversion'),
                         method: 'DELETE',
                         params: {id: elememntId, date: modificationDate}
                     });
-                    
+
                     //get sub collection of versions for removel. Keep current version
                     var removeCollection = grid.getStore().getData().createFiltered(function(item){
                         return item.get('date') != modificationDate;
@@ -226,10 +230,19 @@ pimcore.asset.versions = Class.create({
         var versionId = data.id;
 
         Ext.Ajax.request({
-            url: "/admin/asset/publish-version",
+            url: Routing.generate('pimcore_admin_asset_publishversion'),
             method: 'post',
             params: {id: versionId},
-            success: this.asset.reload.bind(this.asset)
+            success: function(response) {
+                var rdata = Ext.decode(response.responseText);
+
+                if (rdata.success) {
+                    this.asset.reload();
+                    pimcore.helpers.updateTreeElementStyle('asset', this.asset.id, rdata.treeData);
+                } else {
+                    Ext.MessageBox.alert(t("error"), rdata.message);
+                }
+            }.bind(this)
         });
     },
 
@@ -241,7 +254,7 @@ pimcore.asset.versions = Class.create({
 
         if (operation == "edit") {
             Ext.Ajax.request({
-                url: "/admin/element/version-update",
+                url: Routing.generate('pimcore_admin_element_versionupdate'),
                 method: 'PUT',
                 params: {
                     data: Ext.encode(record.data)

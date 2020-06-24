@@ -16,6 +16,7 @@ namespace Pimcore\Image;
 
 use Pimcore\Tool\Console;
 use Pimcore\Tool\Session;
+use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
 
 class HtmlToImage
 {
@@ -43,20 +44,8 @@ class HtmlToImage
     }
 
     /**
-     * @deprecated
-     *
-     * @return bool|mixed|string
-     *
-     * @throws \Exception
-     */
-    public static function getXvfbBinary()
-    {
-        return \Pimcore\Tool\Console::getExecutable('xvfb-run');
-    }
-
-    /**
-     * @param $url
-     * @param $outputFile
+     * @param string $url
+     * @param string $outputFile
      * @param int $screenWidth
      * @param string $format
      *
@@ -73,14 +62,18 @@ class HtmlToImage
             '--format ' . $format
         ];
 
-        if (php_sapi_name() != 'cli') {
-            $options[] = '--cookie ' .  Session::getSessionName() . ' ' . Session::getSessionId();
+        if (php_sapi_name() !== 'cli') {
+            $sessionData = Session::useSession(function (AttributeBagInterface $session) {
+                return ['name' => Session::getSessionName(), 'id' => Session::getSessionId()];
+            });
+
+            $options[] = sprintf('--cookie %s %s', $sessionData['name'], $sessionData['id']);
         }
 
         $arguments = ' ' . implode(' ', $options) . ' "' . $url . '" ' . $outputFile;
 
         // use xvfb if possible
-        if ($xvfb = self::getXvfbBinary()) {
+        if ($xvfb = Console::getExecutable('xvfb-run')) {
             $command = $xvfb . ' --auto-servernum --server-args="-screen 0, 1280x1024x24" ' .
                 self::getWkhtmltoimageBinary() . ' --use-xserver' . $arguments;
         } else {

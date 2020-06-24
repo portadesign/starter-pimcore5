@@ -2,7 +2,7 @@
 
 In system settings (*Settings* > *System Settings*) system wide settings for Pimcore can be made. Changes should 
 be made with care and only by developers. 
-These settings are saved in `var/config/system.php`. 
+These settings are saved in `var/config/system.yml`. 
 
 
 ## General 
@@ -83,11 +83,6 @@ texts and links:
 $cookieListener = $this->get(\Pimcore\Bundle\CoreBundle\EventListener\Frontend\CookiePolicyNoticeListener::class);
 $cookieListener->setTemplateCode("<b>Your Custom Template</b> ...");
 ```
- 
-## MySQL Database
-Settings for database connection. These settings are read only here and need to be modified (if necessary) directly in 
-`var/config/system.php`. 
-
 
 ## Documents
 Settings for documents like version steps, default values and URL settings. 
@@ -108,7 +103,7 @@ Only use a *Service Account* from the Google Cloud Console.
 Google API Key (Simple API Access for CSE, ...) is e.g. required for correct display of geo data types in Pimcore ojbects. 
  
  
-## Ouput-Cache
+## Output-Cache
 Settings for Pimcore [output cache](../19_Development_Tools_and_Details/09_Cache/README.md).
 
 

@@ -35,7 +35,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
         }
 
         this.tagAssignment = new pimcore.element.tag.assignment(this, "asset");
-        this.metadata = new pimcore.asset.metadata(this);
+        this.metadata = new pimcore.asset.metadata.grid(this);
         this.workflows = new pimcore.element.workflows(this, "asset");
         this.embeddedMetaData = new pimcore.asset.embedded_meta_data(this);
 
@@ -102,14 +102,13 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
     getEditPanel: function () {
 
         if (!this.editPanel) {
-            var url = '/admin/asset/image-editor?id=' + this.id;
-            url = pimcore.helpers.addCsrfTokenToUrl(url);
+            var url = Routing.generate('pimcore_admin_asset_imageeditor', {id: this.id});
             var frameId = 'asset_image_edit_' + this.id;
             this.editPanel = new Ext.Panel({
                 title: t("edit"),
                 html: '<iframe src="' + url + '" frameborder="0" ' +
                 'style="width: 100%;" id="' + frameId + '"></iframe>',
-                iconCls: "pimcore_icon_edit"
+                iconCls: "pimcore_material_icon_edit pimcore_material_icon"
             });
             this.editPanel.on("resize", function (el, width, height, rWidth, rHeight) {
                 Ext.get(frameId).setStyle({
@@ -124,6 +123,13 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
     getDisplayPanel: function () {
 
         if (!this.displayPanel) {
+            let detectImageFeaturesHidden = true;
+            if(this.isAllowed('publish')) {
+                if(this.data['customSettings'] && this.data['customSettings']['disableImageFeatureAutoDetection'] === true) {
+                    detectImageFeaturesHidden = false;
+                }
+            }
+
             var details = [{
                 title: t("tools"),
                 bodyStyle: "padding: 10px;",
@@ -138,7 +144,8 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                     }.bind(this)
                 }, {
                     xtype: "button",
-                    text: t("toggle_image_features"),
+                    id: 'toggle_image_features_' + this.id,
+                    text: t("toggle_image_features_visibility"),
                     iconCls: "pimcore_icon_image_features",
                     width: "100%",
                     textAlign: "left",
@@ -150,6 +157,26 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                            Ext.get(feature).toggle();
                         });
                     }.bind(this)
+                }, {
+                    xtype: "button",
+                    id: 'set_image_features_' + this.id,
+                    text: t("detect_image_features"),
+                    iconCls: "pimcore_icon_image_region",
+                    width: "100%",
+                    textAlign: "left",
+                    hidden: detectImageFeaturesHidden,
+                    style: "margin-top: 5px",
+                    handler: this.detectImageFeatures.bind(this)
+                }, {
+                    xtype: "button",
+                    id: 'remove_image_features_' + this.id,
+                    text: t("remove_image_features"),
+                    iconCls: "pimcore_icon_image_region pimcore_icon_overlay_delete",
+                    width: "100%",
+                    textAlign: "left",
+                    hidden: !(this.data['customSettings'] && this.data['customSettings']['faceCoordinates']),
+                    style: "margin-top: 5px",
+                    handler: this.deleteImageFeatures.bind(this)
                 }, {
                     xtype: "container",
                     html: "<hr>"
@@ -212,7 +239,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
             }
 
             var downloadShortcutsHandler = function (type) {
-                pimcore.helpers.download("/admin/asset/download-image-thumbnail?id=" + this.id   + "&type=" + type);
+                pimcore.helpers.download(Routing.generate('pimcore_admin_asset_downloadimagethumbnail', {id: this.id, type: type}));
             };
 
             this.downloadBox = new Ext.Panel({
@@ -227,7 +254,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                     style: "margin-bottom: 5px",
                     text: t("original_file"),
                     handler: function () {
-                        pimcore.helpers.download("/admin/asset/download?id=" + this.data.id);
+                        pimcore.helpers.download(Routing.generate('pimcore_admin_asset_download', {id: this.id}));
                     }.bind(this)
                 },{
                     xtype: "button",
@@ -262,7 +289,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                 autoDestroy: true,
                 proxy: {
                     type: 'ajax',
-                    url: '/admin/settings/thumbnail-downloadable'
+                    url: Routing.generate('pimcore_admin_settings_thumbnaildownloadable')
                 },
                 fields: ['id']
             });
@@ -287,8 +314,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                         if (!config.thumbnail) {
                             pimcore.helpers.showNotification(t("error"), t("no_thumbnail_selected"), "error");
                         } else {
-                            pimcore.helpers.download("/admin/asset/download-image-thumbnail?id=" + this.id
-                                + "&thumbnail=" + config.thumbnail);
+                            pimcore.helpers.download(Routing.generate('pimcore_admin_asset_downloadimagethumbnail', {id: this.id, thumbnail: config.thumbnail}));
                         }
                     }.bind(this)
                 }]
@@ -378,8 +404,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                     iconCls: "pimcore_icon_download",
                     handler: function () {
                         var config = this.customDownloadBox.getForm().getFieldValues();
-                        pimcore.helpers.download("/admin/asset/download-image-thumbnail?id=" + this.id
-                            + "&config=" + Ext.encode(config));
+                        pimcore.helpers.download(Routing.generate('pimcore_admin_asset_downloadimagethumbnail', {id: this.id, config: Ext.encode(config)}));
                     }.bind(this)
                 }]
             });
@@ -394,7 +419,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
             this.displayPanel = new Ext.Panel({
                 title: t("view"),
                 layout: "border",
-                iconCls: "pimcore_icon_view",
+                iconCls: "pimcore_material_icon_view pimcore_material_icon",
                 items: [{
                     region: "center",
                     html: '<div id="' + this.previewContainerId + '" class="pimcore_asset_image_preview"></div>',
@@ -426,7 +451,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
     initPreviewVr: function () {
         Ext.get(this.previewContainerId).setHtml('');
         var vrView = new VRView.Player('#' + this.previewContainerId, {
-            image: '/admin/asset/get-image-thumbnail%3Fid=' + this.id + '%26width=2000',
+            image: Routing.generate('pimcore_admin_asset_getimagethumbnail', {id: this.id, width: 2000}),
             is_stereo: (this.data.imageInfo.dimensions.width === this.data.imageInfo.dimensions.height),
             width: (this.displayPanel.getWidth()-340),
             height: (this.displayPanel.getHeight()-40),
@@ -437,9 +462,8 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
     },
 
     initPreviewImage: function () {
-        var date = new Date();
-        var dc = date.getTime();
-        var html = '<img src="/admin/asset/get-image-thumbnail?id=' + this.id + '&treepreview=true&hdpi=true&_dc=' + dc + '">';
+
+        var html = '<img src="' + this.data.imageInfo['previewUrl'] + '">';
         Ext.get(this.previewContainerId).setHtml(html);
 
         this.previewMode = 'image';
@@ -453,12 +477,39 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                 this.data['customSettings']['faceCoordinates'].forEach(function (coord) {
                     this.addImageFeature(coord);
                 }.bind(this));
-
             }
         }
     },
 
+    detectImageFeatures: function () {
+        Ext.Ajax.request({
+            url: Routing.generate('pimcore_admin_asset_detectimagefeatures'),
+            params: {
+                id: this.id,
+            },
+            success: function (response) {
+                this.reload();
+            }.bind(this)
+        });
+    },
+
+    deleteImageFeatures: function () {
+        Ext.Ajax.request({
+            url: Routing.generate('pimcore_admin_asset_deleteimagefeatures'),
+            params: {
+                id: this.id,
+            },
+            success: function (response) {
+                this.reload();
+            }.bind(this)
+        });
+    },
+
     addImageFeature: function (coords) {
+        if(empty(coords)) {
+            return;
+        }
+
         var area = this.displayPanel.getEl().down('.pimcore_asset_image_preview');
         var imageFeature = area.insertHtml('afterBegin', '<div class="image_feature"></div>', true);
         imageFeature.setTop(coords['y'] + "%");
@@ -485,7 +536,7 @@ pimcore.asset.image = Class.create(pimcore.asset.asset, {
                 iconCls: "pimcore_icon_delete",
                 handler: function (el) {
                     marker.remove();
-                    delete this.marker;
+                    this.marker = false;
                 }.bind(this)
             }));
 

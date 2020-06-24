@@ -21,17 +21,19 @@ pimcore.element.tag.imagecropper = Class.create({
 
         this.ratioX = null;
         this.ratioY = null;
+        this.preserveRatio = false;
         if(typeof config == "object") {
             if(config["ratioX"] && config["ratioY"]) {
                 this.ratioX = config["ratioX"];
                 this.ratioY = config["ratioY"];
+                this.preserveRatio = true;
             }
         }
     },
 
     open: function (modal) {
         var validImage = this.imageId !== null,
-            imageUrl = '/admin/asset/get-image-thumbnail?id=' + this.imageId + '&width=500&height=400&contain=true',
+            imageUrl = Routing.generate('pimcore_admin_asset_getimagethumbnail', {id: this.imageId, width: 500, height: 400, contain: true}),
             button = {};
 
         if(typeof modal != "undefined") {
@@ -144,8 +146,8 @@ pimcore.element.tag.imagecropper = Class.create({
                     target: "selector",
                     pinned: true,
                     width: 100,
-                    height: 100,
-                    preserveRatio: false,
+                    height: 100 / (this.ratioX / this.ratioY) || 100,
+                    preserveRatio: this.preserveRatio,
                     dynamic: true,
                     handles: 'all',
                     listeners: {

@@ -31,7 +31,7 @@ use Symfony\Component\Console\Question\ConfirmationQuestion;
 class MigrateElementNamesCommand extends AbstractCommand
 {
     /**
-     * @var Db\Connection
+     * @var Db\ConnectionInterface
      */
     private $db;
 
@@ -107,7 +107,7 @@ class MigrateElementNamesCommand extends AbstractCommand
             return 1;
         }
 
-        $this->db = $this->getContainer()->get(Db\ConnectionInterface::class);
+        $this->db = Db::get();
 
         $qb = $this->buildQuery();
         $stmt = $qb->execute();
@@ -117,6 +117,8 @@ class MigrateElementNamesCommand extends AbstractCommand
         }
 
         $this->processUpdates();
+
+        return 0;
     }
 
     private function buildQuery(): QueryBuilder

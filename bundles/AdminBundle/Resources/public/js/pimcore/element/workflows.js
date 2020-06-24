@@ -19,31 +19,12 @@ pimcore.element.workflows = Class.create({
         this.type = type;
     },
 
-    /*getLayout: function() {
-        
-        if (this.layout == null) {
-            this.layout = Ext.create("Ext.Panel", {
-                tabConfig: {
-                    tooltip: t('workflow_details')
-                },
-                region: "center",
-                iconCls: "pimcore_icon_workflow_action",
-                layout: 'border',
-                listeners: {
-                    activate: this.getGridLayout.bind(this)
-                }
-            });
-        }
-        return this.layout;
-    }*/
-
     getLayout: function () {
 
         if (this.layout == null) {
 
-            var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize();
             this.store = pimcore.helpers.grid.buildDefaultStore(
-                '/admin/workflow/get-workflow-details?ctype=' + this.type  + '&cid=' + this.element.id,
+                Routing.generate('pimcore_admin_workflow_getworkflowdetailsstore', {ctype: this.type, cid: this.element.id}),
                 ['workflowName','placeInfo','graph'],
                 0, //no paging needed
                 {autoLoad: false}
@@ -76,7 +57,7 @@ pimcore.element.workflows = Class.create({
                     tooltip: t('workflow_details')
                 },
                 items: [this.grid],
-                iconCls: "pimcore_icon_workflow_action",
+                iconCls: "pimcore_material_icon_workflow pimcore_material_icon",
                 layout: 'border'
             });
 

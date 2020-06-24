@@ -17,13 +17,9 @@ declare(strict_types=1);
 
 namespace Pimcore\Bundle\GeneratorBundle\Command;
 
-use Pimcore\Bundle\GeneratorBundle\Command\Helper\QuestionHelper;
 use Pimcore\Bundle\GeneratorBundle\Generator\BundleGenerator;
-use Pimcore\Bundle\GeneratorBundle\Model\Bundle;
-use Sensio\Bundle\GeneratorBundle\Command\GenerateBundleCommand as BaseGenerateBundleCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\HttpKernel\Bundle\BundleInterface;
 
 class GenerateBundleCommand extends BaseGenerateBundleCommand
 {
@@ -61,15 +57,6 @@ EOT
             );
     }
 
-    protected function getSkeletonDirs(BundleInterface $bundle = null)
-    {
-        $dirs = parent::getSkeletonDirs($bundle);
-
-        array_unshift($dirs, __DIR__ . '/../Resources/skeleton');
-
-        return $dirs;
-    }
-
     /**
      * @inheritDoc
      */
@@ -85,6 +72,8 @@ EOT
      *
      * @throws \InvalidArgumentException When namespace doesn't end with Bundle
      * @throws \RuntimeException         When bundle can't be executed
+     *
+     * @return int
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
@@ -119,27 +108,7 @@ EOT
         }
 
         $questionHelper->writeGeneratorSummary($output, $errors);
-    }
 
-    protected function getQuestionHelper()
-    {
-        $question = $this->getHelperSet()->get('question');
-        if (!$question || get_class($question) !== QuestionHelper::class) {
-            $this->getHelperSet()->set($question = new QuestionHelper());
-        }
-
-        return $question;
-    }
-
-    protected function createBundleObject(InputInterface $input)
-    {
-        $bundle = parent::createBundleObject($input);
-
-        return new Bundle($bundle);
-    }
-
-    protected function createGenerator()
-    {
-        return new BundleGenerator($this->getContainer()->get('filesystem'));
+        return 0;
     }
 }

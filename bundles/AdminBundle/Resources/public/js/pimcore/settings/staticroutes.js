@@ -54,7 +54,7 @@ pimcore.settings.staticroutes = Class.create({
 
     getRowEditor:function () {
 
-        var url = '/admin/settings/staticroutes?';
+        var url = Routing.generate('pimcore_admin_settings_staticroutes');
 
         this.store = pimcore.helpers.grid.buildDefaultStore(
             url,
@@ -70,7 +70,7 @@ pimcore.settings.staticroutes = Class.create({
                 {name:'defaults'},
                 {name:'siteId'},
                 {name:'priority', type:'int'},
-                {name:'legacy', type:'bool'},
+                {name:'methods'},
                 {name:'creationDate'},
                 {name:'modificationDate'}
             ], null, {
@@ -96,13 +96,6 @@ pimcore.settings.staticroutes = Class.create({
             }
         });
 
-        var legacyCheck = new Ext.grid.column.Check({
-            text: t("legacy_mode"),
-            dataIndex: "legacy",
-            hidden: !pimcore.settings.isLegacyModeAvailable,
-            width: 90
-        });
-
         var typesColumns = [
             {text:t("name"), flex:50, sortable:true, dataIndex:'name',
                 editor:new Ext.form.TextField({})},
@@ -117,7 +110,7 @@ pimcore.settings.staticroutes = Class.create({
                         autoDestroy: true,
                         proxy: {
                             type: 'ajax',
-                            url: "/admin/misc/get-available-modules",
+                            url: Routing.generate('pimcore_admin_misc_getavailablemodules'),
                             reader: {
                                 type: 'json',
                                 rootProperty: 'data'
@@ -135,7 +128,7 @@ pimcore.settings.staticroutes = Class.create({
                         autoDestroy:true,
                         proxy: {
                             type: 'ajax',
-                            url:"/admin/misc/get-available-controllers",
+                            url:Routing.generate('pimcore_admin_misc_getavailablecontrollers'),
                             reader: {
                                 type: 'json',
                                 rootProperty: 'data'
@@ -168,7 +161,7 @@ pimcore.settings.staticroutes = Class.create({
                         autoDestroy:true,
                         proxy: {
                             type: 'ajax',
-                            url:"/admin/misc/get-available-actions",
+                            url:Routing.generate('pimcore_admin_misc_getavailableactions'),
                             reader: {
                                 type: 'json',
                                 rootProperty: 'data'
@@ -208,7 +201,9 @@ pimcore.settings.staticroutes = Class.create({
                 mode:"local",
                 triggerAction:"all"
             })},
-            legacyCheck,
+            {text:t("methods"), flex:50, sortable:false, dataIndex:'methods',
+                editor:new Ext.form.TextField({}),
+            },
             {text: t("creationDate"), sortable: true, dataIndex: 'creationDate', editable: false,
                 hidden: true,
                 renderer: function(d) {
@@ -260,25 +255,33 @@ pimcore.settings.staticroutes = Class.create({
             bodyCls: "pimcore_editable_grid",
             trackMouseOver:true,
             stripeRows:true,
-            columns:typesColumns,
+            columns: {
+                items: typesColumns,
+                defaults: {
+                    renderer: Ext.util.Format.htmlEncode
+                },
+            },
             sm: Ext.create('Ext.selection.RowModel', {}),
             plugins: [
                 this.cellEditing
             ],
-            tbar:[
-                {
-                    text:t('add'),
-                    handler:this.onAdd.bind(this),
-                    iconCls:"pimcore_icon_add"
-                },
-                "->",
-                {
-                    text:t("filter") + "/" + t("search"),
-                    xtype:"tbtext",
-                    style:"margin: 0 10px 0 0;"
-                },
-                this.filterField
-            ],
+            tbar: {
+                cls: 'pimcore_main_toolbar',
+                items: [
+                    {
+                        text:t('add'),
+                        handler:this.onAdd.bind(this),
+                        iconCls:"pimcore_icon_add"
+                    },
+                    "->",
+                    {
+                        text:t("filter") + "/" + t("search"),
+                        xtype:"tbtext",
+                        style:"margin: 0 10px 0 0;"
+                    },
+                    this.filterField
+                ]
+            },
             viewConfig:{
                 forceFit:true
             }

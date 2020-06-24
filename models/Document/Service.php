@@ -21,7 +21,6 @@ use Pimcore\Document\Renderer\DocumentRenderer;
 use Pimcore\Document\Renderer\DocumentRendererInterface;
 use Pimcore\Event\DocumentEvents;
 use Pimcore\Event\Model\DocumentEvent;
-use Pimcore\Exception\MissingDependencyException;
 use Pimcore\File;
 use Pimcore\Model;
 use Pimcore\Model\Document;
@@ -32,15 +31,16 @@ use Symfony\Component\HttpFoundation\Request;
 
 /**
  * @method \Pimcore\Model\Document\Service\Dao getDao()
- * @method array getTranslations(Document $document)
+ * @method array getTranslations(Document $document, string $task = 'open')
  * @method addTranslation(Document $document, Document $translation, $language = null)
  * @method removeTranslation(Document $document)
  * @method int getTranslationSourceId(Document $document)
+ * @method removeTranslationLink(Document $document, Document $targetDocument)
  */
 class Service extends Model\Element\Service
 {
     /**
-     * @var Model\User
+     * @var Model\User|null
      */
     protected $_user;
     /**
@@ -54,7 +54,7 @@ class Service extends Model\Element\Service
     protected $nearestPathCache;
 
     /**
-     * @param null $user
+     * @param Model\User $user
      */
     public function __construct($user = null)
     {
@@ -62,7 +62,7 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * Renders a document outside of a view with support for legacy documents
+     * Renders a document outside of a view
      *
      * Parameter order was kept for BC (useLayout before query and options).
      *
@@ -81,39 +81,11 @@ class Service extends Model\Element\Service
         $container = \Pimcore::getContainer();
 
         /** @var DocumentRendererInterface $renderer */
-        $renderer = null;
-
-        if ($document->doRenderWithLegacyStack()) {
-            $serviceId = 'pimcore.legacy.document.renderer';
-            if (!$container->has($serviceId)) {
-                throw new MissingDependencyException(sprintf(
-                    'Document %d (%s) is expected to be rendered with the legacy renderer, but legacy renderer does not exist as service "%s"',
-                    $document->getId(),
-                    $document->getFullPath(),
-                    $serviceId
-                ));
-            }
-
-            $renderer = $container->get($serviceId);
-        } else {
-            $renderer = $container->get(DocumentRenderer::class);
-        }
+        $renderer = $container->get(DocumentRenderer::class);
 
         // keep useLayout compatibility
         $attributes['_useLayout'] = $useLayout;
-
-        // set locale based on document
-        $localeService = $container->get('pimcore.locale');
-        $documentLocale = $document->getProperty('language');
-        $tempLocale = $localeService->getLocale();
-        if ($documentLocale) {
-            $localeService->setLocale($documentLocale);
-        }
-
         $content = $renderer->render($document, $attributes, $query, $options);
-
-        // restore original locale
-        $localeService->setLocale($tempLocale);
 
         return $content;
     }
@@ -121,9 +93,11 @@ class Service extends Model\Element\Service
     /**
      * Save document and all child documents
      *
-     * @param     $document
+     * @param Document $document
      * @param int $collectGarbageAfterIteration
      * @param int $saved
+     *
+     * @throws \Exception
      */
     public static function saveRecursive($document, $collectGarbageAfterIteration = 25, &$saved = 0)
     {
@@ -136,14 +110,14 @@ class Service extends Model\Element\Service
         }
 
         foreach ($document->getChildren() as $child) {
-            if (!$child->hasChilds()) {
+            if (!$child->hasChildren()) {
                 $child->save();
                 $saved++;
                 if ($saved % $collectGarbageAfterIteration === 0) {
                     \Pimcore::collectGarbage();
                 }
             }
-            if ($child->hasChilds()) {
+            if ($child->hasChildren()) {
                 self::saveRecursive($child, $collectGarbageAfterIteration, $saved);
             }
         }
@@ -153,7 +127,9 @@ class Service extends Model\Element\Service
      * @param  Document $target
      * @param  Document $source
      *
-     * @return Document copied document
+     * @return Document|null copied document
+     *
+     * @throws \Exception
      */
     public function copyRecursive($target, $source)
     {
@@ -163,7 +139,7 @@ class Service extends Model\Element\Service
             $this->_copyRecursiveIds = [];
         }
         if (in_array($source->getId(), $this->_copyRecursiveIds)) {
-            return;
+            return null;
         }
 
         if (method_exists($source, 'getElements')) {
@@ -172,13 +148,14 @@ class Service extends Model\Element\Service
 
         $source->getProperties();
 
+        /** @var Document $new */
         $new = Element\Service::cloneMe($source);
         $new->setId(null);
         $new->setChildren(null);
         $new->setKey(Element\Service::getSaveCopyName('document', $new->getKey(), $target));
         $new->setParentId($target->getId());
-        $new->setUserOwner($this->_user->getId());
-        $new->setUserModification($this->_user->getId());
+        $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
+        $new->setUserModification($this->_user ? $this->_user->getId() : 0);
         $new->setDao(null);
         $new->setLocked(false);
         $new->setCreationDate(time());
@@ -191,11 +168,11 @@ class Service extends Model\Element\Service
         // add to store
         $this->_copyRecursiveIds[] = $new->getId();
 
-        foreach ($source->getChildren() as $child) {
+        foreach ($source->getChildren(true) as $child) {
             $this->copyRecursive($new, $child);
         }
 
-        $this->updateChilds($target, $new);
+        $this->updateChildren($target, $new);
 
         // triggers actions after the complete document cloning
         \Pimcore::getEventDispatcher()->dispatch(DocumentEvents::POST_COPY, new DocumentEvent($new, [
@@ -206,8 +183,8 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @param $target
-     * @param $source
+     * @param Document $target
+     * @param Document $source
      * @param bool $enableInheritance
      * @param bool $resetIndex
      *
@@ -223,13 +200,16 @@ class Service extends Model\Element\Service
 
         $source->getProperties();
 
+        /**
+         * @var Document $new
+         */
         $new = Element\Service::cloneMe($source);
         $new->setId(null);
-        $new->setChilds(null);
+        $new->setChildren(null);
         $new->setKey(Element\Service::getSaveCopyName('document', $new->getKey(), $target));
         $new->setParentId($target->getId());
-        $new->setUserOwner($this->_user->getId());
-        $new->setUserModification($this->_user->getId());
+        $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
+        $new->setUserModification($this->_user ? $this->_user->getId() : 0);
         $new->setDao(null);
         $new->setLocked(false);
         $new->setCreationDate(time());
@@ -254,7 +234,7 @@ class Service extends Model\Element\Service
 
         $new->save();
 
-        $this->updateChilds($target, $new);
+        $this->updateChildren($target, $new);
 
         //link translated document
         if ($language) {
@@ -270,8 +250,8 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @param $target
-     * @param $source
+     * @param Document $target
+     * @param Document $source
      *
      * @return mixed
      *
@@ -286,6 +266,7 @@ class Service extends Model\Element\Service
         }
 
         if ($source instanceof Document\PageSnippet) {
+            /** @var PageSnippet $target */
             $target->setElements($source->getElements());
 
             $target->setTemplate($source->getTemplate());
@@ -293,24 +274,19 @@ class Service extends Model\Element\Service
             $target->setController($source->getController());
 
             if ($source instanceof Document\Page) {
+                /** @var Page $target */
                 $target->setTitle($source->getTitle());
                 $target->setDescription($source->getDescription());
             }
         } elseif ($source instanceof Document\Link) {
+            /** @var Link $target */
             $target->setInternalType($source->getInternalType());
             $target->setInternal($source->getInternal());
             $target->setDirect($source->getDirect());
             $target->setLinktype($source->getLinktype());
-            $target->setTarget($source->getTarget());
-            $target->setParameters($source->getParameters());
-            $target->setAnchor($source->getAnchor());
-            $target->setTitle($source->getTitle());
-            $target->setAccesskey($source->getAccesskey());
-            $target->setRel($source->getRel());
-            $target->setTabindex($source->getTabindex());
         }
 
-        $target->setUserModification($this->_user->getId());
+        $target->setUserModification($this->_user ? $this->_user->getId() : 0);
         $target->setProperties($source->getProperties());
         $target->save();
 
@@ -341,7 +317,7 @@ class Service extends Model\Element\Service
     /**
      * @static
      *
-     * @param $doc
+     * @param Document $doc
      *
      * @return mixed
      */
@@ -363,8 +339,8 @@ class Service extends Model\Element\Service
     /**
      * @static
      *
-     * @param $path
-     * @param $type
+     * @param string $path
+     * @param string|null $type
      *
      * @return bool
      */
@@ -387,7 +363,7 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @param $type
+     * @param string $type
      *
      * @return bool
      */
@@ -407,8 +383,8 @@ class Service extends Model\Element\Service
      *  "asset" => array(...)
      * )
      *
-     * @param $document
-     * @param $rewriteConfig
+     * @param Document $document
+     * @param array $rewriteConfig
      * @param array $params
      *
      * @return Document
@@ -470,13 +446,15 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @param $url
+     * @param string $url
      *
-     * @return Document
+     * @return Document|null
      */
     public static function getByUrl($url)
     {
         $urlParts = parse_url($url);
+        $document = null;
+
         if ($urlParts['path']) {
             $document = Document::getByPath($urlParts['path']);
 
@@ -494,15 +472,15 @@ class Service extends Model\Element\Service
                 }
             }
         }
-        //TODO: $document is not definied here, shouldn't be null returned here?
+
         return $document;
     }
 
     /**
-     * @param $item
+     * @param Document $item
      * @param int $nr
      *
-     * @return mixed|string
+     * @return string
      *
      * @throws \Exception
      */
@@ -614,7 +592,7 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @param $id
+     * @param int $id
      * @param Request $request
      * @param string $hostUrl
      *
@@ -626,22 +604,13 @@ class Service extends Model\Element\Service
     {
         $success = false;
 
+        /** @var Page $doc */
         $doc = Document::getById($id);
         if (!$hostUrl) {
             $hostUrl = Tool::getHostUrl(false, $request);
         }
 
         $url = $hostUrl . $doc->getRealFullPath();
-
-        $config = \Pimcore\Config::getSystemConfig();
-        if ($config->general->http_auth) {
-            $username = $config->general->http_auth->username;
-            $password = $config->general->http_auth->password;
-            if ($username && $password) {
-                $url = str_replace('://', '://' . $username .':'. $password . '@', $url);
-            }
-        }
-
         $tmpFile = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/screenshot_tmp_' . $doc->getId() . '.png';
         $file = $doc->getPreviewImageFilesystemPath();
 

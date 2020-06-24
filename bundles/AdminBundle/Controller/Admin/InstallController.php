@@ -19,6 +19,7 @@ use Pimcore\Db\ConnectionInterface;
 use Pimcore\Tool\Requirements;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Profiler\Profiler;
 use Symfony\Component\Routing\Annotation\Route;
 
 /**
@@ -27,15 +28,20 @@ use Symfony\Component\Routing\Annotation\Route;
 class InstallController extends AdminController
 {
     /**
-     * @Route("/check", methods={"GET", "POST"})
+     * @Route("/check", name="pimcore_admin_install_check", methods={"GET", "POST"})
      *
      * @param Request $request
      * @param ConnectionInterface $db
+     * @param Profiler $profiler
      *
      * @return Response
      */
-    public function checkAction(Request $request, ConnectionInterface $db)
+    public function checkAction(Request $request, ConnectionInterface $db, ?Profiler $profiler)
     {
+        if ($profiler) {
+            $profiler->disable();
+        }
+
         $checksPHP = Requirements::checkPhp();
         $checksFS = Requirements::checkFilesystem();
         $checksApps = Requirements::checkExternalApplications();

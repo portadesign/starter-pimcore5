@@ -114,8 +114,7 @@ pimcore.settings.gdpr.dataproviders.sentMail = Class.create({
                         }
 
                         var rec = grid.getStore().getAt(rowIndex);
-                        var url = '/admin/email/show-email-log?id=' + rec.get('id') + '&type=html';
-                        url = pimcore.helpers.addCsrfTokenToUrl(url);
+                        var url = Routing.generate('pimcore_admin_email_showemaillog', {id: rec.get('id'), type: 'html'});
                         var iframe = new Ext.Window({
                             title: t("html"),
                             width: iFrameSettings.width,
@@ -155,8 +154,7 @@ pimcore.settings.gdpr.dataproviders.sentMail = Class.create({
                         }
 
                         var rec = grid.getStore().getAt(rowIndex);
-                        var url = '/admin/email/show-email-log?id=' + rec.get('id') + '&type=text';
-                        url = pimcore.helpers.addCsrfTokenToUrl(url);
+                        var url = Routing.generate('pimcore_admin_email_showemaillog', {id: rec.get('id'), type: 'text'});
                         var iframe = new Ext.Window({
                             title: t("text"),
                             width: iFrameSettings.width,
@@ -196,7 +194,7 @@ pimcore.settings.gdpr.dataproviders.sentMail = Class.create({
                         }
 
                         var rec = grid.getStore().getAt(rowIndex);
-                        var url = '/admin/email/show-email-log?id=' + rec.get('id') + '&type=params';
+                        var url = Routing.generate('pimcore_admin_email_showemaillog', {id: rec.get('id'), type: 'params'});
                         var store = Ext.create('Ext.data.TreeStore', {
                             proxy: {
                                 type: 'ajax',
@@ -283,7 +281,7 @@ pimcore.settings.gdpr.dataproviders.sentMail = Class.create({
                             }
 
                             var data = grid.getStore().getAt(rowIndex);
-                            pimcore.helpers.download("/admin/gdpr/sent-mail/export?id=" + data.data.id);
+                            pimcore.helpers.download(Routing.generate('pimcore_admin_gdpr_sentmail_exportdataobject', {id: data.data.id}));
                         }.bind(this),
                         getClass: function(v, meta, rec) {
                             if (!user.isAllowed("emails")) {
@@ -317,7 +315,7 @@ pimcore.settings.gdpr.dataproviders.sentMail = Class.create({
                             fn: function (button) {
                                 if (button == "yes") {
                                     Ext.Ajax.request({
-                                        url: '/admin/email/delete-email-log',
+                                        url: Routing.generate('pimcore_admin_email_deleteemaillog'),
                                         method: 'DELETE',
                                         success: function(response){
                                             var data = Ext.decode( response.responseText );
@@ -354,7 +352,7 @@ pimcore.settings.gdpr.dataproviders.sentMail = Class.create({
 
 
         this.store = pimcore.helpers.grid.buildDefaultStore(
-            '/admin/email/email-logs?',
+            Routing.generate('pimcore_admin_email_emaillogs'),
             storeFields,
             itemsPerPage
         );
@@ -365,7 +363,7 @@ pimcore.settings.gdpr.dataproviders.sentMail = Class.create({
         this.pagingtoolbar = pimcore.helpers.grid.buildDefaultPagingToolbar(this.store);
 
         var toolbar = Ext.create('Ext.Toolbar', {
-            cls: 'main-toolbar',
+            cls: 'pimcore_main_toolbar',
             items: [
                 {
                     text: t("gdpr_dataSource_sentMail_only_email") + ": " + this.searchParams.email,

@@ -22,6 +22,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
 use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
+use Symfony\Component\HttpKernel\Profiler\Profiler;
 use Symfony\Component\Routing\Annotation\Route;
 
 class LinfoController extends AdminController implements EventedControllerInterface
@@ -32,14 +33,19 @@ class LinfoController extends AdminController implements EventedControllerInterf
     protected $linfoHome = '';
 
     /**
-     * @Route("/external_linfo/")
+     * @Route("/external_linfo/", name="pimcore_admin_external_linfo_index")
      *
      * @param Request $request
+     * @param Profiler $profiler
      *
      * @return Response
      */
-    public function indexAction(Request $request)
+    public function indexAction(Request $request, ?Profiler $profiler)
     {
+        if ($profiler) {
+            $profiler->disable();
+        }
+
         $settings = Common::getVarFromFile($this->linfoHome . 'sample.config.inc.php', 'settings');
         $settings['compress_content'] = false;
 
@@ -55,7 +61,7 @@ class LinfoController extends AdminController implements EventedControllerInterf
     }
 
     /**
-     * @Route("/external_linfo/layout/{anything}", defaults={"anything" = null}, requirements={"anything"=".+"})
+     * @Route("/external_linfo/layout/{anything}", name="pimcore_admin_external_linfo_layout", defaults={"anything" = null}, requirements={"anything"=".+"})
      *
      * @param Request $request
      *

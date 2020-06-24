@@ -32,12 +32,12 @@ class Notification extends AbstractModel
     protected $id;
 
     /**
-     * @var int
+     * @var string
      */
     protected $creationDate;
 
     /**
-     * @var int
+     * @var string
      */
     protected $modificationDate;
 
@@ -67,7 +67,7 @@ class Notification extends AbstractModel
     protected $message;
 
     /**
-     * @var Element\AbstractElement
+     * @var Element\ElementInterface|null
      */
     protected $linkedElement;
 
@@ -93,10 +93,13 @@ class Notification extends AbstractModel
         try {
             $notification = Cache\Runtime::get($cacheKey);
         } catch (\Exception $ex) {
-            $notification = new self();
-            $notification->getDao()->getById($id);
-
-            Cache\Runtime::set($cacheKey, $notification);
+            try {
+                $notification = new self();
+                $notification->getDao()->getById($id);
+                Cache\Runtime::set($cacheKey, $notification);
+            } catch (\Exception $e) {
+                $notification = null;
+            }
         }
 
         return $notification;
@@ -231,7 +234,7 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param null|string $title
+     * @param null|string $type
      *
      * @return Notification
      */
@@ -263,9 +266,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @return null|Element\AbstractElement
+     * @return null|Element\ElementInterface
      */
-    public function getLinkedElement(): ?Element\AbstractElement
+    public function getLinkedElement(): ?Element\ElementInterface
     {
         return $this->linkedElement;
     }

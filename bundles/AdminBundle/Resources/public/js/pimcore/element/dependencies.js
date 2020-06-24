@@ -22,7 +22,7 @@ pimcore.element.dependencies = Class.create({
     },
 
     getLayout: function() {
-        
+
         if (this.layout == null) {
             this.layout = new Ext.Panel({
                 tabConfig: {
@@ -33,7 +33,7 @@ pimcore.element.dependencies = Class.create({
                     pack: 'start',
                     align: 'stretch',
                 },
-                iconCls: "pimcore_icon_dependencies",
+                iconCls: "pimcore_material_icon_dependencies pimcore_material_icon",
                 listeners:{
                     activate: this.getGridLayouts.bind(this)
                 }
@@ -53,13 +53,13 @@ pimcore.element.dependencies = Class.create({
     completeLoad: function() {
         this.layout.add(this.requiresPanel);
         this.layout.add(this.requiredByPanel);
-        
+
         this.layout.updateLayout();
     },
 
 
     getGridLayouts: function() {
-        
+
         // only load it once
         if(this.requiresLoaded && this.requiredByLoaded) {
             return;
@@ -70,16 +70,30 @@ pimcore.element.dependencies = Class.create({
 
         this.waitForLoaded();
     },
-        
+
     getRequiresLayout: function() {
 
         var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize(-1);
+
+        var requiresModel = 'requiresModel';
+        if (!Ext.ClassManager.isCreated(requiresModel)) {
+            Ext.define(requiresModel, {
+                extend: 'Ext.data.Model',
+                idProperty: 'rowId',
+                fields: [
+                    'id',
+                    'path',
+                    'type',
+                    'subtype'
+                ]
+            });
+        }
 
         this.requiresStore = new Ext.data.Store({
             pageSize: itemsPerPage,
             proxy : {
                 type: 'ajax',
-                url: '/admin/element/get-requires-dependencies',
+                url: Routing.generate('pimcore_admin_element_getrequiresdependencies'),
                 reader: {
                     type: 'json',
                     rootProperty: 'requires'
@@ -90,7 +104,7 @@ pimcore.element.dependencies = Class.create({
                 }
             },
             autoLoad: false,
-            fields: ['id', 'path', 'type', 'subtype']
+            model: requiresModel
         });
 
         this.requiresGrid = new Ext.grid.GridPanel({
@@ -113,7 +127,8 @@ pimcore.element.dependencies = Class.create({
             bbar: pimcore.helpers.grid.buildDefaultPagingToolbar(this.requiresStore, {pageSize: itemsPerPage})
         });
         this.requiresGrid.on("rowclick", this.click.bind(this));
-        
+        this.requiresGrid.on("rowcontextmenu", this.onRowContextmenu.bind(this));
+
         this.requiresStore.load({
             callback : function(records, operation, success) {
                 if (success) {
@@ -152,18 +167,32 @@ pimcore.element.dependencies = Class.create({
             items: [this.requiresNote, this.requiresGrid]
         });
 
-        this.requiresLoaded = true;        
+        this.requiresLoaded = true;
     },
 
     getRequiredByLayout: function() {
 
         var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize(-1);
-        
+
+        var requiredByModel = 'requiredByModel';
+        if (!Ext.ClassManager.isCreated(requiredByModel)) {
+            Ext.define(requiredByModel, {
+                extend: 'Ext.data.Model',
+                idProperty: 'rowId',
+                fields: [
+                    'id',
+                    'path',
+                    'type',
+                    'subtype'
+                ]
+            });
+        }
+
         this.requiredByStore = new Ext.data.Store({
             pageSize: itemsPerPage,
             proxy : {
                 type: 'ajax',
-                url: '/admin/element/get-required-by-dependencies',
+                url: Routing.generate('pimcore_admin_element_getrequiredbydependencies'),
                 reader: {
                     type: 'json',
                     rootProperty: 'requiredBy'
@@ -174,7 +203,8 @@ pimcore.element.dependencies = Class.create({
                 }
             },
             autoLoad: false,
-            fields: ['id', 'path', 'type', 'subtype']
+            model: requiredByModel
+
         });
 
         this.requiredByGrid = Ext.create('Ext.grid.Panel', {
@@ -197,6 +227,7 @@ pimcore.element.dependencies = Class.create({
             bbar: pimcore.helpers.grid.buildDefaultPagingToolbar(this.requiredByStore,{pageSize: itemsPerPage})
         });
         this.requiredByGrid.on("rowclick", this.click.bind(this));
+        this.requiredByGrid.on("rowcontextmenu", this.onRowContextmenu.bind(this));
 
         this.requiredByStore.load({
             callback : function(records, operation, success) {
@@ -236,23 +267,28 @@ pimcore.element.dependencies = Class.create({
             autoExpandColumn: "path",
             items: [this.requiredByNote, this.requiredByGrid]
         });
-    
-        this.requiredByLoaded = true;        
+
+        this.requiredByLoaded = true;
     },
 
     click: function ( grid, record, tr, rowIndex, e, eOpts ) {
-        
         var d = record.data;
+        pimcore.helpers.openElement(d.id, d.type, d.subtype);
+    },
 
-        if (d.type == "object") {
-            pimcore.helpers.openObject(d.id, d.subtype);
-        }
-        else if (d.type == "asset") {
-            pimcore.helpers.openAsset(d.id, d.subtype);
-        }
-        else if (d.type == "document") {
-            pimcore.helpers.openDocument(d.id, d.subtype);
-        }
+    onRowContextmenu: function (grid, record, tr, rowIndex, e, eOpts) {
+        var menu = new Ext.menu.Menu();
+        var data = record.data;
+
+        menu.add(new Ext.menu.Item({
+            text: t('open'),
+            iconCls: "pimcore_icon_open",
+            handler: function (data) {
+                pimcore.helpers.openElement(data.id, data.type, data.subtype);
+            }.bind(this, data)
+        }));
+
+        e.stopEvent();
+        menu.showAt(e.getXY());
     }
-
 });

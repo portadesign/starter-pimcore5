@@ -17,6 +17,8 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
 use Pimcore\Cache\Core\CoreHandlerInterface;
 use Pimcore\Controller\EventedControllerInterface;
+use Pimcore\Event\Model\TargetGroupEvent;
+use Pimcore\Event\TargetGroupEvents;
 use Pimcore\Model\Tool\Targeting;
 use Pimcore\Model\Tool\Targeting\TargetGroup;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,7 +35,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     /* RULES */
 
     /**
-     * @Route("/rule/list", methods={"GET"})
+     * @Route("/rule/list", name="pimcore_admin_targeting_rulelist", methods={"GET"})
      *
      * @param Request $request
      *
@@ -43,7 +45,6 @@ class TargetingController extends AdminController implements EventedControllerIn
     {
         $targets = [];
 
-        /** @var Targeting\Rule\Listing|Targeting\Rule\Listing\Dao $target */
         $list = new Targeting\Rule\Listing();
         $list->setOrderKey('prio');
         $list->setOrder('ASC');
@@ -62,7 +63,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     }
 
     /**
-     * @Route("/rule/add", methods={"POST"})
+     * @Route("/rule/add", name="pimcore_admin_targeting_ruleadd", methods={"POST"})
      *
      * @param Request $request
      *
@@ -78,7 +79,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     }
 
     /**
-     * @Route("/rule/delete", methods={"DELETE"})
+     * @Route("/rule/delete", name="pimcore_admin_targeting_ruledelete", methods={"DELETE"})
      *
      * @param Request $request
      *
@@ -98,7 +99,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     }
 
     /**
-     * @Route("/rule/get", methods={"GET"})
+     * @Route("/rule/get", name="pimcore_admin_targeting_ruleget", methods={"GET"})
      *
      * @param Request $request
      *
@@ -112,7 +113,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     }
 
     /**
-     * @Route("/rule/save", methods={"PUT"})
+     * @Route("/rule/save", name="pimcore_admin_targeting_rulesave", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -133,7 +134,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     }
 
     /**
-     * @Route("/rule/order", methods={"POST"})
+     * @Route("/rule/order", name="pimcore_admin_targeting_ruleorder", methods={"POST"})
      *
      * @param Request $request
      *
@@ -180,7 +181,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     /* TARGET GROUPS */
 
     /**
-     * @Route("/target-group/list", methods={"GET"})
+     * @Route("/target-group/list", name="pimcore_admin_targeting_targetgrouplist", methods={"GET"})
      *
      * @param Request $request
      *
@@ -216,7 +217,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     }
 
     /**
-     * @Route("/target-group/add", methods={"POST"})
+     * @Route("/target-group/add", name="pimcore_admin_targeting_targetgroupadd", methods={"POST"})
      *
      * @param Request $request
      * @param CoreHandlerInterface $cache
@@ -230,13 +231,16 @@ class TargetingController extends AdminController implements EventedControllerIn
         $targetGroup->setName($request->get('name'));
         $targetGroup->save();
 
+        $event = new TargetGroupEvent($targetGroup);
+        \Pimcore::getEventDispatcher()->dispatch(TargetGroupEvents::POST_ADD, $event);
+
         $cache->clearTag('target_groups');
 
         return $this->adminJson(['success' => true, 'id' => $targetGroup->getId()]);
     }
 
     /**
-     * @Route("/target-group/delete", methods={"DELETE"})
+     * @Route("/target-group/delete", name="pimcore_admin_targeting_targetgroupdelete", methods={"DELETE"})
      *
      * @param Request $request
      * @param CoreHandlerInterface $cache
@@ -250,8 +254,11 @@ class TargetingController extends AdminController implements EventedControllerIn
         /** @var TargetGroup|TargetGroup\Dao $targetGroup */
         $targetGroup = TargetGroup::getById($request->get('id'));
         if ($targetGroup) {
+            $event = new TargetGroupEvent($targetGroup);
             $targetGroup->delete();
             $success = true;
+
+            \Pimcore::getEventDispatcher()->dispatch(TargetGroupEvents::POST_DELETE, $event);
         }
 
         $cache->clearTag('target_groups');
@@ -260,7 +267,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     }
 
     /**
-     * @Route("/target-group/get", methods={"GET"})
+     * @Route("/target-group/get", name="pimcore_admin_targeting_targetgroupget", methods={"GET"})
      *
      * @param Request $request
      *
@@ -275,7 +282,7 @@ class TargetingController extends AdminController implements EventedControllerIn
     }
 
     /**
-     * @Route("/target-group/save", methods={"PUT"})
+     * @Route("/target-group/save", name="pimcore_admin_targeting_targetgroupsave", methods={"PUT"})
      *
      * @param Request $request
      * @param CoreHandlerInterface $cache
@@ -290,6 +297,9 @@ class TargetingController extends AdminController implements EventedControllerIn
         $targetGroup = TargetGroup::getById($request->get('id'));
         $targetGroup->setValues($data['settings']);
         $targetGroup->save();
+
+        $event = new TargetGroupEvent($targetGroup);
+        \Pimcore::getEventDispatcher()->dispatch(TargetGroupEvents::POST_UPDATE, $event);
 
         $cache->clearTag('target_groups');
 

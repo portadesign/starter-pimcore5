@@ -17,14 +17,21 @@
 
 namespace Pimcore\Model\Element\Recyclebin;
 
+use DeepCopy\DeepCopy;
+use DeepCopy\TypeMatcher\TypeMatcher;
 use Pimcore\Cache;
 use Pimcore\File;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\AbstractObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
+use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
+use Pimcore\Model\Version\PimcoreClassDefinitionMatcher;
+use Pimcore\Model\Version\PimcoreClassDefinitionReplaceFilter;
 use Pimcore\Tool\Serialize;
 
 /**
@@ -78,7 +85,7 @@ class Item extends Model\AbstractModel
      * @param Element\ElementInterface $element
      * @param Model\User $user
      */
-    public static function create(Element\ElementInterface $element, Model\User $user)
+    public static function create(Element\ElementInterface $element, Model\User $user = null)
     {
         $item = new self();
         $item->setElement($element);
@@ -88,20 +95,24 @@ class Item extends Model\AbstractModel
     /**
      * @static
      *
-     * @param $id
+     * @param int $id
      *
-     * @return Element\Recyclebin\Item
+     * @return self|null
      */
     public static function getById($id)
     {
-        $item = new self();
-        $item->getDao()->getById($id);
+        try {
+            $item = new self();
+            $item->getDao()->getById($id);
 
-        return $item;
+            return $item;
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /**
-     * @param null $user
+     * @param Model\User|null $user
      *
      * @throws \Exception
      */
@@ -132,11 +143,12 @@ class Item extends Model\AbstractModel
             // see https://github.com/pimcore/pimcore/issues/4219
             Model\Version::disable();
             $className = get_class($element);
+            /** @var Document|Asset|AbstractObject $dummy */
             $dummy = \Pimcore::getContainer()->get('pimcore.model.factory')->build($className);
             $dummy->setId($element->getId());
-            $dummy->setPath($element->getPath());
+            $dummy->setParentId($element->getParentId() ?: 1);
             $dummy->setKey($element->getKey());
-            if ($element instanceof DataObject\Concrete) {
+            if ($dummy instanceof DataObject\Concrete) {
                 $dummy->setOmitMandatoryCheck(true);
             }
             $dummy->save(['isRecycleBinRestore' => true]);
@@ -151,7 +163,12 @@ class Item extends Model\AbstractModel
         }
 
         try {
-            $this->restoreChilds($element);
+            $isDirtyDetectionDisabled = AbstractObject::isDirtyDetectionDisabled();
+            AbstractObject::disableDirtyDetection();
+
+            $this->doRecursiveRestore($element);
+
+            AbstractObject::setDisableDirtyDetection($isDirtyDetectionDisabled);
         } catch (\Exception $e) {
             Logger::error($e);
             if ($dummy) {
@@ -159,6 +176,7 @@ class Item extends Model\AbstractModel
             }
             throw $e;
         }
+
         $this->delete();
     }
 
@@ -175,7 +193,7 @@ class Item extends Model\AbstractModel
         $this->setPath($this->getElement()->getRealFullPath());
         $this->setDate(time());
 
-        $this->loadChilds($this->getElement());
+        $this->loadChildren($this->getElement());
 
         if ($user instanceof Model\User) {
             $this->setDeletedby($user->getName());
@@ -183,7 +201,9 @@ class Item extends Model\AbstractModel
 
         // serialize data
         Element\Service::loadAllFields($this->element);
-        $data = Serialize::serialize($this->getElement());
+
+        $condensedData = $this->marshalData($this->getElement());
+        $data = Serialize::serialize($condensedData);
 
         $this->getDao()->save();
 
@@ -194,7 +214,7 @@ class Item extends Model\AbstractModel
         File::put($this->getStoreageFile(), $data);
 
         $saveBinaryData = function ($element, $rec, $scope) {
-            // assets are kina special because they can contain massive amount of binary data which isn't serialized, we create separate files for them
+            // assets are kind of special because they can contain massive amount of binary data which isn't serialized, we create separate files for them
             if ($element instanceof Asset) {
                 if ($element->getType() != 'folder') {
                     $handle = fopen($scope->getStorageFileBinary($element), 'w', false, File::getContext());
@@ -235,7 +255,7 @@ class Item extends Model\AbstractModel
     /**
      * @param Element\ElementInterface $element
      */
-    public function loadChilds(Element\ElementInterface $element)
+    public function loadChildren(Element\ElementInterface $element)
     {
         $this->amount++;
 
@@ -243,34 +263,38 @@ class Item extends Model\AbstractModel
 
         // for all
         $element->getProperties();
-        if (method_exists($element, 'getScheduledTasks')) {
-            $element->getScheduledTasks();
+        $element->getScheduledTasks();
+
+        if ($element instanceof Element\ElementDumpStateInterface) {
+            $element->setInDumpState(true);
         }
 
-        $element->_fulldump = true;
-
         // we need to add the tag of each item to the cache cleared stack, so that the item doesn't gets into the cache
-        // with the property _fulldump set, because this would cause major issues in wakeUp()
+        // with the dump state set to true, because this would cause major issues in wakeUp()
         Cache::addIgnoredTagOnSave($element->getCacheTag());
 
-        if (method_exists($element, 'getChilds')) {
+        if (method_exists($element, 'getChildren')) {
             if ($element instanceof DataObject\AbstractObject) {
                 // because we also want variants
-                $childs = $element->getChildren([DataObject::OBJECT_TYPE_FOLDER, DataObject::OBJECT_TYPE_VARIANT, DataObject::OBJECT_TYPE_OBJECT]);
+                $children = $element->getChildren([DataObject::OBJECT_TYPE_FOLDER, DataObject::OBJECT_TYPE_VARIANT, DataObject::OBJECT_TYPE_OBJECT], true);
+            } elseif ($element instanceof Document) {
+                $children = $element->getChildren(true);
             } else {
-                $childs = $element->getChilds();
+                $children = $element->getChildren();
             }
 
-            foreach ($childs as $child) {
-                $this->loadChilds($child);
+            foreach ($children as $child) {
+                $this->loadChildren($child);
             }
         }
     }
 
     /**
      * @param Element\ElementInterface $element
+     *
+     * @throws \Exception
      */
-    public function restoreChilds(Element\ElementInterface $element)
+    protected function doRecursiveRestore(Element\ElementInterface $element)
     {
         $restoreBinaryData = function ($element, $scope) {
             // assets are kinda special because they can contain massive amount of binary data which isn't serialized, we create separate files for them
@@ -283,6 +307,7 @@ class Item extends Model\AbstractModel
             }
         };
 
+        $element = $this->unmarshalData($element);
         $restoreBinaryData($element, $this);
 
         if ($element instanceof DataObject\Concrete) {
@@ -291,17 +316,119 @@ class Item extends Model\AbstractModel
         }
         $element->save();
 
-        if (method_exists($element, 'getChilds')) {
+        if (method_exists($element, 'getChildren')) {
             if ($element instanceof DataObject\AbstractObject) {
-                // don't use the getter because this will return an empty array (variants are excluded by default)
-                $childs = $element->getObjectVar('o_childs');
+                $children = $element->getChildren([DataObject::OBJECT_TYPE_FOLDER, DataObject::OBJECT_TYPE_VARIANT, DataObject::OBJECT_TYPE_OBJECT], true);
+            } elseif ($element instanceof Document) {
+                $children = $element->getChildren(true);
             } else {
-                $childs = $element->getChildren();
+                $children = $element->getChildren();
             }
-            foreach ($childs as $child) {
-                $this->restoreChilds($child);
+            if (is_array($children)) {
+                foreach ($children as $child) {
+                    $child->setParentId($element->getId());
+                    $this->doRecursiveRestore($child);
+                }
             }
         }
+    }
+
+    /**
+     * @param Element\ElementInterface $data
+     *
+     * @return mixed
+     */
+    public function marshalData($data)
+    {
+        //for full dump of relation fields in container types
+        $copier = new DeepCopy();
+        $copier->skipUncloneable(true);
+
+        $copier->addFilter(new \DeepCopy\Filter\SetNullFilter(), new \DeepCopy\Matcher\PropertyTypeMatcher('Pimcore\Model\DataObject\ClassDefinition'));
+
+        $copier->addTypeFilter(
+            new \DeepCopy\TypeFilter\ReplaceFilter(
+                function ($currentValue) {
+                    $elementType = Element\Service::getType($currentValue);
+                    $descriptor = new Element\ElementDescriptor($elementType, $currentValue->getId());
+
+                    return $descriptor;
+                }
+            ),
+            new class($this->element) extends TypeMatcher {
+                /**
+                 * @param mixed $element
+                 *
+                 * @return bool
+                 */
+                public function matches($element)
+                {
+                    //compress only elements with full_dump_state = false
+                    return $element instanceof Element\ElementInterface && $element instanceof Element\ElementDumpStateInterface && !($element->isInDumpState());
+                }
+            }
+        );
+        $copier->addFilter(new \DeepCopy\Filter\Doctrine\DoctrineCollectionFilter(), new \DeepCopy\Matcher\PropertyTypeMatcher('Doctrine\Common\Collections\Collection'));
+
+        //filter for marshaling custom data-types which implements CustomRecyclingMarshalInterface
+        if ($data instanceof Concrete) {
+            $copier->addFilter(
+                new PimcoreClassDefinitionReplaceFilter(
+                    function (Concrete $object, Data $fieldDefinition, $property, $currentValue) {
+                        if ($fieldDefinition instanceof Data\CustomRecyclingMarshalInterface) {
+                            return $fieldDefinition->marshalRecycleData($object, $currentValue);
+                        }
+
+                        return $currentValue;
+                    }
+                ), new PimcoreClassDefinitionMatcher(Data\CustomRecyclingMarshalInterface::class)
+            );
+        }
+        $copier->addFilter(new Model\Version\SetDumpStateFilter(true), new \DeepCopy\Matcher\PropertyMatcher(Element\ElementDumpStateInterface::class, Element\ElementDumpStateInterface::DUMP_STATE_PROPERTY_NAME));
+
+        return $copier->copy($data);
+    }
+
+    /**
+     * @param Element\ElementInterface $data
+     *
+     * @return Element\ElementInterface
+     */
+    public function unmarshalData($data)
+    {
+        $copier = new DeepCopy();
+        $copier->addTypeFilter(
+            new \DeepCopy\TypeFilter\ReplaceFilter(
+                function ($currentValue) {
+                    if ($currentValue instanceof Element\ElementDescriptor) {
+                        $value = Element\Service::getElementById($currentValue->getType(), $currentValue->getId());
+
+                        return $value;
+                    }
+
+                    return $currentValue;
+                }
+            ),
+            new Model\Version\UnmarshalMatcher()
+        );
+        $copier->addFilter(new \DeepCopy\Filter\Doctrine\DoctrineCollectionFilter(), new \DeepCopy\Matcher\PropertyTypeMatcher('Doctrine\Common\Collections\Collection'));
+
+        if ($data instanceof Concrete) {
+            //filter for unmarshaling custom data-types which implements CustomRecyclingMarshalInterface
+            $copier->addFilter(
+                new PimcoreClassDefinitionReplaceFilter(
+                    function (Concrete $object, Data $fieldDefinition, $property, $currentValue) {
+                        if ($fieldDefinition instanceof Data\CustomRecyclingMarshalInterface) {
+                            return $fieldDefinition->unmarshalRecycleData($object, $currentValue);
+                        }
+
+                        return $currentValue;
+                    }
+                ), new PimcoreClassDefinitionMatcher(Data\CustomRecyclingMarshalInterface::class)
+            );
+        }
+
+        return $copier->copy($data);
     }
 
     /**
@@ -313,7 +440,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $element
+     * @param Element\ElementInterface $element
      *
      * @return string
      */
@@ -331,7 +458,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $id
+     * @param int $id
      *
      * @return $this
      */
@@ -351,7 +478,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $path
+     * @param string $path
      *
      * @return $this
      */
@@ -371,7 +498,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $type
+     * @param string $type
      *
      * @return $this
      */
@@ -391,7 +518,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $subtype
+     * @param string $subtype
      *
      * @return $this
      */
@@ -411,7 +538,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $amount
+     * @param int $amount
      *
      * @return $this
      */
@@ -431,7 +558,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $date
+     * @param int $date
      *
      * @return $this
      */
@@ -451,7 +578,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $element
+     * @param Element\ElementInterface $element
      *
      * @return $this
      */
@@ -463,7 +590,7 @@ class Item extends Model\AbstractModel
     }
 
     /**
-     * @param $username
+     * @param string $username
      *
      * @return $this
      */

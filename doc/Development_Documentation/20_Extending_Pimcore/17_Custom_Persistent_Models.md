@@ -66,7 +66,7 @@ class Vote extends AbstractModel {
     /**
      * get score by id
      *
-     * @param $id
+     * @param int $id
      * @return null|self
      */
     public static function getById($id) {
@@ -83,7 +83,7 @@ class Vote extends AbstractModel {
     }
  
     /**
-     * @param $score
+     * @param int $score
      */
     public function setScore($score) {
         $this->score = $score;
@@ -97,7 +97,7 @@ class Vote extends AbstractModel {
     }
  
     /**
-     * @param $username
+     * @param string $username
      */
     public function setUsername($username) {
         $this->username = $username;
@@ -111,7 +111,7 @@ class Vote extends AbstractModel {
     }
  
     /**
-     * @param $id
+     * @param int $id
      */
     public function setId($id) {
         $this->id = $id;
@@ -154,7 +154,7 @@ class Dao extends AbstractDao {
     /**
      * get vote by id
      *
-     * @param null $id
+     * @param int|null $id
      * @throws \Exception
      */
     public function getById($id = null) {
@@ -248,7 +248,7 @@ use Pimcore\Model;
 use Zend\Paginator\Adapter\AdapterInterface;
 use Zend\Paginator\AdapterAggregateInterface;
  
-class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_Adapter_Interface, \Zend_Paginator_AdapterAggregate, \Iterator, AdapterInterface, AdapterAggregateInterface
+class Listing extends Model\Listing\AbstractListing implements \Iterator, AdapterInterface, AdapterAggregateInterface
 {
     /**
      * List of Votes.
@@ -258,7 +258,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     public $data = null;
  
     /**
-     * @var string|\Zend_Locale
+     * @var string
      */
     public $locale;
  
@@ -281,10 +281,6 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     {
         $this->data = $data;
     }
- 
-    /**
-     * Methods for \Zend_Paginator_Adapter_Interface.
-     */
  
     /**
      * get total count.
@@ -335,7 +331,7 @@ class Listing extends Model\Listing\AbstractListing implements \Zend_Paginator_A
     /**
      * Get Locale.
      *
-     * @return string|\Zend_Locale
+     * @return string
      */
     public function getLocale()
     {
@@ -436,7 +432,6 @@ class Dao extends Listing\Dao\AbstractDao
      * @return string
      *
      * @throws \Exception
-     * @throws \Zend_Exception
      */
     protected function getTableName()
     {

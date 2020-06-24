@@ -17,14 +17,12 @@ namespace Pimcore\Bundle\AdminBundle\Controller\ExtensionManager;
 use ForceUTF8\Encoding;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
 use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
-use Pimcore\Bundle\LegacyBundle\Controller\Admin\ExtensionManager\LegacyExtensionManagerController;
 use Pimcore\Cache\Symfony\CacheClearer;
 use Pimcore\Controller\EventedControllerInterface;
 use Pimcore\Extension\Bundle\Exception\BundleNotFoundException;
 use Pimcore\Extension\Bundle\PimcoreBundleInterface;
 use Pimcore\Extension\Bundle\PimcoreBundleManager;
 use Pimcore\Extension\Document\Areabrick\AreabrickInterface;
-use Pimcore\Extension\Document\Areabrick\AreabrickManager;
 use Pimcore\Extension\Document\Areabrick\AreabrickManagerInterface;
 use Pimcore\Routing\RouteReferenceInterface;
 use Pimcore\Tool\AssetsInstaller;
@@ -37,10 +35,6 @@ use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Routing\Annotation\Route;
 
-/**
- * Handles all "new" extensions as of pimcore 5 (bundles, new areabrick layout) and pipes legacy extension requests
- * to legacy controller when the legacy bundle is enabled.
- */
 class ExtensionManagerController extends AdminController implements EventedControllerInterface
 {
     /**
@@ -49,7 +43,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
     private $bundleManager;
 
     /**
-     * @var AreabrickManager
+     * @var AreabrickManagerInterface
      */
     private $areabrickManager;
 
@@ -78,7 +72,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
     }
 
     /**
-     * @Route("/admin/extensions", methods={"GET"})
+     * @Route("/admin/extensions", name="pimcore_admin_extensionmanager_extensionmanager_getextensions", methods={"GET"})
      *
      * @return JsonResponse
      */
@@ -89,18 +83,13 @@ class ExtensionManagerController extends AdminController implements EventedContr
             $this->getBrickList()
         );
 
-        $legacyController = $this->getLegacyController();
-        if ($legacyController) {
-            $extensions = array_merge($extensions, $legacyController->getExtensions());
-        }
-
         return $this->adminJson(['extensions' => $extensions]);
     }
 
     /**
      * Updates bundle options (priority, environments)
      *
-     * @Route("/admin/extensions", methods={"PUT"})
+     * @Route("/admin/extensions", name="pimcore_admin_extensionmanager_extensionmanager_updateextensions", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -147,7 +136,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
     }
 
     /**
-     * @Route("/admin/toggle-extension-state", methods={"PUT"})
+     * @Route("/admin/toggle-extension-state", name="pimcore_admin_extensionmanager_extensionmanager_toggleextensionstate", methods={"PUT"})
      *
      * @param Request $request
      * @param KernelInterface $kernel
@@ -161,10 +150,6 @@ class ExtensionManagerController extends AdminController implements EventedContr
         CacheClearer $cacheClearer,
         AssetsInstaller $assetsInstaller
     ) {
-        if (null !== $response = $this->handleLegacyRequest($request, __FUNCTION__)) {
-            return $response;
-        }
-
         $type = $request->get('type');
         $id = $request->get('id');
         $enable = $request->get('method', 'enable') === 'enable' ? true : false;
@@ -240,7 +225,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
     }
 
     /**
-     * @Route("/admin/install", methods={"POST"})
+     * @Route("/admin/install", name="pimcore_admin_extensionmanager_extensionmanager_install", methods={"POST"})
      *
      * @param Request $request
      *
@@ -248,15 +233,11 @@ class ExtensionManagerController extends AdminController implements EventedContr
      */
     public function installAction(Request $request)
     {
-        if (null !== $response = $this->handleLegacyRequest($request, __FUNCTION__)) {
-            return $response;
-        }
-
         return $this->handleInstallation($request, true);
     }
 
     /**
-     * @Route("/admin/uninstall", methods={"POST"})
+     * @Route("/admin/uninstall", name="pimcore_admin_extensionmanager_extensionmanager_uninstall", methods={"POST"})
      *
      * @param Request $request
      *
@@ -264,86 +245,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
      */
     public function uninstallAction(Request $request)
     {
-        if (null !== $response = $this->handleLegacyRequest($request, __FUNCTION__)) {
-            return $response;
-        }
-
         return $this->handleInstallation($request, false);
-    }
-
-    /**
-     * @Route("/admin/update", methods={"POST"})
-     *
-     * @param Request $request
-     *
-     * @return JsonResponse
-     */
-    public function updateAction(Request $request)
-    {
-        try {
-            $bundle = $this->bundleManager->getActiveBundle($request->get('id'), false);
-
-            $this->bundleManager->update($bundle);
-
-            $data = [
-                'success' => true,
-                'bundle' => $this->buildBundleInfo($bundle, true, true)
-            ];
-
-            if (!empty($message = $this->getInstallerOutput($bundle))) {
-                $data['message'] = $message;
-            }
-
-            return $this->adminJson($data);
-        } catch (BundleNotFoundException $e) {
-            return $this->adminJson([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 404);
-        } catch (\Exception $e) {
-            return $this->adminJson([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
-        }
-    }
-
-    /**
-     * @return LegacyExtensionManagerController|null
-     */
-    private function getLegacyController()
-    {
-        if (\Pimcore::isLegacyModeAvailable()) {
-            if ($this->container->has('pimcore.legacy.controller.admin.extension_manager')) {
-                return $this->get('pimcore.legacy.controller.admin.extension_manager');
-            }
-        }
-    }
-
-    /**
-     * Pipe request to legacy controller
-     *
-     * @param Request $request
-     * @param $method
-     *
-     * @return JsonResponse|null
-     */
-    private function handleLegacyRequest(Request $request, $method)
-    {
-        if ($request->get('extensionType') !== 'legacy') {
-            return null;
-        }
-
-        $legacyController = $this->getLegacyController();
-        if (!$legacyController) {
-            throw new BadRequestHttpException(sprintf('Tried to call to legacy extension action %s, but legacy controller was not found', $method));
-        }
-
-        if (!method_exists($legacyController, $method)) {
-            throw new BadRequestHttpException(sprintf('Legacy extension action %s, does not exist on legacy controller', $method));
-        }
-
-        return call_user_func_array([$legacyController, $method], [$request]);
     }
 
     /**
@@ -451,9 +353,9 @@ class ExtensionManagerController extends AdminController implements EventedContr
     }
 
     /**
-     * @param $bundleName
+     * @param string $bundleName
      *
-     * @return PimcoreBundleInterface
+     * @return PimcoreBundleInterface|null
      */
     private function buildBundleInstance($bundleName)
     {
@@ -469,6 +371,8 @@ class ExtensionManagerController extends AdminController implements EventedContr
                 'error' => $e->getMessage()
             ]);
         }
+
+        return null;
     }
 
     /**
@@ -491,7 +395,6 @@ class ExtensionManagerController extends AdminController implements EventedContr
             'active' => $enabled,
             'installable' => false,
             'uninstallable' => false,
-            'updateable' => false,
             'installed' => $installed,
             'canChangeState' => $bm->canChangeState($bundle),
             'configuration' => $this->getIframePath($bundle),
@@ -505,7 +408,6 @@ class ExtensionManagerController extends AdminController implements EventedContr
             $info = array_merge($info, [
                 'installable' => $bm->canBeInstalled($bundle),
                 'uninstallable' => $bm->canBeUninstalled($bundle),
-                'updateable' => $bm->canBeUpdated($bundle),
             ]);
         }
 
@@ -544,6 +446,8 @@ class ExtensionManagerController extends AdminController implements EventedContr
                 return $iframePath;
             }
         }
+
+        return null;
     }
 
     /**
@@ -573,7 +477,6 @@ class ExtensionManagerController extends AdminController implements EventedContr
             'description' => $this->trans($brick->getDescription()),
             'installable' => false,
             'uninstallable' => false,
-            'updateable' => false,
             'installed' => true,
             'active' => $this->areabrickManager->isEnabled($brick->getId()),
             'version' => $brick->getVersion()

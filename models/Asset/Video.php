@@ -41,7 +41,7 @@ class Video extends Model\Asset
      */
     protected function update($params = [])
     {
-        if ($this->getDataChanged() || !$this->getCustomSetting('duration') || !$this->getCustomSetting('embeddedMetaDataExtracted')) {
+        if ($this->getDataChanged() || !$this->getCustomSetting('duration') || !$this->getCustomSetting('embeddedMetaDataExtracted') || !$this->getCustomSetting('videoWidth') || !$this->getCustomSetting('videoHeight')) {
             // save the current data into a tmp file to calculate the dimensions, otherwise updates wouldn't be updated
             // because the file is written in parent::update();
             $tmpFile = $this->getTemporaryFile();
@@ -51,6 +51,21 @@ class Video extends Model\Asset
                     $this->setCustomSetting('duration', $this->getDurationFromBackend($tmpFile));
                 } catch (\Exception $e) {
                     Logger::err('Unable to get duration of video: ' . $this->getId());
+                }
+            }
+
+            if ($this->getDataChanged() || !$this->getCustomSetting('videoWidth') || !$this->getCustomSetting('videoHeight')) {
+                try {
+                    $dimensions = $this->getDimensionsFromBackend();
+                    if ($dimensions) {
+                        $this->setCustomSetting('videoWidth', $dimensions['width']);
+                        $this->setCustomSetting('videoHeight', $dimensions['height']);
+                    } else {
+                        $this->removeCustomSetting('videoWidth');
+                        $this->removeCustomSetting('videoHeight');
+                    }
+                } catch (\Exception $e) {
+                    Logger::err('Unable to get dimensions of video: ' . $this->getId());
                 }
             }
 
@@ -79,19 +94,32 @@ class Video extends Model\Asset
             // clear the thumbnail custom settings
             $this->setCustomSetting('thumbnails', null);
 
-            $imageFiles = glob($this->getImageThumbnailSavePath() . '/image-thumb__' . $this->getId() . '__*');
-            $videoFiles = glob($this->getVideoThumbnailSavePath() . '/video-thumb__' . $this->getId() . '__*');
-            $imageCacheFiles = glob($this->getImageThumbnailSavePath() . '/video-image-cache__' . $this->getId() . '__thumbnail_*');
+            if (is_dir($this->getImageThumbnailSavePath())) {
+                $directoryIterator = new \DirectoryIterator($this->getImageThumbnailSavePath());
+                $filterIterator = new \CallbackFilterIterator($directoryIterator, function (\SplFileInfo $fileInfo) {
+                    return strpos($fileInfo->getFilename(), 'image-thumb__' . $this->getId()) === 0 || strpos($fileInfo->getFilename(), 'video-image-cache__' . $this->getId() . '__thumbnail_') === 0;
+                });
+                /** @var \SplFileInfo $fileInfo */
+                foreach ($filterIterator as $fileInfo) {
+                    recursiveDelete($fileInfo->getPathname());
+                }
+            }
 
-            $files = array_merge($imageFiles, $videoFiles, $imageCacheFiles);
-            foreach ($files as $file) {
-                recursiveDelete($file);
+            if (is_dir($this->getVideoThumbnailSavePath())) {
+                $directoryIterator = new \DirectoryIterator($this->getVideoThumbnailSavePath());
+                $filterIterator = new \CallbackFilterIterator($directoryIterator, function (\SplFileInfo $fileInfo) {
+                    return strpos($fileInfo->getFilename(), 'video-thumb__' . $this->getId()) === 0;
+                });
+                /** @var \SplFileInfo $fileInfo */
+                foreach ($filterIterator as $fileInfo) {
+                    recursiveDelete($fileInfo->getPathname());
+                }
             }
         }
     }
 
     /**
-     * @param string $config
+     * @param string|Video\Thumbnail\Config $config
      *
      * @return Video\Thumbnail\Config|null
      */
@@ -111,10 +139,10 @@ class Video extends Model\Asset
     /**
      * Returns a path to a given thumbnail or an thumbnail configuration
      *
-     * @param $thumbnailName
+     * @param string|Video\Thumbnail\Config $thumbnailName
      * @param array $onlyFormats
      *
-     * @return string
+     * @return array|null
      */
     public function getThumbnail($thumbnailName, $onlyFormats = [])
     {
@@ -152,13 +180,11 @@ class Video extends Model\Asset
     }
 
     /**
-     * @param $thumbnailName
-     * @param null $timeOffset
-     * @param null $imageAsset
+     * @param string|array|Image\Thumbnail\Config $thumbnailName
+     * @param int|null $timeOffset
+     * @param Image|null $imageAsset
      *
-     * @return mixed|string
-     *
-     * @throws \Exception
+     * @return Video\ImageThumbnail
      */
     public function getImageThumbnail($thumbnailName, $timeOffset = null, $imageAsset = null)
     {
@@ -174,7 +200,7 @@ class Video extends Model\Asset
     /**
      * @param string|null $filePath
      *
-     * @return string|null
+     * @return float|null
      *
      * @throws \Exception
      */
@@ -195,7 +221,7 @@ class Video extends Model\Asset
     }
 
     /**
-     * @return array
+     * @return array|null
      *
      * @throws \Exception
      */
@@ -212,7 +238,7 @@ class Video extends Model\Asset
     }
 
     /**
-     * @return mixed
+     * @return int|null
      */
     public function getDuration()
     {
@@ -232,7 +258,7 @@ class Video extends Model\Asset
     }
 
     /**
-     * @return array
+     * @return array|null
      */
     public function getDimensions()
     {
@@ -268,6 +294,8 @@ class Video extends Model\Asset
         if ($dimensions) {
             return $dimensions['width'];
         }
+
+        return null;
     }
 
     /**
@@ -279,6 +307,8 @@ class Video extends Model\Asset
         if ($dimensions) {
             return $dimensions['height'];
         }
+
+        return null;
     }
 
     public function getSphericalMetaData()

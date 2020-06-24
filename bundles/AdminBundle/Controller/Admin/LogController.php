@@ -48,7 +48,7 @@ class LogController extends AdminController implements EventedControllerInterfac
     }
 
     /**
-     * @Route("/log/show", methods={"GET", "POST"})
+     * @Route("/log/show", name="pimcore_admin_log_show", methods={"GET", "POST"})
      *
      * @param Request $request
      *
@@ -183,9 +183,9 @@ class LogController extends AdminController implements EventedControllerInterfac
     }
 
     /**
-     * @param $priority
+     * @param int $priority
      *
-     * @return mixed
+     * @return string
      */
     private function getPriorityName($priority)
     {
@@ -195,7 +195,7 @@ class LogController extends AdminController implements EventedControllerInterfac
     }
 
     /**
-     * @Route("/log/priority-json", methods={"GET"})
+     * @Route("/log/priority-json", name="pimcore_admin_log_priorityjson", methods={"GET"})
      *
      * @param Request $request
      *
@@ -212,7 +212,7 @@ class LogController extends AdminController implements EventedControllerInterfac
     }
 
     /**
-     * @Route("/log/component-json", methods={"GET"})
+     * @Route("/log/component-json", name="pimcore_admin_log_componentjson", methods={"GET"})
      *
      * @param Request $request
      *
@@ -229,7 +229,7 @@ class LogController extends AdminController implements EventedControllerInterfac
     }
 
     /**
-     * @Route("/log/show-file-object", methods={"GET"})
+     * @Route("/log/show-file-object", name="pimcore_admin_log_showfileobject", methods={"GET"})
      *
      * @param Request $request
      *
@@ -240,7 +240,7 @@ class LogController extends AdminController implements EventedControllerInterfac
     public function showFileObjectAction(Request $request)
     {
         $filePath = $request->get('filePath');
-        $filePath = PIMCORE_PROJECT_ROOT . '/' . $filePath;
+        $filePath = PIMCORE_PROJECT_ROOT . DIRECTORY_SEPARATOR . $filePath;
         $filePath = realpath($filePath);
         $fileObjectPath = realpath(PIMCORE_LOG_FILEOBJECT_DIRECTORY);
 

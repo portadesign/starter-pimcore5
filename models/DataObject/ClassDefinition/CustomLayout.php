@@ -67,12 +67,12 @@ class CustomLayout extends Model\AbstractModel
     public $userModification;
 
     /**
-     * @var int
+     * @var string
      */
     public $classId;
 
     /**
-     * @var array
+     * @var Layout|null
      */
     public $layoutDefinitions;
 
@@ -82,18 +82,12 @@ class CustomLayout extends Model\AbstractModel
     public $default;
 
     /**
-     * @param $id
+     * @param string $id
      *
-     * @return mixed|null|CustomLayout
-     *
-     * @throws \Exception
+     * @return null|CustomLayout
      */
     public static function getById($id)
     {
-        if ($id === null) {
-            throw new \Exception('CustomLayout id is null');
-        }
-
         $cacheKey = 'customlayout_' . $id;
 
         try {
@@ -105,12 +99,9 @@ class CustomLayout extends Model\AbstractModel
             try {
                 $customLayout = new self();
                 $customLayout->getDao()->getById($id);
-
                 DataObject\Service::synchronizeCustomLayout($customLayout);
                 \Pimcore\Cache\Runtime::set($cacheKey, $customLayout);
             } catch (\Exception $e) {
-                Logger::error($e);
-
                 return null;
             }
         }
@@ -121,20 +112,31 @@ class CustomLayout extends Model\AbstractModel
     /**
      * @param string $name
      *
-     * @return null|CustomLayout|mixed
+     * @return null|CustomLayout
      */
     public static function getByName(string $name)
     {
-        try {
-            $customLayout = new self();
-            $id = $customLayout->getDao()->getIdByName($name);
-            if ($id) {
-                return self::getById($id);
-            } else {
-                throw new \Exception('There is no customlayout with the name: ' . $name);
-            }
-        } catch (\Exception $e) {
-            Logger::error($e);
+        $customLayout = new self();
+        $id = $customLayout->getDao()->getIdByName($name);
+        if ($id) {
+            return self::getById($id);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $name
+     * @param string $classId
+     *
+     * @return null|CustomLayout
+     */
+    public static function getByNameAndClassId(string $name, $classId)
+    {
+        $customLayout = new self();
+        $id = $customLayout->getDao()->getIdByNameAndClassId($name, $classId);
+        if ($id) {
+            return self::getById($id);
         }
 
         return null;
@@ -143,26 +145,29 @@ class CustomLayout extends Model\AbstractModel
     /**
      * @param string $field
      *
-     * @return \Pimcore\Model\DataObject\ClassDefinition\Data | null
+     * @return Data|null
      */
     public function getFieldDefinition($field)
     {
-        $findElement = function ($key, $definition) use (&$findElement) {
-            if ($definition->getName() == $key) {
+        /**
+         * @param string $key
+         * @param Data|Layout $definition
+         *
+         * @return Data|null
+         */
+        $findElement = static function ($key, $definition) use (&$findElement) {
+            if ($definition->getName() === $key) {
                 return $definition;
-            } else {
-                if (method_exists($definition, 'getChilds')) {
-                    foreach ($definition->getChilds() as $definition) {
-                        if ($definition = $findElement($key, $definition)) {
-                            return $definition;
-                        }
-                    }
-                } else {
-                    if ($definition->getName() == $key) {
-                        return $definition;
+            }
+            if (method_exists($definition, 'getChildren')) {
+                foreach ($definition->getChildren() as $child) {
+                    if ($childDefinition = $findElement($key, $child)) {
+                        return $childDefinition;
                     }
                 }
             }
+
+            return null;
         };
 
         return $findElement($field, $this->getLayoutDefinitions());
@@ -187,8 +192,10 @@ class CustomLayout extends Model\AbstractModel
 
     /**
      * @todo: $isUpdate is not needed
+     *
+     * @param bool $saveDefinitionFile
      */
-    public function save()
+    public function save($saveDefinitionFile = true)
     {
         $isUpdate = $this->exists();
 
@@ -207,7 +214,7 @@ class CustomLayout extends Model\AbstractModel
 
         $this->getDao()->save($isUpdate);
 
-        $this->saveCustomLayoutFile();
+        $this->saveCustomLayoutFile($saveDefinitionFile);
 
         // empty custom layout cache
         try {
@@ -216,6 +223,11 @@ class CustomLayout extends Model\AbstractModel
         }
     }
 
+    /**
+     * @param bool $saveDefinitionFile
+     *
+     * @throws \Exception
+     */
     private function saveCustomLayoutFile($saveDefinitionFile = true)
     {
         // save definition as a php file
@@ -242,7 +254,6 @@ class CustomLayout extends Model\AbstractModel
     }
 
     /**
-     *
      * @return string
      */
     public function getDefinitionFile()
@@ -253,7 +264,7 @@ class CustomLayout extends Model\AbstractModel
     }
 
     /**
-     * @param $data
+     * @param Data|Layout $data
      */
     public static function cleanupForExport(&$data)
     {
@@ -261,8 +272,8 @@ class CustomLayout extends Model\AbstractModel
             unset($data->fieldDefinitionsCache);
         }
 
-        if (method_exists($data, 'getChilds')) {
-            $children = $data->getChilds();
+        if (method_exists($data, 'getChildren')) {
+            $children = $data->getChildren();
             if (is_array($children)) {
                 foreach ($children as $child) {
                     self::cleanupForExport($child);
@@ -280,16 +291,6 @@ class CustomLayout extends Model\AbstractModel
 
         $cd .= '/** ';
         $cd .= "\n";
-        $cd .= '* Generated at: '.date('c')."\n";
-
-        $user = Model\User::getById($this->getUserModification());
-        if ($user) {
-            $cd .= '* Changed by: '.$user->getName().' ('.$user->getId().')'."\n";
-        }
-
-        if (isset($_SERVER['REMOTE_ADDR'])) {
-            $cd .= '* IP: '.$_SERVER['REMOTE_ADDR']."\n";
-        }
 
         if ($this->getDescription()) {
             $description = str_replace(['/**', '*/', '//'], '', $this->getDescription());
@@ -303,7 +304,7 @@ class CustomLayout extends Model\AbstractModel
     }
 
     /**
-     * @param mixed $classId
+     * @param string $classId
      *
      * @return int|null
      */
@@ -343,6 +344,9 @@ class CustomLayout extends Model\AbstractModel
      */
     public function exists()
     {
+        if (is_null($this->getId())) {
+            return false;
+        }
         $name = $this->getDao()->getNameById($this->getId());
 
         return is_string($name);
@@ -509,7 +513,7 @@ class CustomLayout extends Model\AbstractModel
     }
 
     /**
-     * @param array $layoutDefinitions
+     * @param Layout|null $layoutDefinitions
      */
     public function setLayoutDefinitions($layoutDefinitions)
     {
@@ -517,7 +521,7 @@ class CustomLayout extends Model\AbstractModel
     }
 
     /**
-     * @return array
+     * @return Layout|null
      */
     public function getLayoutDefinitions()
     {
@@ -525,7 +529,7 @@ class CustomLayout extends Model\AbstractModel
     }
 
     /**
-     * @param int $classId
+     * @param string $classId
      */
     public function setClassId($classId)
     {

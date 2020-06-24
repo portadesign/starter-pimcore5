@@ -152,6 +152,7 @@ pimcore.settings.targeting.rules.item = Class.create({
             addMenu.push({
                 iconCls: condition.getIconCls(),
                 text: condition.getName(),
+                disabled: !condition.isAvailable(),
                 handler: createHandler(condition)
             });
         });
@@ -201,6 +202,7 @@ pimcore.settings.targeting.rules.item = Class.create({
             title: t("actions"),
             autoScroll: true,
             forceLayout: true,
+            bodyStyle: 'padding: 0 10px 10px 10px;',
             tbar: [{
                 iconCls: "pimcore_icon_add",
                 menu: addMenu
@@ -301,7 +303,7 @@ pimcore.settings.targeting.rules.item = Class.create({
         };
 
         Ext.Ajax.request({
-            url: "/admin/targeting/rule/save",
+            url: Routing.generate('pimcore_admin_targeting_rulesave'),
             method: 'PUT',
             params: {
                 id: this.data.id,
