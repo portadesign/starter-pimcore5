@@ -50,6 +50,11 @@ final class Staticroute extends AbstractModel
      */
     protected array $siteId = [];
 
+     /**
+     * @var int
+     */
+    protected $basePage;
+
     /**
      * @var string[]
      */
@@ -73,6 +78,13 @@ final class Staticroute extends AbstractModel
      *
      */
     protected static array $nameIdMappingCache = [];
+
+    /**
+     * this is a small per request cache which holds id => url basePage mappings
+     *
+     * @var array
+     */
+    protected static $basePageIdMappingCache = [];
 
     /**
      * contains the static route which the current request matches (it he does), this is used in the view to get the current route
@@ -196,9 +208,35 @@ final class Staticroute extends AbstractModel
         return $this->id;
     }
 
-    public function getPattern(): string
+    public function getPattern($prependBasePage = false): string
     {
-        return $this->pattern;
+        $pattern = $this->pattern;
+        if (!$prependBasePage) {
+            return $pattern;
+        }
+        $basePagePath = $this->getBasePagePath();
+        if (!$basePagePath) {
+            return $pattern;
+        }
+        // in case there is an empty pattern
+        if (!$pattern) {
+            return $basePagePath;
+        }
+
+        $delimiter = $pattern[0];
+        // if the delimiter is / insert basePagePath before first \/ (and escape / in basePagePath)
+        // otherwise insert basePagePath before first /
+        $firstSlashPosition = false;
+        if ($delimiter == '/') {
+            $firstSlashPosition = stripos($pattern, '\\/');
+            $basePagePath = str_replace('/', '\\/', $basePagePath);
+        } else {
+            $firstSlashPosition = stripos($pattern, '/');
+        }
+        if ($firstSlashPosition !== false) {
+            $pattern = substr_replace($pattern, $basePagePath, $firstSlashPosition, 0);
+        }
+        return $pattern;
     }
 
     public function getController(): ?string
@@ -294,6 +332,49 @@ final class Staticroute extends AbstractModel
     public function getName(): ?string
     {
         return $this->name;
+    }
+
+    /**
+     *      * @return int
+     */
+    public function getBasePage()
+    {
+        return $this->basePage;
+    }
+
+    /**
+     * @param int $basePage
+     * @return void
+     */
+    public function setBasePage($basePage)
+    {
+        $this->basePage = $basePage;
+
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    protected function getBasePagePath()
+    {
+        $basePagePath = null;
+        if ($this->getBasePage()) {
+            if (isset(self::$basePageIdMappingCache[$this->getBasePage()])) {
+                $basePagePath = self::$basePageIdMappingCache[$this->getBasePage()];
+            } else {
+                $document = Document::getById($this->getBasePage());
+                if ($document instanceof Document\Page) {
+                    $basePagePath = $document->getFullPath();
+                } elseif ($document instanceof Document\Link) {
+                    $basePagePath = $document->getHref();
+                } elseif ($document instanceof Document\Hardlink) {
+                    $basePagePath = $document->getFullPath();
+                }
+                self::$basePageIdMappingCache[$this->getBasePage()] = $basePagePath;
+            }
+        }
+        return $basePagePath;
     }
 
     /**
@@ -438,6 +519,12 @@ final class Staticroute extends AbstractModel
         // convert tmp urlencode escape char back to real escape char
         $url = str_replace($urlEncodeEscapeCharacters, '%', $url);
 
+        // preprend basePage
+        $basePagePath = $this->getBasePagePath();
+        if ($basePagePath) {
+            $url = $basePagePath.$url;
+        }
+
         $event = new GenericEvent($this, [
             'frontendPath' => $url,
             'params' => $urlParams,
@@ -456,7 +543,7 @@ final class Staticroute extends AbstractModel
      */
     public function match(string $path, array $params = []): bool|array
     {
-        if (@preg_match($this->getPattern(), $path)) {
+        if (@preg_match($this->getPattern(true), $path)) {
             // check for site
             if ($this->getSiteId()) {
                 if (!Site::isSiteRequest()) {
@@ -479,7 +566,7 @@ final class Staticroute extends AbstractModel
 
             $variables = explode(',', $this->getVariables());
 
-            preg_match_all($this->getPattern(), $path, $matches);
+            preg_match_all($this->getPattern(true), $path, $matches);
 
             foreach ($matches as $index => $match) {
                 if (isset($variables[$index - 1]) && $variables[$index - 1]) {
