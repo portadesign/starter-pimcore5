@@ -167,7 +167,7 @@ class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
 
         $dataRaw = $this->model->getObjectVars();
         $data = [];
-        $allowedProperties = ['name', 'pattern', 'reverse', 'controller',
+        $allowedProperties = ['name', 'basePage', 'pattern', 'reverse', 'controller',
             'variables', 'defaults', 'siteId', 'priority', 'methods', 'creationDate', 'modificationDate', ];
 
         foreach ($dataRaw as $key => $value) {
