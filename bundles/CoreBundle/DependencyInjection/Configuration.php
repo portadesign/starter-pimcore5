@@ -2226,6 +2226,7 @@ final class Configuration implements ConfigurationInterface
                         ->prototype('array')
                             ->children()
                                 ->scalarNode('name')->end()
+                                ->scalarNode('basePage')->end()
                                 ->scalarNode('pattern')->end()
                                 ->scalarNode('reverse')->end()
                                 ->scalarNode('controller')->end()

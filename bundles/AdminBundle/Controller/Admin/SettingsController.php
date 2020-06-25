@@ -864,9 +864,22 @@ class SettingsController extends AdminAbstractController
                     throw new ConfigWriteException();
                 }
 
+                if (isset($data["basePage"]) && $data["basePage"]) {
+                    if ($doc = Document::getByPath($data["basePage"])) {
+                        $data["basePage"] = $doc->getId();
+                    }
+                }
+
                 $route->setValues($data);
 
                 $route->save();
+
+                $basePage = $route->getBasePage();
+                if (is_numeric($basePage)) {
+                    if ($doc = Document::getById(intval($basePage))) {
+                        $route->setBasePage($doc->getRealFullPath());
+                    }
+                }
 
                 return $this->adminJson(['data' => $route->getObjectVars(), 'success' => true]);
             } elseif ($request->get('xaction') == 'create') {
@@ -877,9 +890,23 @@ class SettingsController extends AdminAbstractController
 
                 // save route
                 $route = new Staticroute();
+
+                if (isset($data["basePage"]) && $data["basePage"]) {
+                    if ($doc = Document::getByPath($data["basePage"])) {
+                        $data["basePage"] = $doc->getId();
+                    }
+                }
+
                 $route->setValues($data);
 
                 $route->save();
+
+                $basePage = $route->getBasePage();
+                if (is_numeric($basePage)) {
+                    if ($doc = Document::getById(intval($basePage))) {
+                        $route->setBasePage($doc->getRealFullPath());
+                    }
+                }
 
                 $responseData = $route->getObjectVars();
                 $responseData['writeable'] = $route->isWriteable();
@@ -908,6 +935,14 @@ class SettingsController extends AdminAbstractController
 
             $routes = [];
             foreach ($list->getRoutes() as $routeFromList) {
+                if ($basePage = $routeFromList->getBasePage()) {
+                    if (is_numeric($basePage)) {
+                        if ($doc = Document::getById(intval($basePage))) {
+                            $routeFromList->setBasePage($doc->getRealFullPath());
+                        }
+                    }
+                }
+
                 $route = $routeFromList->getObjectVars();
                 $route['writeable'] = $routeFromList->isWriteable();
                 if (is_array($routeFromList->getSiteId())) {
