@@ -60,6 +60,7 @@ pimcore.settings.staticroutes = Class.create({
             url,
             [
                 {name:'id', type: 'int'},
+                {name:'basePage'},
                 {name:'name'},
                 {name:'pattern', allowBlank:false},
                 {name:'reverse', allowBlank:true},
@@ -97,6 +98,9 @@ pimcore.settings.staticroutes = Class.create({
         var typesColumns = [
             {text:t("name"), flex:50, sortable:true, dataIndex:'name',
                 editor:new Ext.form.TextField({})},
+            {text: t("base_page")+" ("+t("optional")+")", flex: 100, sortable: false, dataIndex: 'basePage',
+                editor: new Ext.form.TextField({}),
+                tdCls: "input_drop_target"},
             {text:t("pattern"), flex:100, sortable:true, dataIndex:'pattern',
                 editor:new Ext.form.TextField({})},
             {text:t("reverse"), flex:100, sortable:true, dataIndex:'reverse',
@@ -177,6 +181,7 @@ pimcore.settings.staticroutes = Class.create({
                         icon:"/bundles/pimcoreadmin/img/flat-color-icons/delete.svg",
                         handler:function (grid, rowIndex) {
                             grid.getStore().removeAt(rowIndex);
+                            this.updateRows();
                         }.bind(this)
                     }
                 ]
@@ -224,13 +229,66 @@ pimcore.settings.staticroutes = Class.create({
                 ]
             },
             viewConfig:{
-                forceFit:true
+                forceFit:true,
+                listeners: {
+                    rowupdated: this.updateRows.bind(this),
+                    refresh: this.updateRows.bind(this)
+                }
             }
         });
+
+        this.store.on("update", this.updateRows.bind(this));
+        this.grid.on("viewready", this.updateRows.bind(this));
 
         return this.grid;
     },
 
+    updateRows: function () {
+        var rows = Ext.get(this.grid.getEl().dom).query(".x-grid-row");
+
+        for (var i = 0; i < rows.length; i++) {
+
+            var dd = new Ext.dd.DropZone(rows[i], {
+                ddGroup: "element",
+
+                getTargetFromEvent: function(e) {
+                    return this.getEl();
+                },
+
+                onNodeOver : function(target, dd, e, data) {
+                    try {
+                        var record = data.records[0];
+                        var data = record.data;
+
+                        if(in_array(data.type,["page","link","hardlink"])) {
+                            return Ext.dd.DropZone.prototype.dropAllowed;
+                        } else {
+                            return Ext.dd.DropZone.prototype.dropNotAllowed;
+                        }
+                    } catch (e) {
+                        console.log(e);
+                    }
+                },
+
+                onNodeDrop : function(myRowIndex, target, dd, e, data) {
+                    try {
+                        var record = data.records[0];
+                        var data = record.data;
+                        if (in_array(data.type, ["page", "link", "hardlink"])) {
+                            var rec = this.grid.getStore().getAt(myRowIndex);
+                            rec.set("basePage", data.path);
+                            this.updateRows();
+                            return true;
+                        }
+                    } catch (e) {
+                        console.log(e);
+                    }
+                    return false;
+
+                }.bind(this, i)
+            });
+        }
+    },
 
     onAdd:function (btn, ev) {
         var u = {
@@ -238,5 +296,7 @@ pimcore.settings.staticroutes = Class.create({
         };
 
         this.grid.store.add(u);
+
+        this.updateRows();
     }
 });
