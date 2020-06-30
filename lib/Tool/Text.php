@@ -18,6 +18,7 @@ namespace Pimcore\Tool;
 use Onnov\DetectEncoding\EncodingDetector;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject\Concrete;
+use Pimcore\Model\DataObject\Localizedfield;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
 
@@ -154,6 +155,42 @@ class Text
                                 $path = $element->getFullPath();
                             }
                         }
+
+                        // set alt and title from metadata if not already set
+						$language = null;
+                        if (array_key_exists('document', $params) && $params['document'] && $params['document']->getProperty('language')) {
+                            $language = $params['document']->getProperty('language');
+                        }
+                        elseif (array_key_exists('object', $params) && $params['object'] && ($params['object'] instanceof Localizedfield)) {
+                            $language = $params['object']->getLanguage();
+                        }
+
+                        preg_match('/alt="([^"]+)*"/', $oldTag, $altAttr);
+                        preg_match('/title="([^"]+)*"/', $oldTag, $titleAttr);
+
+                        $newTag = $oldTag;
+
+                        if ($alt = $element->getMetadata('alt', $language)) {
+                            if (!isset($altAttr[1])) {
+                                $newTag = str_replace('alt=""', '', $newTag);
+                                $newTag = str_replace('/>', ' alt="'.htmlspecialchars($alt).'" />', $newTag);
+                            }
+                            elseif (array_key_exists('object', $params) && $params['object']) {
+                                $newTag = preg_replace('/alt="[^"]*"/', 'alt="'.htmlspecialchars($alt).'"', $newTag);
+                            }
+                        }
+
+                        if ($title = $element->getMetadata('title', $language)) {
+                            if (!isset($titleAttr[1])) {
+                                $newTag = str_replace('title=""', '', $newTag);
+                                $newTag = str_replace('/>', ' title="'.htmlspecialchars($title).'" />', $newTag);
+                            }
+                            elseif (array_key_exists('object', $params) && $params['object']) {
+                                $newTag = preg_replace('/title="[^"]*"/', 'title="'.htmlspecialchars($title).'"', $newTag);
+                            }
+                        }
+
+                        $text = str_replace($oldTag, $newTag, $text);
                     }
 
                     if ($path) {
