@@ -202,6 +202,10 @@ pimcore.object.tree = Class.create({
     onTreeNodeOver: function (targetNode, position, dragData, e, eOpts ) {
         var node = dragData.records[0];
 
+        if (this.nodeRestrictedByCustomviewExtension(node, targetNode)) {
+            return false;
+        }
+
         //dropping variants not allowed on folder
         if(node.data.type == 'variant' && targetNode.data.type == 'folder'){
             return false;
@@ -293,11 +297,17 @@ pimcore.object.tree = Class.create({
             return false;
         }
 
+        if (this.nodeRestrictedByCustomviewExtension(node, newParent)) {
+            Ext.MessageBox.alert(t('missing_permission'), t('element_cannot_be_moved'));
+            return false;
+        }
+
         // check permissions
         if (node.data.permissions.settings) {
             tree.loadMask.show();
             return true;
         }
+
         return false;
     },
 
@@ -349,6 +359,10 @@ pimcore.object.tree = Class.create({
             object_types.each(function (classRecord) {
 
                 if ($this.config.allowedClasses && !in_array(classRecord.get("id"), $this.config.allowedClasses)) {
+                    return;
+                }
+
+                if (pimcore.helpers.isObjectContextMenuClassRestricted(perspectiveCfg, record, classRecord.get("id"))) {
                     return;
                 }
 
@@ -412,7 +426,7 @@ pimcore.object.tree = Class.create({
 
             if (record.data.permissions.create) {
                 if (!isVariant) {
-                    if (perspectiveCfg.inTreeContextMenu("object.add")) {
+                    if (perspectiveCfg.inTreeContextMenu("object.add") && objectMenu.objects.length > 0) {
                         menu.add(new Ext.menu.Item({
                             text: t('add_object'),
                             iconCls: "pimcore_icon_object pimcore_icon_overlay_add",
@@ -422,7 +436,7 @@ pimcore.object.tree = Class.create({
                     }
                 }
 
-                if (record.data.allowVariants && perspectiveCfg.inTreeContextMenu("object.add")) {
+                if (record.data.allowVariants) {
                     menu.add(new Ext.menu.Item({
                         text: t("add_variant"),
                         iconCls: "pimcore_icon_variant",
@@ -432,7 +446,7 @@ pimcore.object.tree = Class.create({
 
                 if (!isVariant) {
 
-                    if (perspectiveCfg.inTreeContextMenu("object.addFolder")) {
+                    if (perspectiveCfg.inTreeContextMenu("object.addFolder") && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictFolder') === false) {
                         menu.add(new Ext.menu.Item({
                             text: t('create_folder'),
                             iconCls: "pimcore_icon_folder pimcore_icon_overlay_add",
@@ -836,6 +850,17 @@ pimcore.object.tree = Class.create({
     pasteInfo: function (tree, record, type) {
         //this.attributes.reference.tree.loadMask.show();
 
+        // check extension restrictions
+        var node = tree.getStore().getById(pimcore.cachedObjectId);
+        if (!node) {
+            Ext.MessageBox.alert(t('error'), t('cross_tree_moves_not_supported'));
+            return false;
+        }
+        if (this.nodeRestrictedByCustomviewExtension(node, record)) {
+            Ext.MessageBox.alert(t('missing_permission'), t('error_pasting_object'));
+            return false;
+        }
+
         pimcore.helpers.addTreeNodeLoadingIndicator("object", record.data.id);
 
         Ext.Ajax.request({
@@ -1067,5 +1092,21 @@ pimcore.object.tree = Class.create({
         pimcore.helpers.searchAndMove(record.data.id, function() {
             pimcore.elementservice.refreshNode(record);
         }.bind(this), "object");
+    },
+
+    nodeRestrictedByCustomviewExtension: function(node, targetNode) {
+        if (node.data.type === 'folder' && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, targetNode.data.path, 'restrictFolder') === true) {
+            return true;
+        }
+        if (node.data.type === 'object') {
+            var classStore = pimcore.globalmanager.get("object_types_store");
+            var classRecord = classStore.getAt(classStore.find('text', node.data.className));
+            var classId = classRecord.getId();
+            if (pimcore.helpers.isObjectContextMenuClassRestricted(this.perspectiveCfg, targetNode, classId)) {
+                return true;
+            }
+        }
+        return false;
     }
+
 });
