@@ -514,7 +514,7 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
         if (is_array($data)) {
             foreach ($data as $item) {
                 if ($item instanceof Model\DataObject\Data\UrlSlug) {
-                    if (!$item->getSlug() && !$item->getSiteId()) {
+                    if ($item->getSlug()) {
                         return false;
                     }
                 }
@@ -841,5 +841,11 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
     protected function doGetDefaultValue($object, $context = [])
     {
         return null;
+    }
+
+    /** @inheritDoc */
+    public function supportsInheritance()
+    {
+        return false;
     }
 }

@@ -19,15 +19,14 @@
       "homepage": "http://www.pimcore.org/",
       "role": "Developer"
     },
-	{
+    {
       "name": "Martin Kuric",
       "email": "martin.kuric@portadesign.cz"
     },
-	{
+    {
       "name": "Andrea Navratilova",
       "email": "andrea.navratilova@portadesign.cz"
     }
-
   ],
   "support": {
     "issues": "https://github.com/pimcore/pimcore/issues",
