@@ -1,39 +1,46 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Searchadmin;
 
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\Traits\AdminStyleTrait;
 use Pimcore\Bundle\AdminBundle\Helper\GridHelperService;
 use Pimcore\Config;
+use Pimcore\Event\Admin\ElementAdminStyleEvent;
 use Pimcore\Event\AdminEvents;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
 use Pimcore\Model\Search\Backend\Data;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * @Route("/search")
+ *
+ * @internal
  */
 class SearchController extends AdminController
 {
+    use AdminStyleTrait;
+
     /**
      * @Route("/find", name="pimcore_admin_searchadmin_search_find", methods={"GET", "POST"})
      *
@@ -58,9 +65,9 @@ class SearchController extends AdminController
         }
 
         $filterPrepareEvent = new GenericEvent($this, [
-            'requestParams' => $allParams
+            'requestParams' => $allParams,
         ]);
-        $eventDispatcher->dispatch(AdminEvents::SEARCH_LIST_BEFORE_FILTER_PREPARE, $filterPrepareEvent);
+        $eventDispatcher->dispatch($filterPrepareEvent, AdminEvents::SEARCH_LIST_BEFORE_FILTER_PREPARE);
 
         $allParams = $filterPrepareEvent->getArgument('requestParams');
 
@@ -70,8 +77,8 @@ class SearchController extends AdminController
         $subtypes = explode(',', $allParams['subtype'] ?? '');
         $classnames = explode(',', $allParams['class'] ?? '');
 
-        $offset = intval($allParams['start']);
-        $limit = intval($allParams['limit']);
+        $offset = (int)$allParams['start'];
+        $limit = (int)$allParams['limit'];
 
         $offset = $offset ? $offset : 0;
         $limit = $limit ? $limit : 50;
@@ -209,10 +216,10 @@ class SearchController extends AdminController
                         $tag = Element\Tag::getById($tagId);
                         if ($tag) {
                             $tagPath = $tag->getFullIdPath();
-                            $conditionParts[] = 'id IN (SELECT cId FROM tags_assignment INNER JOIN tags ON tags.id = tags_assignment.tagid WHERE ctype = ' . $db->quote($type) . ' AND (id = ' . intval($tagId) . ' OR idPath LIKE ' . $db->quote($tagPath . '%') . '))';
+                            $conditionParts[] = 'id IN (SELECT cId FROM tags_assignment INNER JOIN tags ON tags.id = tags_assignment.tagid WHERE ctype = ' . $db->quote($type) . ' AND (id = ' .(int)$tagId. ' OR idPath LIKE ' . $db->quote($db->escapeLike($tagPath) . '%') . '))';
                         }
                     } else {
-                        $conditionParts[] = 'id IN (SELECT cId FROM tags_assignment WHERE ctype = ' . $db->quote($type) . ' AND tagid = ' . intval($tagId) . ')';
+                        $conditionParts[] = 'id IN (SELECT cId FROM tags_assignment WHERE ctype = ' . $db->quote($type) . ' AND tagid = ' .(int)$tagId. ')';
                     }
                 }
             }
@@ -233,14 +240,14 @@ class SearchController extends AdminController
         if ($sortingSettings['orderKey']) {
             // we need a special mapping for classname as this is stored in subtype column
             $sortMapping = [
-                'classname' => 'subtype'
+                'classname' => 'subtype',
             ];
 
             $sort = $sortingSettings['orderKey'];
             if (array_key_exists($sortingSettings['orderKey'], $sortMapping)) {
                 $sort = $sortMapping[$sortingSettings['orderKey']];
             }
-            $searcherList->setOrderKey($sortingSettings['orderKey']);
+            $searcherList->setOrderKey($sort);
         }
         if ($sortingSettings['order']) {
             $searcherList->setOrder($sortingSettings['order']);
@@ -248,9 +255,9 @@ class SearchController extends AdminController
 
         $beforeListLoadEvent = new GenericEvent($this, [
             'list' => $searcherList,
-            'context' => $allParams
+            'context' => $allParams,
         ]);
-        $eventDispatcher->dispatch(AdminEvents::SEARCH_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+        $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::SEARCH_LIST_BEFORE_LIST_LOAD);
         /** @var Data\Listing $searcherList */
         $searcherList = $beforeListLoadEvent->getArgument('list');
 
@@ -258,9 +265,9 @@ class SearchController extends AdminController
             // Global asset list event (same than the SEARCH_LIST_BEFORE_LIST_LOAD event, but this last one is global for search, list, tree)
             $beforeListLoadEvent = new GenericEvent($this, [
                 'list' => $searcherList,
-                'context' => $allParams
+                'context' => $allParams,
             ]);
-            $eventDispatcher->dispatch(AdminEvents::ASSET_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+            $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::ASSET_LIST_BEFORE_LIST_LOAD);
             /** @var Data\Listing $searcherList */
             $searcherList = $beforeListLoadEvent->getArgument('list');
         }
@@ -269,9 +276,9 @@ class SearchController extends AdminController
             // Global document list event (same than the SEARCH_LIST_BEFORE_LIST_LOAD event, but this last one is global for search, list, tree)
             $beforeListLoadEvent = new GenericEvent($this, [
                 'list' => $searcherList,
-                'context' => $allParams
+                'context' => $allParams,
             ]);
-            $eventDispatcher->dispatch(AdminEvents::DOCUMENT_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+            $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::DOCUMENT_LIST_BEFORE_LIST_LOAD);
             /** @var Data\Listing $searcherList */
             $searcherList = $beforeListLoadEvent->getArgument('list');
         }
@@ -280,9 +287,9 @@ class SearchController extends AdminController
             // Global object list event (same than the SEARCH_LIST_BEFORE_LIST_LOAD event, but this last one is global for search, list, tree)
             $beforeListLoadEvent = new GenericEvent($this, [
                 'list' => $searcherList,
-                'context' => $allParams
+                'context' => $allParams,
             ]);
-            $eventDispatcher->dispatch(AdminEvents::OBJECT_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+            $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::OBJECT_LIST_BEFORE_LIST_LOAD);
             /** @var Data\Listing $searcherList */
             $searcherList = $beforeListLoadEvent->getArgument('list');
         }
@@ -322,9 +329,9 @@ class SearchController extends AdminController
 
         $afterListLoadEvent = new GenericEvent($this, [
             'list' => $result,
-            'context' => $allParams
+            'context' => $allParams,
         ]);
-        $eventDispatcher->dispatch(AdminEvents::SEARCH_LIST_AFTER_LIST_LOAD, $afterListLoadEvent);
+        $eventDispatcher->dispatch($afterListLoadEvent, AdminEvents::SEARCH_LIST_AFTER_LIST_LOAD);
         $result = $afterListLoadEvent->getArgument('list');
 
         return $this->adminJson($result);
@@ -456,9 +463,9 @@ class SearchController extends AdminController
 
         $beforeListLoadEvent = new GenericEvent($this, [
             'list' => $searcherList,
-            'query' => $query
+            'query' => $query,
         ]);
-        $eventDispatcher->dispatch(AdminEvents::QUICKSEARCH_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+        $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::QUICKSEARCH_LIST_BEFORE_LIST_LOAD);
         $searcherList = $beforeListLoadEvent->getArgument('list');
 
         $hits = $searcherList->load();
@@ -472,21 +479,20 @@ class SearchController extends AdminController
                     'type' => $hit->getId()->getType(),
                     'subtype' => $element->getType(),
                     'className' => ($element instanceof DataObject\Concrete) ? $element->getClassName() : '',
-                    'fullpath' => htmlspecialchars($element->getFullPath()),
-                    'fullpathList' => htmlspecialchars($this->shortenPath($element->getFullPath())),
-                    'iconCls' => 'pimcore_icon_asset_default'
+                    'fullpath' => htmlspecialchars($element->getRealFullPath()),
+                    'fullpathList' => htmlspecialchars($this->shortenPath($element->getRealFullPath())),
+                    'iconCls' => 'pimcore_icon_asset_default',
                 ];
 
-                if ($element instanceof Asset) {
-                    $data['iconCls'] .= ' pimcore_icon_' . \Pimcore\File::getFileExtension($element->getFilename());
-                } else {
-                    $data['iconCls'] .= ' pimcore_icon_' . $element->getType();
-                }
+                $this->addAdminStyle($element, ElementAdminStyleEvent::CONTEXT_SEARCH, $data);
 
-                $data['preview'] = $this->renderView('PimcoreAdminBundle:SearchAdmin/Search/Quicksearch:' . $hit->getId()->getType() . '.html.php', [
+                $validLanguages = \Pimcore\Tool::getValidLanguages();
+
+                $data['preview'] = $this->renderView('@PimcoreAdmin/SearchAdmin/Search/Quicksearch/' . $hit->getId()->getType() . '.html.twig', [
                     'element' => $element,
                     'iconCls' => $data['iconCls'],
-                    'config' => $config
+                    'config' => $config,
+                    'validLanguages' => $validLanguages,
                 ]);
 
                 $elements[] = $data;
@@ -495,9 +501,9 @@ class SearchController extends AdminController
 
         $afterListLoadEvent = new GenericEvent($this, [
             'list' => $elements,
-            'context' => $query
+            'context' => $query,
         ]);
-        $eventDispatcher->dispatch(AdminEvents::QUICKSEARCH_LIST_AFTER_LIST_LOAD, $afterListLoadEvent);
+        $eventDispatcher->dispatch($afterListLoadEvent, AdminEvents::QUICKSEARCH_LIST_AFTER_LIST_LOAD);
         $elements = $afterListLoadEvent->getArgument('list');
 
         $result = ['data' => $elements, 'success' => true];
@@ -521,11 +527,11 @@ class SearchController extends AdminController
             if (strlen($shortPath) <= 50 || $i === 0) {
                 break;
             }
-            array_splice($parts, $i - 1, 1, '...');
+            array_splice($parts, $i - 1, 1, '…');
         }
 
-        if (strlen($shortPath) > 50) {
-            $shortPath = substr($shortPath, 0, 47) . '...';
+        if (mb_strlen($shortPath) > 50) {
+            $shortPath = mb_substr($shortPath, 0, 49) . '…';
         }
 
         return $shortPath;

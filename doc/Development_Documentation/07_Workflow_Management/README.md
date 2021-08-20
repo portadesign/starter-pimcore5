@@ -4,7 +4,7 @@
 Pimcore Workflow Management provides configuration of multiple workflows on Pimcore elements (assets, documents, data 
 objects) to support data maintenance processes, element life cycles and various other processes.   
 
-It is based on the [Symfony workflow component](https://symfony.com/doc/3.4/workflow.html) and extends it 
+It is based on the [Symfony workflow component](https://symfony.com/doc/5.2/workflow.html) and extends it 
 with a few Pimcore specific features. So, before using Pimcore Workflow Management it makes sense to know 
 the basics of Symfony workflow component.
 
@@ -22,7 +22,7 @@ of a *petri net*. It models a process of an element and allows multiple places s
 **Workflow Type 'State Machine'**
 A state machine is a subset of a workflow and its purpose is to hold a state of your model. The most important restriction
 is that a state machine cannot be in more than one place simultaneously. 
-For further details see also [Symfony docs](https://symfony.com/doc/3.4/workflow/state-machines.html). 
+For further details see also [Symfony docs](https://symfony.com/doc/5.2/workflow/state-machines.html). 
 
 **Place**
 A place is a step in the workflow and describes a characteristic or a status of an element - for example *in progress*, 
@@ -84,7 +84,7 @@ Roles will send an notification to every user with that role.
                       # Define which channel notification should be sent to, possible values "mail" and "pimcore_notification", default value is "mail".
                       channelType:
                          - mail
-                         - pimcoreNotification
+                         - pimcore_notification
                       
                       # Type of mail source. 
                       mailType: 'template' # this is the default value, One of "template"; "pimcore_document"

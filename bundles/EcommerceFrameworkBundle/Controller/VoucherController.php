@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\Controller;
@@ -17,25 +18,38 @@ namespace Pimcore\Bundle\EcommerceFrameworkBundle\Controller;
 use Pimcore\Bundle\AdminBundle\Security\User\TokenStorageUserResolver;
 use Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\TokenManager\ExportableTokenManagerInterface;
 use Pimcore\Controller\FrontendController;
-use Pimcore\Model\DataObject\AbstractObject;
+use Pimcore\Controller\KernelControllerEventInterface;
+use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\Localizedfield;
 use Pimcore\Model\DataObject\OnlineShopVoucherSeries;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Class VoucherController
  *
  * @Route("/voucher")
+ *
+ * @internal
  */
-class VoucherController extends FrontendController
+class VoucherController extends FrontendController implements KernelControllerEventInterface
 {
+    public static function getSubscribedServices()
+    {
+        $services = parent::getSubscribedServices();
+        $services['translator'] = TranslatorInterface::class;
+        $services[TokenStorageUserResolver::class] = TokenStorageUserResolver::class;
+
+        return $services;
+    }
+
     /**
-     * @param FilterControllerEvent $event
+     * {@inheritdoc}
      */
-    public function onKernelController(FilterControllerEvent $event)
+    public function onKernelControllerEvent(ControllerEvent $event)
     {
         // set language
         $user = $this->get(TokenStorageUserResolver::class)->getUser();
@@ -46,11 +60,8 @@ class VoucherController extends FrontendController
         }
 
         // enable inherited values
-        AbstractObject::setGetInheritedValues(true);
+        DataObject::setGetInheritedValues(true);
         Localizedfield::setGetFallbackValues(true);
-
-        // enable view auto-rendering
-        $this->setViewAutoRender($event->getRequest(), true, 'twig');
     }
 
     /**
@@ -60,7 +71,7 @@ class VoucherController extends FrontendController
      */
     public function voucherCodeTabAction(Request $request)
     {
-        $onlineShopVoucherSeries = AbstractObject::getById($request->get('id'));
+        $onlineShopVoucherSeries = DataObject::getById($request->get('id'));
 
         if (!($onlineShopVoucherSeries instanceof OnlineShopVoucherSeries)) {
             throw new \InvalidArgumentException('Voucher series not found');
@@ -81,7 +92,7 @@ class VoucherController extends FrontendController
         } else {
             $paramsBag['errors'] = ['bundle_ecommerce_voucherservice_msg-error-config-missing'];
 
-            return $this->render('PimcoreEcommerceFrameworkBundle:voucher:voucher_code_tab_error.html.twig', $paramsBag);
+            return $this->render('@PimcoreEcommerceFramework/voucher/voucher_code_tab_error.html.twig', $paramsBag);
         }
     }
 
@@ -92,7 +103,7 @@ class VoucherController extends FrontendController
      */
     public function exportTokensAction(Request $request)
     {
-        $onlineShopVoucherSeries = AbstractObject::getById($request->get('id'));
+        $onlineShopVoucherSeries = DataObject::getById($request->get('id'));
         if (!($onlineShopVoucherSeries instanceof OnlineShopVoucherSeries)) {
             throw new \InvalidArgumentException('Voucher series not found');
         }
@@ -113,6 +124,7 @@ class VoucherController extends FrontendController
                 $result = $tokenManager->exportCsv($request->query->all());
                 $contentType = 'text/csv';
                 $suffix = 'csv';
+
                 break;
 
             case ExportableTokenManagerInterface::FORMAT_PLAIN:
@@ -120,6 +132,7 @@ class VoucherController extends FrontendController
                 $contentType = 'text/plain';
                 $suffix = 'txt';
                 $download = false;
+
                 break;
 
             default:
@@ -144,7 +157,7 @@ class VoucherController extends FrontendController
      */
     public function generateAction(Request $request)
     {
-        $onlineShopVoucherSeries = AbstractObject::getById($request->get('id'));
+        $onlineShopVoucherSeries = DataObject::getById($request->get('id'));
         if ($onlineShopVoucherSeries instanceof OnlineShopVoucherSeries) {
             if ($tokenManager = $onlineShopVoucherSeries->getTokenManager()) {
                 $result = $tokenManager->insertOrUpdateVoucherSeries();
@@ -175,7 +188,7 @@ class VoucherController extends FrontendController
      */
     public function cleanupAction(Request $request)
     {
-        $onlineShopVoucherSeries = AbstractObject::getById($request->get('id'));
+        $onlineShopVoucherSeries = DataObject::getById($request->get('id'));
         if ($onlineShopVoucherSeries instanceof OnlineShopVoucherSeries) {
             if ($tokenManager = $onlineShopVoucherSeries->getTokenManager()) {
                 $translator = $this->get('translator');
@@ -223,7 +236,7 @@ class VoucherController extends FrontendController
             );
         }
 
-        $onlineShopVoucherSeries = AbstractObject::getById($id);
+        $onlineShopVoucherSeries = DataObject::getById($id);
         if ($onlineShopVoucherSeries instanceof OnlineShopVoucherSeries) {
             if ($tokenManager = $onlineShopVoucherSeries->getTokenManager()) {
                 if ($tokenManager->cleanUpReservations($duration, $id)) {

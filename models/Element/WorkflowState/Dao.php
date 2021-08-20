@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Element
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Element\WorkflowState;
@@ -20,6 +18,8 @@ namespace Pimcore\Model\Element\WorkflowState;
 use Pimcore\Model;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Element\WorkflowState $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -71,7 +71,7 @@ class Dao extends Model\Dao\AbstractDao
     {
         $this->db->delete('element_workflow_state', [
             'cid' => $this->model->getCid(),
-            'ctype' => $this->model->getCtype()
+            'ctype' => $this->model->getCtype(),
         ]);
     }
 }

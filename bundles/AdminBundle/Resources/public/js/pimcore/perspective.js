@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.perspective");
@@ -33,19 +33,30 @@ pimcore.perspective = Class.create({
         return this.inPerspectiveConfig(key, "treeContextMenu");
     },
 
-    inPerspectiveConfig: function(key, configName) {
-        if (!this[configName]) {
+    inPerspectiveConfig: function(key, context) {
+
+        var eventData =  {
+            key: key,
+            context: context
+        }
+        pimcore.plugin.broker.fireEvent("preCreateMenuOption", eventData);
+
+        if (typeof eventData.isAllowed !== "undefined") {
+            return eventData.isAllowed;
+        };
+
+        if (!this[context]) {
             return true;
         }
 
-        var cacheKey = configName + "." + key;
+        var cacheKey = context + "." + key;
 
         if (typeof this.cache[cacheKey] !== "undefined") {
             return this.cache[cacheKey];
         }
 
         var parts = key.split(".");
-        var menuItems = this[configName];
+        var menuItems = this[context];
 
         for (var i = 0; i < parts.length; i++) {
             var part = parts[i];

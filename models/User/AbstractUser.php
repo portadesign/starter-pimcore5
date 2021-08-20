@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    User
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\User;
@@ -23,28 +21,29 @@ use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\User\AbstractUser\Dao getDao()
+ * @method void setLastLoginDate()
  */
 class AbstractUser extends Model\AbstractModel
 {
     /**
      * @var int
      */
-    public $id;
+    protected $id;
 
     /**
      * @var int
      */
-    public $parentId;
+    protected $parentId;
 
     /**
      * @var string
      */
-    public $name;
+    protected $name;
 
     /**
      * @var string
      */
-    public $type;
+    protected $type;
 
     /**
      * @param int $id
@@ -54,6 +53,7 @@ class AbstractUser extends Model\AbstractModel
     public static function getById($id)
     {
         $cacheKey = 'user_' . $id;
+
         try {
             if (\Pimcore\Cache\Runtime::isRegistered($cacheKey)) {
                 $user = \Pimcore\Cache\Runtime::get($cacheKey);
@@ -78,11 +78,12 @@ class AbstractUser extends Model\AbstractModel
     /**
      * @param array $values
      *
-     * @return self
+     * @return static
      */
     public static function create($values = [])
     {
         $user = new static();
+        self::checkCreateData($values);
         $user->setValues($values);
         $user->save();
 
@@ -93,6 +94,8 @@ class AbstractUser extends Model\AbstractModel
      * @param string $name
      *
      * @return static|null
+     *
+     * @throws \Exception
      */
     public static function getByName($name)
     {
@@ -101,7 +104,7 @@ class AbstractUser extends Model\AbstractModel
             $user->getDao()->getByName($name);
 
             return $user;
-        } catch (\Exception $e) {
+        } catch (Model\Exception\NotFoundException $e) {
             return null;
         }
     }
@@ -184,9 +187,9 @@ class AbstractUser extends Model\AbstractModel
         $isUpdate = false;
         if ($this->getId()) {
             $isUpdate = true;
-            \Pimcore::getEventDispatcher()->dispatch(UserRoleEvents::PRE_UPDATE, new UserRoleEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(new UserRoleEvent($this), UserRoleEvents::PRE_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(UserRoleEvents::PRE_ADD, new UserRoleEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(new UserRoleEvent($this), UserRoleEvents::PRE_ADD);
         }
 
         if (!preg_match('/^[a-zA-Z0-9\-\.~_@]+$/', $this->getName())) {
@@ -194,6 +197,7 @@ class AbstractUser extends Model\AbstractModel
         }
 
         $this->beginTransaction();
+
         try {
             if (!$this->getId()) {
                 $this->getDao()->create();
@@ -204,42 +208,74 @@ class AbstractUser extends Model\AbstractModel
             $this->commit();
         } catch (\Exception $e) {
             $this->rollBack();
+
             throw $e;
         }
 
         if ($isUpdate) {
-            \Pimcore::getEventDispatcher()->dispatch(UserRoleEvents::POST_UPDATE, new UserRoleEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(new UserRoleEvent($this), UserRoleEvents::POST_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(UserRoleEvents::POST_ADD, new UserRoleEvent($this));
+            \Pimcore::getEventDispatcher()->dispatch(new UserRoleEvent($this), UserRoleEvents::POST_ADD);
         }
 
         return $this;
     }
 
+    /**
+     * @throws \Exception
+     */
     public function delete()
     {
         if ($this->getId() < 1) {
             throw new \Exception('Deleting the system user is not allowed!');
         }
 
-        \Pimcore::getEventDispatcher()->dispatch(UserRoleEvents::PRE_DELETE, new UserRoleEvent($this));
+        \Pimcore::getEventDispatcher()->dispatch(new UserRoleEvent($this), UserRoleEvents::PRE_DELETE);
+
+        $type = $this->getType();
 
         // delete all children
-        if ($this->getType() === 'role' || $this->getType() === 'rolefolder') {
-            $list = new Model\User\Role\Listing();
-        } else {
-            $list = new Listing();
-        }
+        $list = ($type === 'role' || $type === 'rolefolder') ? new Model\User\Role\Listing() : new Listing();
         $list->setCondition('parentId = ?', $this->getId());
         foreach ($list as $user) {
             $user->delete();
+        }
+
+        // remove user-role relations
+        if ($type === 'role') {
+            $this->cleanupUserRoleRelations();
         }
 
         // now delete the current user
         $this->getDao()->delete();
         \Pimcore\Cache::clearAll();
 
-        \Pimcore::getEventDispatcher()->dispatch(UserRoleEvents::POST_DELETE, new UserRoleEvent($this));
+        \Pimcore::getEventDispatcher()->dispatch(new UserRoleEvent($this), UserRoleEvents::POST_DELETE);
+    }
+
+    /**
+     * https://github.com/pimcore/pimcore/issues/7085
+     *
+     * @throws \Exception
+     */
+    private function cleanupUserRoleRelations()
+    {
+        $userRoleListing = new Listing();
+        $userRoleListing->setCondition('FIND_IN_SET(' . $this->getId() . ',roles)');
+        $userRoleListing = $userRoleListing->load();
+        if (count($userRoleListing)) {
+            foreach ($userRoleListing as $relatedUser) {
+                $userRoles = $relatedUser->getRoles();
+                if (is_array($userRoles)) {
+                    $key = array_search($this->getId(), $userRoles);
+                    if (false !== $key) {
+                        unset($userRoles[$key]);
+                        $relatedUser->setRoles($userRoles);
+                        $relatedUser->save();
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -254,7 +290,10 @@ class AbstractUser extends Model\AbstractModel
         return $this;
     }
 
-    public function update()
+    /**
+     * @throws \Exception
+     */
+    protected function update()
     {
         $this->getDao()->update();
     }

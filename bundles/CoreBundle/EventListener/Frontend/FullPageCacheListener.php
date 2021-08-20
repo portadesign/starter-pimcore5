@@ -1,20 +1,22 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\CoreBundle\EventListener\Frontend;
 
 use Pimcore\Bundle\CoreBundle\EventListener\Traits\PimcoreContextAwareTrait;
+use Pimcore\Bundle\CoreBundle\EventListener\Traits\StaticPageContextAwareTrait;
 use Pimcore\Cache;
 use Pimcore\Cache\FullPage\SessionStatus;
 use Pimcore\Config;
@@ -25,32 +27,18 @@ use Pimcore\Http\Request\Resolver\PimcoreContextResolver;
 use Pimcore\Logger;
 use Pimcore\Targeting\VisitorInfoStorageInterface;
 use Pimcore\Tool;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
-use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 use Symfony\Component\HttpKernel\Event\KernelEvent;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class FullPageCacheListener
 {
     use PimcoreContextAwareTrait;
-
-    /**
-     * @var VisitorInfoStorageInterface
-     */
-    private $visitorInfoStorage;
-
-    /**
-     * @var SessionStatus
-     */
-    private $sessionStatus;
-
-    /**
-     * @var EventDispatcherInterface
-     */
-    private $eventDispatcher;
+    use StaticPageContextAwareTrait;
 
     /**
      * @var bool
@@ -82,21 +70,12 @@ class FullPageCacheListener
      */
     protected $defaultCacheKey;
 
-    /**
-     * @var Config
-     */
-    protected $config;
-
     public function __construct(
-        VisitorInfoStorageInterface $visitorInfoStorage,
-        SessionStatus $sessionStatus,
-        EventDispatcherInterface $eventDispatcher,
-        Config $config
+        private VisitorInfoStorageInterface $visitorInfoStorage,
+        private SessionStatus $sessionStatus,
+        private EventDispatcherInterface $eventDispatcher,
+        protected Config $config
     ) {
-        $this->visitorInfoStorage = $visitorInfoStorage;
-        $this->sessionStatus = $sessionStatus;
-        $this->eventDispatcher = $eventDispatcher;
-        $this->config = $config;
     }
 
     /**
@@ -164,10 +143,14 @@ class FullPageCacheListener
     }
 
     /**
-     * @param GetResponseEvent $event
+     * @param RequestEvent $event
      */
-    public function onKernelRequest(GetResponseEvent $event)
+    public function onKernelRequest(RequestEvent $event)
     {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
         $request = $event->getRequest();
 
         if (!$event->isMasterRequest()) {
@@ -234,7 +217,7 @@ class FullPageCacheListener
                 }
 
                 if (!empty($conf['exclude_cookie'])) {
-                    $cookies = explode(',', strval($conf['exclude_cookie']));
+                    $cookies = explode(',', (string)$conf['exclude_cookie']);
 
                     foreach ($cookies as $cookie) {
                         if (!empty($cookie) && isset($_COOKIE[trim($cookie)])) {
@@ -259,7 +242,7 @@ class FullPageCacheListener
         } catch (\Exception $e) {
             Logger::error($e);
 
-            $this->disable('ERROR: Exception (see log files in /var/logs)');
+            $this->disable('ERROR: Exception (see log files in /var/log)');
 
             return;
         }
@@ -290,10 +273,6 @@ class FullPageCacheListener
             if (is_array($tags)) {
                 $appendKey = '_' . implode('_', $tags);
             }
-        }
-
-        if (Tool\Frontend::hasWebpSupport()) {
-            $appendKey .= 'webp';
         }
 
         if ($request->isXmlHttpRequest()) {
@@ -340,9 +319,9 @@ class FullPageCacheListener
     }
 
     /**
-     * @param FilterResponseEvent $event
+     * @param ResponseEvent $event
      */
-    public function onKernelResponse(FilterResponseEvent $event)
+    public function onKernelResponse(ResponseEvent $event)
     {
         if (!$event->isMasterRequest()) {
             return;
@@ -357,10 +336,11 @@ class FullPageCacheListener
             return;
         }
 
-        $response = $event->getResponse();
-        if (!$response) {
-            return;
+        if ($this->matchesStaticPageContext($request)) {
+            $this->disable('Response can\'t be cached for static pages');
         }
+
+        $response = $event->getResponse();
 
         if (!$this->responseCanBeCached($response)) {
             $this->disable('Response can\'t be cached');
@@ -396,7 +376,7 @@ class FullPageCacheListener
                 }
 
                 $event = new PrepareResponseEvent($request, $response);
-                $this->eventDispatcher->dispatch(FullPageCacheEvents::PREPARE_RESPONSE, $event);
+                $this->eventDispatcher->dispatch($event, FullPageCacheEvents::PREPARE_RESPONSE);
 
                 $cacheItem = $event->getResponse();
 
@@ -433,7 +413,7 @@ class FullPageCacheListener
 
         // fire an event to allow full customozations
         $event = new CacheResponseEvent($response, $cache);
-        $this->eventDispatcher->dispatch(FullPageCacheEvents::CACHE_RESPONSE, $event);
+        $this->eventDispatcher->dispatch($event, FullPageCacheEvents::CACHE_RESPONSE);
 
         return $event->getCache();
     }

@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.elementservice.x");
@@ -638,7 +638,7 @@ pimcore.elementservice.refreshNode = function (node) {
 pimcore.elementservice.isDisallowedDocumentKey = function (parentNodeId, key) {
 
     if(parentNodeId == 1) {
-        var disallowedKeys = ["admin","install","webservice","plugin"];
+        var disallowedKeys = ["admin","install","plugin"];
         if(in_arrayi(key, disallowedKeys)) {
             Ext.MessageBox.alert(t('name_is_not_allowed'),
                 t('name_is_not_allowed'));

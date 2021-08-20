@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.element.selector.object");
@@ -386,7 +386,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
             {text: t("published"), width: 40, sortable: true, dataIndex: 'published', hidden: true},
             {text: t("path"), flex: 200, sortable: true, dataIndex: 'fullpath', renderer: Ext.util.Format.htmlEncode},
             {text: t("filename"), width: 200, sortable: false, dataIndex: 'filename', hidden: true, renderer: Ext.util.Format.htmlEncode},
-            {text: t("class"), width: 200, sortable: false, dataIndex: 'classname'}
+            {text: t("class"), width: 200, sortable: true, dataIndex: 'classname'}
         ];
 
 
@@ -599,7 +599,7 @@ pimcore.element.selector.object = Class.create(pimcore.element.selector.abstract
         this.pagingtoolbar.moveFirst();
     },
 
-    createGrid: function (fromConfig, response, settings, save) {
+    createGrid: function (fromConfig, response, settings, save, context) {
         var selectedClass = this.classChangeCombo.getValue();
 
         this.initClassStore(selectedClass,response, save);

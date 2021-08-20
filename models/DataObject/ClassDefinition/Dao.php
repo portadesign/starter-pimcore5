@@ -1,17 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\ClassDefinition;
@@ -21,6 +20,8 @@ use Pimcore\Model;
 use Pimcore\Model\DataObject;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\DataObject\ClassDefinition $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -47,6 +48,7 @@ class Dao extends Model\Dao\AbstractDao
     public function getNameById($id)
     {
         $name = null;
+
         try {
             if (!empty($id)) {
                 $name = $this->db->fetchOne('SELECT name FROM classes WHERE id = ?', [$id]);
@@ -61,15 +63,24 @@ class Dao extends Model\Dao\AbstractDao
      * @param string $name
      *
      * @return string|null
+     *
+     * @throws \Exception
      */
     public function getIdByName($name)
     {
         $id = null;
+
         try {
             if (!empty($name)) {
                 $id = $this->db->fetchOne('SELECT id FROM classes WHERE name = ?', [$name]);
             }
         } catch (\Exception $e) {
+        }
+
+        if (empty($id)) {
+            throw new Model\Exception\NotFoundException(sprintf(
+                'Data object class definition with with name "%s" does not exist.', $name
+            ));
         }
 
         return $id;
@@ -131,6 +142,7 @@ class Dao extends Model\Dao\AbstractDao
 			) DEFAULT CHARSET=utf8mb4;");
 
         $this->db->query('CREATE TABLE IF NOT EXISTS `' . $objectDatastoreTableRelation . "` (
+              `id` BIGINT(20) NOT NULL PRIMARY KEY  AUTO_INCREMENT,
               `src_id` int(11) NOT NULL DEFAULT '0',
               `dest_id` int(11) NOT NULL DEFAULT '0',
               `type` varchar(50) NOT NULL DEFAULT '',
@@ -156,9 +168,8 @@ class Dao extends Model\Dao\AbstractDao
         // add non existing columns in the table
         if (is_array($this->model->getFieldDefinitions()) && count($this->model->getFieldDefinitions())) {
             foreach ($this->model->getFieldDefinitions() as $key => $value) {
-                if ($value instanceof DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface || method_exists($value, 'getDataForResource')) {
+                if ($value instanceof DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface) {
                     // if a datafield requires more than one column in the datastore table => only for non-relation types
-                    /** @var Data&DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface $value */
                     if (!$value->isRelationType()) {
                         if (is_array($value->getColumnType())) {
                             foreach ($value->getColumnType() as $fkey => $fvalue) {
@@ -295,7 +306,7 @@ class Dao extends Model\Dao\AbstractDao
         $this->db->update('objects', ['o_className' => $newName], ['o_classId' => $this->model->getId()]);
 
         $this->db->updateWhere('object_query_' . $this->model->getId(), [
-            'oo_className' => $newName
+            'oo_className' => $newName,
         ]);
     }
 }

@@ -1,5 +1,18 @@
 <?php
 
+/**
+ * Pimcore
+ *
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Commercial License (PCL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
+ *
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ */
+
 namespace Pimcore\Tests\Model\Relations;
 
 use Pimcore\Cache;
@@ -19,7 +32,7 @@ use Pimcore\Tests\Util\TestHelper;
  */
 class MultipleAssigmentTest extends ModelTestCase
 {
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
         TestHelper::cleanUp();
@@ -39,7 +52,7 @@ class MultipleAssigmentTest extends ModelTestCase
         }
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         TestHelper::cleanUp();
         parent::tearDown();
@@ -75,27 +88,11 @@ class MultipleAssigmentTest extends ModelTestCase
 
         $object->setOnlyOneManyToMany($metaDataList);
 
-        $object->save();
-
-        $metaDataList = $object->getOnlyOneManyToMany();
-        $this->checkMultipleAssignmentsOnSingleManyToMany($metaDataList, 'after saving');
-
-        $id = $object->getId();
-
-        //clear cache and collect garbage
-        Cache::clearAll();
-        \Pimcore::collectGarbage();
-
-        //reload data object from database
-        $object = MultipleAssignments::getById($id, true);
-
-        $metaDataList = $object->getOnlyOneManyToMany();
-        $this->checkMultipleAssignmentsOnSingleManyToMany($metaDataList, 'after loading');
-
-        $serializedData = serialize($object);
-        $deserializedObject = unserialize($serializedData);
-        $metaDataList = $deserializedObject->getOnlyOneManyToMany();
-        $this->checkMultipleAssignmentsOnSingleManyToMany($metaDataList, 'after serialize/unserialize');
+        try {
+            $object->save();
+            $this->fail('only one assignment allowed but validation accepted duplicate items');
+        } catch (\Exception $e) {
+        }
     }
 
     protected function checkMultipleAssignmentsOnSingleManyToMany(array $metaDataList, $positionMessage = '')
@@ -130,27 +127,11 @@ class MultipleAssigmentTest extends ModelTestCase
 
         $object->setOnlyOneManyToManyObject($metaDataList);
 
-        $object->save();
-
-        $metaDataList = $object->getOnlyOneManyToManyObject();
-        $this->checkMultipleAssignmentsOnSingleManyToMany($metaDataList, 'after saving');
-
-        $id = $object->getId();
-
-        //clear cache and collect garbage
-        Cache::clearAll();
-        \Pimcore::collectGarbage();
-
-        //reload data object from database
-        $object = MultipleAssignments::getById($id, true);
-
-        $metaDataList = $object->getOnlyOneManyToManyObject();
-        $this->checkMultipleAssignmentsOnSingleManyToMany($metaDataList, 'after loading');
-
-        $serializedData = serialize($object);
-        $deserializedObject = unserialize($serializedData);
-        $metaDataList = $deserializedObject->getOnlyOneManyToManyObject();
-        $this->checkMultipleAssignmentsOnSingleManyToMany($metaDataList, 'after serialize/unserialize');
+        try {
+            $object->save();
+            $this->fail('only one assignment allowed but validation accepted duplicate items');
+        } catch (\Exception $e) {
+        }
     }
 
     protected function checkMultipleAssignmentsOnMultipleManyToMany(array $metaDataList, $positionMessage = '')

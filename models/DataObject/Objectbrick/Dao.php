@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    DataObject\Objectbrick
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\Objectbrick;
@@ -24,6 +22,8 @@ use Pimcore\Model\DataObject\ClassDefinition\Data\LazyLoadingSupportInterface;
 use Pimcore\Model\DataObject\ClassDefinition\Data\ResourcePersistenceAwareInterface;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\DataObject\Objectbrick $model
  */
 class Dao extends Model\DataObject\Fieldcollection\Dao
@@ -63,6 +63,16 @@ class Dao extends Model\DataObject\Fieldcollection\Dao
                 $brick->setObject($object);
 
                 foreach ($fieldDefinitions as $key => $fd) {
+                    $context = [];
+                    $context['object'] = $object;
+                    $context['containerType'] = 'objectbrick';
+                    $context['containerKey'] = $brick->getType();
+                    $context['brickField'] = $key;
+                    $context['fieldname'] = $brick->getFieldname();
+                    $params['context'] = $context;
+                    $params['owner'] = $this->model;
+                    $params['fieldname'] = $key;
+
                     if ($fd instanceof CustomResourcePersistingInterface) {
                         $doLoad = true;
 
@@ -74,14 +84,6 @@ class Dao extends Model\DataObject\Fieldcollection\Dao
 
                         if ($doLoad) {
                             // datafield has it's own loader
-                            $context = [];
-                            $context['object'] = $object;
-                            $context['containerType'] = 'objectbrick';
-                            $context['containerKey'] = $brick->getType();
-                            $context['brickField'] = $key;
-                            $context['fieldname'] = $brick->getFieldname();
-                            $params['context'] = $context;
-
                             $value = $fd->load($brick, $params);
                             if ($value === 0 || !empty($value)) {
                                 $brick->setValue($key, $value);
@@ -96,12 +98,12 @@ class Dao extends Model\DataObject\Fieldcollection\Dao
                             }
                             $brick->setValue(
                                 $key,
-                                $fd->getDataFromResource($multidata)
+                                $fd->getDataFromResource($multidata, $object, $params)
                             );
                         } else {
                             $brick->setValue(
                                 $key,
-                                $fd->getDataFromResource($result[$key])
+                                $fd->getDataFromResource($result[$key], $object, $params)
                             );
                         }
                     }

@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.tags.link");
@@ -45,7 +45,7 @@ pimcore.object.tags.link = Class.create(pimcore.object.tags.abstract, {
         var renderer = function (key, value, metaData, record) {
             this.applyPermissionStyle(key, value, metaData, record);
 
-            if (record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
+            if (record.data.inheritedFields && record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
                 metaData.tdCls += " grid_value_inherited";
             }
             if (value) {
@@ -95,14 +95,24 @@ pimcore.object.tags.link = Class.create(pimcore.object.tags.abstract, {
             value: text
         });
 
-        this.component = new Ext.form.FieldContainer({
+        var componentCfg = {
             fieldLabel: this.fieldConfig.title,
             layout: 'hbox',
             border: false,
             combineErrors: false,
             items: [this.displayField, this.openButton, this.editButton],
-            componentCls: "object_field"
-        });
+            componentCls: "object_field object_field_type_" + this.type
+        };
+
+        if (this.fieldConfig.labelWidth) {
+            componentCfg.labelWidth = this.fieldConfig.labelWidth;
+        }
+
+        if (this.fieldConfig.labelAlign) {
+            componentCfg.labelAlign = this.fieldConfig.labelAlign;
+        }
+
+        this.component = Ext.create('Ext.form.FieldContainer', componentCfg);
 
         return this.component;
     },

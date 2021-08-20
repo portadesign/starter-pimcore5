@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Element
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\Traits;
@@ -24,6 +22,9 @@ use Pimcore\Model\DataObject\Exception\InheritanceParentNotFoundException;
 use Pimcore\Model\DataObject\Localizedfield;
 use Pimcore\Model\DataObject\Objectbrick\Data\AbstractData;
 
+/**
+ * @internal
+ */
 trait DefaultValueTrait
 {
     /** @var string */
@@ -64,16 +65,8 @@ trait DefaultValueTrait
             $class = null;
             $owner = isset($params['owner']) ? $params['owner'] : null;
             if ($owner instanceof Concrete) {
-                if ($isUpdate) {
-                    // only consider default value for new objects
-                    return $data;
-                }
                 $class = $owner->getClass();
             } elseif ($owner instanceof AbstractData) {
-                if ($isUpdate) {
-                    // only consider default value for new bricks
-                    return $data;
-                }
                 $class = $owner->getObject()->getClass();
             }
 
@@ -88,28 +81,28 @@ trait DefaultValueTrait
                     if ($owner instanceof Concrete) {
                         $params['context'] = array_merge($params['context'], [
                             'ownerType' => 'object',
-                            'fieldname' => $this->getName()
+                            'fieldname' => $this->getName(),
                         ]);
                     } elseif ($owner instanceof Localizedfield) {
                         $params['context'] = array_merge($params['context'], [
                             'ownerType' => 'localizedfield',
                             'ownerName' => 'localizedfields',
                             'position' => $params['language'],
-                            'fieldname' => $this->getName()
+                            'fieldname' => $this->getName(),
                         ]);
                     } elseif ($owner instanceof \Pimcore\Model\DataObject\Fieldcollection\Data\AbstractData) {
                         $params['context'] = array_merge($params['context'], [
                             'ownerType' => 'fieldcollection',
                             'ownerName' => $owner->getFieldname(),
                             'fieldname' => $this->getName(),
-                            'index' => $owner->getIndex()
+                            'index' => $owner->getIndex(),
                         ]);
                     } elseif ($owner instanceof AbstractData) {
                         $params['context'] = array_merge($params['context'], [
                             'ownerType' => 'objectbrick',
                             'ownerName' => $owner->getFieldname(),
                             'fieldname' => $this->getName(),
-                            'index' => $owner->getType()
+                            'index' => $owner->getType(),
                         ]);
                     }
 
@@ -126,13 +119,20 @@ trait DefaultValueTrait
                 if ($class && $class->getAllowInherit()) {
                     $params = [];
 
+                    $inheritanceEnabled = Concrete::getGetInheritedValues();
+
                     try {
+                        // make sure we get the inherited value of the parent
+                        Concrete::setGetInheritedValues(true);
+
                         $data = $owner->getValueFromParent($this->getName(), $params);
                         if (!$this->isEmpty($data)) {
-                            return $data;
+                            return null;
                         }
                     } catch (InheritanceParentNotFoundException $e) {
                         // no data from parent available, use the default value
+                    } finally {
+                        Concrete::setGetInheritedValues($inheritanceEnabled);
                     }
                 }
             }

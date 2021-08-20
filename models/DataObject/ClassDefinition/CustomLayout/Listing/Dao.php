@@ -1,17 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\ClassDefinition\CustomLayout\Listing;
@@ -19,6 +18,8 @@ namespace Pimcore\Model\DataObject\ClassDefinition\CustomLayout\Listing;
 use Pimcore\Model;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\DataObject\ClassDefinition\CustomLayout\Listing $model
  */
 class Dao extends Model\Listing\Dao\AbstractDao
@@ -35,7 +36,10 @@ class Dao extends Model\Listing\Dao\AbstractDao
         $layoutsRaw = $this->db->fetchCol('SELECT id FROM custom_layouts' . $this->getCondition() . $this->getOrder() . $this->getOffsetLimit(), $this->model->getConditionVariables());
 
         foreach ($layoutsRaw as $classRaw) {
-            $layouts[] = Model\DataObject\ClassDefinition\CustomLayout::getById($classRaw);
+            $customLayout = Model\DataObject\ClassDefinition\CustomLayout::getById($classRaw);
+            if ($customLayout) {
+                $layouts[] = $customLayout;
+            }
         }
 
         $this->model->setLayoutDefinitions($layouts);
@@ -45,18 +49,13 @@ class Dao extends Model\Listing\Dao\AbstractDao
 
     /**
      * @return int
-     *
-     * @todo: $amount could not be defined, so this could cause an issue
      */
     public function getTotalCount()
     {
-        $amount = 0;
-
         try {
-            $amount = (int) $this->db->fetchOne('SELECT COUNT(*) as amount FROM custom_layouts ' . $this->getCondition(), $this->model->getConditionVariables());
+            return (int) $this->db->fetchOne('SELECT COUNT(*) FROM custom_layouts ' . $this->getCondition(), $this->model->getConditionVariables());
         } catch (\Exception $e) {
+            return 0;
         }
-
-        return $amount;
     }
 }

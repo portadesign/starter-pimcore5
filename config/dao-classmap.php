@@ -1,5 +1,18 @@
 <?php
 
+/**
+ * Pimcore
+ *
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Commercial License (PCL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
+ *
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ */
+
 return [
     'Pimcore\\Model\\Redirect\\Listing' => 'Pimcore\\Model\\Redirect\\Listing\\Dao',
     'Pimcore\\Model\\Site' => 'Pimcore\\Model\\Site\\Dao',
@@ -21,11 +34,8 @@ return [
     'Pimcore\\Model\\User\\Role\\Folder' => 'Pimcore\\Model\\User\\Role\\Folder\\Dao',
     'Pimcore\\Model\\Search\\Backend\\Data' => 'Pimcore\\Model\\Search\\Backend\\Data\\Dao',
     'Pimcore\\Model\\Search\\Backend\\Data\\Listing' => 'Pimcore\\Model\\Search\\Backend\\Data\\Listing\\Dao',
-    'Pimcore\\Model\\Translation\\Website\\Listing' => 'Pimcore\\Model\\Translation\\Website\\Listing\\Dao',
-    'Pimcore\\Model\\Translation\\Admin\\Listing' => 'Pimcore\\Model\\Translation\\Admin\\Listing\\Dao',
-    'Pimcore\\Model\\Translation\\AbstractTranslation\\Listing' => 'Pimcore\\Model\\Translation\\AbstractTranslation\\Listing\\Dao',
-    'Pimcore\\Model\\Translation\\Admin' => 'Pimcore\\Model\\Translation\\Admin\\Dao',
-    'Pimcore\\Model\\Translation\\Website' => 'Pimcore\\Model\\Translation\\Website\\Dao',
+    'Pimcore\\Model\\Translation' => 'Pimcore\\Model\\Translation\\Dao',
+    'Pimcore\\Model\\Translation\\Listing' => 'Pimcore\\Model\\Translation\\Listing\\Dao',
     'Pimcore\\Model\\Glossary\\Listing' => 'Pimcore\\Model\\Glossary\\Listing\\Dao',
     'Pimcore\\Model\\Document\\Link' => 'Pimcore\\Model\\Document\\Link\\Dao',
     'Pimcore\\Model\\Document\\Hardlink' => 'Pimcore\\Model\\Document\\Hardlink\\Dao',
@@ -42,27 +52,25 @@ return [
     'Pimcore\\Model\\Document\\Printcontainer' => 'Pimcore\\Model\\Document\\Printcontainer\\Dao',
     'Pimcore\\Model\\Document\\DocType\\Listing' => 'Pimcore\\Model\\Document\\DocType\\Listing\\Dao',
     'Pimcore\\Model\\Document\\Email' => 'Pimcore\\Model\\Document\\Email\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Textarea' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Select' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Link' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Checkbox' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Multiselect' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Area' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Table' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Image' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Block' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Multihref' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Numeric' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Renderlet' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Pdf' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Video' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Snippet' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Wysiwyg' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Date' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Embed' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Input' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Href' => 'Pimcore\\Model\\Document\\Tag\\Dao',
-    'Pimcore\\Model\\Document\\Tag\\Areablock' => 'Pimcore\\Model\\Document\\Tag\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Textarea' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Select' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Link' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Checkbox' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Multiselect' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Area' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Table' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Image' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Block' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Numeric' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Renderlet' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Pdf' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Video' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Snippet' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Wysiwyg' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Date' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Embed' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Input' => 'Pimcore\\Model\\Document\\Editable\\Dao',
+    'Pimcore\\Model\\Document\\Editable\\Areablock' => 'Pimcore\\Model\\Document\\Editable\\Dao',
     'Pimcore\\Model\\Document\\Snippet' => 'Pimcore\\Model\\Document\\Snippet\\Dao',
     'Pimcore\\Model\\Document\\Newsletter' => 'Pimcore\\Model\\Document\\Newsletter\\Dao',
     'Pimcore\\Model\\Document\\Page' => 'Pimcore\\Model\\Document\\Page\\Dao',
@@ -140,10 +148,7 @@ return [
     'Pimcore\\Model\\Tool\\Targeting\\Persona\\Listing' => 'Pimcore\\Model\\Tool\\Targeting\\Persona\\Listing\\Dao',
     'Pimcore\\Model\\Tool\\Targeting\\TargetGroup\\Listing' => 'Pimcore\\Model\\Tool\\Targeting\\TargetGroup\\Listing\\Dao',
     'Pimcore\\Model\\Tool\\Targeting\\Rule\\Listing' => 'Pimcore\\Model\\Tool\\Targeting\\Rule\\Listing\\Dao',
-    'Pimcore\\Model\\Tool\\Qrcode\\Config' => 'Pimcore\\Model\\Tool\\Qrcode\\Config\\Dao',
-    'Pimcore\\Model\\Tool\\Qrcode\\Config\\Listing' => 'Pimcore\\Model\\Tool\\Qrcode\\Config\\Listing\\Dao',
     'Pimcore\\Model\\Tool\\Lock' => 'Pimcore\\Model\\Tool\\Lock\\Dao',
-    'Pimcore\\Model\\Tool\\Tracking\\Event' => 'Pimcore\\Model\\Tool\\Tracking\\Event\\Dao',
     'Pimcore\\Model\\Tool\\UUID\\Listing' => 'Pimcore\\Model\\Tool\\UUID\\Listing\\Dao',
     'Pimcore\\Model\\Tool\\TmpStore' => 'Pimcore\\Model\\Tool\\TmpStore\\Dao',
     'Pimcore\\Model\\Tool\\Tag\\Config' => 'Pimcore\\Model\\Tool\\Tag\\Config\\Dao',
@@ -166,5 +171,5 @@ return [
     'Pimcore\\Model\\Metadata\\Predefined\\Listing' => 'Pimcore\\Model\\Metadata\\Predefined\\Listing\\Dao',
     'Pimcore\\Model\\Metadata\\Predefined' => 'Pimcore\\Model\\Metadata\\Predefined\\Dao',
     'Pimcore\\Model\\Property\\Predefined\\Listing' => 'Pimcore\\Model\\Property\\Predefined\\Listing\\Dao',
-    'Pimcore\\Model\\Property\\Predefined' => 'Pimcore\\Model\\Property\\Predefined\\Dao'
+    'Pimcore\\Model\\Property\\Predefined' => 'Pimcore\\Model\\Property\\Predefined\\Dao',
 ];

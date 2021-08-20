@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Glossary
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model;
@@ -25,59 +23,74 @@ namespace Pimcore\Model;
 class Glossary extends AbstractModel
 {
     /**
+     * @internal
+     *
      * @var int
      */
-    public $id;
+    protected $id;
 
     /**
+     * @internal
+     *
      * @var string
      */
-    public $text;
+    protected $text;
 
     /**
+     * @internal
+     *
      * @var string
      */
-    public $link;
+    protected $link;
 
     /**
+     * @internal
+     *
      * @var string
      */
-    public $abbr;
+    protected $abbr;
 
     /**
+     * @internal
+     *
      * @var string
      */
-    public $acronym;
+    protected $language;
 
     /**
-     * @var string
-     */
-    public $language;
-
-    /**
+     * @internal
+     *
      * @var bool
      */
-    public $casesensitive;
+    protected $casesensitive;
 
     /**
+     * @internal
+     *
      * @var bool
      */
-    public $exactmatch;
+    protected $exactmatch;
 
     /**
+     * @internal
+     *
      * @var int
      */
-    public $site;
+    protected $site;
 
     /**
+     * @internal
+     *
      * @var int
      */
-    public $creationDate;
+    protected $creationDate;
 
     /**
+     * @internal
+     *
      * @var int
      */
-    public $modificationDate;
+    protected $modificationDate;
 
     /**
      * @param int $id
@@ -88,7 +101,7 @@ class Glossary extends AbstractModel
     {
         try {
             $glossary = new self();
-            $glossary->setId(intval($id));
+            $glossary->setId((int)$id);
             $glossary->getDao()->getById();
 
             return $glossary;
@@ -186,26 +199,6 @@ class Glossary extends AbstractModel
     public function getAbbr()
     {
         return $this->abbr;
-    }
-
-    /**
-     * @param string $acronym
-     *
-     * @return $this
-     */
-    public function setAcronym($acronym)
-    {
-        $this->acronym = $acronym;
-
-        return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getAcronym()
-    {
-        return $this->acronym;
     }
 
     /**

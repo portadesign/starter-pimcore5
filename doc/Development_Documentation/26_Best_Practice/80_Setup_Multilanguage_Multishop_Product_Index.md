@@ -22,7 +22,7 @@ There are two ways of setting up a multi language product index.
 This is suitable when only having a few multi language fields, e.g. just name and description, and all the other fields 
 are the same for each language. 
 
-```yml 
+```yml
 pimcore_ecommerce_framework:
     index_service:
         tenants:
@@ -58,7 +58,7 @@ This is suitable when having multiple language fields or complex applications an
 In order to reduce configuration effort (like copying all attributes for each assortment tenant), you can take advantage of
 the `_defaults` configuration feature and `placeholders`.
  
-```yml 
+```yml
 pimcore_ecommerce_framework:
     index_service:
         tenants:
@@ -117,7 +117,7 @@ pimcore_ecommerce_framework:
 ```
 
 The config has to be set up as container service. A sample implementation for a configuration with sub tenants is
-[DefaultMysqlSubTenantConfig](https://github.com/pimcore/pimcore/blob/master/bundles/EcommerceFrameworkBundle/IndexService/Config/DefaultMysqlSubTenantConfig.php). 
+[DefaultMysqlSubTenantConfig](https://github.com/pimcore/pimcore/blob/10.x/bundles/EcommerceFrameworkBundle/IndexService/Config/DefaultMysqlSubTenantConfig.php). 
 
 
 

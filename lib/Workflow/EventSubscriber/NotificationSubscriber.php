@@ -1,21 +1,22 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Workflow\EventSubscriber;
 
 use Pimcore\Model\DataObject\Concrete;
-use Pimcore\Model\Element\AbstractElement;
+use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\Element\Service;
 use Pimcore\Model\Element\ValidationException;
 use Pimcore\Workflow;
@@ -25,12 +26,17 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Workflow\Event\Event;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
+/**
+ * @internal
+ */
 class NotificationSubscriber implements EventSubscriberInterface
 {
     const MAIL_TYPE_TEMPLATE = 'template';
+
     const MAIL_TYPE_DOCUMENT = 'pimcore_document';
 
     const NOTIFICATION_CHANNEL_MAIL = 'mail';
+
     const NOTIFICATION_CHANNEL_PIMCORE_NOTIFICATION = 'pimcore_notification';
 
     const DEFAULT_MAIL_TEMPLATE_PATH = '@PimcoreCore/Workflow/NotificationEmail/notificationEmail.html.twig';
@@ -92,7 +98,7 @@ class NotificationSubscriber implements EventSubscriberInterface
             return;
         }
 
-        /** @var AbstractElement $subject */
+        /** @var ElementInterface $subject */
         $subject = $event->getSubject();
         /** @var Transition $transition */
         $transition = $event->getTransition();
@@ -120,13 +126,13 @@ class NotificationSubscriber implements EventSubscriberInterface
     /**
      * @param Transition $transition
      * @param \Symfony\Component\Workflow\Workflow $workflow
-     * @param AbstractElement $subject
+     * @param ElementInterface $subject
      * @param string $mailType
      * @param string $mailPath
      * @param array $notifyUsers
      * @param array $notifyRoles
      */
-    private function handleNotifyPostWorkflowEmail(Transition $transition, \Symfony\Component\Workflow\Workflow $workflow, AbstractElement $subject, string $mailType, string $mailPath, array $notifyUsers, array $notifyRoles)
+    private function handleNotifyPostWorkflowEmail(Transition $transition, \Symfony\Component\Workflow\Workflow $workflow, ElementInterface $subject, string $mailType, string $mailPath, array $notifyUsers, array $notifyRoles)
     {
         //notify users
         $subjectType = ($subject instanceof Concrete ? $subject->getClassName() : Service::getType($subject));
@@ -146,11 +152,11 @@ class NotificationSubscriber implements EventSubscriberInterface
     /**
      * @param Transition $transition
      * @param \Symfony\Component\Workflow\Workflow $workflow
-     * @param AbstractElement $subject
+     * @param ElementInterface $subject
      * @param array $notifyUsers
      * @param array $notifyRoles
      */
-    private function handleNotifyPostWorkflowPimcoreNotification(Transition $transition, \Symfony\Component\Workflow\Workflow $workflow, AbstractElement $subject, array $notifyUsers, array $notifyRoles)
+    private function handleNotifyPostWorkflowPimcoreNotification(Transition $transition, \Symfony\Component\Workflow\Workflow $workflow, ElementInterface $subject, array $notifyUsers, array $notifyRoles)
     {
         $subjectType = ($subject instanceof Concrete ? $subject->getClassName() : Service::getType($subject));
         $this->pimcoreNotificationService->sendPimcoreNotification(
@@ -174,7 +180,7 @@ class NotificationSubscriber implements EventSubscriberInterface
     {
         return $this->isEnabled()
             && $event->getTransition() instanceof Transition
-            && $event->getSubject() instanceof AbstractElement;
+            && $event->getSubject() instanceof ElementInterface;
     }
 
     /**
@@ -196,7 +202,7 @@ class NotificationSubscriber implements EventSubscriberInterface
     public static function getSubscribedEvents()
     {
         return [
-            'workflow.completed' => ['onWorkflowCompleted', 0]
+            'workflow.completed' => ['onWorkflowCompleted', 0],
         ];
     }
 }

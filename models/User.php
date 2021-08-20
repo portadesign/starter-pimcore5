@@ -1,113 +1,107 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    User
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model;
 
 use Pimcore\Config;
 use Pimcore\File;
+use Pimcore\Helper\TemporaryFileHelperTrait;
 use Pimcore\Model\User\Role;
 use Pimcore\Tool;
 
 /**
  * @method \Pimcore\Model\User\Dao getDao()
  */
-class User extends User\UserRole
+final class User extends User\UserRole
 {
-    /**
-     * @var string
-     */
-    public $type = 'user';
+    use TemporaryFileHelperTrait;
 
     /**
      * @var string
      */
-    public $password;
+    protected $type = 'user';
 
     /**
      * @var string
      */
-    public $firstname;
+    protected $password;
 
     /**
      * @var string
      */
-    public $lastname;
+    protected $firstname;
 
     /**
      * @var string
      */
-    public $email;
+    protected $lastname;
 
     /**
      * @var string
      */
-    public $language = 'en';
+    protected $email;
+
+    /**
+     * @var string
+     */
+    protected $language = 'en';
 
     /**
      * @var bool
      */
-    public $admin = false;
+    protected $admin = false;
 
     /**
      * @var bool
      */
-    public $active = true;
+    protected $active = true;
 
     /**
      * @var array
      */
-    public $roles = [];
+    protected $roles = [];
 
     /**
      * @var bool
      */
-    public $welcomescreen = false;
+    protected $welcomescreen = false;
 
     /**
      * @var bool
      */
-    public $closeWarning = true;
+    protected $closeWarning = true;
 
     /**
      * @var bool
      */
-    public $memorizeTabs = true;
+    protected $memorizeTabs = true;
 
     /**
      * @var bool
      */
-    public $allowDirtyClose = false;
-
-    /**
-     * @deprecated
-     *
-     * @var string|null
-     */
-    public $apiKey;
+    protected $allowDirtyClose = false;
 
     /**
      * @var string|null
      */
-    public $contentLanguages;
+    protected $contentLanguages;
 
     /**
      * @var string|null
      */
-    public $activePerspective;
+    protected $activePerspective;
 
     /**
      * @var null|array
@@ -127,17 +121,17 @@ class User extends User\UserRole
     /**
      * @var int
      */
-    public $lastLogin;
+    protected $lastLogin;
 
     /**
      * @var string
      */
-    public $keyBindings;
+    protected $keyBindings;
 
     /**
      * @var array
      */
-    public $twoFactorAuthentication;
+    protected $twoFactorAuthentication;
 
     /**
      * @return string
@@ -163,8 +157,6 @@ class User extends User\UserRole
 
     /**
      * Alias for getName()
-     *
-     * @deprecated
      *
      * @return string
      */
@@ -513,56 +505,53 @@ class User extends User\UserRole
     }
 
     /**
-     * @deprecated
+     * @internal
      *
-     * @param string $apiKey
-     *
-     * @throws \Exception
+     * @return string
      */
-    public function setApiKey($apiKey)
+    protected function getOriginalImageStoragePath(): string
     {
-        if (!empty($apiKey) && strlen($apiKey) < 32) {
-            throw new \Exception('API-Key has to be at least 32 characters long');
-        }
-        $this->apiKey = $apiKey;
+        return sprintf('/user-image/user-%s.png', $this->getId());
+    }
+
+    /***
+     * @internal
+     * @return string
+     */
+    protected function getThumbnailImageStoragePath(): string
+    {
+        return sprintf('/user-image/user-thumbnail-%s.png', $this->getId());
     }
 
     /**
-     * @deprecated
-     *
-     * @return null|string
-     */
-    public function getApiKey()
-    {
-        if (empty($this->apiKey)) {
-            return null;
-        }
-
-        return $this->apiKey;
-    }
-
-    /**
-     * @param string $path
+     * @param string|null $path
      */
     public function setImage($path)
     {
-        if (!is_dir(PIMCORE_USERIMAGE_DIRECTORY)) {
-            File::mkdir(PIMCORE_USERIMAGE_DIRECTORY);
+        $storage = Tool\Storage::get('admin');
+        $originalFileStoragePath = $this->getOriginalImageStoragePath();
+        $thumbFileStoragePath = $this->getThumbnailImageStoragePath();
+
+        if ($storage->fileExists($originalFileStoragePath)) {
+            $storage->delete($originalFileStoragePath);
         }
 
-        $destFile = PIMCORE_USERIMAGE_DIRECTORY . '/user-' . $this->getId() . '.png';
-        $thumb = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/user-thumbnail-' . $this->getId() . '.png';
-        @unlink($destFile);
-        @unlink($thumb);
-        copy($path, $destFile);
-        @chmod($destFile, File::getDefaultMode());
+        if ($storage->fileExists($thumbFileStoragePath)) {
+            $storage->delete($thumbFileStoragePath);
+        }
+
+        if ($path) {
+            $handle = fopen($path, 'rb');
+            $storage->writeStream($originalFileStoragePath, $handle);
+            fclose($handle);
+        }
     }
 
     /**
      * @param int|null $width
      * @param int|null $height
      *
-     * @return string
+     * @return resource
      */
     public function getImage($width = null, $height = null)
     {
@@ -573,21 +562,25 @@ class User extends User\UserRole
             $height = 46;
         }
 
-        $id = $this->getId();
-        $user = PIMCORE_USERIMAGE_DIRECTORY . '/user-' . $id . '.png';
-        if (file_exists($user)) {
-            $thumb = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/user-thumbnail-' . $id . '.png';
-            if (!file_exists($thumb)) {
+        $storage = Tool\Storage::get('admin');
+        if ($storage->fileExists($this->getOriginalImageStoragePath())) {
+            if (!$storage->fileExists($this->getThumbnailImageStoragePath())) {
+                $localFile = self::getLocalFileFromStream($storage->readStream($this->getOriginalImageStoragePath()));
+                $targetFile = File::getLocalTempFilePath('png');
+
                 $image = \Pimcore\Image::getInstance();
-                $image->load($user);
+                $image->load($localFile);
                 $image->cover($width, $height);
-                $image->save($thumb, 'png');
+                $image->save($targetFile, 'png');
+
+                $storage->write($this->getThumbnailImageStoragePath(), file_get_contents($targetFile));
+                unlink($targetFile);
             }
 
-            return $thumb;
+            return $storage->readStream($this->getThumbnailImageStoragePath());
         }
 
-        return PIMCORE_WEB_ROOT . '/bundles/pimcoreadmin/img/avatar.png';
+        return fopen($this->getFallbackImage(), 'rb');
     }
 
     /**
@@ -603,7 +596,7 @@ class User extends User\UserRole
     }
 
     /**
-     * @param null|string $contentLanguages
+     * @param null|string|array $contentLanguages
      */
     public function setContentLanguages($contentLanguages)
     {
@@ -638,7 +631,7 @@ class User extends User\UserRole
      *
      * @return array|string[]
      */
-    public function getMergedPerspectives()
+    private function getMergedPerspectives()
     {
         if (null === $this->mergedPerspectives) {
             $this->mergedPerspectives = $this->getPerspectives();
@@ -663,6 +656,8 @@ class User extends User\UserRole
     /**
      * Returns the first perspective name
      *
+     * @internal
+     *
      * @return string
      */
     public function getFirstAllowedPerspective()
@@ -681,9 +676,9 @@ class User extends User\UserRole
     /**
      * Returns array of website translation languages for editing related to user and all related roles
      *
-     * @return array|null
+     * @return array
      */
-    public function getMergedWebsiteTranslationLanguagesEdit()
+    private function getMergedWebsiteTranslationLanguagesEdit(): array
     {
         if (null === $this->mergedWebsiteTranslationLanguagesEdit) {
             $this->mergedWebsiteTranslationLanguagesEdit = $this->getWebsiteTranslationLanguagesEdit();
@@ -701,6 +696,8 @@ class User extends User\UserRole
     /**
      * Returns array of languages allowed for editing. If edit and view languages are empty all languages are allowed.
      * If only edit languages are empty (but view languages not) empty array is returned.
+     *
+     * @internal
      *
      * @return array|null
      */
@@ -722,9 +719,9 @@ class User extends User\UserRole
     /**
      * Returns array of website translation languages for viewing related to user and all related roles
      *
-     * @return array|null
+     * @return array
      */
-    public function getMergedWebsiteTranslationLanguagesView()
+    private function getMergedWebsiteTranslationLanguagesView(): array
     {
         if (null === $this->mergedWebsiteTranslationLanguagesView) {
             $this->mergedWebsiteTranslationLanguagesView = $this->getWebsiteTranslationLanguagesView();
@@ -741,6 +738,8 @@ class User extends User\UserRole
 
     /**
      * Returns array of languages allowed for viewing. If view languages are empty all languages are allowed.
+     *
+     * @internal
      *
      * @return array|null
      */
@@ -775,6 +774,8 @@ class User extends User\UserRole
     }
 
     /**
+     * @internal
+     *
      * @return string
      */
     public static function getDefaultKeyBindings()
@@ -784,205 +785,205 @@ class User extends User\UserRole
                 [
                     'action' => 'save',
                     'key' => ord('S'),
-                    'ctrl' => true
+                    'ctrl' => true,
                 ],
                 [
                     'action' => 'publish',
                     'key' => ord('P'),
                     'ctrl' => true,
-                    'shift' => true
+                    'shift' => true,
                 ],
                 [
                     'action' => 'unpublish',
                     'key' => ord('U'),
                     'ctrl' => true,
-                    'shift' => true
+                    'shift' => true,
                 ],
                 [
                     'action' => 'rename',
                     'key' => ord('R'),
                     'alt' => true,
-                    'shift' => true
+                    'shift' => true,
                 ],
                 [
                     'action' => 'refresh',
-                    'key' => 116
+                    'key' => 116,
                 ],
                 [
                     'action' => 'openAsset',
                     'key' => ord('A'),
                     'ctrl' => true,
-                    'shift' => true
+                    'shift' => true,
                 ],
                 [
                     'action' => 'openObject',
                     'key' => ord('O'),
                     'ctrl' => true,
-                    'shift' => true
+                    'shift' => true,
                 ],
                 [
                     'action' => 'openDocument',
                     'key' => ord('D'),
                     'ctrl' => true,
-                    'shift' => true
+                    'shift' => true,
                 ],
                 [
                     'action' => 'openClassEditor',
                     'key' => ord('C'),
                     'ctrl' => true,
-                    'shift' => true
+                    'shift' => true,
 
                 ],
                 [
                     'action' => 'openInTree',
                     'key' => ord('L'),
                     'ctrl' => true,
-                    'shift' => true
+                    'shift' => true,
 
                 ],
                 [
                     'action' => 'showMetaInfo',
                     'key' => ord('I'),
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'searchDocument',
                     'key' => ord('W'),
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'searchAsset',
                     'key' => ord('A'),
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'searchObject',
                     'key' => ord('O'),
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'showElementHistory',
                     'key' => ord('H'),
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'closeAllTabs',
                     'key' => ord('T'),
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'searchAndReplaceAssignments',
                     'key' => ord('S'),
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'glossary',
                     'key' => ord('G'),
                     'shift' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'redirects',
                     'key' => ord('R'),
                     'ctrl' => false,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'sharedTranslations',
                     'key' => ord('T'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'recycleBin',
                     'key' => ord('R'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'notesEvents',
                     'key' => ord('N'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'applicationLogger',
                     'key' => ord('L'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'reports',
                     'key' => ord('M'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'tagManager',
                     'key' => ord('H'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'seoDocumentEditor',
                     'key' => ord('S'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'robots',
                     'key' => ord('J'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'httpErrorLog',
                     'key' => ord('O'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'customReports',
                     'key' => ord('C'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'tagConfiguration',
                     'key' => ord('N'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'users',
                     'key' => ord('U'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'roles',
                     'key' => ord('P'),
                     'ctrl' => true,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'clearAllCaches',
                     'key' => ord('Q'),
                     'ctrl' => false,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'clearDataCache',
                     'key' => ord('C'),
                     'ctrl' => false,
-                    'alt' => true
+                    'alt' => true,
                 ],
                 [
                     'action' => 'quickSearch',
                     'key' => ord('F'),
                     'ctrl' => true,
-                    'shift' => true
-                ]
+                    'shift' => true,
+                ],
             ]);
     }
 
@@ -1015,7 +1016,7 @@ class User extends User\UserRole
                 'required' => false,
                 'enabled' => false,
                 'secret' => '',
-                'type' => ''
+                'type' => '',
             ];
         }
 
@@ -1050,5 +1051,20 @@ class User extends User\UserRole
 
             $this->twoFactorAuthentication[$key] = $value;
         }
+    }
+
+    public function hasImage()
+    {
+        return Tool\Storage::get('admin')->fileExists($this->getOriginalImageStoragePath());
+    }
+
+    /**
+     * @internal
+     *
+     * @return string
+     */
+    protected function getFallbackImage()
+    {
+        return PIMCORE_WEB_ROOT . '/bundles/pimcoreadmin/img/avatar.png';
     }
 }

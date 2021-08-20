@@ -1,22 +1,26 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Db;
 
 use Pimcore\File;
 
-class PhpArrayFileTable
+/**
+ * @internal
+ */
+final class PhpArrayFileTable
 {
     /**
      * @var array
@@ -73,10 +77,10 @@ class PhpArrayFileTable
     {
         $writeable = false;
 
-        if (file_exists($filePath) && is_writeable($filePath)) {
+        if (file_exists($filePath) && is_writable($filePath)) {
             $writeable = true;
         } elseif (!file_exists($filePath)) {
-            if (is_writeable(dirname($filePath))) {
+            if (is_writable(dirname($filePath))) {
                 $writeable = true;
             }
         }

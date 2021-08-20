@@ -1,40 +1,41 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Listing;
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Query\QueryBuilder;
 use Pimcore\Db;
 use Pimcore\Model\AbstractModel;
+use Pimcore\Model\Listing\Dao\AbstractDao;
 
 /**
- * Class AbstractListing
- *
- * @package Pimcore\Model\Listing
- *
- * @method \Pimcore\Db\ZendCompatibility\QueryBuilder getQuery()
+ * @method AbstractDao getDao()
+ * @method QueryBuilder getQueryBuilder()
  */
-abstract class AbstractListing extends AbstractModel implements \Iterator
+abstract class AbstractListing extends AbstractModel implements \Iterator, \Countable
 {
     /**
-     * @var string|array
+     * @var array
      */
-    protected $order;
+    protected $order = [];
 
     /**
      * @var array
      */
-    protected $orderKey;
+    protected $orderKey = [];
 
     /**
      * @var int
@@ -71,7 +72,7 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
      */
     protected $validOrders = [
         'ASC',
-        'DESC'
+        'DESC',
     ];
 
     /**
@@ -136,7 +137,7 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
     }
 
     /**
-     * @return array|string
+     * @return array
      */
     public function getOrder()
     {
@@ -152,8 +153,8 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
     {
         $this->setData(null);
 
-        if (intval($limit) > 0) {
-            $this->limit = intval($limit);
+        if ((int)$limit > 0) {
+            $this->limit = (int)$limit;
         }
 
         return $this;
@@ -168,8 +169,8 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
     {
         $this->setData(null);
 
-        if (intval($offset) > 0) {
-            $this->offset = intval($offset);
+        if ((int)$offset >= 0) {
+            $this->offset = (int)$offset;
         }
 
         return $this;
@@ -186,17 +187,18 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
 
         $this->order = [];
 
-        if (is_string($order) && !empty($order)) {
-            $order = strtoupper($order);
-            if (in_array($order, $this->validOrders)) {
-                $this->order[] = $order;
-            }
-        } elseif (is_array($order) && !empty($order)) {
-            $this->order = [];
-            foreach ($order as $o) {
-                $o = strtoupper($o);
-                if (in_array($o, $this->validOrders)) {
-                    $this->order[] = $o;
+        if (!empty($order)) {
+            if (is_string($order)) {
+                $order = strtoupper($order);
+                if (in_array($order, $this->validOrders)) {
+                    $this->order[] = $order;
+                }
+            } elseif (is_array($order)) {
+                foreach ($order as $o) {
+                    $o = strtoupper($o);
+                    if (in_array($o, $this->validOrders)) {
+                        $this->order[] = $o;
+                    }
                 }
             }
         }
@@ -310,7 +312,11 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
                 if (!$value['ignore-value']) {
                     if (is_array($value['value'])) {
                         foreach ($value['value'] as $k => $v) {
-                            $params[$k] = $v;
+                            if (is_int($k)) {
+                                $params[] = $v;
+                            } else {
+                                $params[$k] = $v;
+                            }
                         }
                     } else {
                         $params[] = $value['value'];
@@ -326,12 +332,22 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
         foreach ($params as $pkey => $param) {
             if (is_array($param)) {
                 if (isset($param[0]) && is_string($param[0])) {
-                    $conditionVariableTypes[$pkey] = \Doctrine\DBAL\Connection::PARAM_STR_ARRAY;
+                    $conditionVariableTypes[$pkey] = Connection::PARAM_STR_ARRAY;
                 } else {
-                    $conditionVariableTypes[$pkey] = \Doctrine\DBAL\Connection::PARAM_INT_ARRAY;
+                    $conditionVariableTypes[$pkey] = Connection::PARAM_INT_ARRAY;
                 }
             } else {
-                $conditionVariableTypes[$pkey] = \PDO::PARAM_STR;
+                if (is_bool($param)) {
+                    $type = \PDO::PARAM_BOOL;
+                } elseif (is_int($param)) {
+                    $type = \PDO::PARAM_INT;
+                } elseif (is_null($param)) {
+                    $type = \PDO::PARAM_NULL;
+                } else {
+                    $type = \PDO::PARAM_STR;
+                }
+
+                $conditionVariableTypes[$pkey] = $type;
             }
         }
 
@@ -344,7 +360,7 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
 
     /**
      * @param string $condition
-     * @param array|null $conditionVariables
+     * @param array|scalar $conditionVariables
      *
      * @return $this
      */
@@ -427,6 +443,18 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
     }
 
     /**
+     * @param string $value
+     *
+     * @return string
+     */
+    public function escapeLike(string $value): string
+    {
+        $db = Db::get();
+
+        return $db->escapeLike($value);
+    }
+
+    /**
      * @param array $conditionVariables
      *
      * @return $this
@@ -444,6 +472,7 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
     public function getConditionVariables()
     {
         $this->getCondition();          // this will merge conditionVariablesFromSetCondition and additional params into conditionVariables
+
         return $this->conditionVariables;
     }
 
@@ -483,15 +512,7 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
     public function getData()
     {
         if ($this->data === null) {
-            $dao = $this->getDao();
-            if (\method_exists($dao, 'load')) {
-                $this->getDao()->load();
-            } else {
-                @trigger_error(
-                    'Please provide load() method in '.\get_class($dao).'. This method will be required in Pimcore 7.',
-                    \E_USER_DEPRECATED
-                );
-            }
+            $this->getDao()->load();
         }
 
         return $this->data;
@@ -553,5 +574,13 @@ abstract class AbstractListing extends AbstractModel implements \Iterator
     {
         $this->getData();
         reset($this->data);
+    }
+
+    /**
+     * @return int
+     */
+    public function count()
+    {
+        return $this->getDao()->getTotalCount();
     }
 }

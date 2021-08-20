@@ -1,41 +1,36 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Translation;
 
 use Pimcore\Cache;
-use Pimcore\Model\Translation\AbstractTranslation;
+use Pimcore\Model\Translation;
 use Pimcore\Tool;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Translation\Exception\InvalidArgumentException;
 use Symfony\Component\Translation\MessageCatalogue;
-use Symfony\Component\Translation\MessageCatalogueInterface;
 use Symfony\Component\Translation\TranslatorBagInterface;
-use Symfony\Component\Translation\TranslatorInterface as LegacyTranslatorInterface;
+use Symfony\Contracts\Translation\LocaleAwareInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-class Translator implements LegacyTranslatorInterface, TranslatorInterface, TranslatorBagInterface
+class Translator implements TranslatorInterface, TranslatorBagInterface, LocaleAwareInterface
 {
     /**
      * @var TranslatorInterface|TranslatorBagInterface
      */
     protected $translator;
-
-    /**
-     * @var bool
-     */
-    protected $caseInsensitive = false;
 
     /**
      * @var array
@@ -46,6 +41,11 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
      * @var string
      */
     protected $adminPath = '';
+
+    /**
+     * @var array
+     */
+    protected $adminTranslationMapping = [];
 
     /**
      * If true, the translator will just return the translation key instead of actually translating
@@ -62,23 +62,21 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
     protected $kernel;
 
     /**
-     * @param LegacyTranslatorInterface $translator
-     * @param bool $caseInsensitive
+     * @param TranslatorInterface $translator
      */
-    public function __construct(LegacyTranslatorInterface $translator, bool $caseInsensitive = false)
+    public function __construct(TranslatorInterface $translator)
     {
         if (!$translator instanceof TranslatorBagInterface) {
             throw new InvalidArgumentException(sprintf('The Translator "%s" must implement TranslatorInterface and TranslatorBagInterface.', get_class($translator)));
         }
 
         $this->translator = $translator;
-        $this->caseInsensitive = $caseInsensitive;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function trans($id, array $parameters = [], $domain = null, $locale = null)
+    public function trans(string $id, array $parameters = [], string $domain = null, string $locale = null)
     {
         $id = trim($id);
 
@@ -87,21 +85,32 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
         }
 
         if (null === $domain) {
-            $domain = 'messages';
+            $domain = Translation::DOMAIN_DEFAULT;
         }
 
         $id = (string) $id;
+
+        if ($domain === Translation::DOMAIN_ADMIN && !empty($this->adminTranslationMapping)) {
+            if (null === $locale) {
+                $locale = $this->getLocale();
+            }
+
+            if (array_key_exists($locale, $this->adminTranslationMapping)) {
+                $locale = $this->adminTranslationMapping[$locale];
+            }
+        }
+
         $catalogue = $this->getCatalogue($locale);
         $locale = $catalogue->getLocale();
 
         $this->lazyInitialize($domain, $locale);
 
-        if (isset($parameters['%count%'])) {
-            $id = $this->translator->trans($id, $parameters, $domain, $locale);
-        }
+        $originalId = $id;
+        $term = $this->translator->trans($id, $parameters, $domain, $locale);
 
-        $term = $this->getFromCatalogue($catalogue, $id, $domain, $locale);
-        $term = strtr($term, $parameters);
+        // only check for empty translation on original ID - we don't want to create empty
+        // translations for normalized IDs when case insensitive
+        $term = $this->checkForEmptyTranslation($originalId, $term, $parameters, $domain, $locale);
 
         // check for an indexed array, that used the ZF1 vsprintf() notation for parameters
         if (isset($parameters[0])) {
@@ -116,39 +125,11 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
     /**
      * {@inheritdoc}
      */
-    public function transChoice($id, $number, array $parameters = [], $domain = null, $locale = null)
+    public function setLocale(string $locale)
     {
-        @trigger_error(
-            'transChoice is deprecated since version 6.0.1 and will be removed in 7.0.0. ' .
-            ' Use the trans() method with "%count%" parameter.',
-            E_USER_DEPRECATED
-        );
-
-        return $this->trans($id, ['%count%' => $number] + $parameters, $domain, $locale);
-    }
-
-    protected function getFromCatalogue(MessageCatalogueInterface $catalogue, $id, $domain, $locale)
-    {
-        $originalId = $id;
-        if ($this->caseInsensitive && in_array($domain, ['messages', 'admin'])) {
-            $id = mb_strtolower($id);
+        if ($this->translator instanceof LocaleAwareInterface) {
+            $this->translator->setLocale($locale);
         }
-
-        $term = $catalogue->get($id, $domain);
-
-        // only check for empty translation on original ID - we don't want to create empty
-        // translations for normalized IDs when case insensitive
-        $term = $this->checkForEmptyTranslation($originalId, $term, $domain, $locale);
-
-        return $term;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function setLocale($locale)
-    {
-        $this->translator->setLocale($locale);
     }
 
     /**
@@ -156,42 +137,48 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
      */
     public function getLocale()
     {
-        return $this->translator->getLocale();
+        if ($this->translator instanceof LocaleAwareInterface) {
+            return $this->translator->getLocale();
+        }
+
+        return \Pimcore\Tool::getDefaultLanguage();
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getCatalogue($locale = null)
+    public function getCatalogue(string $locale = null)
     {
         return $this->translator->getCatalogue($locale);
     }
 
     /**
+     * @internal
+     *
      * @param string $domain
      * @param string $locale
      */
     public function lazyInitialize($domain, $locale)
     {
-        $cacheKey = 'translation_data_' . $domain . '_' . $locale;
+        $cacheKey = 'translation_data_' . md5($domain . '_' . $locale);
 
         if (isset($this->initializedCatalogues[$cacheKey])) {
             return;
         }
 
         $this->initializedCatalogues[$cacheKey] = true;
-        $backend = $this->getBackendForDomain($domain);
 
-        if ($backend) {
+        if (Translation::isAValidDomain($domain)) {
             $catalogue = null;
 
             if (!$catalogue = Cache::load($cacheKey)) {
                 $data = ['__pimcore_dummy' => 'only_a_dummy'];
+                $dataIntl = ['__pimcore_dummy' => 'only_a_dummy'];
 
                 if ($domain == 'admin') {
                     $jsonFiles = [
                         $locale . '.json' => 'en.json',
-                        $locale . '.extended.json' => 'en.extended.json'
+                        $locale . '.extended.json' => 'en.extended.json',
                     ];
 
                     foreach ($jsonFiles as $sourceFile => $fallbackFile) {
@@ -214,9 +201,10 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
                     }
                 }
 
-                $listClass = '\\Pimcore\\Model\\Translation\\' . ucfirst($backend) . '\\Listing';
-                $list = new $listClass();
+                $list = new Translation\Listing();
+                $list->setDomain($domain);
 
+                $debugAdminTranslations = \Pimcore\Config::getSystemConfiguration('general')['debug_admin_translations'] ?? false;
                 $list->setCondition('language = ?', [$locale]);
                 $translations = $list->loadRaw();
 
@@ -227,12 +215,20 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
                         !empty($translationTerm)) {
                         $translationKey = $translation['key'];
 
-                        // store as case insensitive if configured
-                        if ($this->caseInsensitive) {
-                            $translationKey = mb_strtolower($translationKey);
+                        if (empty($translationTerm)) {
+                            $translationTerm = $translationKey;
+
+                            //wrap non-translated keys with "+", if debug admin translations is enabled
+                            if ($debugAdminTranslations) {
+                                $translationTerm = '+' . $translationTerm. '+';
+                            }
                         }
 
-                        $data[$translationKey] = $translationTerm;
+                        if (empty($translation['type']) || $translation['type'] === 'simple') {
+                            $data[$translationKey] = $translationTerm;
+                        } else {
+                            $dataIntl[$translationKey] = $translationTerm;
+                        }
                     }
                 }
 
@@ -247,7 +243,10 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
                     }
                 }
 
-                $data = [$domain => $data];
+                $data = [
+                    $domain => $data,
+                    $domain.MessageCatalogue::INTL_DOMAIN_SUFFIX => $dataIntl,
+                ];
                 $catalogue = new MessageCatalogue($locale, $data);
 
                 Cache::save($catalogue, $cacheKey, ['translator', 'translator_website', 'translate'], null, 999);
@@ -262,6 +261,7 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
     /**
      * @param string $id
      * @param string $translated
+     * @param array $parameters
      * @param string $domain
      * @param string $locale
      *
@@ -269,32 +269,37 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
      *
      * @throws \Exception
      */
-    protected function checkForEmptyTranslation($id, $translated, $domain, $locale)
+    private function checkForEmptyTranslation($id, $translated, $parameters, $domain, $locale)
     {
+        if (empty($id)) {
+            return $translated;
+        }
+
         $normalizedId = $id;
-        if ($this->caseInsensitive) {
-            $normalizedId = mb_strtolower($id);
+
+        //translate only plural form(seperated by pipe "|") with count param
+        if (isset($parameters['%count%']) && $translated && strpos($normalizedId, '|') !== false) {
+            $normalizedId = $id = $translated;
+            $translated = $this->translator->trans($normalizedId, $parameters, $domain, $locale);
         }
 
         $lookForFallback = empty($translated);
-        if (empty($id)) {
+        if ($normalizedId != $translated && $translated) {
             return $translated;
-        } elseif ($normalizedId != $translated && $translated) {
-            return $translated;
-        } elseif ($normalizedId == $translated && !$this->getCatalogue($locale)->has($normalizedId, $domain)) {
-            $backend = $this->getBackendForDomain($domain);
-            if ($backend) {
+        } elseif ($normalizedId == $translated) {
+            if ($this->getCatalogue($locale)->has($normalizedId, $domain)) {
+                $translated = $this->getCatalogue($locale)->get($normalizedId, $domain);
+                if ($normalizedId != $translated && $translated) {
+                    return $translated;
+                }
+            } elseif (Translation::isAValidDomain($domain)) {
                 if (strlen($id) > 190) {
                     throw new \Exception("Message ID's longer than 190 characters are invalid!");
                 }
 
-                $class = '\\Pimcore\\Model\\Translation\\' . ucfirst($backend);
-
                 // no translation found create key
-                if ($class::isValidLanguage($locale)) {
-
-                    /** @var AbstractTranslation|null $t */
-                    $t = $class::getByKey($id);
+                if (Translation::IsAValidLanguage($domain, $locale)) {
+                    $t = Translation::getByKey($id, $domain);
                     if ($t) {
                         if (!$t->hasTranslation($locale)) {
                             $t->addTranslation($locale, '');
@@ -303,12 +308,12 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
                             return $id;
                         }
                     } else {
-                        /** @var AbstractTranslation $t */
-                        $t = new $class();
+                        $t = new Translation();
+                        $t->setDomain($domain);
                         $t->setKey($id);
 
                         // add all available languages
-                        $availableLanguages = (array)$class::getLanguages();
+                        $availableLanguages = (array)Translation::getValidLanguages();
                         foreach ($availableLanguages as $language) {
                             $t->addTranslation($language, '');
                         }
@@ -320,9 +325,6 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
                 // put it into the catalogue, otherwise when there are more calls to the same key during one process
                 // the key would be inserted/updated several times, what would be redundant
                 $this->getCatalogue($locale)->set($normalizedId, $id, $domain);
-
-                $translated = $id; // use the original translation key, this is necessary if using case-insensitive configuration
-                $lookForFallback = true;
             }
         }
 
@@ -338,44 +340,21 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
                     $fallbackValue = $catalogue->get($normalizedId, $domain);
                 }
 
-                if ($fallbackValue) {
+                if ($fallbackValue && $normalizedId != $fallbackValue) {
                     // update fallback value in original catalogue otherwise multiple calls to the same id will not work
                     $this->getCatalogue($locale)->set($normalizedId, $fallbackValue, $domain);
 
-                    return $fallbackValue;
+                    return strtr($fallbackValue, $parameters);
                 }
             }
-
-            return $id;
         }
 
-        if (empty($translated)) {
-            return $id;
-        } else {
-            return $translated;
-        }
+        return !empty($translated) ? $translated : $id;
     }
 
     /**
-     * @param string $domain
+     * @internal
      *
-     * @return string|null
-     */
-    protected function getBackendForDomain($domain)
-    {
-        $backends = [
-            'messages' => 'website',
-            'admin' => 'admin'
-        ];
-
-        if (isset($backends[$domain])) {
-            return $backends[$domain];
-        }
-
-        return null;
-    }
-
-    /**
      * @return string
      */
     public function getAdminPath()
@@ -384,6 +363,8 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
     }
 
     /**
+     * @internal
+     *
      * @param string $adminPath
      */
     public function setAdminPath($adminPath)
@@ -392,6 +373,28 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
     }
 
     /**
+     * @internal
+     *
+     * @return array
+     */
+    public function getAdminTranslationMapping(): array
+    {
+        return $this->adminTranslationMapping;
+    }
+
+    /**
+     * @internal
+     *
+     * @param array $adminTranslationMapping
+     */
+    public function setAdminTranslationMapping(array $adminTranslationMapping): void
+    {
+        $this->adminTranslationMapping = $adminTranslationMapping;
+    }
+
+    /**
+     * @internal
+     *
      * @return Kernel
      */
     public function getKernel()
@@ -400,6 +403,8 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
     }
 
     /**
+     * @internal
+     *
      * @param Kernel $kernel
      */
     public function setKernel($kernel)
@@ -417,18 +422,18 @@ class Translator implements LegacyTranslatorInterface, TranslatorInterface, Tran
         $this->disableTranslations = $disableTranslations;
     }
 
-    public function updateLinks(string $text)
+    /**
+     * @param string $text
+     *
+     * @return string
+     */
+    private function updateLinks(string $text): string
     {
         if (strpos($text, 'pimcore_id')) {
             $text = Tool\Text::wysiwygText($text);
         }
 
         return $text;
-    }
-
-    public function getCaseInsensitive(): bool
-    {
-        return $this->caseInsensitive;
     }
 
     /**

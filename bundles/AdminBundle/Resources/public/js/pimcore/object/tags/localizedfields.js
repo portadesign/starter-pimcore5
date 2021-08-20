@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.tags.localizedfields");
@@ -20,7 +20,7 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
 
     tabPanelDefaultConfig: {
         monitorResize: true,
-        cls: "object_field",
+        cls: "object_field object_field_type_localizedfields",
         activeTab: 0,
         height: "auto",
         items: [],
@@ -41,7 +41,7 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
         this.availablePanels = [];
         this.dropdownLayout = false;
 
-        if (pimcore.currentuser.admin || fieldConfig.permissionView === undefined) {
+        if (pimcore.currentuser.admin || fieldConfig.permissionView === undefined || fieldConfig.permissionView === null) {
             this.frontendLanguages = pimcore.settings.websiteLanguages;
         } else {
             this.frontendLanguages = fieldConfig.permissionView;
@@ -180,7 +180,7 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
                         this.languageElements[currentLanguage] = [];
 
                         var editable = (pimcore.currentuser.admin ||
-                            this.fieldConfig.permissionEdit === undefined || this.fieldConfig.permissionEdit.length == 0 || in_array(currentLanguage, this.fieldConfig.permissionEdit));
+                            this.fieldConfig.permissionEdit === undefined || this.fieldConfig.permissionEdit === null || this.fieldConfig.permissionEdit.length == 0 || in_array(currentLanguage, this.fieldConfig.permissionEdit));
 
                         var runtimeContext = Ext.clone(this.context);
                         runtimeContext.language = Ext.clone(currentLanguage);
@@ -191,6 +191,10 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
 
                         if (this.fieldConfig.labelWidth) {
                             item.labelWidth = this.fieldConfig.labelWidth;
+                        }
+
+                        if (this.fieldConfig.labelAlign) {
+                            item.labelAlign = this.fieldConfig.labelAlign;
                         }
 
                         if (side == "left") {
@@ -295,7 +299,7 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
                     this.languageElements[currentLanguage] = [];
 
                     var editable = !showMode && (pimcore.currentuser.admin ||
-                        this.fieldConfig.permissionEdit === undefined || this.fieldConfig.permissionEdit.length == 0 || in_array(currentLanguage, this.fieldConfig.permissionEdit));
+                        this.fieldConfig.permissionEdit === undefined || this.fieldConfig.permissionEdit === null || this.fieldConfig.permissionEdit.length == 0 || in_array(currentLanguage, this.fieldConfig.permissionEdit));
 
                     var runtimeContext = Ext.clone(this.context);
                     runtimeContext.language = Ext.clone(currentLanguage);
@@ -355,7 +359,7 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
                     this.languageElements[currentLanguage] = [];
 
                     var editable = !showMode && (pimcore.currentuser.admin ||
-                        this.fieldConfig.permissionEdit === undefined || this.fieldConfig.permissionEdit.length == 0 || in_array(currentLanguage, this.fieldConfig.permissionEdit));
+                        this.fieldConfig.permissionEdit === undefined || this.fieldConfig.permissionEdit === null || this.fieldConfig.permissionEdit.length == 0 || in_array(currentLanguage, this.fieldConfig.permissionEdit));
 
                     var runtimeContext = Ext.clone(this.context);
                     runtimeContext.language = Ext.clone(currentLanguage);
@@ -433,9 +437,12 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
                                 for (var i = 0; i < l.childs.length; i++) {
                                     var childConfig = l.childs[i];
 
-                                    // inherit label width from localized fields configuration
+                                    // inherit label width/align from localized fields configuration
                                     if (this.fieldConfig.labelWidth) {
                                         childConfig.labelWidth = this.fieldConfig.labelWidth;
+                                    }
+                                    if (this.fieldConfig.labelAlign) {
+                                        childConfig.labelAlign = this.fieldConfig.labelAlign;
                                     }
 
                                     var children = this.getRecursiveLayout(childConfig, !editable, runtimeContext, false, false, dataProvider, true);
@@ -492,6 +499,7 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
     getValue: function () {
         var localizedData = {};
         var currentLanguage;
+        var ignoreIsDirty = ['fieldcollection'].includes(this.getContext().containerType) || ['block'].includes(this.getContext().subContainerType);
 
         for (var i = 0; i < this.frontendLanguages.length; i++) {
             currentLanguage = this.frontendLanguages[i];
@@ -502,8 +510,7 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
 
             for (var s = 0; s < this.languageElements[currentLanguage].length; s++) {
                 try {
-
-                    if (this.languageElements[currentLanguage][s].isDirty()) {
+                    if (ignoreIsDirty || this.languageElements[currentLanguage][s].isDirty()) {
                         localizedData[currentLanguage][this.languageElements[currentLanguage][s].getName()]
                             = this.languageElements[currentLanguage][s].getValue();
                     }

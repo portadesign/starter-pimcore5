@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 
@@ -69,15 +69,12 @@ pimcore.asset.helpers.grid = Class.create({
                 var key = fieldConfig.key;
                 var readerFieldConfig = {name: key};
                 // dynamic select returns data + options on cell level
-                if (type == "select") {
-                    readerFieldConfig["convert"] = function (key, v, rec) {
-                        if (v && typeof v.options !== "undefined") {
-                            // split it up and store the options in a separate field
-                            rec.set(key + "%options", v.options, {convert: false, dirty: false});
-                            return v.value;
-                        }
-                        return v;
-                    }.bind(this, key);
+
+                if (pimcore.asset.metadata.tags[type]
+                    && typeof pimcore.asset.metadata.tags[type].prototype.addGridOptionsFromColumnConfig == "function") {
+
+                    readerFieldConfig["convert"] = pimcore.asset.metadata.tags[type].prototype.addGridOptionsFromColumnConfig.bind(this, key);
+
                     var readerFieldConfigOptions = {name: key + "%options", persist: false};
                     readerFields.push(readerFieldConfigOptions);
                 }

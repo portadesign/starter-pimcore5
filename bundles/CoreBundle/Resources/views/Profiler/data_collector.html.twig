@@ -1,4 +1,4 @@
-{% extends 'WebProfilerBundle:Profiler:layout.html.twig' %}
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
 
 {% block toolbar %}
     {% import _self as macros %}
@@ -6,7 +6,7 @@
     {% set icon %}
         {# this is the content displayed as a panel in the toolbar #}
         <div style="padding-top: 3px">
-            {{ include("PimcoreCoreBundle:Profiler:logo.svg.twig") }}
+            {{ include("@PimcoreCore/Profiler/logo.svg.twig") }}
         </div>
     {% endset %}
 
@@ -32,7 +32,7 @@
 {% block menu %}
     <span class="label">
         <span class="icon">
-            {{ include("PimcoreCoreBundle:Profiler:logo.svg.twig") }}
+            {{ include("@PimcoreCore/Profiler/logo.svg.twig") }}
         </span>
         <strong>Pimcore</strong>
     </span>

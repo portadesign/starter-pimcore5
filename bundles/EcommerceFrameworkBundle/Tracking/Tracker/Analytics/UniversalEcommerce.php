@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\Tracker\Analytics;
@@ -28,7 +29,7 @@ class UniversalEcommerce extends AbstractAnalyticsTracker implements CheckoutCom
         parent::configureOptions($resolver);
 
         $resolver->setDefaults([
-            'template_prefix' => 'PimcoreEcommerceFrameworkBundle:Tracking/analytics/universal'
+            'template_prefix' => '@PimcoreEcommerceFramework/Tracking/analytics/universal',
         ]);
     }
 
@@ -62,9 +63,9 @@ class UniversalEcommerce extends AbstractAnalyticsTracker implements CheckoutCom
     {
         $calls = [
             'ecommerce:addTransaction' => [
-                $this->transformTransaction($transaction)
+                $this->transformTransaction($transaction),
             ],
-            'ecommerce:addItem' => []
+            'ecommerce:addItem' => [],
         ];
 
         foreach ($items as $item) {
@@ -88,7 +89,7 @@ class UniversalEcommerce extends AbstractAnalyticsTracker implements CheckoutCom
             'affiliation' => $transaction->getAffiliation() ?: '',      // Affiliation or store name.
             'revenue' => $transaction->getTotal(),                  // Grand Total.
             'shipping' => round($transaction->getShipping(), 2),               // Shipping.
-            'tax' => round($transaction->getTax(), 2)                     // Tax.
+            'tax' => round($transaction->getTax(), 2),                     // Tax.
         ],
                 $transaction->getAdditionalAttributes())
         );

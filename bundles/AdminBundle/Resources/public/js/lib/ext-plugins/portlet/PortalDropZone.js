@@ -48,7 +48,7 @@ Ext.define('Portal.view.PortalDropZone', {
             this.lastCW = cw;
         }else if(this.lastCW != cw){
             this.lastCW = cw;
-            portal.doLayout();
+            portal.updateLayout();
             this.grid = this.getGrid();
         }
 
@@ -174,8 +174,10 @@ Ext.define('Portal.view.PortalDropZone', {
 
     // unregister the dropzone from ScrollManager
     unreg: function() {
-        Ext.dd.ScrollManager.unregister(this.portal.body);
-        Portal.view.PortalDropZone.superclass.unreg.call(this);
-        delete this.portal.afterLayout;
+        if (this.portal) {
+            Ext.dd.ScrollManager.unregister(this.portal.body);
+            Portal.view.PortalDropZone.superclass.unreg.call(this);
+            delete this.portal.afterLayout;
+        }
     }
 });

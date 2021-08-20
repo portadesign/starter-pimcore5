@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.asset.listfolder");
@@ -72,7 +72,7 @@ pimcore.asset.listfolder = Class.create(pimcore.asset.helpers.gridTabAbstract, {
         });
     },
 
-    createGrid: function (fromConfig, response, settings, save) {
+    createGrid: function (fromConfig, response, settings, save, context) {
         var itemsPerPage = pimcore.helpers.grid.getDefaultPageSize(-1);
 
         var fields = [];
@@ -85,7 +85,6 @@ pimcore.asset.listfolder = Class.create(pimcore.asset.helpers.gridTabAbstract, {
             }
 
             fields = response.availableFields;
-            this.gridLanguage = response.language;
             this.gridPageSize = response.pageSize;
             this.sortinfo = response.sortinfo;
 
@@ -93,11 +92,11 @@ pimcore.asset.listfolder = Class.create(pimcore.asset.helpers.gridTabAbstract, {
             this.availableConfigs = response.availableConfigs;
             this.sharedConfigs = response.sharedConfigs;
 
-            if (response.onlyDirectChildren) {
+            if (typeof response.onlyDirectChildren != "undefined") {
                 this.onlyDirectChildren = response.onlyDirectChildren;
             }
 
-            if (response.onlyUnreferenced) {
+            if (typeof response.onlyUnreferenced != "undefined") {
                 this.onlyUnreferenced = response.onlyUnreferenced;
             }
         } else {
@@ -168,10 +167,6 @@ pimcore.asset.listfolder = Class.create(pimcore.asset.helpers.gridTabAbstract, {
         var gridColumns = gridHelper.getGridColumns();
 
         this.pagingtoolbar = pimcore.helpers.grid.buildDefaultPagingToolbar(this.store, {pageSize: itemsPerPage});
-
-        this.languageInfo = new Ext.Toolbar.TextItem({
-            text: t("grid_current_language") + ": " + (this.gridLanguage == "default" ? t("default") : pimcore.available_languages[this.gridLanguage])
-        });
 
         this.checkboxOnlyDirectChildren = new Ext.form.Checkbox({
             name: "onlyDirectChildren",
@@ -277,16 +272,16 @@ pimcore.asset.listfolder = Class.create(pimcore.asset.helpers.gridTabAbstract, {
                     this.store.load();
                 }.bind(this),
                 celldblclick: function(grid, td, cellIndex, record, tr, rowIndex, e, eOpts) {
-                    var columnName = grid.ownerGrid.getColumns();
-                    if(columnName[cellIndex].dataIndex == 'id~system' || columnName[cellIndex].dataIndex == 'fullpath~system'
-                        || columnName[cellIndex].dataIndex == 'preview~system') {
+                    var columns = grid.grid.getColumnManager().getColumns();
+                    if(columns[cellIndex].dataIndex == 'id~system' || columns[cellIndex].dataIndex == 'fullpath~system'
+                        || columns[cellIndex].dataIndex == 'preview~system') {
                         var data = this.store.getAt(rowIndex);
                         pimcore.helpers.openAsset(data.id, data.get("type~system"));
                     }
                 }
             },
             tbar: [
-                this.languageInfo, "->",
+                "->",
                 this.checkboxOnlyDirectChildren, "-",
                 this.checkboxOnlyUnreferenced, "-",
                 this.downloadSelectedZipButton, "-",

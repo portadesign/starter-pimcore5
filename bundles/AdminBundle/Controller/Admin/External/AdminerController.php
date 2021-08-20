@@ -1,30 +1,33 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\External {
 
     use Pimcore\Bundle\AdminBundle\Controller\AdminController;
-    use Pimcore\Controller\EventedControllerInterface;
+    use Pimcore\Controller\KernelControllerEventInterface;
     use Pimcore\Tool\Session;
     use Symfony\Component\HttpFoundation\Request;
     use Symfony\Component\HttpFoundation\Response;
-    use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
-    use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
+    use Symfony\Component\HttpKernel\Event\ControllerEvent;
     use Symfony\Component\HttpKernel\Profiler\Profiler;
     use Symfony\Component\Routing\Annotation\Route;
 
-    class AdminerController extends AdminController implements EventedControllerInterface
+    /**
+     * @internal
+     */
+    class AdminerController extends AdminController implements KernelControllerEventInterface
     {
         /**
          * @var string
@@ -34,12 +37,11 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin\External {
         /**
          * @Route("/external_adminer/adminer", name="pimcore_admin_external_adminer_adminer")
          *
-         * @param Request $request
-         * @param Profiler $profiler
+         * @param Profiler|null $profiler
          *
          * @return Response
          */
-        public function adminerAction(Request $request, ?Profiler $profiler)
+        public function adminerAction(?Profiler $profiler)
         {
             if ($profiler) {
                 $profiler->disable();
@@ -112,9 +114,9 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin\External {
         }
 
         /**
-         * @param FilterControllerEvent $event
+         * @param ControllerEvent $event
          */
-        public function onKernelController(FilterControllerEvent $event)
+        public function onKernelControllerEvent(ControllerEvent $event)
         {
             $isMasterRequest = $event->isMasterRequest();
             if (!$isMasterRequest) {
@@ -136,14 +138,6 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin\External {
         }
 
         /**
-         * @param FilterResponseEvent $event
-         */
-        public function onKernelResponse(FilterResponseEvent $event)
-        {
-            // nothing to do
-        }
-
-        /**
          * Merges http-headers set from Adminer via headers function
          * to the Symfony Response Object
          *
@@ -157,7 +151,7 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin\External {
                 $headersRaw = headers_list();
 
                 foreach ($headersRaw as $header) {
-                    $header = explode(':', $header);
+                    $header = explode(':', $header, 2);
                     list($headerKey, $headerValue) = $header;
 
                     if ($headerKey && $headerValue) {
@@ -205,6 +199,17 @@ namespace {
                 new \AdminerDumpAlter,
             ];
 
+            // support for SSL (at least for PDO)
+            $driverOptions = \Pimcore\Db::get()->getParams()['driverOptions'] ?? [];
+            $ssl = [
+                'key' => $driverOptions[\PDO::MYSQL_ATTR_SSL_KEY] ?? null,
+                'cert' => $driverOptions[\PDO::MYSQL_ATTR_SSL_CERT] ?? null,
+                'ca' => $driverOptions[\PDO::MYSQL_ATTR_SSL_CA] ?? null,
+            ];
+            if ($ssl['key'] !== null || $ssl['cert'] !== null || $ssl['ca'] !== null) {
+                $plugins[] = new \AdminerLoginSsl($ssl);
+            }
+
             class AdminerPimcore extends \AdminerPlugin
             {
                 /**
@@ -248,18 +253,18 @@ namespace {
                  */
                 public function credentials()
                 {
-                    $db = \Pimcore\Db::get();
+                    $params = \Pimcore\Db::get()->getParams();
 
-                    $host = $db->getHost();
-                    if ($db->getPort()) {
-                        $host .= ':' . $db->getPort();
+                    $host = $params['host'] ?? null;
+                    if ($port = $params['port'] ?? null) {
+                        $host .= ':' . $port;
                     }
 
                     // server, username and password for connecting to database
                     $result = [
                         $host,
-                        $db->getUsername(),
-                        $db->getPassword()
+                        $params['user'] ?? null,
+                        $params['password'] ?? null,
                     ];
 
                     return $result;

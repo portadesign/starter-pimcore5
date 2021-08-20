@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 
@@ -30,6 +30,10 @@ pimcore.object.helpers.edit = {
         }
 
         context.objectId = this.object.id;
+
+        if (this.object.data.currentLayoutId) {
+            context.layoutId = this.object.data.currentLayoutId;
+        }
 
         var panelListenerConfig = {};
 
@@ -127,7 +131,7 @@ pimcore.object.helpers.edit = {
         };
 
         var validKeys = ["xtype","title","layout","icon","items","region","width","height","name","text","html","handler",
-            "labelWidth", "fieldLabel", "collapsible","collapsed","bodyStyle","listeners", "border", "tabPosition"];
+            "labelWidth", "labelAlign", "fieldLabel", "collapsible","collapsed","bodyStyle","listeners", "border", "tabPosition"];
 
         var tmpItems;
 
@@ -145,6 +149,9 @@ pimcore.object.helpers.edit = {
                         var childConfig = l.childs[i];
                         if (typeof childConfig.labelWidth == "undefined" && l.labelWidth != "undefined") {
                             childConfig.labelWidth = l.labelWidth;
+                        }
+                        if (typeof childConfig.labelAlign == "undefined" && l.labelAlign != "undefined") {
+                            childConfig.labelAlign = l.labelAlign;
                         }
 
                         if (typeof childConfig.fieldLabel == "undefined" && l.fieldLabel != "undefined") {
@@ -233,7 +240,12 @@ pimcore.object.helpers.edit = {
                         defaults: {}
                     });
                     newConfig.defaults.labelWidth = newConfig.labelWidth;
-
+                }
+                if (typeof newConfig.labelAlign != "undefined") {
+                    newConfig = Ext.applyIf(newConfig, {
+                        defaults: {}
+                    });
+                    newConfig.defaults.labelAlign = newConfig.labelAlign;
                 }
 
                 newConfig.forceLayout = true;
@@ -317,9 +329,12 @@ pimcore.object.helpers.edit = {
                     field.finishSetup();
                 }
 
-
                 if (typeof l.labelWidth != "undefined") {
                     field.labelWidth = l.labelWidth;
+                }
+
+                if (typeof l.labelAlign != "undefined") {
+                    field.labelAlign = l.labelAlign;
                 }
 
                 dataProvider.addToDataFields(field, l.name);

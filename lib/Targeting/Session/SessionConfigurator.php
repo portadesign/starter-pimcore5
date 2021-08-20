@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Targeting\Session;
@@ -29,13 +29,14 @@ use Symfony\Component\HttpFoundation\Session\SessionInterface;
 class SessionConfigurator implements SessionConfiguratorInterface, EventSubscriberInterface
 {
     const TARGETING_BAG_SESSION = 'pimcore_targeting_session';
+
     const TARGETING_BAG_VISITOR = 'pimcore_targeting_visitor';
 
     public static function getSubscribedEvents()
     {
         return [
             FullPageCacheEvents::IGNORED_SESSION_KEYS => 'configureIgnoredSessionKeys',
-            FullPageCacheEvents::PREPARE_RESPONSE => 'prepareFullPageCacheResponse'
+            FullPageCacheEvents::PREPARE_RESPONSE => 'prepareFullPageCacheResponse',
         ];
     }
 
@@ -56,7 +57,7 @@ class SessionConfigurator implements SessionConfiguratorInterface, EventSubscrib
         // configures full page cache to ignore session data in targeting storage
         $event->setKeys(array_merge($event->getKeys(), [
             '_' . self::TARGETING_BAG_SESSION,
-            '_' . self::TARGETING_BAG_VISITOR
+            '_' . self::TARGETING_BAG_VISITOR,
         ]));
     }
 
@@ -81,7 +82,6 @@ class SessionConfigurator implements SessionConfiguratorInterface, EventSubscrib
 
         $cookies = $response->headers->getCookies();
 
-        /** @var Cookie $cookie */
         foreach ($cookies as $cookie) {
             if ($cookie->getName() === $sessionName) {
                 $response->headers->removeCookie(

@@ -1,22 +1,21 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Element
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Element;
 
+use Pimcore\Model\Dependency;
 use Pimcore\Model\ModelInterface;
 use Pimcore\Model\Property;
 use Pimcore\Model\Schedule\Task;
@@ -99,7 +98,7 @@ interface ElementInterface extends ModelInterface
     public function setModificationDate($modificationDate);
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getUserOwner();
 
@@ -126,7 +125,7 @@ interface ElementInterface extends ModelInterface
      *
      * @param int $id
      *
-     * @return ElementInterface $resource
+     * @return static|null
      */
     public static function getById($id);
 
@@ -141,6 +140,42 @@ interface ElementInterface extends ModelInterface
      * @return Property[]
      */
     public function getProperties();
+
+    /**
+     * @param Property[]|null $properties
+     *
+     * @return $this
+     */
+    public function setProperties(?array $properties);
+
+    /**
+     * Get specific property data or the property object itself ($asContainer=true) by its name, if the
+     * property doesn't exists return null
+     *
+     * @param string $name
+     * @param bool $asContainer
+     *
+     * @return mixed
+     */
+    public function getProperty($name, $asContainer = false);
+
+    /**
+     * @param string $name
+     * @param string $type
+     * @param mixed $data
+     * @param bool $inherited
+     * @param bool $inheritable
+     *
+     * @return $this
+     */
+    public function setProperty($name, $type, $data, $inherited = false, $inheritable = false);
+
+    /**
+     * @param string $name
+     *
+     * @return bool
+     */
+    public function hasProperty($name);
 
     /**
      * returns true if the element is locked
@@ -171,6 +206,11 @@ interface ElementInterface extends ModelInterface
     public function getParentId();
 
     /**
+     * @return self|null
+     */
+    public function getParent();
+
+    /**
      * @return string
      */
     public function getCacheTag();
@@ -180,7 +220,7 @@ interface ElementInterface extends ModelInterface
      *
      * @return array
      */
-    public function getCacheTags($tags = []);
+    public function getCacheTags(array $tags = []): array;
 
     /**
      * @return bool
@@ -237,4 +277,14 @@ interface ElementInterface extends ModelInterface
      * @return Version[]
      */
     public function getVersions();
+
+    /**
+     * @return Dependency
+     */
+    public function getDependencies();
+
+    /**
+     * @return string
+     */
+    public function __toString();
 }

@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Tests\Unit\Targeting\Condition;
@@ -40,26 +40,26 @@ class GeoPointTest extends TestCase
         // pimcore office
         'sbg' => [
             47.83610443106286,
-            13.062701225280762
+            13.062701225280762,
         ],
 
         // munich olympiapark
         'muc' => [
             48.17546460000001,
-            11.551796999999965
+            11.551796999999965,
         ],
 
         // berlin alexanderplatz
         'ber' => [
             52.5219184,
-            13.413214700000026
+            13.413214700000026,
         ],
 
         // bangkok grand palace
         'bkk' => [
             13.75005680956885,
-            100.49125671386719
-        ]
+            100.49125671386719,
+        ],
     ];
 
     /**
@@ -83,43 +83,43 @@ class GeoPointTest extends TestCase
         yield [
             $this->createCondition('sbg', 110),
             $this->createVisitorInfo('muc'),
-            false
+            false,
         ];
 
         yield [
             $this->createCondition('sbg', 120),
             $this->createVisitorInfo('muc'),
-            true
+            true,
         ];
 
         yield [
             $this->createCondition('sbg', 500),
             $this->createVisitorInfo('ber'),
-            false
+            false,
         ];
 
         yield [
             $this->createCondition('sbg', 600),
             $this->createVisitorInfo('ber'),
-            true
+            true,
         ];
 
         yield [
             $this->createCondition('sbg', 100),
             $this->createVisitorInfo('bkk'),
-            false
+            false,
         ];
 
         yield [
             $this->createCondition('sbg', 8000),
             $this->createVisitorInfo('bkk'),
-            false
+            false,
         ];
 
         yield [
             $this->createCondition('sbg', 9000),
             $this->createVisitorInfo('bkk'),
-            true
+            true,
         ];
     }
 

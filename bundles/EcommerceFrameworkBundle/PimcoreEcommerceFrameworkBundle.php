@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle;
@@ -22,12 +23,15 @@ use Pimcore\Extension\Bundle\Traits\StateHelperTrait;
 use Pimcore\Version;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
+/**
+ * @internal
+ */
 class PimcoreEcommerceFrameworkBundle extends AbstractPimcoreBundle
 {
     use StateHelperTrait;
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function getVersion()
     {
@@ -35,7 +39,7 @@ class PimcoreEcommerceFrameworkBundle extends AbstractPimcoreBundle
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function build(ContainerBuilder $container)
     {
@@ -49,7 +53,7 @@ class PimcoreEcommerceFrameworkBundle extends AbstractPimcoreBundle
     {
         return [
             '/bundles/pimcoreecommerceframework/css/backend.css',
-            '/bundles/pimcoreecommerceframework/css/pricing.css'
+            '/bundles/pimcoreecommerceframework/css/pricing.css',
         ];
     }
 
@@ -71,18 +75,15 @@ class PimcoreEcommerceFrameworkBundle extends AbstractPimcoreBundle
             '/bundles/pimcoreecommerceframework/js/pricing/config/objects.js',
             '/bundles/pimcoreecommerceframework/js/voucherservice/VoucherSeriesTab.js',
             '/bundles/pimcoreecommerceframework/js/order/OrderTab.js',
-            '/admin/ecommerceframework/config/js-config'
+            '/admin/ecommerceframework/config/js-config',
         ];
     }
 
     public function boot()
     {
         $container = $this->container;
-
-        if ($container->hasParameter('pimcore_ecommerce.decimal_scale')) {
-            // set default decimal scale from config
-            Decimal::setDefaultScale($container->getParameter('pimcore_ecommerce.decimal_scale'));
-        }
+        // set default decimal scale from config
+        Decimal::setDefaultScale($container->getParameter('pimcore_ecommerce.decimal_scale'));
     }
 
     /**

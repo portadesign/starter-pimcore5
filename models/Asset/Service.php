@@ -1,26 +1,26 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Asset
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Asset;
 
 use Pimcore\Event\AssetEvents;
 use Pimcore\Event\Model\AssetEvent;
+use Pimcore\Loader\ImplementationLoader\Exception\UnsupportedException;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
+use Pimcore\Model\Asset\MetaData\ClassDefinition\Data\Data;
 use Pimcore\Model\Element;
 
 /**
@@ -29,15 +29,22 @@ use Pimcore\Model\Element;
 class Service extends Model\Element\Service
 {
     /**
+     * @internal
+     *
      * @var array
      */
-    public static $gridSystemColumns = ['preview', 'id', 'type', 'fullpath', 'filename', 'creationDate', 'modificationDate', 'size'];
+    public const GRID_SYSTEM_COLUMNS = ['preview', 'id', 'type', 'fullpath', 'filename', 'creationDate', 'modificationDate', 'size'];
 
     /**
+     * @internal
+     *
      * @var Model\User|null
      */
     protected $_user;
+
     /**
+     * @internal
+     *
      * @var array
      */
     protected $_copyRecursiveIds;
@@ -78,7 +85,7 @@ class Service extends Model\Element\Service
             $new->setChildren(null);
         }
 
-        $new->setFilename(Element\Service::getSaveCopyName('asset', $new->getFilename(), $target));
+        $new->setFilename(Element\Service::getSafeCopyName($new->getFilename(), $target));
         $new->setParentId($target->getId());
         $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
         $new->setUserModification($this->_user ? $this->_user->getId() : 0);
@@ -100,9 +107,10 @@ class Service extends Model\Element\Service
         }
 
         // triggers actions after the complete asset cloning
-        \Pimcore::getEventDispatcher()->dispatch(AssetEvents::POST_COPY, new AssetEvent($new, [
-            'base_element' => $source // the element used to make a copy
-        ]));
+        $event = new AssetEvent($new, [
+            'base_element' => $source, // the element used to make a copy
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, AssetEvents::POST_COPY);
 
         return $new;
     }
@@ -126,7 +134,7 @@ class Service extends Model\Element\Service
         if ($new instanceof Asset\Folder) {
             $new->setChildren(null);
         }
-        $new->setFilename(Element\Service::getSaveCopyName('asset', $new->getFilename(), $target));
+        $new->setFilename(Element\Service::getSafeCopyName($new->getFilename(), $target));
         $new->setParentId($target->getId());
         $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
         $new->setUserModification($this->_user ? $this->_user->getId() : 0);
@@ -141,9 +149,10 @@ class Service extends Model\Element\Service
         }
 
         // triggers actions after the complete asset cloning
-        \Pimcore::getEventDispatcher()->dispatch(AssetEvents::POST_COPY, new AssetEvent($new, [
-            'base_element' => $source // the element used to make a copy
-        ]));
+        $event = new AssetEvent($new, [
+            'base_element' => $source, // the element used to make a copy
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, AssetEvents::POST_COPY);
 
         return $new;
     }
@@ -184,10 +193,13 @@ class Service extends Model\Element\Service
      * @param array $params
      *
      * @return array
+     *
+     * @internal
      */
     public static function gridAssetData($asset, $fields = null, $requestedLanguage = null, $params = [])
     {
         $data = Element\Service::gridElementData($asset);
+        $loader = null;
 
         if ($asset instanceof Asset && !empty($fields)) {
             $data = [
@@ -209,21 +221,33 @@ class Service extends Model\Element\Service
                     if ($fieldDef[0] === 'preview') {
                         $data[$field] = self::getPreviewThumbnail($asset, ['treepreview' => true, 'width' => 108, 'height' => 70, 'frame' => true]);
                     } elseif ($fieldDef[0] === 'size') {
-                        /** @var Asset $asset */
-                        $filename = PIMCORE_ASSET_DIRECTORY . '/' . $asset->getRealFullPath();
-                        $size = @filesize($filename);
+                        $size = $asset->getFileSize();
                         $data[$field] = formatBytes($size);
                     }
                 } else {
                     if (isset($fieldDef[1])) {
                         $language = ($fieldDef[1] === 'none' ? '' : $fieldDef[1]);
-                        $metaData = $asset->getMetadata($fieldDef[0], $language, true);
+                        $rawMetaData = $asset->getMetadata($fieldDef[0], $language, true, true);
                     } else {
-                        $metaData = $asset->getMetadata($field, $requestedLanguage, true);
+                        $rawMetaData = $asset->getMetadata($field, $requestedLanguage, true, true);
                     }
 
-                    if ($metaData instanceof Model\Element\AbstractElement) {
-                        $metaData = $metaData->getFullPath();
+                    $metaData = $rawMetaData['data'] ?? null;
+
+                    if ($rawMetaData) {
+                        $type = $rawMetaData['type'];
+                        if (!$loader) {
+                            $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
+                        }
+
+                        $metaData = $rawMetaData['data'] ?? null;
+
+                        try {
+                            /** @var Data $instance */
+                            $instance = $loader->build($type);
+                            $metaData = $instance->getDataForListfolderGrid($rawMetaData['data'] ?? null, $rawMetaData);
+                        } catch (UnsupportedException $e) {
+                        }
                     }
 
                     $data[$field] = $metaData;
@@ -240,6 +264,8 @@ class Service extends Model\Element\Service
      * @param bool $onlyMethod
      *
      * @return string|null
+     *
+     * @internal
      */
     public static function getPreviewThumbnail($asset, $params = [], $onlyMethod = false)
     {
@@ -295,13 +321,13 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @static
+     * @internal
      *
      * @param Element\ElementInterface $element
      *
      * @return Element\ElementInterface
      */
-    public static function loadAllFields(Element\ElementInterface $element)
+    public static function loadAllFields(Element\ElementInterface $element): Element\ElementInterface
     {
         $element->getProperties();
 
@@ -318,6 +344,8 @@ class Service extends Model\Element\Service
      *  "object" => array(...),
      *  "asset" => array(...)
      * )
+     *
+     * @internal
      *
      * @param Asset $asset
      * @param array $rewriteConfig
@@ -337,11 +365,14 @@ class Service extends Model\Element\Service
     }
 
     /**
+     * @internal
+     *
      * @param array $metadata
+     * @param string $mode
      *
      * @return array
      */
-    public static function minimizeMetadata($metadata)
+    public static function minimizeMetadata($metadata, string $mode)
     {
         if (!is_array($metadata)) {
             return $metadata;
@@ -349,24 +380,22 @@ class Service extends Model\Element\Service
 
         $result = [];
         foreach ($metadata as $item) {
-            $type = $item['type'];
-            switch ($type) {
-                case 'document':
-                case 'asset':
-                case 'object':
-                    {
-                        $element = Element\Service::getElementByPath($type, $item['data']);
-                        if ($element) {
-                            $item['data'] = $element->getId();
-                        } else {
-                            $item['data'] = '';
-                        }
-                    }
+            $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
 
-                    break;
-                default:
-                    //nothing to do
+            try {
+                /** @var Data $instance */
+                $instance = $loader->build($item['type']);
+
+                if ($mode == 'grid') {
+                    $transformedData = $instance->getDataFromListfolderGrid($item['data'] ?? null, $item);
+                } else {
+                    $transformedData = $instance->getDataFromEditMode($item['data'] ?? null, $item);
+                }
+
+                $item['data'] = $transformedData;
+            } catch (UnsupportedException $e) {
             }
+
             $result[] = $item;
         }
 
@@ -377,6 +406,8 @@ class Service extends Model\Element\Service
      * @param array $metadata
      *
      * @return array
+     *
+     * @internal
      */
     public static function expandMetadataForEditmode($metadata)
     {
@@ -386,35 +417,25 @@ class Service extends Model\Element\Service
 
         $result = [];
         foreach ($metadata as $item) {
-            $type = $item['type'];
-            switch ($type) {
-                case 'document':
-                case 'asset':
-                case 'object':
-                {
-                    $element = $item['data'];
-                    if (is_numeric($item['data'])) {
-                        $element = Element\Service::getElementById($type, $item['data']);
-                    }
-                    if ($element instanceof Element\ElementInterface) {
-                        $item['data'] = $element->getRealFullPath();
-                    } else {
-                        $item['data'] = '';
-                    }
-                }
+            $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
+            $transformedData = $item['data'];
 
-                    break;
-                default:
-                    //nothing to do
+            try {
+                /** @var Data $instance */
+                $instance = $loader->build($item['type']);
+                $transformedData = $instance->getDataForEditMode($item['data'], $item);
+            } catch (UnsupportedException $e) {
             }
 
+            $item['data'] = $transformedData;
             //get the config from an predefined property-set (eg. select)
             $predefined = Model\Metadata\Predefined::getByName($item['name']);
             if ($predefined && $predefined->getType() == $item['type'] && $predefined->getConfig()) {
                 $item['config'] = $predefined->getConfig();
             }
 
-            $result[] = $item;
+            $key = $item['name'] . '~' . $item['language'];
+            $result[$key] = $item;
         }
 
         return $result;

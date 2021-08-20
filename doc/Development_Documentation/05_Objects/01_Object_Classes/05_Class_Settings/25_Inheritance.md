@@ -28,9 +28,12 @@ specific attribute.
 > If you toggle the inheritance flag after creating objects, the *object_*_*\_query_* might contain  
 > wrong values even after saving the object again. Pimcore will disable the dirty detection
 > if the class is newer than the object which should fix this issue.
-> However, you can still call AbstractObject::disableDirtyDetection() before saving the object
+> However, you can still call DataObject::disableDirtyDetection() before saving the object
 > if you want to explicitely fix that.
 
+> **Default Values
+> Make sure that you understand the impacts of defining a default value which is described
+> [here](../01_Data_Types/README.md)
 
 ![Data Inheritance](../../../img/classes-data-inheritance1.png)
 

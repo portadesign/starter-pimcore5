@@ -1,17 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
@@ -19,21 +18,33 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
+use Pimcore\Normalizer\NormalizerInterface;
 
-class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface
+class BooleanSelect extends Data implements
+    ResourcePersistenceAwareInterface,
+    QueryResourcePersistenceAwareInterface,
+    TypeDeclarationSupportInterface,
+    EqualComparisonInterface,
+    VarExporterInterface,
+    NormalizerInterface
 {
     use Model\DataObject\Traits\SimpleComparisonTrait;
     use Extension\ColumnType;
     use Extension\QueryColumnType;
+    use DataObject\Traits\SimpleNormalizerTrait;
 
     /** storage value for yes */
     const YES_VALUE = 1;
+
     /** storage value for no */
     const NO_VALUE = -1;
+
     /** storage value for empty */
     const EMPTY_VALUE = null;
+
     /** edit mode valze for empty */
     const EMPTY_VALUE_EDITMODE = 0;
+
     /**
      * Available options to select - Default options
      *
@@ -42,38 +53,66 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
     const DEFAULT_OPTIONS = [
         [
             'key' => 'empty',
-            'value' => self::EMPTY_VALUE_EDITMODE
+            'value' => self::EMPTY_VALUE_EDITMODE,
         ],
         [
             'key' => 'yes',
-            'value' => self::YES_VALUE
+            'value' => self::YES_VALUE,
         ],
         [
             'key' => 'no',
-            'value' => self::NO_VALUE
-        ]
+            'value' => self::NO_VALUE,
+        ],
     ];
+
     /**
      * Static type of this element
+     *
+     * @internal
      *
      * @var string
      */
     public $fieldtype = 'booleanSelect';
-    /** @var string */
+
+    /**
+     * @internal
+     *
+     * @var string
+     */
     public $yesLabel;
-    /** @var string */
+
+    /**
+     * @internal
+     *
+     * @var string
+     */
     public $noLabel;
-    /** @var string */
+
+    /**
+     * @internal
+     *
+     * @var string
+     */
     public $emptyLabel;
+
+    /**
+     * @internal
+     *
+     * @var array|array[]
+     */
     public $options = self::DEFAULT_OPTIONS;
 
     /**
-     * @var int
+     * @internal
+     *
+     * @var string|int
      */
-    public $width;
+    public $width = 0;
 
     /**
      * Type for the column to query
+     *
+     * @internal
      *
      * @var string
      */
@@ -82,16 +121,11 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
     /**
      * Type for the column
      *
-     * @var string
-     */
-    public $columnType = 'tinyint(1) null';
-
-    /**
-     * Type for the generated phpdoc
+     * @internal
      *
      * @var string
      */
-    public $phpdocType = 'boolean';
+    public $columnType = 'tinyint(1) null';
 
     /**
      * @return array
@@ -113,7 +147,7 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
     }
 
     /**
-     * @return int
+     * @return string|int
      */
     public function getWidth()
     {
@@ -121,13 +155,16 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
     }
 
     /**
-     * @param int|null $width
+     * @param string|int $width
      *
      * @return $this
      */
     public function setWidth($width)
     {
-        $this->width = $this->getAsIntegerCast($width);
+        if (is_numeric($width)) {
+            $width = (int)$width;
+        }
+        $this->width = $width;
 
         return $this;
     }
@@ -136,7 +173,7 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param int|null $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return bool|null
@@ -160,7 +197,7 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
      * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
      * @param int|bool|null $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param array $params
      *
      * @return int|null
@@ -174,7 +211,7 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
      * @param int|bool|null $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param array $params
      *
      * @return int|null
@@ -196,7 +233,7 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
     /**
      * @see Data::getVersionPreview
      *
-     * @param string $data
+     * @param bool|null $data
      * @param DataObject\Concrete|null $object
      * @param array $params
      *
@@ -204,14 +241,18 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
      */
     public function getVersionPreview($data, $object = null, $params = [])
     {
-        return $data;
+        if ($data === true) {
+            return $this->getYesLabel();
+        }
+        if ($data === false) {
+            return $this->getNoLabel();
+        }
+
+        return '';
     }
 
-    /** True if change is allowed in edit mode.
-     * @param DataObject\Concrete $object
-     * @param mixed $params
-     *
-     * @return bool
+    /**
+     * {@inheritdoc}
      */
     public function isDiffChangeAllowed($object, $params = [])
     {
@@ -238,8 +279,9 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
 
         $value = '';
         foreach ($this->options as $option) {
-            if ($option->value == $data) {
-                $value = $option->key;
+            if ($option['value'] == $data) {
+                $value = $option['key'];
+
                 break;
             }
         }
@@ -253,14 +295,9 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
     }
 
     /**
-     * Checks if data is valid for current data field
-     *
-     * @param mixed $data
-     * @param bool $omitMandatoryCheck
-     *
-     * @throws \Exception
+     * {@inheritdoc}
      */
-    public function checkValidity($data, $omitMandatoryCheck = false)
+    public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
         //TODO mandatory probably doesn't make much sense
         if (!$omitMandatoryCheck && $this->getMandatory() && $this->isEmpty($data)) {
@@ -313,8 +350,8 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
         if (!is_array($this->options)) {
             $this->options = [
                 ['key' => $label,
-                'value' => $value
-                ]
+                'value' => $value,
+                ],
 
             ];
         } else {
@@ -322,6 +359,7 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
                 if ($option['value'] == $value) {
                     $option['key'] = $label;
                     $this->options[$idx] = $option;
+
                     break;
                 }
             }
@@ -375,8 +413,8 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
     /**
      * @see Data::getDataForEditmode
      *
-     * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param bool|null $data
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return int
@@ -385,7 +423,8 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
     {
         if ($data === true) {
             return self::YES_VALUE;
-        } elseif ($data === false) {
+        }
+        if ($data === false) {
             return self::NO_VALUE;
         }
 
@@ -408,19 +447,79 @@ class BooleanSelect extends Data implements ResourcePersistenceAwareInterface, Q
      * @see Data::getDataFromEditmode
      *
      * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return bool|null
      */
     public function getDataFromEditmode($data, $object = null, $params = [])
     {
-        if (intval($data) === 1) {
+        if ((int)$data === 1) {
             return true;
-        } elseif (intval($data) === -1) {
+        } elseif ((int)$data === -1) {
             return false;
         }
 
         return null;
+    }
+
+    /**
+     * @param mixed $oldValue
+     * @param mixed $newValue
+     *
+     * @return bool
+     */
+    public function isEqual($oldValue, $newValue): bool
+    {
+        return $oldValue === $newValue;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getForCsvExport($object, $params = [])
+    {
+        $value = $this->getDataFromObjectParam($object, $params);
+        if ($value === null) {
+            $value = '';
+        } elseif ($value) {
+            $value = '1';
+        } else {
+            $value = '0';
+        }
+
+        return $value;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getParameterTypeDeclaration(): ?string
+    {
+        return '?bool';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getReturnTypeDeclaration(): ?string
+    {
+        return '?bool';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocInputType(): ?string
+    {
+        return 'bool|null';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocReturnType(): ?string
+    {
+        return 'bool|null';
     }
 }

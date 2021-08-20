@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.element.tag.tree");
@@ -92,7 +92,7 @@ pimcore.element.tag.tree = Class.create({
                 treePlugins = {
                     ptype: 'treeviewdragdrop',
                     ddGroup: "tags",
-                    appendOnly: true
+                    appendOnly: false
                 };
             }
 
@@ -113,7 +113,7 @@ pimcore.element.tag.tree = Class.create({
             this.filterButton = new Ext.Button({
                 iconCls: "pimcore_icon_search",
                 text: t("filter"),
-                handler: this.updateTagFilter.bind(this)
+                handler: this.tagFilter.bind(this)
             });
 
             this.tree = Ext.create('Ext.tree.Panel', {
@@ -245,7 +245,7 @@ pimcore.element.tag.tree = Class.create({
             }));
         }
 
-        if (this.allowDelete && user.isAllowed("tags_configuration")) {
+        if (this.allowDelete && user.isAllowed("tags_configuration") && index !== 0) {
             hasEntries = true;
             menu.add(new Ext.menu.Item({
                 text: t('delete'),
@@ -269,7 +269,7 @@ pimcore.element.tag.tree = Class.create({
             }));
         }
 
-        if (this.allowRename && user.isAllowed("tags_configuration")) {
+        if (this.allowRename && user.isAllowed("tags_configuration") && index !== 0) {
             hasEntries = true;
             menu.add(new Ext.menu.Item({
                 text: t('rename'),
@@ -278,6 +278,10 @@ pimcore.element.tag.tree = Class.create({
                     Ext.MessageBox.prompt(t('rename_tag'), t('enter_new_name_of_the_tag'), function (tree, record, button, value) {
                         value = strip_tags(trim(value));
                         if (button == "ok" && value.length > 0) {
+                            if (this.isKeyInSameLevel(record.parentNode, value, record)) {
+                                return;
+                            }
+
                             Ext.Ajax.request({
                                 url: Routing.generate('pimcore_admin_tags_update'),
                                 method: 'PUT',
@@ -315,6 +319,10 @@ pimcore.element.tag.tree = Class.create({
     addTagComplete: function (tree, record, button, value, object) {
         value = strip_tags(trim(value));
         if (button == "ok" && value.length > 0) {
+            if (this.isKeyInSameLevel(record, value, record)) {
+               return;
+            }
+
             Ext.Ajax.request({
                 url: Routing.generate('pimcore_admin_tags_add'),
                 method: 'POST',
@@ -322,7 +330,12 @@ pimcore.element.tag.tree = Class.create({
                     parentId: record.data.id,
                     text: value
                 },
-                success: function (tree, record) {
+                success: function (tree, record, response) {
+                    res = Ext.decode(response.responseText);
+                    if (!res.success) {
+                        pimcore.helpers.showNotification(t("error"), t("error"), "error", t(res.message));
+                    }
+
                     var currentFilterValue = this.filterField.getValue().toLowerCase();
                     if (currentFilterValue) {
                         this.tagFilter();
@@ -354,6 +367,17 @@ pimcore.element.tag.tree = Class.create({
         });
 
         return checkedTagIds;
+    },
+
+    isKeyInSameLevel: function (parentNode, key, record) {
+        var parentChilds = parentNode.childNodes;
+        for (var i = 0; i < parentChilds.length; i++) {
+            if (parentChilds[i].data.text == key && parentChilds[i] !== record) {
+                Ext.MessageBox.alert(t('error'),
+                    t('name_already_in_use'));
+                return true;
+            }
+        }
     }
 
 });

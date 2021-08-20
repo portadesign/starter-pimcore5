@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 // some global helper functions
@@ -17,7 +17,16 @@ pimcore.registerNS("pimcore.helpers.quantityValue.x");
 pimcore.helpers.quantityValue.storeLoaded = false;
 pimcore.helpers.quantityValue.store = null;
 
-pimcore.helpers.quantityValue.initUnitStore = function(callback, filters) {
+pimcore.helpers.quantityValue.initUnitStore = function(callback, filters, data) {
+    if (data && data.unit && pimcore.helpers.quantityValue.storeLoaded) {
+        let rec = pimcore.helpers.quantityValue.store.getById(data.unit);
+        if (rec == null) {
+            pimcore.helpers.quantityValue.storeLoaded = false;
+            pimcore.helpers.quantityValue.store = null;
+        }
+    }
+
+
     if (!pimcore.helpers.quantityValue.storeLoaded) {
         var newListener = function () {
             pimcore.helpers.quantityValue.storeLoaded = true;

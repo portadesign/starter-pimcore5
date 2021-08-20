@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Element
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Element\Tag;
@@ -21,6 +19,8 @@ use Pimcore\Model;
 use Pimcore\Model\Element\Tag;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Element\Tag $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -33,7 +33,7 @@ class Dao extends Model\Dao\AbstractDao
     public function getById($id)
     {
         $data = $this->db->fetchRow('SELECT * FROM tags WHERE id = ?', $id);
-        if (!$data['id']) {
+        if (!$data) {
             throw new \Exception('Tag item with id ' . $id . ' not found');
         }
         $this->assignVariablesToModel($data);
@@ -55,6 +55,7 @@ class Dao extends Model\Dao\AbstractDao
         }
 
         $this->db->beginTransaction();
+
         try {
             $dataAttributes = $this->model->getObjectVars();
 
@@ -74,12 +75,12 @@ class Dao extends Model\Dao\AbstractDao
 
             $lastInsertId = $this->db->lastInsertId();
             if (!$this->model->getId() && $lastInsertId) {
-                $this->model->setId($lastInsertId);
+                $this->model->setId((int) $lastInsertId);
             }
 
             //check for id-path and update it, if path has changed -> update all other tags that have idPath == idPath/id
             if ($originalIdPath && $originalIdPath != $this->model->getIdPath()) {
-                $this->db->query('UPDATE tags SET idPath = REPLACE(idPath, ?, ?)  WHERE idPath LIKE ?;', [$originalIdPath, $this->model->getIdPath(), $originalIdPath . $this->model->getId() . '/%']);
+                $this->db->query('UPDATE tags SET idPath = REPLACE(idPath, ?, ?)  WHERE idPath LIKE ?;', [$originalIdPath, $this->model->getIdPath(), $this->db->escapeLike($originalIdPath) . $this->model->getId() . '/%']);
             }
 
             $this->db->commit();
@@ -87,6 +88,7 @@ class Dao extends Model\Dao\AbstractDao
             return true;
         } catch (\Exception $e) {
             $this->db->rollBack();
+
             throw $e;
         }
     }
@@ -99,16 +101,18 @@ class Dao extends Model\Dao\AbstractDao
     public function delete()
     {
         $this->db->beginTransaction();
+
         try {
             $this->db->delete('tags_assignment', ['tagid' => $this->model->getId()]);
-            $this->db->deleteWhere('tags_assignment', $this->db->quoteInto('tagid IN (SELECT id FROM tags WHERE idPath LIKE ?)', $this->model->getIdPath() . $this->model->getId() . '/%'));
+            $this->db->deleteWhere('tags_assignment', $this->db->quoteInto('tagid IN (SELECT id FROM tags WHERE idPath LIKE ?)', $this->db->escapeLike($this->model->getIdPath()) . $this->model->getId() . '/%'));
 
             $this->db->delete('tags', ['id' => $this->model->getId()]);
-            $this->db->deleteWhere('tags', $this->db->quoteInto('idPath LIKE ?', $this->model->getIdPath() . $this->model->getId() . '/%'));
+            $this->db->deleteWhere('tags', $this->db->quoteInto('idPath LIKE ?', $this->db->escapeLike($this->model->getIdPath()) . $this->model->getId() . '/%'));
 
             $this->db->commit();
         } catch (\Exception $e) {
             $this->db->rollBack();
+
             throw $e;
         }
     }
@@ -155,7 +159,7 @@ class Dao extends Model\Dao\AbstractDao
         $data = [
             'tagid' => $tagId,
             'ctype' => $cType,
-            'cid' => $cId
+            'cid' => $cId,
         ];
         $this->db->insertOrUpdate('tags_assignment', $data);
     }
@@ -169,7 +173,7 @@ class Dao extends Model\Dao\AbstractDao
         $this->db->delete('tags_assignment', [
             'tagid' => $this->model->getId(),
             'ctype' => $cType,
-            'cid' => $cId
+            'cid' => $cId,
         ]);
     }
 
@@ -183,6 +187,7 @@ class Dao extends Model\Dao\AbstractDao
     public function setTagsForElement($cType, $cId, array $tags)
     {
         $this->db->beginTransaction();
+
         try {
             $this->db->delete('tags_assignment', ['ctype' => $cType, 'cid' => $cId]);
 
@@ -193,6 +198,7 @@ class Dao extends Model\Dao\AbstractDao
             $this->db->commit();
         } catch (\Exception $e) {
             $this->db->rollBack();
+
             throw $e;
         }
     }
@@ -246,50 +252,95 @@ class Dao extends Model\Dao\AbstractDao
             'object' => ['objects', 'o_id', 'o_type', '\Pimcore\Model\DataObject\AbstractObject'],
         ];
 
-        $select = $this->db->select()
-                           ->from('tags_assignment', [])
-                           ->where('tags_assignment.ctype = ?', $type);
+        $select = $this->db->createQueryBuilder()->select(['*'])
+                           ->from('tags_assignment')
+                           ->andWhere('tags_assignment.ctype = :ctype')->setParameter(':ctype', $type);
 
         if (true === $considerChildTags) {
-            $select->joinInner('tags', 'tags.id = tags_assignment.tagid', ['tags_id' => 'id']);
-            $select->where(
+            $select->innerJoin('tags_assignment', 'tags', 'tags', 'tags.id = tags_assignment.tagid');
+            $select->andWhere(
                 '(' .
                 $this->db->quoteInto('tags_assignment.tagid = ?', $tag->getId()) . ' OR ' .
-                $this->db->quoteInto('tags.idPath LIKE ?', $tag->getFullIdPath() . '%') . ')'
+                $this->db->quoteInto('tags.idPath LIKE ?', $this->db->escapeLike($tag->getFullIdPath()) . '%')
+                . ')'
             );
         } else {
-            $select->where('tags_assignment.tagid = ?', $tag->getId());
+            $select->andWhere('tags_assignment.tagid = :tagId')->setParameter(':tagId', $tag->getId());
         }
 
-        $select->joinInner(
-            ['el' => $map[$type][0]],
-            'tags_assignment.cId = el.' . $map[$type][1],
-            ['el_id' => $map[$type][1]]
-        );
+        $select->innerJoin('tags_assignment', $map[$type][0], 'el', 'tags_assignment.cId = el.' . $map[$type][1]);
 
         if (! empty($subtypes)) {
             foreach ($subtypes as $subType) {
                 $quotedSubTypes[] = $this->db->quote($subType);
             }
-            $select->where($map[$type][2] . ' IN (' . implode(',', $quotedSubTypes) . ')');
+            $select->andWhere($map[$type][2] . ' IN (' . implode(',', $quotedSubTypes) . ')');
         }
 
         if ('object' === $type && ! empty($classNames)) {
             foreach ($classNames as $cName) {
                 $quotedClassNames[] = $this->db->quote($cName);
             }
-            $select->where('o_className IN ( ' .  implode(',', $quotedClassNames) . ' )');
+            $select->andWhere('o_className IN ( ' .  implode(',', $quotedClassNames) . ' )');
         }
 
-        $res = $this->db->query($select);
+        $res = $this->db->query((string) $select, $select->getParameters());
 
         while ($row = $res->fetch()) {
-            $el = $map[$type][3]::getById($row['el_id']);
+            $el = $map[$type][3]::getById($row['cid']);
             if ($el) {
                 $elements[] = $el;
             }
         }
 
         return $elements;
+    }
+
+    /**
+     * @param string $tagPath separated by "/"
+     *
+     * @return null|Tag
+     */
+    public function getByPath($tagPath)
+    {
+        $parentTagId = 0;
+
+        $tag = null;
+        $tagPath = ltrim($tagPath, '/');
+        foreach (explode('/', $tagPath) as $tagItem) {
+            $tags = new Tag\Listing();
+            $tags->addConditionParam('name = ?', $tagItem);
+
+            if (empty($parentTagId)) {
+                $tags->addConditionParam('parentId = 0 OR parentId IS NULL'); // NULL is allowed by database schema
+            } else {
+                $tags->addConditionParam('parentId = ?', $parentTagId);
+            }
+
+            $tags->setLimit(1);
+
+            $tags = $tags->load();
+
+            if (count($tags) === 0) {
+                return null;
+            }
+
+            $tag = $tags[0];
+            $parentTagId = $tag->getId();
+        }
+
+        return $tag;
+    }
+
+    /**
+     * @return bool
+     */
+    public function exists()
+    {
+        if (is_null($this->model->getId())) {
+            return false;
+        }
+
+        return (bool) $this->db->fetchOne('SELECT COUNT(*) FROM tags WHERE id = ?', $this->model->getId());
     }
 }

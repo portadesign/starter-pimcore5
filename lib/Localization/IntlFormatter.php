@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Localization;
@@ -20,13 +21,21 @@ namespace Pimcore\Localization;
 class IntlFormatter
 {
     const DATE_SHORT = 'date_short';
+
     const DATE_MEDIUM = 'date_medium';
+
     const DATE_LONG = 'date_long';
+
     const DATETIME_SHORT = 'datetime_short';
+
     const DATETIME_MEDIUM = 'datetime_medium';
+
     const DATETIME_LONG = 'datetime_long';
+
     const TIME_SHORT = 'time_short';
+
     const TIME_MEDIUM = 'time_medium';
+
     const TIME_LONG = 'time_long';
 
     /**
@@ -34,13 +43,16 @@ class IntlFormatter
      */
     protected $locale;
 
+    /** @var LocaleServiceInterface */
+    private $localeService;
+
     /**
      * @var \IntlDateFormatter[]
      */
     protected $dateFormatters = [];
 
     /**
-     * @var \NumberFormatter
+     * @var \NumberFormatter|null
      */
     protected $numberFormatter;
 
@@ -61,7 +73,7 @@ class IntlFormatter
      */
     public function __construct(LocaleServiceInterface $locale)
     {
-        $this->locale = $locale->findLocale();
+        $this->localeService = $locale;
     }
 
     /**
@@ -69,6 +81,10 @@ class IntlFormatter
      */
     public function getLocale()
     {
+        if ($this->locale === null) {
+            $this->locale = $this->localeService->findLocale();
+        }
+
         return $this->locale;
     }
 
@@ -111,55 +127,55 @@ class IntlFormatter
         switch ($format) {
             case self::DATE_SHORT:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::SHORT,
                     \IntlDateFormatter::NONE
                 );
             case self::DATE_MEDIUM:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::MEDIUM,
                     \IntlDateFormatter::NONE
                 );
             case self::DATE_LONG:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::LONG,
                     \IntlDateFormatter::NONE
                 );
             case self::DATETIME_SHORT:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::SHORT,
                     \IntlDateFormatter::SHORT
                 );
             case self::DATETIME_MEDIUM:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::MEDIUM,
                     \IntlDateFormatter::MEDIUM
                 );
             case self::DATETIME_LONG:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::LONG,
                     \IntlDateFormatter::LONG
                 );
             case self::TIME_SHORT:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::NONE,
                     \IntlDateFormatter::SHORT
                 );
             case self::TIME_MEDIUM:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::NONE,
                     \IntlDateFormatter::MEDIUM
                 );
             case self::TIME_LONG:
                 return \IntlDateFormatter::create(
-                    $this->locale,
+                    $this->getLocale(),
                     \IntlDateFormatter::NONE,
                     \IntlDateFormatter::LONG
                 );
@@ -198,7 +214,7 @@ class IntlFormatter
     public function formatNumber($value)
     {
         if (empty($this->numberFormatter)) {
-            $this->numberFormatter = new \NumberFormatter($this->locale, \NumberFormatter::DECIMAL);
+            $this->numberFormatter = new \NumberFormatter($this->getLocale(), \NumberFormatter::DECIMAL);
         }
 
         return $this->numberFormatter->format($value);
@@ -216,12 +232,12 @@ class IntlFormatter
     public function formatCurrency($value, $currency, $pattern = 'default')
     {
         if (empty($this->currencyFormatters[$pattern])) {
-            $formatter = new \NumberFormatter($this->locale, \NumberFormatter::CURRENCY);
+            $formatter = new \NumberFormatter($this->getLocale(), \NumberFormatter::CURRENCY);
 
             if ($pattern !== 'default') {
                 $formatter->setPattern($pattern);
-            } elseif ($this->currencyFormats[$this->locale]) {
-                $formatter->setPattern($this->currencyFormats[$this->locale]);
+            } elseif ($this->currencyFormats[$this->getLocale()] ?? null) {
+                $formatter->setPattern($this->currencyFormats[$this->getLocale()]);
             }
 
             $this->currencyFormatters[$pattern] = $formatter;

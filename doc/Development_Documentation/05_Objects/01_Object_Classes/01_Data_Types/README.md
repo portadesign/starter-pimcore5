@@ -58,7 +58,7 @@ The entire list of data types is indicated below:
 | Advanced Many-To-Many Relation | collection of references to Pimcore documents, objects, assets with additional metadata on the relation                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Many-To-Many Object Relation | collection of Pimcore object references                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Advanced Many-To-One Object Relation | collection of Pimcore object references with additional metadata on the relation                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| [Reverse Many-To-Many Object Relation](75_Reverse_Many_To_Many_Object_Relation_Type.md) | collection of Pimcore object references which are owned by a different object                                                                                                                                                                                                                                                                                                                                |
+| [Reverse Object Relation](75_Reverse_Object_Relation_Type.md) | collection of Pimcore object references which are owned by a different object                                                                                                                                                                                                                                                                                                                                |
 
 
 ### Structured Datatypes
@@ -135,8 +135,8 @@ languages. Please see the article about Translations to find out how to add obje
 * `visible in search result`: Determines if the field's data column is shown in the search results grid, or hidden 
   (meaning it has to be activated manually)
 * `indexed`: puts an index on this column in the database
-Moreover, each data field can have a `tooltip`, which is shown when the mouse hovers over the input field.
-* `unique`: currently the `input`, `numeric` and `user` data types allow to add a unique constraint. If checked, the values will also be indexed. Note that only works on top level attributes and not on nested stuff inside localized fields etc.
+* `unique`: If checked, the value has to be unique across all objects of this class. Note that only works on top level attributes and not on nested stuff inside localized fields etc. Beware that this does not add a database index to the query table which `Listing` classes use.
+* Moreover, each data field can have a `tooltip`, which is shown when the mouse hovers over the input field.
 
 ![Data Field Settings](../../../img/classes-datatypes1.jpg)
 ![Data Field Settings](../../../img/classes-datatypes2.jpg)
@@ -155,7 +155,23 @@ See sub-pages of this page for detail documentation of different data types.
 
 ### Default values
 
-For datatypes which support default values (currently these are Input, Date, Datetime, Numeric, Checkbox, Select, Url Slug and Quantity Value) you can either specify a fixed default (not supported for slugs as values have to be unique) value or you can specify a default value generator service or class which can generate a dynamic default value. Default values only get used if the field is empty and in case of [inheritance](../05_Class_Settings/25_Inheritance.md) being enabled also the parent's field is empty.
+For datatypes which support default values (currently these are Input, Date, Datetime, Numeric, Checkbox, Select and Quantity Value) you can either specify a fixed default value or you can specify a default value generator service or class which can generate a dynamic default value. 
+
+The data is persisted according to the following rules.
+
+1. ***No [inheritance](../05_Class_Settings/25_Inheritance.md)***: default value is persisted to store/query table on create
+2. ***With inheritance and NO parent value***: default value is persisted to store/query table on create
+3. ***With inheritance and existing parent value***: no value is persisted to store table, 
+inherited value is persisted to query table, inheritance is active
 
 A default value generator is a class which implements `\Pimcore\Model\DataObject\ClassDefinition\DefaultValueGeneratorInterface`. This class can generate a value based on the current data of an object.
 Have a look at [Calculated Value](./10_Calculated_Value_Type.md) for an overview of contextual information.
+
+If a default value generator is defined then it has a higher priority than a configured static default value.
+
+The decisions are made in the following order:
+1. default value generator. if defined the process stops here
+2. parent value if inheritance is enabled
+3. fixed default value
+
+ 

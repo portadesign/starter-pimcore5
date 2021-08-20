@@ -13,6 +13,8 @@ services:
             - null
             - '@event_dispatcher'
             - ~
+            - ~
+
     state_machine.abstract:
         class: Symfony\Component\Workflow\StateMachine
         abstract: true
@@ -22,11 +24,14 @@ services:
             - null
             - '@event_dispatcher'
             - ~
+            - ~
+
     workflow.marking_store.multiple_state:
-        class: Symfony\Component\Workflow\MarkingStore\MultipleStateMarkingStore
+        class: Symfony\Component\Workflow\MarkingStore\MethodMarkingStore
         abstract: true
+
     workflow.marking_store.single_state:
-        class: Symfony\Component\Workflow\MarkingStore\SingleStateMarkingStore
+        class: Symfony\Component\Workflow\MarkingStore\MethodMarkingStore
         abstract: true
 
     workflow.registry:

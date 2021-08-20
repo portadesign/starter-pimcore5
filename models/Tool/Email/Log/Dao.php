@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Document
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Tool\Email\Log;
@@ -21,6 +19,8 @@ use Pimcore\Logger;
 use Pimcore\Model;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Tool\Email\Log $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -139,18 +139,18 @@ class Dao extends Model\Dao\AbstractDao
     protected function prepareLoggingData($key, $value)
     {
         $class = new \stdClass();
-        $class->key = strval($key); // key has to be a string otherwise the treeGrid won't work
+        $class->key = (string)$key; // key has to be a string otherwise the treeGrid won't work
 
         if (is_string($value) || is_int($value) || is_null($value)) {
             $class->data = ['type' => 'simple',
-                'value' => $value];
+                'value' => $value, ];
         } elseif ($value instanceof \DateTimeInterface) {
             $class->data = ['type' => 'simple',
-                'value' => $value->format('Y-m-d H:i')];
+                'value' => $value->format('Y-m-d H:i'), ];
         } elseif (is_object($value) && method_exists($value, 'getId')) {
             $class->data = ['type' => 'object',
                 'objectId' => $value->getId(),
-                'objectClass' => get_class($value)];
+                'objectClass' => get_class($value), ];
         } elseif (is_array($value)) {
             foreach ($value as $entryKey => $entryValue) {
                 $class->children[] = self::prepareLoggingData($entryKey, $entryValue);

@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
@@ -17,14 +18,16 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
 use Pimcore\Event\AdminEvents;
 use Pimcore\Model\Element\Tag;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * @Route("/tags")
+ *
+ * @internal
  */
 class TagsController extends AdminController
 {
@@ -37,12 +40,16 @@ class TagsController extends AdminController
      */
     public function addAction(Request $request)
     {
-        $tag = new Tag();
-        $tag->setName(strip_tags($request->get('text')));
-        $tag->setParentId(intval($request->get('parentId')));
-        $tag->save();
+        try {
+            $tag = new Tag();
+            $tag->setName(strip_tags($request->get('text')));
+            $tag->setParentId((int)$request->get('parentId'));
+            $tag->save();
 
-        return $this->adminJson(['success' => true, 'id' => $tag->getId()]);
+            return $this->adminJson(['success' => true, 'id' => $tag->getId()]);
+        } catch (\Exception $e) {
+            return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -81,7 +88,7 @@ class TagsController extends AdminController
         if ($tag) {
             $parentId = $request->get('parentId');
             if ($parentId || $parentId === '0') {
-                $tag->setParentId(intval($parentId));
+                $tag->setParentId((int)$parentId);
             }
             if ($request->get('text')) {
                 $tag->setName(strip_tags($request->get('text')));
@@ -105,13 +112,13 @@ class TagsController extends AdminController
     public function treeGetChildrenByIdAction(Request $request)
     {
         $showSelection = $request->get('showSelection') == 'true';
-        $assginmentCId = intval($request->get('assignmentCId'));
-        $assginmentCType = strip_tags($request->get('assignmentCType'));
+        $assignmentCId = (int)$request->get('assignmentCId');
+        $assignmentCType = strip_tags($request->get('assignmentCType'));
 
         $recursiveChildren = false;
         $assignedTagIds = [];
-        if ($assginmentCId && $assginmentCType) {
-            $assignedTags = Tag::getTagsForElement($assginmentCType, $assginmentCId);
+        if ($assignmentCId && $assignmentCType) {
+            $assignedTags = Tag::getTagsForElement($assignmentCType, $assignmentCId);
 
             foreach ($assignedTags as $assignedTag) {
                 $assignedTagIds[$assignedTag->getId()] = $assignedTag;
@@ -120,7 +127,7 @@ class TagsController extends AdminController
 
         $tagList = new Tag\Listing();
         if ($request->get('node')) {
-            $tagList->setCondition('parentId = ?', intval($request->get('node')));
+            $tagList->setCondition('parentId = ?', (int)$request->get('node'));
         } else {
             $tagList->setCondition('ISNULL(parentId) OR parentId = 0');
         }
@@ -129,14 +136,14 @@ class TagsController extends AdminController
         if (!empty($request->get('filter'))) {
             $filterIds = [0];
             $filterTagList = new Tag\Listing();
-            $filterTagList->setCondition('`name` LIKE '. $filterTagList->quote('%'. $request->get('filter') .'%'));
+            $filterTagList->setCondition('LOWER(`name`) LIKE ?', ['%' . $filterTagList->escapeLike(mb_strtolower($request->get('filter'))) . '%']);
             foreach ($filterTagList->load() as $filterTag) {
-                if ($parentId = $filterTag->getParentId() == 0) {
+                if ($filterTag->getParentId() === 0) {
                     $filterIds[] = $filterTag->getId();
                 } else {
                     $ids = explode('/', $filterTag->getIdPath());
                     if (isset($ids[1])) {
-                        $filterIds[] = intval($ids[1]);
+                        $filterIds[] = (int)$ids[1];
                     }
                 }
             }
@@ -173,8 +180,8 @@ class TagsController extends AdminController
             'leaf' => !$tag->hasChildren(),
             'iconCls' => 'pimcore_icon_element_tags',
             'qtipCfg' => [
-                'title' => 'ID: ' . $tag->getId()
-            ]
+                'title' => 'ID: ' . $tag->getId(),
+            ],
         ];
 
         if ($showSelection) {
@@ -201,7 +208,7 @@ class TagsController extends AdminController
      */
     public function loadTagsForElementAction(Request $request)
     {
-        $assginmentCId = intval($request->get('assignmentCId'));
+        $assginmentCId = (int)$request->get('assignmentCId');
         $assginmentCType = strip_tags($request->get('assignmentCType'));
 
         $assignedTagArray = [];
@@ -225,9 +232,9 @@ class TagsController extends AdminController
      */
     public function addTagToElementAction(Request $request)
     {
-        $assginmentCId = intval($request->get('assignmentElementId'));
+        $assginmentCId = (int)$request->get('assignmentElementId');
         $assginmentCType = strip_tags($request->get('assignmentElementType'));
-        $tagId = intval($request->get('tagId'));
+        $tagId = (int)$request->get('tagId');
 
         $tag = Tag::getById($tagId);
         if ($tag) {
@@ -248,9 +255,9 @@ class TagsController extends AdminController
      */
     public function removeTagFromElementAction(Request $request)
     {
-        $assginmentCId = intval($request->get('assignmentElementId'));
+        $assginmentCId = (int)$request->get('assignmentElementId');
         $assginmentCType = strip_tags($request->get('assignmentElementType'));
-        $tagId = intval($request->get('tagId'));
+        $tagId = (int)$request->get('tagId');
 
         $tag = Tag::getById($tagId);
         if ($tag) {
@@ -272,28 +279,31 @@ class TagsController extends AdminController
      */
     public function getBatchAssignmentJobsAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
-        $elementId = intval($request->get('elementId'));
+        $elementId = (int)$request->get('elementId');
         $elementType = strip_tags($request->get('elementType'));
 
         $idList = [];
         switch ($elementType) {
             case 'object':
-                $object = \Pimcore\Model\DataObject\AbstractObject::getById($elementId);
+                $object = \Pimcore\Model\DataObject::getById($elementId);
                 if ($object) {
                     $idList = $this->getSubObjectIds($object, $eventDispatcher);
                 }
+
                 break;
             case 'asset':
                 $asset = \Pimcore\Model\Asset::getById($elementId);
                 if ($asset) {
                     $idList = $this->getSubAssetIds($asset, $eventDispatcher);
                 }
+
                 break;
             case 'document':
                 $document = \Pimcore\Model\Document::getById($elementId);
                 if ($document) {
                     $idList = $this->getSubDocumentIds($document, $eventDispatcher);
                 }
+
                 break;
         }
 
@@ -327,13 +337,13 @@ class TagsController extends AdminController
              )';
         }
 
-        $childsList->setCondition($condition, $object->getRealFullPath() . '/%');
+        $childsList->setCondition($condition, $childsList->escapeLike($object->getRealFullPath()) . '/%');
 
         $beforeListLoadEvent = new GenericEvent($this, [
             'list' => $childsList,
-            'context' => []
+            'context' => [],
         ]);
-        $eventDispatcher->dispatch(AdminEvents::OBJECT_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+        $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::OBJECT_LIST_BEFORE_LIST_LOAD);
         /** @var \Pimcore\Model\DataObject\Listing $childsList */
         $childsList = $beforeListLoadEvent->getArgument('list');
 
@@ -359,13 +369,13 @@ class TagsController extends AdminController
             )';
         }
 
-        $childsList->setCondition($condition, $asset->getRealFullPath() . '/%');
+        $childsList->setCondition($condition, $childsList->escapeLike($asset->getRealFullPath()) . '/%');
 
         $beforeListLoadEvent = new GenericEvent($this, [
             'list' => $childsList,
-            'context' => []
+            'context' => [],
         ]);
-        $eventDispatcher->dispatch(AdminEvents::ASSET_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+        $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::ASSET_LIST_BEFORE_LIST_LOAD);
         /** @var \Pimcore\Model\Asset\Listing $childsList */
         $childsList = $beforeListLoadEvent->getArgument('list');
 
@@ -391,13 +401,13 @@ class TagsController extends AdminController
             )';
         }
 
-        $childsList->setCondition($condition, $document->getRealFullPath() . '/%');
+        $childsList->setCondition($condition, $childsList->escapeLike($document->getRealFullPath()) . '/%');
 
         $beforeListLoadEvent = new GenericEvent($this, [
             'list' => $childsList,
-            'context' => []
+            'context' => [],
         ]);
-        $eventDispatcher->dispatch(AdminEvents::DOCUMENT_LIST_BEFORE_LIST_LOAD, $beforeListLoadEvent);
+        $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::DOCUMENT_LIST_BEFORE_LIST_LOAD);
         /** @var \Pimcore\Model\Document\Listing $childsList */
         $childsList = $beforeListLoadEvent->getArgument('list');
 

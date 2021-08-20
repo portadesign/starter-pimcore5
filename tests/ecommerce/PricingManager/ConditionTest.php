@@ -1,5 +1,18 @@
 <?php
 
+/**
+ * Pimcore
+ *
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Commercial License (PCL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
+ *
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ */
+
 namespace Pimcore\Tests\Ecommerce\PricingManager;
 
 use Codeception\Util\Stub;
@@ -29,7 +42,7 @@ class ConditionTest extends EcommerceTestCase
         $priceCalculator = Stub::construct(CartPriceCalculator::class, [$this->buildEnvironment(), $cart], [
             'getSubTotal' => function () {
                 return new Price(Decimal::create(200), new Currency('EUR')) ;
-            }
+            },
         ]);
 
         $cart->method('getPriceCalculator')->willReturn($priceCalculator);
@@ -42,7 +55,7 @@ class ConditionTest extends EcommerceTestCase
 
             'getProduct' => function () {
                 return null;
-            }
+            },
         ]);
 
         $cartAmount = new CartAmount();
@@ -68,7 +81,7 @@ class ConditionTest extends EcommerceTestCase
 
             'getProduct' => function () {
                 return 'notnull';
-            }
+            },
         ]);
 
         $cartAmount = new CartAmount();
@@ -84,7 +97,7 @@ class ConditionTest extends EcommerceTestCase
 
             'getProduct' => function () {
                 return 'notnull';
-            }
+            },
         ]);
 
         $cartAmount = new CartAmount();
@@ -114,7 +127,7 @@ class ConditionTest extends EcommerceTestCase
         $environment = Stub::make(Environment::class, [
             'getCategories' => function () use ($environmentCategories) {
                 return $environmentCategories;
-            }
+            },
         ]);
 
         $catalogCategory = new CatalogCategory();
@@ -130,7 +143,7 @@ class ConditionTest extends EcommerceTestCase
         $environment = Stub::make(Environment::class, [
             'getCategories' => function () use ($environmentCategories) {
                 return $environmentCategories;
-            }
+            },
         ]);
 
         $catalogCategory = new CatalogCategory();
@@ -212,7 +225,7 @@ class ConditionTest extends EcommerceTestCase
                 return false;
             },
             'modified' => function () {
-            }
+            },
         ]);
 
         $cart->addItem($this->mockProduct(451, 450), 2);
@@ -229,7 +242,7 @@ class ConditionTest extends EcommerceTestCase
         $environment = Stub::make(Environment::class, [
             'getExecutionMode' => function () {
                 return EnvironmentInterface::EXECUTION_MODE_PRODUCT;
-            }
+            },
         ]);
 
         $catalogProduct = new CatalogProduct();
@@ -250,7 +263,7 @@ class ConditionTest extends EcommerceTestCase
             },
             'getCart' => function () use ($cart) {
                 return $cart;
-            }
+            },
         ]);
 
         $this->assertFalse($catalogProduct->check($environment), 'check environment with cart against filled products');
@@ -265,7 +278,7 @@ class ConditionTest extends EcommerceTestCase
             },
             'getProduct' => function () use ($mockProduct1) {
                 return $mockProduct1;
-            }
+            },
         ]);
 
         $this->assertFalse($catalogProduct->check($environment), 'check environment with cart and product against filled products');
@@ -280,7 +293,7 @@ class ConditionTest extends EcommerceTestCase
             },
             'getProduct' => function () use ($mockProduct1) {
                 return $mockProduct1;
-            }
+            },
         ]);
 
         $this->assertTrue($catalogProduct->check($environment), 'check environment with cart and product against filled products');
@@ -295,7 +308,7 @@ class ConditionTest extends EcommerceTestCase
             },
             'getProduct' => function () use ($mockProduct1) {
                 return $mockProduct1;
-            }
+            },
         ]);
 
         $this->assertTrue($catalogProduct->check($environment), 'check environment with cart and product against filled products');
@@ -313,7 +326,7 @@ class ConditionTest extends EcommerceTestCase
             },
             'getProduct' => function () use ($mockProduct1) {
                 return $mockProduct1;
-            }
+            },
         ]);
 
         $this->assertFalse($catalogProduct->check($environment), 'check environment with cart and product against filled products');

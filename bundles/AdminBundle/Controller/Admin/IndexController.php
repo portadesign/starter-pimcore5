@@ -1,49 +1,51 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
-use Linfo;
 use Pimcore\Analytics\Google\Config\SiteConfigProvider;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
-use Pimcore\Bundle\AdminBundle\EventListener\CsrfProtectionListener;
 use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
+use Pimcore\Bundle\AdminBundle\Security\CsrfProtectionHandler;
 use Pimcore\Config;
-use Pimcore\Controller\Configuration\TemplatePhp;
-use Pimcore\Controller\EventedControllerInterface;
+use Pimcore\Controller\KernelResponseEventInterface;
 use Pimcore\Db\ConnectionInterface;
-use Pimcore\Event\Admin\IndexSettingsEvent;
+use Pimcore\Event\Admin\IndexActionSettingsEvent;
 use Pimcore\Event\AdminEvents;
+use Pimcore\Extension\Bundle\PimcoreBundleManager;
 use Pimcore\Google;
 use Pimcore\Maintenance\Executor;
 use Pimcore\Maintenance\ExecutorInterface;
 use Pimcore\Model\Element\Service;
 use Pimcore\Model\User;
-use Pimcore\Templating\Model\ViewModel;
 use Pimcore\Tool;
 use Pimcore\Tool\Admin;
 use Pimcore\Tool\Session;
 use Pimcore\Version;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
-use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
-use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
-class IndexController extends AdminController implements EventedControllerInterface
+/**
+ * @internal
+ */
+class IndexController extends AdminController implements KernelResponseEventInterface
 {
     /**
      * @var EventDispatcherInterface
@@ -60,16 +62,15 @@ class IndexController extends AdminController implements EventedControllerInterf
 
     /**
      * @Route("/", name="pimcore_admin_index", methods={"GET"})
-     * @TemplatePhp()
      *
      * @param Request $request
      * @param SiteConfigProvider $siteConfigProvider
      * @param KernelInterface $kernel
      * @param Executor $maintenanceExecutor
-     * @param CsrfProtectionListener $csrfProtectionListener
+     * @param CsrfProtectionHandler $csrfProtection
      * @param Config $config
      *
-     * @return ViewModel
+     * @return Response
      *
      * @throws \Exception
      */
@@ -78,21 +79,19 @@ class IndexController extends AdminController implements EventedControllerInterf
         SiteConfigProvider $siteConfigProvider,
         KernelInterface $kernel,
         Executor $maintenanceExecutor,
-        CsrfProtectionListener $csrfProtectionListener,
+        CsrfProtectionHandler $csrfProtection,
         Config $config
     ) {
         $user = $this->getAdminUser();
-        $view = new ViewModel([
-            'config' => $config
-        ]);
+        $templateParams = [
+            'config' => $config,
+        ];
 
         $this
-            ->addRuntimePerspective($view, $user)
-            ->addReportConfig($view)
-            ->addPluginAssets($view);
+            ->addRuntimePerspective($templateParams, $user)
+            ->addPluginAssets($templateParams);
 
-        $settings = $this->buildPimcoreSettings($request, $view, $user, $kernel, $maintenanceExecutor, $csrfProtectionListener);
-        $this->buildGoogleAnalyticsSettings($view, $settings, $siteConfigProvider);
+        $this->buildPimcoreSettings($request, $templateParams, $user, $kernel, $maintenanceExecutor, $csrfProtection, $siteConfigProvider);
 
         if ($user->getTwoFactorAuthentication('required') && !$user->getTwoFactorAuthentication('enabled')) {
             // only one login is allowed to setup 2FA by the user himself
@@ -103,17 +102,16 @@ class IndexController extends AdminController implements EventedControllerInterf
             });
 
             $user->save();
-            $settings->getParameters()->add([
-                'twoFactorSetupRequired' => true
-            ]);
+
+            $templateParams['settings']['twoFactorSetupRequired'] = true;
         }
 
         // allow to alter settings via an event
-        $this->eventDispatcher->dispatch(AdminEvents::INDEX_SETTINGS, new IndexSettingsEvent($settings));
+        $settingsEvent = new IndexActionSettingsEvent($templateParams['settings'] ?? []);
+        $this->eventDispatcher->dispatch($settingsEvent, AdminEvents::INDEX_ACTION_SETTINGS);
+        $templateParams['settings'] = $settingsEvent->getSettings();
 
-        $view->settings = $settings;
-
-        return $view;
+        return $this->render('@PimcoreAdmin/Admin/Index/index.html.twig', $templateParams);
     }
 
     /**
@@ -130,51 +128,28 @@ class IndexController extends AdminController implements EventedControllerInterf
     public function statisticsAction(Request $request, ConnectionInterface $db, KernelInterface $kernel)
     {
         // DB
-        $mysqlVersion = null;
         try {
-            $tables = $db->fetchAll('SELECT TABLE_NAME as name,TABLE_ROWS as rows from information_schema.TABLES
+            $tables = $db->fetchAll('SELECT TABLE_NAME as name,TABLE_ROWS as `rows` from information_schema.TABLES
                 WHERE TABLE_ROWS IS NOT NULL AND TABLE_SCHEMA = ?', [$db->getDatabase()]);
-
-            $mysqlVersion = $db->fetchOne('SELECT VERSION()');
         } catch (\Exception $e) {
             $tables = [];
         }
 
-        // System
         try {
-            $linfo = new Linfo\Linfo([
-                'show' => [
-                    'os' => true,
-                    'ram' => true,
-                    'cpu' => true,
-                    'virtualization' => true,
-                    'distro' => true,
-                ]
-            ]);
-            $linfo->scan();
-            $systemData = $linfo->getInfo();
-            $system = [
-                'OS' => $systemData['OS'],
-                'Distro' => $systemData['Distro'],
-                'RAMTotal' => $systemData['RAM']['total'],
-                'CPUCount' => count($systemData['CPU']),
-                'CPUModel' => $systemData['CPU'][0]['Model'],
-                'CPUClock' => $systemData['CPU'][0]['MHz'],
-                'virtualization' => $systemData['virtualization'],
-            ];
+            $mysqlVersion = $db->fetchOne('SELECT VERSION()');
         } catch (\Exception $e) {
-            $system = [];
+            $mysqlVersion = null;
         }
 
         try {
             $data = [
                 'instanceId' => $this->getInstanceId(),
+                'pimcore_major_version' => 10,
                 'pimcore_version' => Version::getVersion(),
                 'pimcore_hash' => Version::getRevision(),
                 'php_version' => PHP_VERSION,
                 'mysql_version' => $mysqlVersion,
                 'bundles' => array_keys($kernel->getBundles()),
-                'system' => $system,
                 'tables' => $tables,
             ];
         } catch (\Exception $e) {
@@ -185,62 +160,51 @@ class IndexController extends AdminController implements EventedControllerInterf
     }
 
     /**
-     * @param ViewModel $view
+     * @param array $templateParams
      * @param User $user
      *
      * @return $this
      */
-    protected function addRuntimePerspective(ViewModel $view, User $user)
+    protected function addRuntimePerspective(array &$templateParams, User $user)
     {
         $runtimePerspective = Config::getRuntimePerspective($user);
-
-        $view->runtimePerspective = $runtimePerspective;
-
-        return $this;
-    }
-
-    /**
-     * @param ViewModel $view
-     *
-     * @return $this
-     */
-    protected function addReportConfig(ViewModel $view)
-    {
-        // TODO where is this used?
-        $view->report_config = Config::getReportConfig();
+        $templateParams['runtimePerspective'] = $runtimePerspective;
 
         return $this;
     }
 
     /**
-     * @param ViewModel $view
+     * @param array $templateParams
      *
      * @return $this
      */
-    protected function addPluginAssets(ViewModel $view)
+    protected function addPluginAssets(array &$templateParams)
     {
-        $bundleManager = $this->get('pimcore.extension.bundle_manager');
+        $bundleManager = $this->get(PimcoreBundleManager::class);
 
-        $view->pluginJsPaths = $bundleManager->getJsPaths();
-        $view->pluginCssPaths = $bundleManager->getCssPaths();
+        $templateParams['pluginJsPaths'] = $bundleManager->getJsPaths();
+        $templateParams['pluginCssPaths'] = $bundleManager->getCssPaths();
 
         return $this;
     }
 
     /**
      * @param Request $request
-     * @param ViewModel $view
+     * @param array $templateParams
      * @param User $user
      * @param KernelInterface $kernel
      * @param ExecutorInterface $maintenanceExecutor
-     * @param CsrfProtectionListener $csrfProtectionListener
+     * @param CsrfProtectionHandler $csrfProtection
+     * @param SiteConfigProvider $siteConfigProvider
      *
-     * @return ViewModel
+     * @return $this
      */
-    protected function buildPimcoreSettings(Request $request, ViewModel $view, User $user, KernelInterface $kernel, ExecutorInterface $maintenanceExecutor, CsrfProtectionListener $csrfProtectionListener)
+    protected function buildPimcoreSettings(Request $request, array &$templateParams, User $user, KernelInterface $kernel, ExecutorInterface $maintenanceExecutor, CsrfProtectionHandler $csrfProtection, SiteConfigProvider $siteConfigProvider)
     {
-        $config = $view->config;
-        $settings = new ViewModel([
+        $config = $templateParams['config'];
+        $dashboardHelper = new \Pimcore\Helper\Dashboard($user);
+
+        $settings = [
             'instanceId' => $this->getInstanceId(),
             'version' => Version::getVersion(),
             'build' => Version::getRevision(),
@@ -250,26 +214,19 @@ class IndexController extends AdminController implements EventedControllerInterf
             'environment' => $kernel->getEnvironment(),
             'cached_environments' => Tool::getCachedSymfonyEnvironments(),
             'sessionId' => htmlentities(Session::getSessionId(), ENT_QUOTES, 'UTF-8'),
-        ]);
 
-        // languages
-        $settings->getParameters()->add([
+            // languages
             'language' => $request->getLocale(),
             'websiteLanguages' => Admin::reorderWebsiteLanguages(
                 $this->getAdminUser(),
                 $config['general']['valid_languages'],
                 true
-            )
-        ]);
+            ),
 
-        // flags
-        $namingStrategy = $this->get('pimcore.document.tag.naming.strategy');
-
-        $settings->getParameters()->add([
+            // flags
             'showCloseConfirmation' => true,
             'debug_admin_translations' => (bool)$config['general']['debug_admin_translations'],
             'document_generatepreviews' => (bool)$config['documents']['generate_preview'],
-            'document_naming_strategy' => $namingStrategy->getName(),
             'asset_disable_tree_preview' => (bool)$config['assets']['disable_tree_preview'],
             'htmltoimage' => \Pimcore\Image\HtmlToImage::isSupported(),
             'videoconverter' => \Pimcore\Video::isAvailable(),
@@ -282,17 +239,20 @@ class IndexController extends AdminController implements EventedControllerInterf
             'asset_tree_paging_limit' => $config['assets']['tree_paging_limit'],
             'document_tree_paging_limit' => $config['documents']['tree_paging_limit'],
             'object_tree_paging_limit' => $config['objects']['tree_paging_limit'],
-            'maxmind_geoip_installed' => (bool) $this->getParameter('pimcore.geoip.db_file')
-        ]);
+            'maxmind_geoip_installed' => (bool) $this->getParameter('pimcore.geoip.db_file'),
+            'hostname' => htmlentities(\Pimcore\Tool::getHostname(), ENT_QUOTES, 'UTF-8'),
 
-        $dashboardHelper = new \Pimcore\Helper\Dashboard($user);
+            'document_auto_save_interval' => $config['documents']['auto_save_interval'],
+            'object_auto_save_interval' => $config['objects']['auto_save_interval'],
 
-        // perspective and portlets
-        $settings->getParameters()->add([
-            'perspective' => $view->runtimePerspective,
+            // perspective and portlets
+            'perspective' => $templateParams['runtimePerspective'],
             'availablePerspectives' => Config::getAvailablePerspectives($user),
             'disabledPortlets' => $dashboardHelper->getDisabledPortlets(),
-        ]);
+
+            // google analytics
+            'google_analytics_enabled' => (bool) $siteConfigProvider->isSiteReportingConfigured(),
+        ];
 
         $this
             ->addSystemVarSettings($settings)
@@ -300,9 +260,11 @@ class IndexController extends AdminController implements EventedControllerInterf
             ->addMailSettings($settings, $config)
             ->addCustomViewSettings($settings);
 
-        $settings->csrfToken = $csrfProtectionListener->getCsrfToken();
+        $settings['csrfToken'] = $csrfProtection->getCsrfToken();
 
-        return $settings;
+        $templateParams['settings'] = $settings;
+
+        return $this;
     }
 
     /**
@@ -311,6 +273,7 @@ class IndexController extends AdminController implements EventedControllerInterf
     private function getInstanceId()
     {
         $instanceId = 'not-set';
+
         try {
             $instanceId = $this->getParameter('secret');
             $instanceId = sha1(substr($instanceId, 3, -3));
@@ -321,32 +284,19 @@ class IndexController extends AdminController implements EventedControllerInterf
         return $instanceId;
     }
 
-    private function buildGoogleAnalyticsSettings(
-        ViewModel $view,
-        ViewModel $settings,
-        SiteConfigProvider $siteConfigProvider
-    ) {
-        $config = $view->config;
-
-        $settings->getParameters()->add([
-            'google_analytics_enabled' => (bool)$siteConfigProvider->isSiteReportingConfigured(),
-            'google_webmastertools_enabled' => (bool)Google\Webmastertools::isConfigured()
-        ]);
-    }
-
     /**
-     * @param ViewModel $settings
+     * @param array $settings
      *
      * @return $this
      */
-    protected function addSystemVarSettings(ViewModel $settings)
+    protected function addSystemVarSettings(array &$settings)
     {
         // upload limit
         $max_upload = filesize2bytes(ini_get('upload_max_filesize') . 'B');
         $max_post = filesize2bytes(ini_get('post_max_size') . 'B');
         $upload_mb = min($max_upload, $max_post);
 
-        $settings->upload_max_filesize = (int)$upload_mb;
+        $settings['upload_max_filesize'] = (int) $upload_mb;
 
         // session lifetime (gc)
         $session_gc_maxlifetime = ini_get('session.gc_maxlifetime');
@@ -354,18 +304,18 @@ class IndexController extends AdminController implements EventedControllerInterf
             $session_gc_maxlifetime = 120;
         }
 
-        $settings->session_gc_maxlifetime = (int)$session_gc_maxlifetime;
+        $settings['session_gc_maxlifetime'] = (int)$session_gc_maxlifetime;
 
         return $this;
     }
 
     /**
-     * @param ViewModel $settings
+     * @param array $settings
      * @param ExecutorInterface $maintenanceExecutor
      *
      * @return $this
      */
-    protected function addMaintenanceSettings(ViewModel $settings, ExecutorInterface $maintenanceExecutor)
+    protected function addMaintenanceSettings(array &$settings, ExecutorInterface $maintenanceExecutor)
     {
         // check maintenance
         $maintenance_active = false;
@@ -375,19 +325,19 @@ class IndexController extends AdminController implements EventedControllerInterf
             }
         }
 
-        $settings->maintenance_active = $maintenance_active;
-        $settings->maintenance_mode = Admin::isInMaintenanceMode();
+        $settings['maintenance_active'] = $maintenance_active;
+        $settings['maintenance_mode'] = Admin::isInMaintenanceMode();
 
         return $this;
     }
 
     /**
-     * @param ViewModel $settings
+     * @param array $settings
      * @param Config $config
      *
      * @return $this
      */
-    protected function addMailSettings(ViewModel $settings, $config)
+    protected function addMailSettings(array &$settings, $config)
     {
         //mail settings
         $mailIncomplete = false;
@@ -398,23 +348,20 @@ class IndexController extends AdminController implements EventedControllerInterf
             if (empty($config['email']['sender']['email'])) {
                 $mailIncomplete = true;
             }
-            if (($config['email']['method'] ?? '') == 'smtp' && empty($config['email']['smtp']['host'])) {
-                $mailIncomplete = true;
-            }
         }
 
-        $settings->mail = !$mailIncomplete;
-        $settings->mailDefaultAddress = $config['email']['sender']['email'] ?? null;
+        $settings['mail'] = !$mailIncomplete;
+        $settings['mailDefaultAddress'] = $config['email']['sender']['email'] ?? null;
 
         return $this;
     }
 
     /**
-     * @param ViewModel $settings
+     * @param array $settings
      *
      * @return $this
      */
-    protected function addCustomViewSettings(ViewModel $settings)
+    protected function addCustomViewSettings(array &$settings)
     {
         $cvData = [];
 
@@ -430,7 +377,7 @@ class IndexController extends AdminController implements EventedControllerInterf
 
                 if ($rootNode) {
                     $tmpData['rootId'] = $rootNode->getId();
-                    $tmpData['allowedClasses'] = isset($tmpData['classes']) && $tmpData['classes'] ? explode(',', $tmpData['classes']) : null;
+                    $tmpData['allowedClasses'] = $tmpData['classes'] ?? null;
                     $tmpData['showroot'] = (bool)$tmpData['showroot'];
 
                     // Check if a user has privileges to that node
@@ -441,16 +388,15 @@ class IndexController extends AdminController implements EventedControllerInterf
             }
         }
 
-        $settings->customviews = $cvData;
+        $settings['customviews'] = $cvData;
 
         return $this;
     }
 
-    public function onKernelController(FilterControllerEvent $event)
-    {
-    }
-
-    public function onKernelResponse(FilterResponseEvent $event)
+    /**
+     * {@inheritdoc}
+     */
+    public function onKernelResponseEvent(ResponseEvent $event)
     {
         $event->getResponse()->headers->set('X-Frame-Options', 'deny', true);
     }

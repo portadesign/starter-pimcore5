@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Event;
@@ -112,4 +113,19 @@ final class DataObjectEvents
      * @var string
      */
     const POST_COPY = 'pimcore.dataobject.postCopy';
+
+    /**
+     * Arguments:
+     *  - objectData | array | contains the export data of the object
+     *  - context | array | context information - default ['source' => 'pimcore-export']
+     *  - requestedLanguage | string | requested language
+     *  - helperDefinitions | array | containing the column definition from the grid view
+     *  - localeService | \Pimcore\Localization\LocaleService
+     *  - returnMappedFieldNames | bool | if "true" the objectData is an associative array, otherwise it is an indexed array
+     *
+     * @Event("Pimcore\Event\Model\DataObjectEvent")
+     *
+     * @var string
+     */
+    const POST_CSV_ITEM_EXPORT = 'pimcore.dataobject.postCsvItemExport';
 }

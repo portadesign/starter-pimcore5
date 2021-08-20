@@ -7,31 +7,32 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\Document;
 
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
-use Pimcore\Document\Tag\TagHandlerInterface;
+use Pimcore\Document\Editable\EditableHandler;
 use Pimcore\Localization\LocaleServiceInterface;
 use Pimcore\Model\Document;
-use Pimcore\Model\Element\AbstractElement;
 use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\Element\Service;
 use Pimcore\Model\Tool\Targeting\TargetGroup;
-use Pimcore\Templating\Model\ViewModel;
 use Pimcore\Templating\Renderer\ActionRenderer;
 use Symfony\Cmf\Bundle\RoutingBundle\Routing\DynamicRouter;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @internal
+ */
 class RenderletController extends AdminController
 {
     /**
@@ -41,7 +42,7 @@ class RenderletController extends AdminController
      *
      * @param Request $request
      * @param ActionRenderer $actionRenderer
-     * @param TagHandlerInterface $tagHandler
+     * @param EditableHandler $editableHandler
      * @param LocaleServiceInterface $localeService
      *
      * @return Response
@@ -49,7 +50,7 @@ class RenderletController extends AdminController
     public function renderletAction(
         Request $request,
         ActionRenderer $actionRenderer,
-        TagHandlerInterface $tagHandler,
+        EditableHandler $editableHandler,
         LocaleServiceInterface $localeService
     ) {
         $query = $request->query->all();
@@ -93,11 +94,11 @@ class RenderletController extends AdminController
 
         // setting locale manually here before rendering the action to make sure editables use the right locale - if this
         // is needed in multiple places, move this to the tag handler instead (see #1834)
-        if ($attributes['_locale']) {
+        if (isset($attributes['_locale'])) {
             $localeService->setLocale($attributes['_locale']);
         }
 
-        $result = $tagHandler->renderAction(new ViewModel(), $controller, $action, $moduleOrBundle, $attributes, $query);
+        $result = $editableHandler->renderAction($controller, $attributes, $query);
 
         return new Response($result);
     }
@@ -117,10 +118,8 @@ class RenderletController extends AdminController
             throw $this->createNotFoundException(sprintf('Element with type %s and ID %d was not found', $type ?: 'null', $id ?: 'null'));
         }
 
-        if ($element instanceof AbstractElement) {
-            if (!$element->isAllowed('view')) {
-                throw $this->createAccessDeniedException(sprintf('Access to element with type %s and ID %d is not allowed', $type, $id));
-            }
+        if (!$element->isAllowed('view')) {
+            throw $this->createAccessDeniedException(sprintf('Access to element with type %s and ID %d is not allowed', $type, $id));
         }
 
         return $element;

@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Object
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\Classificationstore\KeyGroupRelation;
@@ -20,6 +18,8 @@ namespace Pimcore\Model\DataObject\Classificationstore\KeyGroupRelation;
 use Pimcore\Model;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\DataObject\Classificationstore\KeyGroupRelation $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -41,7 +41,7 @@ class Dao extends Model\Dao\AbstractDao
         }
 
         $data = $this->db->fetchRow('SELECT * FROM ' . self::TABLE_NAME_RELATIONS
-            . ',' . Model\DataObject\Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS . ' WHERE keyId = ? AND groupId = `?', $this->model->getKeyId(), $this->model->groupId);
+            . ',' . Model\DataObject\Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS . ' WHERE keyId = ? AND groupId = ?', [$this->model->getKeyId(), $this->model->getGroupId()]);
 
         $this->assignVariablesToModel($data);
     }
@@ -58,7 +58,7 @@ class Dao extends Model\Dao\AbstractDao
     {
         $this->db->delete(self::TABLE_NAME_RELATIONS, [
             'keyId' => $this->model->getKeyId(),
-            'groupId' => $this->model->getGroupId()
+            'groupId' => $this->model->getGroupId(),
         ]);
     }
 

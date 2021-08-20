@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
@@ -34,6 +34,8 @@ use Symfony\Component\Routing\Annotation\Route;
 
 /**
  * @Route("/redirects")
+ *
+ * @internal
  */
 class RedirectsController extends AdminController
 {
@@ -47,9 +49,10 @@ class RedirectsController extends AdminController
      */
     public function redirectsAction(Request $request, RedirectHandler $redirectHandler)
     {
-        if ($request->get('data')) {
-            $this->checkPermission('redirects');
+        // check permission for both update and listing
+        $this->checkPermission('redirects');
 
+        if ($request->get('data')) {
             if ($request->get('xaction') == 'destroy') {
                 $data = $this->decodeJson($request->get('data'));
 
@@ -82,12 +85,12 @@ class RedirectsController extends AdminController
 
                 $redirectTarget = $redirect->getTarget();
                 if (is_numeric($redirectTarget)) {
-                    if ($doc = Document::getById(intval($redirectTarget))) {
+                    if ($doc = Document::getById((int)$redirectTarget)) {
                         $redirect->setTarget($doc->getRealFullPath());
                     }
                 }
 
-                return $this->adminJson(['data' => $redirect, 'success' => true]);
+                return $this->adminJson(['data' => $redirect->getObjectVars(), 'success' => true]);
             } elseif ($request->get('xaction') == 'create') {
                 $data = $this->decodeJson($request->get('data'));
                 unset($data['id']);
@@ -111,12 +114,12 @@ class RedirectsController extends AdminController
 
                 $redirectTarget = $redirect->getTarget();
                 if (is_numeric($redirectTarget)) {
-                    if ($doc = Document::getById(intval($redirectTarget))) {
+                    if ($doc = Document::getById((int)$redirectTarget)) {
                         $redirect->setTarget($doc->getRealFullPath());
                     }
                 }
 
-                return $this->adminJson(['data' => $redirect, 'success' => true]);
+                return $this->adminJson(['data' => $redirect->getObjectVars(), 'success' => true]);
             }
         } else {
             // get list of routes
@@ -155,13 +158,13 @@ class RedirectsController extends AdminController
             foreach ($list->getRedirects() as $redirect) {
                 if ($link = $redirect->getTarget()) {
                     if (is_numeric($link)) {
-                        if ($doc = Document::getById(intval($link))) {
+                        if ($doc = Document::getById((int)$link)) {
                             $redirect->setTarget($doc->getRealFullPath());
                         }
                     }
                 }
 
-                $redirects[] = $redirect;
+                $redirects[] = $redirect->getObjectVars();
             }
 
             return $this->adminJson(['data' => $redirects, 'success' => true, 'total' => $list->getTotalCount()]);
@@ -214,7 +217,7 @@ class RedirectsController extends AdminController
     {
         $this->checkPermission('redirects');
 
-        /** @var UploadedFile $file */
+        /** @var UploadedFile|null $file */
         $file = $request->files->get('redirects');
 
         if (!$file) {
@@ -225,7 +228,7 @@ class RedirectsController extends AdminController
 
         return $this->adminJson([
             'success' => true,
-            'data' => $result
+            'data' => $result,
         ]);
     }
 

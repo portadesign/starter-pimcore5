@@ -1,30 +1,40 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\CoreBundle\Command;
 
 use Pimcore\Console\AbstractCommand;
+use Pimcore\Console\Traits\Parallelization;
 use Pimcore\Model\Asset;
-use Symfony\Component\Console\Helper\ProgressBar;
+use Pimcore\Model\Asset\Image;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * @internal
+ */
 class ThumbnailsImageCommand extends AbstractCommand
 {
+    use Parallelization;
+
     protected function configure()
     {
+        parent::configure();
+        self::configureParallelization($this);
+
         $this
             ->setName('pimcore:thumbnails:image')
             ->setAliases(['thumbnails:image'])
@@ -33,7 +43,7 @@ class ThumbnailsImageCommand extends AbstractCommand
                 'parent',
                 'p',
                 InputOption::VALUE_OPTIONAL,
-                'only create thumbnails of images in this folder (ID)'
+                'only create thumbnails of images in this folder (comma separated IDs e.g. 543,1077)'
             )
             ->addOption(
                 'id',
@@ -74,139 +84,153 @@ class ThumbnailsImageCommand extends AbstractCommand
             );
     }
 
-    /**
-     * @inheritDoc
-     */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function fetchItems(InputInterface $input): array
     {
-        $list = new Asset\Image\Thumbnail\Config\Listing();
-        $thumbnailConfigList = $list->getThumbnails();
+        $list = new Asset\Listing();
 
-        $allowedThumbs = [];
-        if ($input->getOption('thumbnails')) {
-            $allowedThumbs = explode(',', $input->getOption('thumbnails'));
-        }
-
-        /**
-         * @var Asset\Image\Thumbnail\Config[] $thumbnailsToGenerate
-         */
-        $thumbnailsToGenerate = [];
-
-        foreach ($thumbnailConfigList as $thumbnailConfig) {
-            if (empty($allowedThumbs) || in_array($thumbnailConfig->getName(), $allowedThumbs)) {
-                $medias = array_merge(['default' => 'defaultMedia'], $thumbnailConfig->getMedias() ?: []);
-                foreach ($medias as $mediaName => $media) {
-                    $configMedia = clone $thumbnailConfig;
-                    if ($mediaName !== 'default') {
-                        $configMedia->selectMedia($mediaName);
-                    }
-
-                    if ($input->getOption('skip-medias') && $mediaName !== 'default') {
-                        continue;
-                    }
-
-                    $resolutions = [1, 2];
-                    if ($input->getOption('skip-high-res')) {
-                        $resolutions = [1];
-                    }
-
-                    foreach ($resolutions as $resolution) {
-                        $resConfig = clone $configMedia;
-                        $resConfig->setHighResolution($resolution);
-                        $thumbnailsToGenerate[] = $resConfig;
-
-                        if (!$input->getOption('skip-webp') && $resConfig->getFormat() === 'SOURCE') {
-                            $webpConfig = clone $resConfig;
-                            $webpConfig->setFormat('webp');
-                            $thumbnailsToGenerate[] = $webpConfig;
-                        }
-                    }
-                }
-            }
-        }
-
-        if ($input->getOption('system')) {
-            if (!$input->getOption('thumbnails')) {
-                $thumbnailsToGenerate = [];
-            }
-            $thumbnailsToGenerate[] = Asset\Image\Thumbnail\Config::getPreviewConfig();
-        } elseif (!$input->getOption('thumbnails')) {
-            $thumbnailsToGenerate[] = Asset\Image\Thumbnail\Config::getPreviewConfig();
-        }
-
-        $thumbnailConfigNames = [];
-        foreach ($thumbnailsToGenerate as $thumbnailConfig) {
-            $thumbnailConfigNames[] = $thumbnailConfig->getName();
-        }
-        $thumbnailConfigNames = array_unique($thumbnailConfigNames);
+        $parentConditions = [];
 
         // get only images
         $conditions = ["type = 'image'"];
 
         if ($input->getOption('parent')) {
-            $parent = Asset::getById($input->getOption('parent'));
-            if ($parent instanceof Asset\Folder) {
-                $conditions[] = "path LIKE '".$parent->getRealFullPath()."/%'";
-            } else {
-                $this->writeError($input->getOption('parent').' is not a valid asset folder ID!');
-                exit;
+            $parentIds = explode(',', $input->getOption('parent'));
+            foreach ($parentIds as $parentId) {
+                $parent = Asset::getById($parentId);
+                if ($parent instanceof Asset\Folder) {
+                    $parentConditions[] = "path LIKE '" . $list->escapeLike($parent->getRealFullPath()) . "/%'";
+                } else {
+                    $this->writeError($input->getOption('parent').' is not a valid asset folder ID!');
+                    exit(1);
+                }
             }
+            $conditions[] = '('. implode(' OR ', $parentConditions) . ')';
         }
 
         if ($ids = $input->getOption('id')) {
             $conditions[] = sprintf('id in (%s)', implode(',', $ids));
         }
 
-        $list = new Asset\Listing();
         $list->setCondition(implode(' AND ', $conditions));
-        $total = $list->getTotalCount();
-        $perLoop = 10;
 
-        $totalToGenerate = $total * count($thumbnailsToGenerate);
+        $assetIdsList = $list->loadIdList();
+        $thumbnailList = new Asset\Image\Thumbnail\Config\Listing();
 
-        $progress = new ProgressBar($output, $totalToGenerate);
-        $progress->setFormat(
-            ' %current%/%max% [%bar%] %percent:3s%% (%elapsed:6s%/%estimated:-6s%) %memory:6s%: %message%'
-        );
-        $progress->start();
-
-        for ($i = 0; $i < (ceil($total / $perLoop)); $i++) {
-            $list->setLimit($perLoop);
-            $list->setOffset($i * $perLoop);
-            $images = $list->load();
-
-            foreach ($images as $image) {
-                if (!$image instanceof Asset\Image) {
-                    continue;
-                }
-
-                if ($input->getOption('force')) {
-                    foreach ($thumbnailConfigNames as $thumbnailConfigName) {
-                        $image->clearThumbnail($thumbnailConfigName);
-                    }
-                }
-
-                foreach ($thumbnailsToGenerate as $thumbnailConfig) {
-                    $thumbnail = $image->getThumbnail($thumbnailConfig);
-
-                    $progress->setMessage(
-                        sprintf(
-                            'generated thumbnail for image [%d] | file: %s',
-                            $image->getId(),
-                            $thumbnail->getPath(false)
-                        )
-                    );
-
-                    $progress->advance(1);
-                }
-            }
-            \Pimcore::collectGarbage();
+        $allowedThumbs = [];
+        if ($input->getOption('thumbnails')) {
+            $allowedThumbs = explode(',', $input->getOption('thumbnails'));
         }
 
-        $progress->finish();
+        $items = [];
+        foreach ($assetIdsList as $assetId) {
+            foreach ($thumbnailList->getThumbnails() as $thumbnailConfig) {
+                $thumbName = $thumbnailConfig->getName();
+                if (empty($allowedThumbs) || in_array($thumbName, $allowedThumbs)) {
+                    $items[] = $assetId . '~~~' . $thumbName;
+                }
+            }
+        }
 
-        $output->writeln('');
+        return $items;
+    }
 
-        return 0;
+    protected function runSingleCommand(string $item, InputInterface $input, OutputInterface $output): void
+    {
+        list($assetId, $thumbnailConfigName) = explode('~~~', $item, 2);
+
+        $image = Image::getById($assetId);
+        if (!$image) {
+            $this->writeError('No image with ID=' . $assetId . ' found. Has the image been deleted or is the asset of another type?</error>');
+
+            return;
+        }
+
+        $thumbnailsToGenerate = $this->fetchThumbnailConfigs($input, $thumbnailConfigName);
+
+        if ($input->getOption('force')) {
+            $image->clearThumbnail($thumbnailConfigName);
+        }
+
+        foreach ($thumbnailsToGenerate as $thumbnailConfig) {
+            $thumbnail = $image->getThumbnail($thumbnailConfig);
+            $path = $thumbnail->getPath(false);
+
+            if ($output->isVerbose()) {
+                $output->writeln(
+                    sprintf(
+                        'generated thumbnail for image [%d] | file: %s',
+                        $image->getId(),
+                        $path
+                    )
+                );
+            }
+        }
+    }
+
+    /**
+     * @param InputInterface $input
+     * @param string $thumbnailConfigName
+     *
+     * @return Asset\Image\Thumbnail\Config[]
+     */
+    private function fetchThumbnailConfigs(InputInterface $input, string $thumbnailConfigName): array
+    {
+        /** @var Image\Thumbnail\Config $thumbnailConfig */
+        $thumbnailConfig = Image\Thumbnail\Config::getByName($thumbnailConfigName);
+        $thumbnailsToGenerate = [$thumbnailConfig];
+
+        $medias = array_merge(['default' => 'defaultMedia'], $thumbnailConfig->getMedias() ?: []);
+        foreach ($medias as $mediaName => $media) {
+            $configMedia = clone $thumbnailConfig;
+            if ($mediaName !== 'default') {
+                $configMedia->selectMedia($mediaName);
+            }
+
+            if ($input->getOption('skip-medias') && $mediaName !== 'default') {
+                continue;
+            }
+
+            $resolutions = [1, 2];
+            if ($input->getOption('skip-high-res')) {
+                $resolutions = [1];
+            }
+
+            foreach ($resolutions as $resolution) {
+                $resConfig = clone $configMedia;
+                $resConfig->setHighResolution($resolution);
+                $thumbnailsToGenerate[] = $resConfig;
+
+                if (!$input->getOption('skip-webp') && $resConfig->getFormat() === 'SOURCE') {
+                    $webpConfig = clone $resConfig;
+                    $webpConfig->setFormat('webp');
+                    $thumbnailsToGenerate[] = $webpConfig;
+                }
+            }
+
+            if ($input->getOption('system')) {
+                if (!$input->getOption('thumbnails')) {
+                    $thumbnailsToGenerate = [];
+                }
+
+                $thumbnailsToGenerate[] = Asset\Image\Thumbnail\Config::getPreviewConfig(false);
+
+                if (!$input->getOption('skip-high-res')) {
+                    $thumbnailsToGenerate[] = Asset\Image\Thumbnail\Config::getPreviewConfig(true);
+                }
+            } elseif (!$input->getOption('thumbnails')) {
+                $thumbnailsToGenerate[] = Asset\Image\Thumbnail\Config::getPreviewConfig(false);
+
+                if (!$input->getOption('skip-high-res')) {
+                    $thumbnailsToGenerate[] = Asset\Image\Thumbnail\Config::getPreviewConfig(true);
+                }
+            }
+        }
+
+        return $thumbnailsToGenerate;
+    }
+
+    protected function getItemName(int $count): string
+    {
+        return $count == 1 ? 'thumbnail' : 'thumbnails';
     }
 }

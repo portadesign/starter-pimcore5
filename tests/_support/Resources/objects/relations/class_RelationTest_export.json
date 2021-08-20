@@ -1,17 +1,17 @@
 {
     "id": null,
     "description": null,
+    "modificationDate": null,
     "parentClass": null,
-    "listingParentClass": null,
-    "useTraits": null,
-    "listingUseTraits": null,
+    "implementsInterfaces": null,
+    "listingParentClass": "",
+    "useTraits": "",
+    "listingUseTraits": "",
     "allowInherit": false,
     "allowVariants": false,
     "showVariants": false,
-    "implementsInterfaces": null,
     "layoutDefinitions": {
         "fieldtype": "panel",
-        "labelWidth": 100,
         "layout": null,
         "border": false,
         "name": null,
@@ -44,7 +44,6 @@
                 "childs": [
                     {
                         "fieldtype": "panel",
-                        "labelWidth": 100,
                         "layout": null,
                         "border": false,
                         "name": "MyLayout",
@@ -66,7 +65,6 @@
                                 "queryColumnType": "varchar",
                                 "columnType": "varchar",
                                 "columnLength": 190,
-                                "phpdocType": "string",
                                 "regex": "",
                                 "unique": null,
                                 "showCharCount": null,
@@ -93,7 +91,6 @@
                                 "queryColumnType": "varchar",
                                 "columnType": "varchar",
                                 "columnLength": 190,
-                                "phpdocType": "string",
                                 "regex": "",
                                 "unique": null,
                                 "showCharCount": null,
@@ -120,7 +117,6 @@
                                 "queryColumnType": "varchar",
                                 "columnType": "varchar",
                                 "columnLength": 190,
-                                "phpdocType": "string",
                                 "regex": "",
                                 "unique": null,
                                 "showCharCount": null,
@@ -147,7 +143,6 @@
                                 "queryColumnType": "varchar",
                                 "columnType": "varchar",
                                 "columnLength": 190,
-                                "phpdocType": "string",
                                 "regex": "",
                                 "unique": null,
                                 "showCharCount": null,
@@ -174,7 +169,6 @@
                                 "queryColumnType": "varchar",
                                 "columnType": "varchar",
                                 "columnLength": 190,
-                                "phpdocType": "string",
                                 "regex": "",
                                 "unique": null,
                                 "showCharCount": null,
@@ -196,7 +190,6 @@
                             },
                             {
                                 "fieldtype": "localizedfields",
-                                "phpdocType": "\\Pimcore\\Model\\DataObject\\Localizedfield",
                                 "childs": [
                                     {
                                         "fieldtype": "input",
@@ -205,7 +198,6 @@
                                         "queryColumnType": "varchar",
                                         "columnType": "varchar",
                                         "columnLength": 190,
-                                        "phpdocType": "string",
                                         "regex": "",
                                         "unique": null,
                                         "showCharCount": null,
@@ -232,7 +224,6 @@
                                         "queryColumnType": "varchar",
                                         "columnType": "varchar",
                                         "columnLength": 190,
-                                        "phpdocType": "string",
                                         "regex": "",
                                         "unique": null,
                                         "showCharCount": null,
@@ -259,7 +250,6 @@
                                         "queryColumnType": "varchar",
                                         "columnType": "varchar",
                                         "columnLength": 190,
-                                        "phpdocType": "string",
                                         "regex": "",
                                         "unique": null,
                                         "showCharCount": null,
@@ -286,7 +276,6 @@
                                         "queryColumnType": "varchar",
                                         "columnType": "varchar",
                                         "columnLength": 190,
-                                        "phpdocType": "string",
                                         "regex": "",
                                         "unique": null,
                                         "showCharCount": null,
@@ -313,7 +302,6 @@
                                         "queryColumnType": "varchar",
                                         "columnType": "varchar",
                                         "columnLength": 190,
-                                        "phpdocType": "string",
                                         "regex": "",
                                         "unique": null,
                                         "showCharCount": null,
@@ -341,12 +329,13 @@
                                 "width": null,
                                 "height": null,
                                 "maxTabs": null,
-                                "labelWidth": null,
                                 "border": false,
                                 "provideSplitView": null,
                                 "tabPosition": "top",
                                 "hideLabelsWhenTabsReached": null,
                                 "fieldDefinitionsCache": null,
+                                "permissionView": [],
+                                "permissionEdit": [],
                                 "tooltip": null,
                                 "mandatory": null,
                                 "noteditable": null,
@@ -358,24 +347,33 @@
                                 "relationType": false,
                                 "invisible": false,
                                 "visibleGridView": true,
-                                "visibleSearch": true
+                                "visibleSearch": true,
+                                "labelWidth": 100,
+                                "labelAlign": "left"
                             }
                         ],
                         "locked": false,
-                        "icon": null
+                        "icon": null,
+                        "labelWidth": 100,
+                        "labelAlign": "left"
                     }
                 ],
                 "locked": false
             }
         ],
         "locked": false,
-        "icon": null
+        "icon": null,
+        "labelWidth": 100,
+        "labelAlign": "left"
     },
     "icon": null,
     "previewUrl": null,
     "group": null,
+    "showAppLoggerTab": false,
     "linkGeneratorReference": null,
-    "compositeIndices": null,
+    "compositeIndices": [],
+    "generateTypeDeclarations": true,
+    "showFieldLookup": false,
     "propertyVisibility": {
         "grid": {
             "id": true,
@@ -391,5 +389,6 @@
             "modificationDate": true,
             "creationDate": true
         }
-    }
+    },
+    "enableGridLocking": false
 }

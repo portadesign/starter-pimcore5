@@ -1,25 +1,29 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
-
-declare(strict_types=1);
 
 namespace Pimcore\Model\Notification\Listing;
 
+use Doctrine\DBAL\Exception;
 use Pimcore\Model\Listing\Dao\AbstractDao;
 use Pimcore\Model\Notification;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Notification\Listing $model
  */
 class Dao extends AbstractDao
@@ -42,10 +46,15 @@ class Dao extends AbstractDao
         return $count;
     }
 
+    public function getTotalCount()
+    {
+        return $this->count();
+    }
+
     /**
      * @return array
      *
-     * @throws \Doctrine\DBAL\DBALException
+     * @throws Exception
      */
     public function load(): array
     {

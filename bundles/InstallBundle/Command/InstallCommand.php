@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\InstallBundle\Command;
@@ -33,6 +33,8 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * @method Application getApplication()
+ *
+ * @internal
  */
 class InstallCommand extends Command
 {
@@ -119,25 +121,7 @@ class InstallCommand extends Command
                 'description' => 'MySQL SSL certificate path (if empty non-ssl connection assumed)',
                 'mode' => InputOption::VALUE_OPTIONAL,
                 'default' => '',
-                'group' => 'db_credentials'
-            ],
-            'skip-database-structure' => [
-                'description' => 'Skipping creation of database structure during install',
-                'mode' => InputOption::VALUE_OPTIONAL,
-                'default' => false,
-                'group' => 'install_options',
-            ],
-            'skip-database-data' => [
-                'description' => 'Skipping importing of any data into database',
-                'mode' => InputOption::VALUE_OPTIONAL,
-                'default' => false,
-                'group' => 'install_options',
-            ],
-            'skip-database-data-dump' => [
-                'description' => 'Skipping importing of provided data dumps into database (if available). Only imports needed base data.',
-                'mode' => InputOption::VALUE_OPTIONAL,
-                'default' => false,
-                'group' => 'install_options',
+                'group' => 'db_credentials',
             ],
         ];
 
@@ -151,7 +135,7 @@ class InstallCommand extends Command
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     protected function configure()
     {
@@ -177,6 +161,26 @@ class InstallCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Do not abort if a <comment>system.yml</comment> file already exists'
+            )->addOption(
+                'skip-database-config',
+                null,
+                InputOption::VALUE_NONE,
+                'Do not write a database config file: <comment>database.yml</comment>'
+            )->addOption(
+                'skip-database-structure',
+                null,
+                InputOption::VALUE_NONE,
+                'Skip creation of database structure during install'
+            )->addOption(
+                'skip-database-data',
+                null,
+                InputOption::VALUE_NONE,
+                'Skip importing of any data into database'
+            )->addOption(
+                'skip-database-data-dump',
+                null,
+                InputOption::VALUE_NONE,
+                'Skipping importing of provided data dumps into database (if available). Only imports needed base data.'
             );
 
         foreach ($this->getOptions() as $name => $config) {
@@ -190,7 +194,7 @@ class InstallCommand extends Command
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     protected function initialize(InputInterface $input, OutputInterface $output)
     {
@@ -198,6 +202,21 @@ class InstallCommand extends Command
         $configFile = Config::locateConfigFile('system.yml');
         if ($configFile && is_file($configFile) && !$input->getOption('ignore-existing-config')) {
             throw new \RuntimeException(sprintf('The system.yml config file already exists in "%s". You can run this command with the --ignore-existing-config flag to ignore this error.', $configFile));
+        }
+
+        if ($input->getOption('skip-database-config')) {
+            $this->installer->setSkipDatabaseConfig(true);
+        }
+
+        //check skipping database creation or database data
+        if ($input->getOption('skip-database-structure')) {
+            $this->installer->setCreateDatabaseStructure(false);
+        }
+        if ($input->getOption('skip-database-data')) {
+            $this->installer->setImportDatabaseData(false);
+        }
+        if ($input->getOption('skip-database-data-dump')) {
+            $this->installer->setImportDatabaseDataDump(false);
         }
 
         $this->io = new PimcoreStyle($input, $output);
@@ -220,7 +239,7 @@ class InstallCommand extends Command
                     sprintf(
                         'Consider using the interactive prompt or the <comment>%s</comment> environment variable instead.',
                         $config['env']
-                    )
+                    ),
                 ]);
 
                 $this->io->newLine();
@@ -238,7 +257,7 @@ class InstallCommand extends Command
     /**
      * Prompt options which are not set interactively
      *
-     * @inheritDoc
+     * {@inheritdoc}
      */
     protected function interact(InputInterface $input, OutputInterface $output)
     {
@@ -289,15 +308,11 @@ class InstallCommand extends Command
             return false;
         }
 
-        if ('install_options' === ($config['group'] ?? null) && InputOption::VALUE_OPTIONAL === ($config['mode'] ?? null)) {
-            return false;
-        }
-
         return true;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
@@ -316,7 +331,7 @@ class InstallCommand extends Command
             $value = $input->getOption($name);
 
             // Empty MySQL password allowed, empty ssl cert path means it is not used
-            if ($value || $name === 'mysql-password' || $name === 'mysql-ssl-cert-path') {
+            if ($value || $name === 'mysql-password' || $name === 'mysql-ssl-cert-path' || $config['mode'] === InputOption::VALUE_NONE) {
                 $param = str_replace('-', '_', $name);
                 $params[$param] = $value;
             } else {
@@ -342,7 +357,7 @@ class InstallCommand extends Command
         }
 
         $this->io->writeln(sprintf(
-            'Running installation. You can find a detailed install log in <comment>var/installer/logs/%s.log</comment>',
+            'Running installation. You can find a detailed install log in <comment>var/log/%s.log</comment>',
             $this->getApplication()->getKernel()->getEnvironment()
         ));
 

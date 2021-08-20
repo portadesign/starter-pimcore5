@@ -1,42 +1,45 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\DataObject;
 
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
 use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
-use Pimcore\Controller\EventedControllerInterface;
+use Pimcore\Controller\KernelControllerEventInterface;
 use Pimcore\Db;
 use Pimcore\Event\AdminEvents;
 use Pimcore\Logger;
-use Pimcore\Model;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\Document;
+use Pimcore\Model\Translation;
 use Pimcore\Tool\Session;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
-use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
-use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * @Route("/class")
+ *
+ * @internal
  */
-class ClassController extends AdminController implements EventedControllerInterface
+class ClassController extends AdminController implements KernelControllerEventInterface
 {
     /**
      * @Route("/get-document-types", name="pimcore_admin_dataobject_class_getdocumenttypes", methods={"GET"})
@@ -51,7 +54,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         $typeItems = [];
         foreach ($documentTypes as $documentType) {
             $typeItems[] = [
-                'text' => $documentType
+                'text' => $documentType,
             ];
         }
 
@@ -71,7 +74,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         $typeItems = [];
         foreach ($assetTypes as $assetType) {
             $typeItems[] = [
-                'text' => $assetType
+                'text' => $assetType,
             ];
         }
 
@@ -119,16 +122,13 @@ class ClassController extends AdminController implements EventedControllerInterf
                 'icon' => $class->getIcon() ? $class->getIcon() : $defaultIcon,
                 'cls' => 'pimcore_class_icon',
                 'propertyVisibility' => $class->getPropertyVisibility(),
-                'enableGridLocking' => $class->isEnableGridLocking()
+                'enableGridLocking' => $class->isEnableGridLocking(),
             ];
         };
 
         // build groups
         $groups = [];
         foreach ($classes as $class) {
-            if (!$class) {
-                continue;
-            }
             $groupName = null;
 
             if ($class->getGroup()) {
@@ -146,18 +146,22 @@ class ClassController extends AdminController implements EventedControllerInterf
                 }
             }
 
-            $groupName = \Pimcore\Model\Translation\Admin::getByKeyLocalized($groupName, true, true);
+            $groupName = Translation::getByKeyLocalized($groupName, Translation::DOMAIN_ADMIN, true, true);
 
             if (!isset($groups[$groupName])) {
                 $groups[$groupName] = [
                     'classes' => [],
-                    'type' => $type
+                    'type' => $type,
                 ];
             }
             $groups[$groupName]['classes'][] = $class;
         }
 
         $treeNodes = [];
+        if (!empty($groups)) {
+            $types = array_column($groups, 'type');
+            array_multisort($types, SORT_ASC, array_keys($groups), SORT_ASC, $groups);
+        }
 
         if (!$request->get('grouped')) {
             // list output
@@ -185,7 +189,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                         'expandable' => true,
                         'allowChildren' => true,
                         'iconCls' => 'pimcore_icon_folder',
-                        'children' => []
+                        'children' => [],
                     ];
 
                     foreach ($groupData['classes'] as $class) {
@@ -211,6 +215,9 @@ class ClassController extends AdminController implements EventedControllerInterf
     {
         $class = DataObject\ClassDefinition::getById($request->get('id'));
         $class->setFieldDefinitions([]);
+        $isWriteable = $class->isWritable();
+        $class = $class->getObjectVars();
+        $class['isWriteable'] = $isWriteable;
 
         return $this->adminJson($class);
     }
@@ -225,6 +232,9 @@ class ClassController extends AdminController implements EventedControllerInterf
     public function getCustomLayoutAction(Request $request)
     {
         $customLayout = DataObject\ClassDefinition\CustomLayout::getById($request->get('id'));
+        $isWriteable = $customLayout->isWritable();
+        $customLayout = $customLayout->getObjectVars();
+        $customLayout['isWriteable'] = $isWriteable;
 
         return $this->adminJson(['success' => true, 'data' => $customLayout]);
     }
@@ -249,7 +259,7 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $class = DataObject\ClassDefinition::create(
             ['name' => $className,
-                'userOwner' => $this->getAdminUser()->getId()]
+                'userOwner' => $this->getAdminUser()->getId(), ]
         );
 
         $class->setId($classId);
@@ -278,15 +288,19 @@ class ClassController extends AdminController implements EventedControllerInterf
             [
                 'name' => $request->get('layoutName'),
                 'userOwner' => $this->getAdminUser()->getId(),
-                'classId' => $request->get('classId')
+                'classId' => $request->get('classId'),
             ]
         );
 
         $customLayout->setId($layoutId);
         $customLayout->save();
 
+        $isWriteable = $customLayout->isWritable();
+        $data = $customLayout->getObjectVars();
+        $data['isWriteable'] = $isWriteable;
+
         return $this->adminJson(['success' => true, 'id' => $customLayout->getId(), 'name' => $customLayout->getName(),
-                                 'data' => $customLayout]);
+                                 'data' => $data, ]);
     }
 
     /**
@@ -336,7 +350,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         $configuration = $this->decodeJson($request->get('configuration'));
         $values = $this->decodeJson($request->get('values'));
 
-        $modificationDate = intval($values['modificationDate']);
+        $modificationDate = (int)$values['modificationDate'];
         if ($modificationDate < $customLayout->getModificationDate()) {
             return $this->adminJson(['success' => false, 'msg' => 'custom_layout_changed']);
         }
@@ -353,7 +367,7 @@ class ClassController extends AdminController implements EventedControllerInterf
             $customLayout->setDefault($values['default']);
             $customLayout->save();
 
-            return $this->adminJson(['success' => true, 'id' => $customLayout->getId(), 'data' => $customLayout]);
+            return $this->adminJson(['success' => true, 'id' => $customLayout->getId(), 'data' => $customLayout->getObjectVars()]);
         } catch (\Exception $e) {
             Logger::error($e->getMessage());
 
@@ -466,7 +480,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         $success = DataObject\ClassDefinition\Service::importClassDefinitionFromJson($class, $json, false, true);
 
         $response = $this->adminJson([
-            'success' => $success
+            'success' => $success,
         ]);
         // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
         // Ext.form.Action.Submit and mark the submission as failed
@@ -503,7 +517,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         }
 
         $response = $this->adminJson([
-            'success' => $success
+            'success' => $success,
         ]);
 
         // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
@@ -528,7 +542,6 @@ class ClassController extends AdminController implements EventedControllerInterf
         $list->setCondition('classId = ' . $list->quote($classId));
         $list = $list->load();
         $result = [];
-        /** @var DataObject\ClassDefinition\CustomLayout $item */
         foreach ($list as $item) {
             $result[] = [
                 'id' => $item->getId(),
@@ -572,14 +585,14 @@ class ClassController extends AdminController implements EventedControllerInterf
                 $resultList[] = [
                     'type' => 'master',
                     'id' => $class->getId() . '_' . 0,
-                    'name' => $class->getName()
+                    'name' => $class->getName(),
                 ];
 
                 foreach ($classMapping as $layout) {
                     $resultList[] = [
                         'type' => 'custom',
                         'id' => $class->getId() . '_' . $layout->getId(),
-                        'name' => $class->getName() . ' - ' . $layout->getName()
+                        'name' => $class->getName() . ' - ' . $layout->getName(),
                     ];
                 }
             }
@@ -603,6 +616,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         if (!$class instanceof DataObject\ClassDefinition) {
             $errorMessage = ': Class with id [ ' . $id . ' not found. ]';
             Logger::error($errorMessage);
+
             throw $this->createNotFoundException($errorMessage);
         }
 
@@ -630,16 +644,13 @@ class ClassController extends AdminController implements EventedControllerInterf
             $customLayout = DataObject\ClassDefinition\CustomLayout::getById($id);
             if ($customLayout) {
                 $name = $customLayout->getName();
-                unset($customLayout->id);
-                unset($customLayout->classId);
-                unset($customLayout->name);
-                unset($customLayout->creationDate);
-                unset($customLayout->modificationDate);
-                unset($customLayout->userOwner);
-                unset($customLayout->userModification);
-                unset($customLayout->fieldDefinitions);
+                $customLayoutData = [
+                    'description' => $customLayout->getDescription(),
+                    'layoutDefinitions' => $customLayout->getLayoutDefinitions(),
+                    'default' => $customLayout->getDefault() ?? 0,
+                ];
 
-                $json = json_encode($customLayout, JSON_PRETTY_PRINT);
+                $json = json_encode($customLayoutData, JSON_PRETTY_PRINT);
 
                 $response = new Response($json);
                 $response->headers->set('Content-type', 'application/json');
@@ -651,6 +662,7 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $errorMessage = ': Custom Layout with id [ ' . $id . ' not found. ]';
         Logger::error($errorMessage);
+
         throw $this->createNotFoundException($errorMessage);
     }
 
@@ -668,6 +680,10 @@ class ClassController extends AdminController implements EventedControllerInterf
     public function fieldcollectionGetAction(Request $request)
     {
         $fc = DataObject\Fieldcollection\Definition::getByKey($request->get('id'));
+
+        $isWriteable = $fc->isWritable();
+        $fc = $fc->getObjectVars();
+        $fc['isWriteable'] = $isWriteable;
 
         return $this->adminJson($fc);
     }
@@ -707,6 +723,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                 $values = $this->decodeJson($request->get('values'));
                 $fcDef->setParentClass($values['parentClass']);
                 $fcDef->setImplementsInterfaces($values['implementsInterfaces']);
+                $fcDef->setGenerateTypeDeclarations($values['generateTypeDeclarations']);
             }
 
             if ($request->get('configuration')) {
@@ -745,7 +762,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         $success = DataObject\ClassDefinition\Service::importFieldCollectionFromJson($fieldCollection, $data);
 
         $response = $this->adminJson([
-            'success' => $success
+            'success' => $success,
         ]);
 
         // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
@@ -769,6 +786,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         if (!$fieldCollection instanceof DataObject\Fieldcollection\Definition) {
             $errorMessage = ': Field-Collection with id [ ' . $request->get('id') . ' not found. ]';
             Logger::error($errorMessage);
+
             throw $this->createNotFoundException($errorMessage);
         }
 
@@ -799,10 +817,11 @@ class ClassController extends AdminController implements EventedControllerInterf
      * @Route("/fieldcollection-tree", name="pimcore_admin_dataobject_class_fieldcollectiontree", methods={"GET", "POST"})
      *
      * @param Request $request
+     * @param EventDispatcherInterface $eventDispatcher
      *
      * @return JsonResponse
      */
-    public function fieldcollectionTreeAction(Request $request)
+    public function fieldcollectionTreeAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
         $list = new DataObject\Fieldcollection\Definition\Listing();
         $list = $list->load();
@@ -817,13 +836,12 @@ class ClassController extends AdminController implements EventedControllerInterf
         if ($request->query->has('allowedTypes')) {
             $allowedTypes = explode(',', $request->get('allowedTypes'));
         }
-        $object = DataObject\AbstractObject::getById($request->get('object_id'));
+        $object = DataObject::getById($request->get('object_id'));
 
         $currentLayoutId = $request->get('layoutId', null);
         $user = \Pimcore\Tool\Admin::getCurrentUser();
 
         $groups = [];
-        /** @var DataObject\Fieldcollection\Definition $item */
         foreach ($list as $item) {
             if ($allowedTypes && !in_array($item->getKey(), $allowedTypes)) {
                 continue;
@@ -839,7 +857,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                         'allowChildren' => true,
                         'iconCls' => 'pimcore_icon_folder',
                         'group' => $item->getGroup(),
-                        'children' => []
+                        'children' => [],
                     ];
                 }
                 if ($forObjectEditor) {
@@ -858,7 +876,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                         'title' => $item->getTitle(),
                         'key' => $item->getKey(),
                         'leaf' => true,
-                        'iconCls' => 'pimcore_icon_fieldcollection'
+                        'iconCls' => 'pimcore_icon_fieldcollection',
                     ];
             } else {
                 if ($forObjectEditor) {
@@ -877,7 +895,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                     'title' => $item->getTitle(),
                     'key' => $item->getKey(),
                     'leaf' => true,
-                    'iconCls' => 'pimcore_icon_fieldcollection'
+                    'iconCls' => 'pimcore_icon_fieldcollection',
                 ];
             }
         }
@@ -888,9 +906,9 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $event = new GenericEvent($this, [
             'list' => $definitions,
-            'objectId' => $request->get('object_id')
+            'objectId' => $request->get('object_id'),
         ]);
-        \Pimcore::getEventDispatcher()->dispatch(AdminEvents::CLASS_FIELDCOLLECTION_LIST_PRE_SEND_DATA, $event);
+        $eventDispatcher->dispatch($event, AdminEvents::CLASS_FIELDCOLLECTION_LIST_PRE_SEND_DATA);
         $definitions = $event->getArgument('list');
 
         if ($forObjectEditor) {
@@ -904,10 +922,11 @@ class ClassController extends AdminController implements EventedControllerInterf
      * @Route("/fieldcollection-list", name="pimcore_admin_dataobject_class_fieldcollectionlist", methods={"GET"})
      *
      * @param Request $request
+     * @param EventDispatcherInterface $eventDispatcher
      *
      * @return JsonResponse
      */
-    public function fieldcollectionListAction(Request $request)
+    public function fieldcollectionListAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
         $user = \Pimcore\Tool\Admin::getCurrentUser();
         $currentLayoutId = $request->get('layoutId');
@@ -918,7 +937,6 @@ class ClassController extends AdminController implements EventedControllerInterf
         if ($request->query->has('allowedTypes')) {
             $filteredList = [];
             $allowedTypes = explode(',', $request->get('allowedTypes'));
-            /** @var DataObject\Fieldcollection\Definition $type */
             foreach ($list as $type) {
                 if (in_array($type->getKey(), $allowedTypes)) {
                     $filteredList[] = $type;
@@ -928,10 +946,10 @@ class ClassController extends AdminController implements EventedControllerInterf
                     $context = [
                         'containerType' => 'fieldcollection',
                         'containerKey' => $type->getKey(),
-                        'outerFieldname' => $request->get('field_name')
+                        'outerFieldname' => $request->get('field_name'),
                     ];
 
-                    $object = DataObject\AbstractObject::getById($request->get('object_id'));
+                    $object = DataObject::getById($request->get('object_id'));
 
                     DataObject\Service::enrichLayoutDefinition($layoutDefinitions, $object, $context);
 
@@ -946,9 +964,9 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $event = new GenericEvent($this, [
             'list' => $list,
-            'objectId' => $request->get('object_id')
+            'objectId' => $request->get('object_id'),
         ]);
-        \Pimcore::getEventDispatcher()->dispatch(AdminEvents::CLASS_FIELDCOLLECTION_LIST_PRE_SEND_DATA, $event);
+        $eventDispatcher->dispatch($event, AdminEvents::CLASS_FIELDCOLLECTION_LIST_PRE_SEND_DATA);
         $list = $event->getArgument('list');
 
         return $this->adminJson(['fieldcollections' => $list]);
@@ -964,7 +982,7 @@ class ClassController extends AdminController implements EventedControllerInterf
     public function getClassDefinitionForColumnConfigAction(Request $request)
     {
         $class = DataObject\ClassDefinition::getById($request->get('id'));
-        $objectId = intval($request->get('oid'));
+        $objectId = (int)$request->get('oid');
 
         $filteredDefinitions = DataObject\Service::getCustomLayoutDefinitionForGridColumnConfig($class, $objectId);
 
@@ -975,12 +993,14 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $result = [];
 
+        DataObject\Service::enrichLayoutDefinition($layoutDefinitions);
+
         $result['objectColumns']['childs'] = $layoutDefinitions->getChilds();
         $result['objectColumns']['nodeLabel'] = 'object_columns';
         $result['objectColumns']['nodeType'] = 'object';
 
         // array("id", "fullpath", "published", "creationDate", "modificationDate", "filename", "classname");
-        $systemColumnNames = DataObject\Concrete::$systemColumnNames;
+        $systemColumnNames = DataObject\Concrete::SYSTEM_COLUMN_NAMES;
         $systemColumns = [];
         foreach ($systemColumnNames as $systemColumn) {
             $systemColumns[] = ['title' => $systemColumn, 'name' => $systemColumn, 'datatype' => 'data', 'fieldtype' => 'system'];
@@ -1004,10 +1024,19 @@ class ClassController extends AdminController implements EventedControllerInterf
 
                         $key = $brickDefinition->getKey();
 
+                        $brickLayoutDefinitions = $brickDefinition->getLayoutDefinitions();
+                        $context = [
+                            'containerType' => 'objectbrick',
+                            'containerKey' => $key,
+                            'outerFieldname' => $fieldName,
+                        ];
+                        DataObject\Service::enrichLayoutDefinition($brickLayoutDefinitions, null, $context);
+
                         $result[$key]['nodeLabel'] = $key;
                         $result[$key]['brickField'] = $fieldName;
                         $result[$key]['nodeType'] = 'objectbricks';
-                        $result[$key]['childs'] = $brickDefinition->getLayoutDefinitions()->getChildren();
+                        $result[$key]['childs'] = $brickLayoutDefinitions->getChildren();
+
                         break;
                     }
                 }
@@ -1032,6 +1061,10 @@ class ClassController extends AdminController implements EventedControllerInterf
     {
         $fc = DataObject\Objectbrick\Definition::getByKey($request->get('id'));
 
+        $isWriteable = $fc->isWritable();
+        $fc = $fc->getObjectVars();
+        $fc['isWriteable'] = $isWriteable;
+
         return $this->adminJson($fc);
     }
 
@@ -1039,10 +1072,11 @@ class ClassController extends AdminController implements EventedControllerInterf
      * @Route("/objectbrick-update", name="pimcore_admin_dataobject_class_objectbrickupdate", methods={"PUT", "POST"})
      *
      * @param Request $request
+     * @param EventDispatcherInterface $eventDispatcher
      *
      * @return JsonResponse
      */
-    public function objectbrickUpdateAction(Request $request)
+    public function objectbrickUpdateAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
         try {
             $key = $request->get('key');
@@ -1073,6 +1107,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                 $brickDef->setParentClass($values['parentClass']);
                 $brickDef->setImplementsInterfaces($values['implementsInterfaces']);
                 $brickDef->setClassDefinitions($values['classDefinitions']);
+                $brickDef->setGenerateTypeDeclarations($values['generateTypeDeclarations']);
             }
 
             if ($request->get('configuration')) {
@@ -1086,9 +1121,9 @@ class ClassController extends AdminController implements EventedControllerInterf
             }
 
             $event = new GenericEvent($this, [
-                'brickDefinition' => $brickDef
+                'brickDefinition' => $brickDef,
             ]);
-            \Pimcore::getEventDispatcher()->dispatch(AdminEvents::CLASS_OBJECTBRICK_UPDATE_DEFINITION, $event);
+            $eventDispatcher->dispatch($event, AdminEvents::CLASS_OBJECTBRICK_UPDATE_DEFINITION);
             $brickDef = $event->getArgument('brickDefinition');
 
             $brickDef->save();
@@ -1116,7 +1151,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         $success = DataObject\ClassDefinition\Service::importObjectBrickFromJson($objectBrick, $data);
 
         $response = $this->adminJson([
-            'success' => $success
+            'success' => $success,
         ]);
 
         // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
@@ -1140,6 +1175,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         if (!$objectBrick instanceof DataObject\Objectbrick\Definition) {
             $errorMessage = ': Object-Brick with id [ ' . $request->get('id') . ' not found. ]';
             Logger::error($errorMessage);
+
             throw $this->createNotFoundException($errorMessage);
         }
 
@@ -1170,10 +1206,11 @@ class ClassController extends AdminController implements EventedControllerInterf
      * @Route("/objectbrick-tree", name="pimcore_admin_dataobject_class_objectbricktree", methods={"GET", "POST"})
      *
      * @param Request $request
+     * @param EventDispatcherInterface $eventDispatcher
      *
      * @return JsonResponse
      */
-    public function objectbrickTreeAction(Request $request)
+    public function objectbrickTreeAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
         $list = new DataObject\Objectbrick\Definition\Listing();
         $list = $list->load();
@@ -1186,7 +1223,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         $fieldname = null;
         $className = null;
 
-        $object = DataObject\AbstractObject::getById($request->get('object_id'));
+        $object = DataObject::getById($request->get('object_id'));
 
         if ($request->query->has('class_id') && $request->query->has('field_name')) {
             $classId = $request->get('class_id');
@@ -1195,7 +1232,6 @@ class ClassController extends AdminController implements EventedControllerInterf
             $className = $classDefinition->getName();
         }
 
-        /** @var DataObject\Objectbrick\Definition $item */
         foreach ($list as $item) {
             if ($request->query->has('class_id') && $request->query->has('field_name')) {
                 $keep = false;
@@ -1204,6 +1240,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                     foreach ($clsDefs as $cd) {
                         if ($cd['classname'] == $className && $cd['fieldname'] == $fieldname) {
                             $keep = true;
+
                             continue;
                         }
                     }
@@ -1223,7 +1260,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                         'allowChildren' => true,
                         'iconCls' => 'pimcore_icon_folder',
                         'group' => $item->getGroup(),
-                        'children' => []
+                        'children' => [],
                     ];
                 }
                 if ($forObjectEditor) {
@@ -1239,7 +1276,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                         'title' => $item->getTitle(),
                         'key' => $item->getKey(),
                         'leaf' => true,
-                        'iconCls' => 'pimcore_icon_objectbricks'
+                        'iconCls' => 'pimcore_icon_objectbricks',
                     ];
             } else {
                 if ($forObjectEditor) {
@@ -1256,7 +1293,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                     $context = [
                         'containerType' => 'objectbrick',
                         'containerKey' => $item->getKey(),
-                        'outerFieldname' => $request->get('field_name')
+                        'outerFieldname' => $request->get('field_name'),
                     ];
 
                     DataObject\Service::enrichLayoutDefinition($layout, $object, $context);
@@ -1269,7 +1306,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                     'title' => $item->getTitle(),
                     'key' => $item->getKey(),
                     'leaf' => true,
-                    'iconCls' => 'pimcore_icon_objectbricks'
+                    'iconCls' => 'pimcore_icon_objectbricks',
                 ];
             }
         }
@@ -1280,9 +1317,9 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $event = new GenericEvent($this, [
             'list' => $definitions,
-            'objectId' => $request->get('object_id')
+            'objectId' => $request->get('object_id'),
         ]);
-        \Pimcore::getEventDispatcher()->dispatch(AdminEvents::CLASS_OBJECTBRICK_LIST_PRE_SEND_DATA, $event);
+        $eventDispatcher->dispatch($event, AdminEvents::CLASS_OBJECTBRICK_LIST_PRE_SEND_DATA);
         $definitions = $event->getArgument('list');
 
         if ($forObjectEditor) {
@@ -1296,10 +1333,11 @@ class ClassController extends AdminController implements EventedControllerInterf
      * @Route("/objectbrick-list", name="pimcore_admin_dataobject_class_objectbricklist", methods={"GET"})
      *
      * @param Request $request
+     * @param EventDispatcherInterface $eventDispatcher
      *
      * @return JsonResponse
      */
-    public function objectbrickListAction(Request $request)
+    public function objectbrickListAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
         $list = new DataObject\Objectbrick\Definition\Listing();
         $list = $list->load();
@@ -1317,6 +1355,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                     foreach ($clsDefs as $cd) {
                         if ($cd['classname'] == $className && $cd['fieldname'] == $fieldname) {
                             $filteredList[] = $type;
+
                             continue;
                         }
                     }
@@ -1335,10 +1374,10 @@ class ClassController extends AdminController implements EventedControllerInterf
                 $context = [
                     'containerType' => 'objectbrick',
                     'containerKey' => $type->getKey(),
-                    'outerFieldname' => $request->get('field_name')
+                    'outerFieldname' => $request->get('field_name'),
                 ];
 
-                $object = DataObject\AbstractObject::getById($request->get('object_id'));
+                $object = DataObject::getById($request->get('object_id'));
 
                 DataObject\Service::enrichLayoutDefinition($layout, $object, $context);
                 $type->setLayoutDefinitions($layout);
@@ -1349,9 +1388,9 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $event = new GenericEvent($this, [
             'list' => $list,
-            'objectId' => $request->get('object_id')
+            'objectId' => $request->get('object_id'),
         ]);
-        \Pimcore::getEventDispatcher()->dispatch(AdminEvents::CLASS_OBJECTBRICK_LIST_PRE_SEND_DATA, $event);
+        $eventDispatcher->dispatch($event, AdminEvents::CLASS_OBJECTBRICK_LIST_PRE_SEND_DATA);
         $list = $event->getArgument('list');
 
         return $this->adminJson(['objectbricks' => $list]);
@@ -1571,7 +1610,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                 'checked' => true,
                 'type' => 'fieldcollection',
                 'name' => $fieldCollection->getKey(),
-                'displayName' => $fieldCollection->getKey()
+                'displayName' => $fieldCollection->getKey(),
             ];
         }
 
@@ -1586,7 +1625,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                 'checked' => true,
                 'type' => 'class',
                 'name' => $class->getName(),
-                'displayName' => $class->getName()
+                'displayName' => $class->getName(),
             ];
         }
 
@@ -1599,7 +1638,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                 'checked' => true,
                 'type' => 'objectbrick',
                 'name' => $objectBrick->getKey(),
-                'displayName' => $objectBrick->getKey()
+                'displayName' => $objectBrick->getKey(),
             ];
         }
 
@@ -1614,7 +1653,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                 'checked' => true,
                 'type' => 'customlayout',
                 'name' => $customLayout->getId(),
-                'displayName' => $displayName
+                'displayName' => $displayName,
             ];
         }
 
@@ -1644,7 +1683,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                 $result['fieldcollection'][] = $fieldCollectionJson;
             } elseif ($item['type'] == 'class') {
                 $class = DataObject\ClassDefinition::getByName($item['name']);
-                $data = Model\Webservice\Data\Mapper::map($class, '\\Pimcore\\Model\\Webservice\\Data\\ClassDefinition\\Out', 'out');
+                $data = json_decode(json_encode($class));
                 unset($data->fieldDefinitions);
                 $result['class'][] = $data;
             } elseif ($item['type'] == 'objectbrick') {
@@ -1673,9 +1712,9 @@ class ClassController extends AdminController implements EventedControllerInterf
     }
 
     /**
-     * @param FilterControllerEvent $event
+     * @param ControllerEvent $event
      */
-    public function onKernelController(FilterControllerEvent $event)
+    public function onKernelControllerEvent(ControllerEvent $event)
     {
         $isMasterRequest = $event->isMasterRequest();
         if (!$isMasterRequest) {
@@ -1685,18 +1724,10 @@ class ClassController extends AdminController implements EventedControllerInterf
         // check permissions
         $unrestrictedActions = [
             'getTreeAction', 'fieldcollectionListAction', 'fieldcollectionTreeAction', 'fieldcollectionGetAction',
-            'getClassDefinitionForColumnConfigAction', 'objectbrickListAction', 'objectbrickTreeAction', 'objectbrickGetAction'
+            'getClassDefinitionForColumnConfigAction', 'objectbrickListAction', 'objectbrickTreeAction', 'objectbrickGetAction',
         ];
 
         $this->checkActionPermission($event, 'classes', $unrestrictedActions);
-    }
-
-    /**
-     * @param FilterResponseEvent $event
-     */
-    public function onKernelResponse(FilterResponseEvent $event)
-    {
-        // nothing to do
     }
 
     /**
@@ -1721,7 +1752,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                     if (is_array($allowedKeys) && in_array($key, $allowedKeys)) {
                         $result[] = [
                             'class' => $class->getName(),
-                            'field' => $fieldDef->getName()
+                            'field' => $fieldDef->getName(),
                         ];
                     }
                 }
@@ -1753,7 +1784,7 @@ class ClassController extends AdminController implements EventedControllerInterf
                 if ($myclass->getName() == $class['classname']) {
                     $result[] = [
                         'objectbrick' => $brickDefinition->getKey(),
-                        'field' => $class['fieldname']
+                        'field' => $class['fieldname'],
                     ];
                 }
             }
@@ -1766,10 +1797,11 @@ class ClassController extends AdminController implements EventedControllerInterf
      * @Route("/get-icons", name="pimcore_admin_dataobject_class_geticons", methods={"GET"})
      *
      * @param Request $request
+     * @param EventDispatcherInterface $eventDispatcher
      *
      * @return Response
      */
-    public function getIconsAction(Request $request)
+    public function getIconsAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
         $classId = $request->get('classId');
 
@@ -1786,16 +1818,16 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $event = new GenericEvent($this, [
             'icons' => $icons,
-            'classId' => $classId
+            'classId' => $classId,
         ]);
-        \Pimcore::getEventDispatcher()->dispatch(AdminEvents::CLASS_OBJECT_ICONS_PRE_SEND_DATA, $event);
+        $eventDispatcher->dispatch($event, AdminEvents::CLASS_OBJECT_ICONS_PRE_SEND_DATA);
         $icons = $event->getArgument('icons');
 
         $result = [];
         foreach ($icons as $icon) {
             $result[] = [
                 'text' => "<img src='{$icon}'>",
-                'value' => $icon
+                'value' => $icon,
             ];
         }
 
@@ -1816,7 +1848,7 @@ class ClassController extends AdminController implements EventedControllerInterf
 
         $result = [
             'suggestedIdentifier' => $maxId ? $maxId + 1 : 1,
-            'existingIds' => $existingIds
+            'existingIds' => $existingIds,
             ];
 
         return $this->adminJson($result);
@@ -1841,7 +1873,6 @@ class ClassController extends AdminController implements EventedControllerInterf
         $existingIds = [];
         $existingNames = [];
 
-        /** @var DataObject\ClassDefinition\CustomLayout $item */
         foreach ($list as $item) {
             $existingIds[] = $item->getId();
             if ($item->getClassId() == $classId) {
@@ -1852,7 +1883,7 @@ class ClassController extends AdminController implements EventedControllerInterf
         $result = [
             'suggestedIdentifier' => $identifier,
             'existingIds' => $existingIds,
-            'existingNames' => $existingNames
+            'existingNames' => $existingNames,
             ];
 
         return $this->adminJson($result);

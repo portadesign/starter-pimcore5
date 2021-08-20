@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.tags.input");
@@ -24,6 +24,14 @@ pimcore.object.tags.input = Class.create(pimcore.object.tags.abstract, {
             this.data = data;
         }
         this.fieldConfig = fieldConfig;
+    },
+
+    applyDefaultValue: function() {
+        this.defaultValue = null;
+        if ((typeof this.data === "undefined" || !this.data) && this.fieldConfig.defaultValue && this.context.type === "classificationstore") {
+            this.data = this.fieldConfig.defaultValue;
+            this.defaultValue = this.fieldConfig.defaultValue;
+        }
     },
 
     getGridColumnEditor: function(field) {
@@ -52,9 +60,13 @@ pimcore.object.tags.input = Class.create(pimcore.object.tags.abstract, {
         var input = {
             fieldLabel: this.fieldConfig.title,
             name: this.fieldConfig.name,
-            componentCls: "object_field",
-            labelWidth: 100
+            labelWidth: 100,
+            labelAlign: "left"
         };
+
+        if (!this.fieldConfig.showCharCount) {
+            input.componentCls = "object_field object_field_type_" + this.type;
+        }
 
         if (this.data) {
             input.value = this.data;
@@ -69,7 +81,14 @@ pimcore.object.tags.input = Class.create(pimcore.object.tags.abstract, {
         if (this.fieldConfig.labelWidth) {
             input.labelWidth = this.fieldConfig.labelWidth;
         }
-        input.width += input.labelWidth;
+
+        if (this.fieldConfig.labelAlign) {
+            input.labelAlign = this.fieldConfig.labelAlign;
+        }
+
+        if (!this.fieldConfig.labelAlign || 'left' === this.fieldConfig.labelAlign) {
+            input.width = this.sumWidths(input.width, input.labelWidth);
+        }
 
         if(this.fieldConfig.columnLength) {
             input.maxLength = this.fieldConfig.columnLength;
@@ -100,7 +119,7 @@ pimcore.object.tags.input = Class.create(pimcore.object.tags.abstract, {
             this.updateCharCount(this.component, charCount);
 
             return Ext.create("Ext.Panel", {
-                cls: "object_field",
+                cls: "object_field object_field_type_" + this.type,
                 style: "margin-bottom: 10px",
                 layout: {
                     type: 'vbox',

@@ -1,90 +1,97 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Metadata
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Metadata;
 
+use Pimcore\Loader\ImplementationLoader\Exception\UnsupportedException;
+use Pimcore\Logger;
 use Pimcore\Model;
 
 /**
+ * @internal
+ *
  * @method \Pimcore\Model\Metadata\Predefined\Dao getDao()
  * @method void save()
  * @method void delete()
  */
-class Predefined extends Model\AbstractModel
+final class Predefined extends Model\AbstractModel
 {
     /**
      * @var int
      */
-    public $id;
+    protected $id;
 
     /**
      * @var string
      */
-    public $name;
+    protected $name;
 
     /**
      * @var string
      */
-    public $description;
+    protected $description;
 
     /**
      * @var string
      */
-    public $key;
+    protected $key;
 
     /**
      * @var string
      */
-    public $type;
+    protected $type;
 
     /**
      * @var string
      */
-    public $targetSubtype;
+    protected $targetSubtype;
 
     /**
      * @var mixed
      */
-    public $data;
+    protected $data;
 
     /**
      * @var string
      */
-    public $config;
+    protected $config;
 
     /**
      * @var string
      */
-    public $ctype;
+    protected $ctype;
 
     /**
      * @var string
      */
-    public $language;
+    protected $language;
+
+    /**
+     * @var string
+     */
+    protected $group;
 
     /**
      * @var int
      */
-    public $creationDate;
+    protected $creationDate;
 
     /**
      * @var int
      */
-    public $modificationDate;
+    protected $modificationDate;
 
     /**
      * @param int $id
@@ -108,6 +115,8 @@ class Predefined extends Model\AbstractModel
      * @param string $language
      *
      * @return self|null
+     *
+     * @throws \Exception
      */
     public static function getByName($name, $language = '')
     {
@@ -117,7 +126,7 @@ class Predefined extends Model\AbstractModel
             $metadata->getDao()->getByNameAndLanguage($name, $language);
 
             return $metadata;
-        } catch (\Exception $e) {
+        } catch (Model\Exception\NotFoundException $e) {
             return null;
         }
     }
@@ -290,6 +299,22 @@ class Predefined extends Model\AbstractModel
     }
 
     /**
+     * @param string $group
+     */
+    public function setGroup($group)
+    {
+        $this->group = $group;
+    }
+
+    /**
+     * @return string
+     */
+    public function getGroup()
+    {
+        return $this->group;
+    }
+
+    /**
      * @param string $targetSubtype
      */
     public function setTargetSubtype($targetSubtype)
@@ -323,17 +348,25 @@ class Predefined extends Model\AbstractModel
 
     public function minimize()
     {
-        $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
-        /** @var Model\Asset\MetaData\ClassDefinition\Data\Data $instance */
-        $instance = $loader->build($this->type);
-        $this->data = $instance->marshal($this->data);
+        try {
+            $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
+            /** @var Model\Asset\MetaData\ClassDefinition\Data\Data $instance */
+            $instance = $loader->build($this->type);
+            $this->data = $instance->marshal($this->data);
+        } catch (UnsupportedException $e) {
+            Logger::error('could not resolve asset metadata implementation for ' . $this->type);
+        }
     }
 
     public function expand()
     {
-        $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
-        /** @var Model\Asset\MetaData\ClassDefinition\Data\Data $instance */
-        $instance = $loader->build($this->type);
-        $this->data = $instance->unmarshal($this->data);
+        try {
+            $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
+            /** @var Model\Asset\MetaData\ClassDefinition\Data\Data $instance */
+            $instance = $loader->build($this->type);
+            $this->data = $instance->unmarshal($this->data);
+        } catch (UnsupportedException $e) {
+            Logger::error('could not resolve asset metadata implementation for ' . $this->type);
+        }
     }
 }

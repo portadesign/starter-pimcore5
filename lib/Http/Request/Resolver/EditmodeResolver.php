@@ -1,29 +1,28 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Http\Request\Resolver;
 
 use Pimcore\Bundle\AdminBundle\Security\User\UserLoader;
-use Pimcore\Cache\Runtime;
 use Pimcore\Http\RequestHelper;
-use Pimcore\Templating\Vars\TemplateVarsProviderInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 
-class EditmodeResolver extends AbstractRequestResolver implements TemplateVarsProviderInterface, LoggerAwareInterface
+class EditmodeResolver extends AbstractRequestResolver implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
@@ -95,7 +94,7 @@ class EditmodeResolver extends AbstractRequestResolver implements TemplateVarsPr
         $logData = [
             'param' => false,
             'adminRequest' => false,
-            'user' => false
+            'user' => false,
         ];
 
         // read editmode from request params
@@ -123,24 +122,11 @@ class EditmodeResolver extends AbstractRequestResolver implements TemplateVarsPr
 
         $this->logger->debug('Resolved editmode to {editmode}', [
             'editmode' => $result ? 'true' : 'false',
-            'params' => $logData
+            'params' => $logData,
         ]);
 
         $request->attributes->set(static::ATTRIBUTE_EDITMODE, $result);
 
-        // TODO this can be removed later
-        Runtime::set('pimcore_editmode', $result);
-
         return $result;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function addTemplateVars(Request $request, array $templateVars)
-    {
-        $templateVars['editmode'] = $this->isEditmode($request);
-
-        return $templateVars;
     }
 }

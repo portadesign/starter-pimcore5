@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 /**
@@ -73,6 +74,16 @@ class Breadcrumbs extends AbstractRenderer
     // Accessors:
 
     /**
+     * Returns breadcrumb separator
+     *
+     * @return string  breadcrumb separator
+     */
+    public function getSeparator()
+    {
+        return $this->_separator;
+    }
+
+    /**
      * @param string $separator
      *
      * @return $this
@@ -84,16 +95,6 @@ class Breadcrumbs extends AbstractRenderer
         }
 
         return $this;
-    }
-
-    /**
-     * Returns breadcrumb separator
-     *
-     * @return string  breadcrumb separator
-     */
-    public function getSeparator()
-    {
-        return $this->_separator;
     }
 
     /**
@@ -128,22 +129,12 @@ class Breadcrumbs extends AbstractRenderer
 
     /**
      * @param array|string $template
+     *
+     * @return $this
      */
     public function setTemplate($template)
     {
         $this->_template = $template;
-    }
-
-    /**
-     * Alias of setTemplate()
-     *
-     * @param  string $partial
-     *
-     * @return $this
-     */
-    public function setPartial($partial)
-    {
-        $this->_template = $partial;
 
         return $this;
     }
@@ -155,10 +146,58 @@ class Breadcrumbs extends AbstractRenderer
      */
     public function getPartial()
     {
-        return $this->_template;
+        return $this->getTemplate();
+    }
+
+    /**
+     * Alias of setTemplate()
+     *
+     * @param  string $partial
+     *
+     * @return $this
+     */
+    public function setPartial($partial)
+    {
+        return $this->setTemplate($partial);
     }
 
     // Render methods:
+
+    /**
+     * Get all pages between the currently active page and the container's root page.
+     *
+     * @param Container $container
+     *
+     * @return array
+     */
+    public function getPages(Container $container)
+    {
+        $pages = [];
+        if (! $active = $this->findActive($container)) {
+            return [];
+        }
+
+        /** @var \Pimcore\Navigation\Page $active */
+        $active = $active['page'];
+        $pages[] = $active;
+
+        while ($parent = $active->getParent()) {
+            if ($parent instanceof Page) {
+                $pages[] = $parent;
+            } else {
+                break;
+            }
+
+            if ($parent === $container) {
+                // break if at the root of the given container
+                break;
+            }
+
+            $active = $parent;
+        }
+
+        return array_reverse($pages);
+    }
 
     /**
      * Renders breadcrumbs by chaining 'a' elements with the separator
@@ -224,31 +263,9 @@ class Breadcrumbs extends AbstractRenderer
             throw new \Exception('Unable to render menu: No partial view script provided');
         }
 
-        // put breadcrumb pages in model
-        $model = ['pages' => []];
-        if ($active = $this->findActive($container)) {
-            /** @var Page $active */
-            $active = $active['page'];
-            $model['pages'][] = $active;
+        $pages = $this->getPages($container);
 
-            while ($parent = $active->getParent()) {
-                if ($parent instanceof Page) {
-                    $model['pages'][] = $parent;
-                } else {
-                    break;
-                }
-
-                if ($parent === $container) {
-                    // break if at the root of the given container
-                    break;
-                }
-
-                $active = $parent;
-            }
-            $model['pages'] = array_reverse($model['pages']);
-        }
-
-        return $this->templatingEngine->render($partial, $model);
+        return $this->templatingEngine->render($partial, compact('pages'));
     }
 
     /**
@@ -265,9 +282,7 @@ class Breadcrumbs extends AbstractRenderer
     }
 
     /**
-     * @param Container $container
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function render(Container $container)
     {

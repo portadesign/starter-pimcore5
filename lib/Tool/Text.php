@@ -1,19 +1,21 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Tool;
 
+use Onnov\DetectEncoding\EncodingDetector;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\Document;
@@ -109,8 +111,8 @@ class Text
 
                         if ((isset($widthAttr[1]) && $widthAttr[1]) || (isset($heightAttr[1]) && $heightAttr[1])) {
                             $config = [
-                                'width' => intval((isset($widthAttr[1]) ? $widthAttr[1] : null)),
-                                'height' => intval((isset($heightAttr[1]) ? $heightAttr[1] : null))
+                                'width' => (int)(isset($widthAttr[1]) ? $widthAttr[1] : null),
+                                'height' => (int)(isset($heightAttr[1]) ? $heightAttr[1] : null),
                             ];
                         }
 
@@ -174,79 +176,11 @@ class Text
     }
 
     /**
-     * @deprecated
-     * @static
-     *
-     * @param  array $idMapping e.g. array("asset"=>array(OLD_ID=>NEW_ID),"object"=>array(OLD_ID=>NEW_ID),"document"=>array(OLD_ID=>NEW_ID));
-     * @param  string $text html text of wysiwyg field
-     *
-     * @return mixed
-     */
-    public static function replaceWysiwygTextRelationIds($idMapping, $text)
-    {
-        if (!empty($text)) {
-            $html = str_get_html($text);
-            if (!$html) {
-                return $text;
-            }
-
-            $s = $html->find('a[pimcore_id],img[pimcore_id]');
-
-            foreach ($s as $el) {
-                $type = null;
-
-                // image
-                if ($el->src) {
-                    $type = 'asset';
-                }
-
-                // link
-                if ($el->href) {
-                    if ($el->pimcore_type == 'asset') {
-                        $type = 'asset';
-                    } elseif ($el->pimcore_type == 'document') {
-                        $type = 'document';
-                    }
-                }
-
-                $newId = $idMapping[$type][$el->attr['pimcore_id']] ?? null;
-                if ($newId) {
-                    //update id
-
-                    if ($type == 'asset') {
-                        $pimcoreElement = Asset::getById($newId);
-                    } else {
-                        $pimcoreElement = Document::getById($newId);
-                    }
-
-                    //TODO
-
-                    $el->pimcore_id = $newId;
-                    $el->src = $pimcoreElement->getFullPath();
-                } else {
-                    //remove relation, not found in mapping
-                    $el->pimcore_id = null;
-                    $el->src = null;
-                }
-            }
-
-            $return = $html->save();
-
-            $html->clear();
-            unset($html);
-
-            return $return;
-        }
-    }
-
-    /**
-     * @static
-     *
      * @param string $text
      *
      * @return array
      */
-    public static function getElementsTagsInWysiwyg($text)
+    private static function getElementsTagsInWysiwyg($text)
     {
         if (!is_string($text) || strlen($text) < 1) {
             return [];
@@ -266,13 +200,11 @@ class Text
     }
 
     /**
-     * @static
-     *
      * @param string $text
      *
      * @return array
      */
-    public static function getElementsInWysiwyg($text)
+    private static function getElementsInWysiwyg($text)
     {
         $hash = 'elements_wysiwyg_text_' . md5($text);
         if (\Pimcore\Cache\Runtime::isRegistered($hash)) {
@@ -296,7 +228,7 @@ class Text
                     $elements[] = [
                         'id' => $id,
                         'type' => $type,
-                        'element' => $element
+                        'element' => $element,
                     ];
                 }
             }
@@ -309,8 +241,6 @@ class Text
 
     /**
      * extracts all dependencies to other elements from wysiwyg text
-     *
-     * @static
      *
      * @param  string $text
      *
@@ -326,7 +256,7 @@ class Text
                 $key = $element['type'] . '_' . $element['id'];
                 $dependencies[$key] = [
                     'id' => $element['id'],
-                    'type' => $element['type']
+                    'type' => $element['type'],
                 ];
             }
         }
@@ -340,10 +270,8 @@ class Text
      *
      * @return array
      */
-    public static function getCacheTagsOfWysiwygText($text, $tags = [])
+    public static function getCacheTagsOfWysiwygText($text, array $tags = []): array
     {
-        $tags = is_array($tags) ? $tags : [];
-
         if (!empty($text)) {
             $elements = self::getElementsInWysiwyg($text);
             foreach ($elements as $element) {
@@ -402,52 +330,8 @@ class Text
             return 'UTF-16LE';
         }
 
-        if (function_exists('mb_detect_encoding')) {
-            $encoding = mb_detect_encoding($text, [
-                'UTF-8',
-                'UTF-7',
-                'UTF7-IMAP',
-                'ASCII',
-                'Windows-1252',
-                'Windows-1254',
-                'ISO-8859-1',
-                'ISO-8859-2',
-                'ISO-8859-3',
-                'ISO-8859-4',
-                'ISO-8859-5',
-                'ISO-8859-6',
-                'ISO-8859-7',
-                'ISO-8859-8',
-                'ISO-8859-9',
-                'ISO-8859-10',
-                'ISO-8859-13',
-                'ISO-8859-14',
-                'ISO-8859-15',
-                'ISO-8859-16',
-                'EUC-CN',
-                'CP936',
-                'HZ',
-                'EUC-TW',
-                'BIG-5',
-                'EUC-KR',
-                'UHC',
-                'ISO-2022-KR',
-                'Windows-1251',
-                'CP866',
-                'KOI8-R',
-                'KOI8-U',
-                'ArmSCII-8',
-                'CP850',
-                'EUC-JP',
-                'SJIS',
-                'eucJP-win',
-                'SJIS-win',
-                'CP51932',
-                'JIS',
-                'ISO-2022-JP',
-                'ISO-2022-JP-MS'
-            ]);
-        }
+        $detector = new EncodingDetector();
+        $encoding = $detector->getEncoding($text);
 
         if (empty($encoding)) {
             $encoding = 'UTF-8';
@@ -485,7 +369,7 @@ class Text
             if (false !== ($length = strrpos($text, ' '))) {
                 $text = substr($text, 0, $length);
             }
-            $string = $text.'...';
+            $string = $text . '…';
         }
 
         return $string;

@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Document
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Document;
@@ -29,6 +27,8 @@ class Page extends TargetingDocument
     /**
      * Contains the title of the page (meta-title)
      *
+     * @internal
+     *
      * @var string
      */
     protected $title = '';
@@ -36,23 +36,27 @@ class Page extends TargetingDocument
     /**
      * Contains the description of the page (meta-description)
      *
+     * @internal
+     *
      * @var string
      */
     protected $description = '';
 
     /**
+     * @internal
+     *
      * @var array
      */
     protected $metaData = [];
 
     /**
-     * Static type of the document
-     *
-     * @var string
+     * {@inheritdoc}
      */
-    protected $type = 'page';
+    protected string $type = 'page';
 
     /**
+     * @internal
+     *
      * @var string|null
      */
     protected $prettyUrl;
@@ -60,19 +64,17 @@ class Page extends TargetingDocument
     /**
      * Comma separated IDs of target groups
      *
+     * @internal
+     *
      * @var string
      */
     protected $targetGroupIds = '';
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
-    public function delete(bool $isNested = false)
+    protected function doDelete()
     {
-        if ($this->getId() == 1) {
-            throw new \Exception('root-node cannot be deleted');
-        }
-
         // check for redirects pointing to this document, and delete them too
         $redirects = new Redirect\Listing();
         $redirects->setCondition('target = ?', $this->getId());
@@ -86,7 +88,7 @@ class Page extends TargetingDocument
             $site->delete();
         }
 
-        parent::delete($isNested);
+        parent::doDelete();
     }
 
     /**
@@ -150,7 +152,7 @@ class Page extends TargetingDocument
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function getFullPath(bool $force = false)
     {

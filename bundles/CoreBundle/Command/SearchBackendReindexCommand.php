@@ -1,27 +1,32 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\CoreBundle\Command;
 
 use Pimcore\Console\AbstractCommand;
 use Pimcore\Logger;
-use Pimcore\Model\DataObject\AbstractObject;
+use Pimcore\Model\Asset;
+use Pimcore\Model\DataObject;
 use Pimcore\Model\Element\Service;
 use Pimcore\Model\Search;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * @internal
+ */
 class SearchBackendReindexCommand extends AbstractCommand
 {
     protected function configure()
@@ -33,7 +38,7 @@ class SearchBackendReindexCommand extends AbstractCommand
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
@@ -54,9 +59,9 @@ class SearchBackendReindexCommand extends AbstractCommand
 
             if (method_exists($list, 'setObjectTypes')) {
                 $list->setObjectTypes([
-                    AbstractObject::OBJECT_TYPE_OBJECT,
-                    AbstractObject::OBJECT_TYPE_FOLDER,
-                    AbstractObject::OBJECT_TYPE_VARIANT
+                    DataObject::OBJECT_TYPE_OBJECT,
+                    DataObject::OBJECT_TYPE_FOLDER,
+                    DataObject::OBJECT_TYPE_VARIANT,
                 ]);
             }
 
@@ -71,6 +76,11 @@ class SearchBackendReindexCommand extends AbstractCommand
                 $elements = $list->load();
                 foreach ($elements as $element) {
                     try {
+                        //process page count, if not exists
+                        if ($element instanceof Asset\Document && $element->getCustomSetting('document_page_count')) {
+                            $element->processPageCount();
+                        }
+
                         $searchEntry = Search\Backend\Data::getForElement($element);
                         if ($searchEntry instanceof Search\Backend\Data and $searchEntry->getId() instanceof Search\Backend\Data\Id) {
                             $searchEntry->setDataFromElement($element);

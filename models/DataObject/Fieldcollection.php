@@ -1,23 +1,22 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    DataObject\Fieldcollection
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject;
 
 use Pimcore\Model;
+use Pimcore\Model\DataObject;
 use Pimcore\Model\Element\DirtyIndicatorInterface;
 
 /**
@@ -30,11 +29,15 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
     use Model\Element\Traits\DirtyIndicatorTrait;
 
     /**
+     * @internal
+     *
      * @var Model\DataObject\Fieldcollection\Data\AbstractData[]
      */
     protected $items = [];
 
     /**
+     * @internal
+     *
      * @var string
      */
     protected $fieldname;
@@ -97,6 +100,8 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
     }
 
     /**
+     * @internal
+     *
      * @return Fieldcollection\Definition[]
      */
     public function getItemDefinitions()
@@ -131,6 +136,7 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
                     if (in_array($collection->getType(), $allowedTypes)) {
                         $collection->setFieldname($this->getFieldname());
                         $collection->setIndex($index++);
+                        $params['owner'] = $collection;
 
                         // set the current object again, this is necessary because the related object in $this->object can change (eg. clone & copy & paste, etc.)
                         $collection->setObject($object);
@@ -166,7 +172,7 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
      */
     public function remove($index)
     {
-        if ($this->items[$index]) {
+        if (isset($this->items[$index])) {
             array_splice($this->items, $index, 1);
 
             $this->markFieldDirty('_self', true);
@@ -180,19 +186,15 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
      */
     public function get($index)
     {
-        if ($this->items[$index]) {
-            return $this->items[$index];
-        }
-
-        return null;
+        return $this->items[$index] ?? null;
     }
 
     /**
-     * @param int $index
+     * @param int|null $index
      *
      * @return Fieldcollection\Data\AbstractData|null
      */
-    public function getByOriginalIndex($index)
+    private function getByOriginalIndex($index)
     {
         if ($index === null) {
             return null;
@@ -221,8 +223,8 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
      * Methods for Iterator
      */
 
-    /*
-     *
+    /**
+     * {@inheritdoc}
      */
     public function rewind()
     {
@@ -230,7 +232,7 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
     }
 
     /**
-     * @return mixed
+     * {@inheritdoc}
      */
     public function current()
     {
@@ -240,7 +242,7 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
     }
 
     /**
-     * @return mixed
+     * {@inheritdoc}
      */
     public function key()
     {
@@ -250,17 +252,15 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
     }
 
     /**
-     * @return mixed
+     * {@inheritdoc}
      */
     public function next()
     {
-        $var = next($this->items);
-
-        return $var;
+        next($this->items);
     }
 
     /**
-     * @return bool
+     * {@inheritdoc}
      */
     public function valid()
     {
@@ -277,6 +277,8 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
      * @param string $field
      *
      * @throws \Exception
+     *
+     * @internal
      */
     public function loadLazyField(Concrete $object, $type, $fcField, $index, $field)
     {
@@ -294,14 +296,14 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
                         'containerType' => 'fieldcollection',
                         'containerKey' => $type,
                         'fieldname' => $fcField,
-                        'index' => $index
-                    ]];
+                        'index' => $index,
+                    ], ];
 
-                $isDirtyDetectionDisabled = AbstractObject::isDirtyDetectionDisabled();
-                AbstractObject::disableDirtyDetection();
+                $isDirtyDetectionDisabled = DataObject::isDirtyDetectionDisabled();
+                DataObject::disableDirtyDetection();
 
                 $data = $fieldDef->load($item, $params);
-                AbstractObject::setDisableDirtyDetection($isDirtyDetectionDisabled);
+                DataObject::setDisableDirtyDetection($isDirtyDetectionDisabled);
                 $item->setObjectVar($field, $data);
             }
             $item->markLazyKeyAsLoaded($field);

@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Event;
@@ -25,7 +26,7 @@ final class FrontendEvents
      *  - filesystemPath | string | Absolute path of the thumbnail on the filesystem
      *  - frontendPath | string | Web-path, relative
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */
@@ -40,7 +41,7 @@ final class FrontendEvents
      *  - filesystemPath | string | Absolute path of the thumbnail on the filesystem
      *  - frontendPath | string | Web-path, relative
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */
@@ -55,7 +56,7 @@ final class FrontendEvents
      *  - filesystemPath | string | Absolute path of the thumbnail on the filesystem
      *  - frontendPath | string | Web-path, relative
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */
@@ -70,7 +71,7 @@ final class FrontendEvents
      *  - filesystemPath | string | Absolute path of the thumbnail on the filesystem
      *  - frontendPath | string | Web-path, relative
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */
@@ -84,7 +85,7 @@ final class FrontendEvents
      * Arguments:
      *  - frontendPath | string | Web-path, relative
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */
@@ -98,7 +99,7 @@ final class FrontendEvents
      * Arguments:
      *  - frontendPath | string | Web-path, relative
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */
@@ -115,29 +116,29 @@ final class FrontendEvents
      *  - reset | bool
      *  - encode | bool
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */
     const STATICROUTE_PATH = 'pimcore.frontend.path.staticroute';
 
     /**
-     * Subject: 	\Pimcore\Templating\Helper\HeadLink
+     * Subject: 	\Pimcore\Twig\Extension\Templating\HeadLink
      * Arguments:
      *  - item | stdClass
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */
     const VIEW_HELPER_HEAD_LINK = 'pimcore.frontend.view.helper.head-link';
 
     /**
-     * Subject: 	\Pimcore\Templating\Helper\HeadScript
+     * Subject: 	\Pimcore\Twig\Extension\Templating\HeadScript
      * Arguments:
      *  - item | stdClass
      *
-     * @Event("Pimcore\Event\Model\GenericEvent")
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *
      * @var string
      */

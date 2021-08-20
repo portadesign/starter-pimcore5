@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.tags.quantityValue");
@@ -44,7 +44,7 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             fields: ['id', 'abbreviation']
         });
 
-        pimcore.helpers.quantityValue.initUnitStore(this.setData.bind(this), this.fieldConfig.validUnits);
+        pimcore.helpers.quantityValue.initUnitStore(this.setData.bind(this), this.fieldConfig.validUnits, this.data);
     },
 
     setData: function(data) {
@@ -106,11 +106,15 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             });
         }.bind(this);
 
+        if (typeof this.store === "undefined") {
+            this.finishSetup();
+        }
+
         this.store.on('datachanged', function() {
             updateCompatibleUnitsToolTipContent();
         });
 
-        var input = {};
+        var input = {mouseWheelEnabled: false};
 
         if (this.data && !isNaN(this.data.value)) {
             input.value = this.data.value;
@@ -182,7 +186,7 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             }
         };
 
-        if(this.data && this.data.unit != null && !isNaN(this.data.unit)) {
+        if(this.data && this.data.unit != null) {
             options.value = this.data.unit;
         } else {
             options.value = -1;
@@ -199,7 +203,7 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
             labelWidth: labelWidth,
             combineErrors: false,
             items: [this.inputField, this.unitField, compatibleUnitsButton],
-            componentCls: "object_field",
+            componentCls: "object_field object_field_type_" + this.type,
             isDirty: function() {
                 return this.defaultValue || this.inputField.isDirty() || this.unitField.isDirty()
             }.bind(this)
@@ -212,7 +216,7 @@ pimcore.object.tags.quantityValue = Class.create(pimcore.object.tags.abstract, {
         var renderer = function (key, value, metaData, record) {
             this.applyPermissionStyle(key, value, metaData, record);
 
-            if (record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
+            if (record.data.inheritedFields && record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
                 try {
                     metaData.tdCls += " grid_value_inherited";
                 } catch (e) {

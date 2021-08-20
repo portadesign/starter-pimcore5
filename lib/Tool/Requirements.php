@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Tool;
@@ -19,7 +20,10 @@ use Pimcore\File;
 use Pimcore\Image;
 use Pimcore\Tool\Requirements\Check;
 
-class Requirements
+/**
+ * @internal
+ */
+final class Requirements
 {
     /**
      * @return Check[]
@@ -29,7 +33,7 @@ class Requirements
         $checks = [];
 
         // filesystem checks
-        foreach ([PIMCORE_PUBLIC_VAR, PIMCORE_PRIVATE_VAR] as $varDir) {
+        foreach ([PIMCORE_PRIVATE_VAR] as $varDir) {
             $varWritable = true;
 
             try {
@@ -48,12 +52,12 @@ class Requirements
                 $checks[] = new Check([
                     'name' => str_replace(PIMCORE_PROJECT_ROOT, '', $varDir) . ' writeable',
                     'state' => $varWritable ? Check::STATE_OK : Check::STATE_ERROR,
-                    'message' => str_replace(PIMCORE_PROJECT_ROOT, '', $varDir) . ' needs to be writable by PHP'
+                    'message' => str_replace(PIMCORE_PROJECT_ROOT, '', $varDir) . ' needs to be writable by PHP',
                 ]);
             } catch (\Exception $e) {
                 $checks[] = new Check([
                     'name' => str_replace(PIMCORE_PROJECT_ROOT, '', $varDir) . ' (not checked - too many files)',
-                    'state' => Check::STATE_WARNING
+                    'state' => Check::STATE_WARNING,
                 ]);
             }
         }
@@ -76,43 +80,44 @@ class Requirements
         // innodb
         $checks[] = new Check([
             'name' => 'InnoDB Support',
-            'state' => ($engines && in_arrayi('innodb', $engines)) ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => ($engines && in_arrayi('innodb', $engines)) ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // ARCHIVE & MyISAM
         $checks[] = new Check([
             'name' => 'ARCHIVE or MyISAM Support',
-            'state' => ($engines && (in_arrayi('archive', $engines) || in_arrayi('myisam', $engines))) ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => ($engines && (in_arrayi('archive', $engines) || in_arrayi('myisam', $engines))) ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         // check database charset =>  utf-8 encoding
         $result = $db->fetchRow('SHOW VARIABLES LIKE "character\_set\_database"');
         $checks[] = new Check([
             'name' => 'Database Charset utf8mb4',
-            'state' => ($result && (strtolower($result['Value']) == 'utf8mb4')) ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => ($result && (strtolower($result['Value']) == 'utf8mb4')) ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // empty values are provided by MariaDB => 10.3
         $largePrefix = $db->fetchRow("SHOW GLOBAL VARIABLES LIKE 'innodb\_large\_prefix';");
         $checks[] = new Check([
             'name' => 'innodb_large_prefix = ON ',
-            'state' => ($largePrefix && !in_arrayi(strtolower((string) $largePrefix['Value']), ['on', '1', ''])) ? Check::STATE_ERROR : Check::STATE_OK
+            'state' => ($largePrefix && !in_arrayi(strtolower((string) $largePrefix['Value']), ['on', '1', ''])) ? Check::STATE_ERROR : Check::STATE_OK,
         ]);
 
         $fileFormat = $db->fetchRow("SHOW GLOBAL VARIABLES LIKE 'innodb\_file\_format';");
         $checks[] = new Check([
             'name' => 'innodb_file_format = Barracuda',
-            'state' => ($fileFormat && (!empty($fileFormat['Value']) && strtolower($fileFormat['Value']) != 'barracuda')) ? Check::STATE_ERROR : Check::STATE_OK
+            'state' => ($fileFormat && (!empty($fileFormat['Value']) && strtolower($fileFormat['Value']) != 'barracuda')) ? Check::STATE_ERROR : Check::STATE_OK,
         ]);
 
         $fileFilePerTable = $db->fetchRow("SHOW GLOBAL VARIABLES LIKE 'innodb\_file\_per\_table';");
         $checks[] = new Check([
             'name' => 'innodb_file_per_table = ON',
-            'state' => ($fileFilePerTable && !in_arrayi(strtolower((string) $fileFilePerTable['Value']), ['on', '1'])) ? Check::STATE_ERROR : Check::STATE_OK
+            'state' => ($fileFilePerTable && !in_arrayi(strtolower((string) $fileFilePerTable['Value']), ['on', '1'])) ? Check::STATE_ERROR : Check::STATE_OK,
         ]);
 
         // create table
         $queryCheck = true;
+
         try {
             $db->query('CREATE TABLE __pimcore_req_check (
                   id int(11) NOT NULL AUTO_INCREMENT,
@@ -125,11 +130,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'CREATE TABLE',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // alter table
         $queryCheck = true;
+
         try {
             $db->query('ALTER TABLE __pimcore_req_check ADD COLUMN alter_field varchar(190) NULL DEFAULT NULL');
         } catch (\Exception $e) {
@@ -138,37 +144,27 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'ALTER TABLE',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // Manage indexes
         $queryCheck = true;
-        try {
-            $db->query('ALTER TABLE __pimcore_req_check
-                  CHANGE COLUMN id id int(11) NOT NULL,
-                  CHANGE COLUMN field field varchar(190) NULL DEFAULT NULL,
-                  CHANGE COLUMN alter_field alter_field varchar(190) NULL DEFAULT NULL,
-                  ADD KEY field (field),
-                  DROP PRIMARY KEY ,
-                 DEFAULT CHARSET=utf8mb4');
 
-            $db->query('ALTER TABLE __pimcore_req_check
-                  CHANGE COLUMN id id int(11) NOT NULL AUTO_INCREMENT,
-                  CHANGE COLUMN field field varchar(190) NULL DEFAULT NULL,
-                  CHANGE COLUMN alter_field alter_field varchar(190) NULL DEFAULT NULL,
-                  ADD PRIMARY KEY (id) ,
-                 DEFAULT CHARSET=utf8mb4');
+        try {
+            $db->query('CREATE INDEX field_alter_field ON __pimcore_req_check (field, alter_field);');
+            $db->query('DROP INDEX field_alter_field ON __pimcore_req_check;');
         } catch (\Exception $e) {
             $queryCheck = false;
         }
 
         $checks[] = new Check([
             'name' => 'Manage Indexes',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // Fulltext indexes
         $queryCheck = true;
+
         try {
             $db->query('ALTER TABLE __pimcore_req_check ADD FULLTEXT INDEX `fulltextFieldIndex` (`field`)');
         } catch (\Exception $e) {
@@ -177,15 +173,16 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'Fulltext Indexes',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // insert data
         $queryCheck = true;
+
         try {
             $db->insert('__pimcore_req_check', [
                 'field' => uniqid(),
-                'alter_field' => uniqid()
+                'alter_field' => uniqid(),
             ]);
         } catch (\Exception $e) {
             $queryCheck = false;
@@ -193,15 +190,16 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'INSERT',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // update
         $queryCheck = true;
+
         try {
             $db->updateWhere('__pimcore_req_check', [
                 'field' => uniqid(),
-                'alter_field' => uniqid()
+                'alter_field' => uniqid(),
             ]);
         } catch (\Exception $e) {
             $queryCheck = false;
@@ -209,11 +207,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'UPDATE',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // select
         $queryCheck = true;
+
         try {
             $db->fetchAll('SELECT * FROM __pimcore_req_check');
         } catch (\Exception $e) {
@@ -222,11 +221,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'SELECT',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // create view
         $queryCheck = true;
+
         try {
             $db->query('CREATE OR REPLACE VIEW __pimcore_req_check_view AS SELECT * FROM __pimcore_req_check');
         } catch (\Exception $e) {
@@ -235,11 +235,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'CREATE VIEW',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // select from view
         $queryCheck = true;
+
         try {
             $db->fetchAll('SELECT * FROM __pimcore_req_check_view');
         } catch (\Exception $e) {
@@ -248,11 +249,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'SELECT (from view)',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // delete
         $queryCheck = true;
+
         try {
             $db->deleteWhere('__pimcore_req_check');
         } catch (\Exception $e) {
@@ -261,11 +263,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'DELETE',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // show create view
         $queryCheck = true;
+
         try {
             $db->query('SHOW CREATE VIEW __pimcore_req_check_view');
         } catch (\Exception $e) {
@@ -274,11 +277,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'SHOW CREATE VIEW',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // show create table
         $queryCheck = true;
+
         try {
             $db->query('SHOW CREATE TABLE __pimcore_req_check');
         } catch (\Exception $e) {
@@ -287,11 +291,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'SHOW CREATE TABLE',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // drop view
         $queryCheck = true;
+
         try {
             $db->query('DROP VIEW __pimcore_req_check_view');
         } catch (\Exception $e) {
@@ -300,11 +305,12 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'DROP VIEW',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // drop table
         $queryCheck = true;
+
         try {
             $db->query('DROP TABLE __pimcore_req_check');
         } catch (\Exception $e) {
@@ -313,7 +319,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'DROP TABLE',
-            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $queryCheck ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         return $checks;
@@ -335,13 +341,13 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'PHP',
-            'state' => $phpCliBin ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => $phpCliBin ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // Composer
         $checks[] = new Check([
             'name' => 'Composer',
-            'state' => (bool) \Pimcore\Tool\Console::getExecutable('composer') ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => (bool) \Pimcore\Tool\Console::getExecutable('composer') ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // FFMPEG BIN
@@ -353,7 +359,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'FFMPEG',
-            'state' => $ffmpegBin ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $ffmpegBin ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         // WKHTMLTOIMAGE BIN
@@ -365,7 +371,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'wkhtmltoimage',
-            'state' => $wkhtmltopdfBin ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $wkhtmltopdfBin ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         // ghostscript BIN
@@ -377,7 +383,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'Ghostscript',
-            'state' => $ghostscriptBin ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $ghostscriptBin ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         // LibreOffice BIN
@@ -389,7 +395,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'LibreOffice',
-            'state' => $libreofficeBin ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $libreofficeBin ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         // image optimizer
@@ -402,7 +408,7 @@ class Requirements
 
             $checks[] = new Check([
                 'name' => $optimizerName,
-                'state' => $optimizerAvailable ? Check::STATE_OK : Check::STATE_WARNING
+                'state' => $optimizerAvailable ? Check::STATE_OK : Check::STATE_WARNING,
             ]);
         }
 
@@ -415,7 +421,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'timeout - (GNU coreutils)',
-            'state' => $timeoutBin ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $timeoutBin ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         // pdftotext binary
@@ -427,18 +433,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'pdftotext - (part of poppler-utils)',
-            'state' => $pdftotextBin ? Check::STATE_OK : Check::STATE_WARNING
-        ]);
-
-        try {
-            $sqipAvailable = \Pimcore\Tool\Console::getExecutable('sqip');
-        } catch (\Exception $e) {
-            $sqipAvailable = false;
-        }
-
-        $checks[] = new Check([
-            'name' => 'SQIP - SVG Placeholder',
-            'state' => $sqipAvailable ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $pdftotextBin ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         try {
@@ -449,7 +444,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'facedetect',
-            'state' => $facedetectAvailable ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $facedetectAvailable ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         try {
@@ -460,7 +455,7 @@ class Requirements
 
         $checks[] = new Check([
             'name' => 'Graphviz',
-            'state' => $graphvizAvailable ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $graphvizAvailable ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         return $checks;
@@ -495,7 +490,7 @@ class Requirements
             'name' => 'memory_limit (in php.ini)',
             'link' => 'http://www.php.net/memory_limit',
             'state' => $memoryLimitState,
-            'message' => $memoryLimitMessage
+            'message' => $memoryLimitMessage,
         ]);
 
         // pdo_mysql
@@ -510,7 +505,7 @@ class Requirements
             'name' => 'Mysqli',
             'link' => 'http://www.php.net/mysqli',
             'state' => class_exists('mysqli') ? Check::STATE_OK : Check::STATE_WARNING,
-            'message' => "Mysqli can be used instead of PDO MySQL, though it isn't a requirement."
+            'message' => "Mysqli can be used instead of PDO MySQL, though it isn't a requirement.",
         ]);
 
         // iconv
@@ -566,21 +561,21 @@ class Requirements
         $checks[] = new Check([
             'name' => 'zip',
             'link' => 'http://www.php.net/zip',
-            'state' => class_exists('ZipArchive') ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => class_exists('ZipArchive') ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // gzip
         $checks[] = new Check([
             'name' => 'zlib / gzip',
             'link' => 'http://www.php.net/zlib',
-            'state' => function_exists('gzcompress') ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => function_exists('gzcompress') ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // Intl
         $checks[] = new Check([
             'name' => 'Intl',
             'link' => 'http://www.php.net/intl',
-            'state' => extension_loaded('intl') ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => extension_loaded('intl') ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // Locales
@@ -589,8 +584,8 @@ class Requirements
             $checks[] = new Check([
                 'name' => 'locales-all',
                 'link' => 'https://packages.debian.org/en/stable/locales-all',
-                'state' => ($fmt->format(new \DateTime('next tuesday')) == 'Dienstag') ? Check::STATE_OK : Check::STATE_WARNING,
-                'message' => "It's recommended to have the GNU C Library locale data installed (eg. apt-get install locales-all)."
+                'state' => ($fmt->format(new \DateTime('next tuesday', new \DateTimeZone('Europe/Vienna'))) == 'Dienstag') ? Check::STATE_OK : Check::STATE_WARNING,
+                'message' => "It's recommended to have the GNU C Library locale data installed (eg. apt-get install locales-all).",
             ]);
         }
 
@@ -598,7 +593,7 @@ class Requirements
         $checks[] = new Check([
             'name' => 'Imagick',
             'link' => 'http://www.php.net/imagick',
-            'state' => class_exists('Imagick') ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => class_exists('Imagick') ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         // APCu
@@ -606,7 +601,7 @@ class Requirements
             'name' => 'APCu',
             'link' => 'http://www.php.net/apcu',
             'state' => (function_exists('apcu_fetch') && ini_get('apc.enabled')) ? Check::STATE_OK : Check::STATE_WARNING,
-            'message' => "It's highly recommended to have the APCu extension installed and enabled."
+            'message' => "It's highly recommended to have the APCu extension installed and enabled.",
         ]);
 
         // OPcache
@@ -614,31 +609,36 @@ class Requirements
             'name' => 'OPcache',
             'link' => 'http://www.php.net/opcache',
             'state' => function_exists('opcache_reset') ? Check::STATE_OK : Check::STATE_WARNING,
-            'message' => "It's highly recommended to have the OPCache extension installed and enabled."
+            'message' => "It's highly recommended to have the OPCache extension installed and enabled.",
         ]);
 
         // Redis
         $checks[] = new Check([
             'name' => 'Redis',
             'link' => 'https://pecl.php.net/package/redis',
-            'state' => class_exists('Redis') ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => class_exists('Redis') ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         // curl for google api sdk
         $checks[] = new Check([
             'name' => 'curl',
             'link' => 'http://www.php.net/curl',
-            'state' => function_exists('curl_init') ? Check::STATE_OK : Check::STATE_ERROR
+            'state' => function_exists('curl_init') ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // WebP for active image adapter
-        $imageAdapter = Image::getInstance();
+        if (extension_loaded('imagick')) {
+            $imageAdapter = new Image\Adapter\Imagick();
+        } else {
+            $imageAdapter = new Image\Adapter\GD();
+        }
+
         $reflect = new \ReflectionClass($imageAdapter);
         $imageAdapterType = $reflect->getShortName();
         $checks[] = new Check([
             'name' => 'WebP (via ' . $imageAdapterType . ')',
             // we use the force flag here, because during the installer the cache is not available
-            'state' => $imageAdapter->supportsFormat('webp', true) ? Check::STATE_OK : Check::STATE_WARNING
+            'state' => $imageAdapter->supportsFormat('webp', true) ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
         return $checks;
@@ -673,5 +673,20 @@ class Requirements
         }
 
         return $data;
+    }
+
+    /**
+     * @param ConnectionInterface $db
+     *
+     * @return array
+     */
+    public static function checkAll(ConnectionInterface $db): array
+    {
+        return [
+            'checksPHP' => static::checkPhp(),
+            'checksFS' => static::checkFilesystem(),
+            'checksApps' => static::checkExternalApplications(),
+            'checksMySQL' => static::checkMysql($db),
+        ];
     }
 }

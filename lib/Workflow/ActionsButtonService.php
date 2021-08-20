@@ -1,21 +1,22 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Workflow;
 
 use Pimcore\Model\DataObject\AbstractObject;
-use Pimcore\Model\Element\AbstractElement;
+use Pimcore\Model\Element\ElementInterface;
 use Symfony\Component\Workflow\Workflow;
 
 class ActionsButtonService
@@ -32,11 +33,11 @@ class ActionsButtonService
 
     /**
      * @param Workflow $workflow
-     * @param AbstractElement $element
+     * @param ElementInterface $element
      *
      * @return array
      */
-    public function getAllowedTransitions(Workflow $workflow, AbstractElement $element)
+    public function getAllowedTransitions(Workflow $workflow, ElementInterface $element)
     {
         $allowedTransitions = [];
 
@@ -53,7 +54,7 @@ class ActionsButtonService
                 'label' => $transition->getLabel(),
                 'iconCls' => $transition->getIconClass(),
                 'objectLayout' => $transition->getObjectLayout(),
-                'notes' => $notes
+                'notes' => $notes,
             ];
         }
 
@@ -62,11 +63,11 @@ class ActionsButtonService
 
     /**
      * @param Workflow $workflow
-     * @param AbstractElement $element
+     * @param ElementInterface $element
      *
      * @return array
      */
-    public function getGlobalActions(Workflow $workflow, AbstractElement $element)
+    public function getGlobalActions(Workflow $workflow, ElementInterface $element)
     {
         $globalActions = [];
         foreach ($this->workflowManager->getGlobalActions($workflow->getName()) as $globalAction) {
@@ -80,7 +81,7 @@ class ActionsButtonService
                     'label' => $globalAction->getLabel(),
                     'iconCls' => $globalAction->getIconClass(),
                     'objectLayout' => $globalAction->getObjectLayout(),
-                    'notes' => $notes
+                    'notes' => $notes,
                 ];
             }
         }

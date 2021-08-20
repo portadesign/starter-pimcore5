@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.tags.textarea");
@@ -47,12 +47,10 @@ pimcore.object.tags.textarea = Class.create(pimcore.object.tags.abstract, {
     },
 
     getLayoutEdit: function () {
-
-
-        if (intval(this.fieldConfig.width) < 1) {
+        if (!this.fieldConfig.width) {
             this.fieldConfig.width = 250;
         }
-        if (intval(this.fieldConfig.height) < 1) {
+        if (!this.fieldConfig.height) {
             this.fieldConfig.height = 250;
         }
 
@@ -63,11 +61,20 @@ pimcore.object.tags.textarea = Class.create(pimcore.object.tags.abstract, {
             width: this.fieldConfig.width,
             height: this.fieldConfig.height,
             fieldLabel: this.fieldConfig.title,
-            componentCls: "object_field",
             labelWidth: labelWidth
         };
 
-        conf.width += conf.labelWidth;
+        if (!this.fieldConfig.showCharCount) {
+            conf.componentCls = "object_field object_field_type_" + this.type;
+        }
+
+        if (this.fieldConfig.labelAlign) {
+            conf.labelAlign = this.fieldConfig.labelAlign;
+        }
+
+        if (!this.fieldConfig.labelAlign || 'left' === this.fieldConfig.labelAlign) {
+            conf.width = this.sumWidths(conf.width, conf.labelWidth);
+        }
 
         if (this.data) {
             conf.value = this.data;
@@ -97,7 +104,7 @@ pimcore.object.tags.textarea = Class.create(pimcore.object.tags.abstract, {
             this.updateCharCount(this.component, charCount);
 
             return Ext.create("Ext.Panel", {
-                cls: "object_field",
+                cls: "object_field object_field_type_" + this.type,
                 style: "margin-bottom: 10px",
                 layout: {
                     type: 'vbox',

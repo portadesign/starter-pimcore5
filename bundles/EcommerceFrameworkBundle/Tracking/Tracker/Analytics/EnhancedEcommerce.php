@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\Tracker\Analytics;
@@ -24,8 +25,6 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\CartProductActionRemoveInte
 use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\CheckoutCompleteInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\CheckoutInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\CheckoutStepInterface;
-use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\IProductActionAdd;
-use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\IProductActionRemove;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\ProductAction;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\ProductImpression;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Tracking\ProductImpressionInterface;
@@ -39,8 +38,6 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 class EnhancedEcommerce extends AbstractAnalyticsTracker implements
     ProductViewInterface,
     ProductImpressionInterface,
-    IProductActionAdd,
-    IProductActionRemove,
     CartProductActionAddInterface,
     CartProductActionRemoveInterface,
     CheckoutInterface,
@@ -71,7 +68,7 @@ class EnhancedEcommerce extends AbstractAnalyticsTracker implements
         parent::configureOptions($resolver);
 
         $resolver->setDefaults([
-            'template_prefix' => 'PimcoreEcommerceFrameworkBundle:Tracking/analytics/enhanced'
+            'template_prefix' => '@PimcoreEcommerceFramework/Tracking/analytics/enhanced',
         ]);
     }
 
@@ -109,7 +106,7 @@ class EnhancedEcommerce extends AbstractAnalyticsTracker implements
         $item = $this->trackingItemBuilder->buildProductImpressionItem($product, $list);
 
         $parameters = [
-            'productData' => $this->transformProductImpression($item)
+            'productData' => $this->transformProductImpression($item),
         ];
 
         $result = $this->renderTemplate('product_impression', $parameters);
@@ -117,7 +114,7 @@ class EnhancedEcommerce extends AbstractAnalyticsTracker implements
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function trackCartProductActionAdd(CartInterface $cart, ProductInterface $product, $quantity = 1)
     {
@@ -137,7 +134,7 @@ class EnhancedEcommerce extends AbstractAnalyticsTracker implements
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function trackCartProductActionRemove(CartInterface $cart, ProductInterface $product, $quantity = 1)
     {
@@ -189,7 +186,7 @@ class EnhancedEcommerce extends AbstractAnalyticsTracker implements
         $parameters['items'] = $items;
         $parameters['calls'] = $this->buildCheckoutCalls($items);
         $parameters['actionData'] = [
-            'step' => 1
+            'step' => 1,
         ];
 
         $result = $this->renderTemplate('checkout', $parameters);
@@ -343,7 +340,7 @@ class EnhancedEcommerce extends AbstractAnalyticsTracker implements
                 'price' => $item->getPrice() ? Decimal::fromNumeric($item->getPrice())->asString() : '',
                 'quantity' => $item->getQuantity() ?: 1,
                 'position' => $item->getPosition(),
-                'coupon' => $item->getCoupon()
+                'coupon' => $item->getCoupon(),
             ],
                 $item->getAdditionalAttributes())
         );
@@ -366,7 +363,7 @@ class EnhancedEcommerce extends AbstractAnalyticsTracker implements
             'variant' => $item->getVariant(),
             'price' => $item->getPrice() ? Decimal::fromNumeric($item->getPrice())->asString() : '',
             'list' => $item->getList(),
-            'position' => $item->getPosition()
+            'position' => $item->getPosition(),
         ], $item->getAdditionalAttributes()));
 
         return $data;
@@ -382,7 +379,7 @@ class EnhancedEcommerce extends AbstractAnalyticsTracker implements
         }
 
         $result = $this->renderTemplate('dependencies', [
-            'dependencies' => $this->dependencies
+            'dependencies' => $this->dependencies,
         ]);
 
         $this->trackCode($result);

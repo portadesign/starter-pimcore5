@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\CoreBundle\EventListener;
@@ -22,62 +23,55 @@ use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\Event\GetResponseEvent;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
+/**
+ * @internal
+ */
 class PimcoreContextListener implements EventSubscriberInterface, LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
-    /**
-     * @var PimcoreContextResolver
-     */
-    protected $resolver;
-
-    /**
-     * @var RequestStack
-     */
-    protected $requestStack;
+    const ATTRIBUTE_PIMCORE_CONTEXT_FORCE_RESOLVING = '_pimcore_context_force_resolving';
 
     /**
      * @param PimcoreContextResolver $resolver
      * @param RequestStack $requestStack
      */
     public function __construct(
-        PimcoreContextResolver $resolver,
-        RequestStack $requestStack
+        protected PimcoreContextResolver $resolver,
+        protected RequestStack $requestStack
     ) {
-        $this->resolver = $resolver;
-        $this->requestStack = $requestStack;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public static function getSubscribedEvents()
     {
         return [
             // run after router to be able to match the _route attribute
             // TODO check if this is early enough
-            KernelEvents::REQUEST => ['onKernelRequest', 24]
+            KernelEvents::REQUEST => ['onKernelRequest', 24],
         ];
     }
 
-    public function onKernelRequest(GetResponseEvent $event)
+    public function onKernelRequest(RequestEvent $event)
     {
         $request = $event->getRequest();
 
-        if ($event->isMasterRequest()) {
+        if ($event->isMasterRequest() || $event->getRequest()->attributes->has(self::ATTRIBUTE_PIMCORE_CONTEXT_FORCE_RESOLVING)) {
             $context = $this->resolver->getPimcoreContext($request);
 
             if ($context) {
                 $this->logger->debug('Resolved pimcore context for path {path} to {context}', [
                     'path' => $request->getPathInfo(),
-                    'context' => $context
+                    'context' => $context,
                 ]);
             } else {
                 $this->logger->debug('Could not resolve a pimcore context for path {path}', [
-                    'path' => $request->getPathInfo()
+                    'path' => $request->getPathInfo(),
                 ]);
             }
 
@@ -93,20 +87,16 @@ class PimcoreContextListener implements EventSubscriberInterface, LoggerAwareInt
      */
     protected function initializeContext($context, $request)
     {
-        if ($context == PimcoreContextResolver::CONTEXT_ADMIN || $context == PimcoreContextResolver::CONTEXT_WEBSERVICE) {
+        if ($context == PimcoreContextResolver::CONTEXT_ADMIN) {
             \Pimcore::setAdminMode();
             Document::setHideUnpublished(false);
-            DataObject\AbstractObject::setHideUnpublished(false);
-
-            if ($context == PimcoreContextResolver::CONTEXT_WEBSERVICE) {
-                DataObject\AbstractObject::setGetInheritedValues(filter_var($request->get('inheritance'), FILTER_VALIDATE_BOOLEAN));
-            }
+            DataObject::setHideUnpublished(false);
             DataObject\Localizedfield::setGetFallbackValues(false);
         } else {
             \Pimcore::unsetAdminMode();
             Document::setHideUnpublished(true);
-            DataObject\AbstractObject::setHideUnpublished(true);
-            DataObject\AbstractObject::setGetInheritedValues(true);
+            DataObject::setHideUnpublished(true);
+            DataObject::setGetInheritedValues(true);
             DataObject\Localizedfield::setGetFallbackValues(true);
         }
     }

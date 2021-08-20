@@ -1,5 +1,18 @@
 <?php
 
+/**
+ * Pimcore
+ *
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Commercial License (PCL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
+ *
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ */
+
 namespace Pimcore\Tests\Ecommerce;
 
 use Codeception\Util\Stub;
@@ -45,7 +58,7 @@ class ProductTaxManagementTest extends EcommerceTestCase
         $pricingManagers = Stub::make(PricingManagerLocator::class, [
             'getPricingManager' => function () {
                 return new PricingManager([], [], $this->buildSession());
-            }
+            },
         ]);
 
         $priceSystem = Stub::construct(AttributePriceSystem::class, [$pricingManagers, $environment], [
@@ -57,7 +70,7 @@ class ProductTaxManagementTest extends EcommerceTestCase
             },
             'calculateAmount' => function () use ($grossPrice): Decimal {
                 return $grossPrice;
-            }
+            },
         ]);
 
         /** @var AbstractProduct|\PHPUnit_Framework_MockObject_Stub $product */
@@ -70,7 +83,7 @@ class ProductTaxManagementTest extends EcommerceTestCase
             },
             'getCategories' => function () {
                 return [];
-            }
+            },
         ]);
 
         return $product;

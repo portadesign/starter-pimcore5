@@ -7,25 +7,25 @@ declare(strict_types = 1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Asset\Metadata\Loader;
 
 use Pimcore\Loader\ImplementationLoader\ImplementationLoader;
-use Pimcore\Model\Asset\MetaData\ClassDefinition\Data\Data;
+use Pimcore\Model\Asset\MetaData\ClassDefinition\Data\DataDefinitionInterface;
 
-class DataLoader extends ImplementationLoader implements DataLoaderInterface
+final class DataLoader extends ImplementationLoader implements DataLoaderInterface
 {
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
-    public function build(string $name, array $params = []): Data
+    public function build(string $name, array $params = []): DataDefinitionInterface
     {
         return parent::build($name, $params);
     }

@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.asset.audio");
@@ -35,7 +35,7 @@ pimcore.asset.audio = Class.create(pimcore.asset.asset, {
         }
 
         this.tagAssignment = new pimcore.element.tag.assignment(this, "asset");
-        this.metadata = new pimcore.asset.metadata.grid(this);
+        this.metadata = new pimcore.asset.metadata.editor(this);
         this.workflows = new pimcore.element.workflows(this, "asset");
 
         this.getData();
@@ -95,7 +95,7 @@ pimcore.asset.audio = Class.create(pimcore.asset.asset, {
 
             var html = t("preview_not_available");
 
-            if(this.data.filename.match(/\.mp3$/) || (!Ext.isIE && this.data.filename.match(/\.wav$/))) {
+            if(this.data.filename.match(/\.mp3$/) || this.data.filename.match(/\.wav$/)) {
                 html = '<audio controls><source src="' + this.data.path + this.data.filename + '" type="' + this.data.mimetype + '"></audio>';
             }
 

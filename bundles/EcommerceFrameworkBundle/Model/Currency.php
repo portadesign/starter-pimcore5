@@ -1,28 +1,35 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\Model;
 
 use Pimcore\Bundle\EcommerceFrameworkBundle\Type\Decimal;
+use Pimcore\Localization\IntlFormatter;
 
 class Currency
 {
     const LEFT = 'left';
+
     const RIGHT = 'right';
+
     const NO_SYMBOL = 'none';
+
     const USE_SYMBOL = 'sign';
+
     const USE_SHORTNAME = 'shortname';
+
     const USE_NAME = 'longname';
 
     /**
@@ -41,30 +48,25 @@ class Currency
     protected $currencyName;
 
     /**
-     * @var \Pimcore\Localization\IntlFormatter
-     */
-    protected $formattingService;
-
-    /**
      * @var array
      */
     protected $patternStore = [
         self::NO_SYMBOL => [
             self::LEFT => '#,##0.00',
-            self::RIGHT => '#,##0.00'
+            self::RIGHT => '#,##0.00',
         ],
         self::USE_SYMBOL => [
             self::LEFT => '¤ #,##0.00',
-            self::RIGHT => '#,##0.00 ¤'
+            self::RIGHT => '#,##0.00 ¤',
         ],
         self::USE_SHORTNAME => [
             self::LEFT => '¤¤ #,##0.00',
-            self::RIGHT => '#,##0.00 ¤¤'
+            self::RIGHT => '#,##0.00 ¤¤',
         ],
         self::USE_NAME => [
             self::LEFT => '¤¤¤ #,##0.00',
-            self::RIGHT => '#,##0.00 ¤¤¤'
-        ]
+            self::RIGHT => '#,##0.00 ¤¤¤',
+        ],
     ];
 
     /**
@@ -75,12 +77,16 @@ class Currency
     public function __construct($currencyShortName)
     {
         $this->currencyShortName = $currencyShortName;
-        $this->formattingService = \Pimcore::getContainer()->get('pimcore.locale.intl_formatter');
+    }
+
+    protected function getFormatter(): IntlFormatter
+    {
+        return \Pimcore::getContainer()->get(IntlFormatter::class);
     }
 
     /**
      * @param Decimal|float|int|string $value
-     * @param string $pattern
+     * @param string|array $pattern
      *
      * @return string
      */
@@ -97,7 +103,7 @@ class Currency
             $value = $value->asString();
         }
 
-        return $this->formattingService->formatCurrency($value, $this->currencyShortName, $pattern);
+        return $this->getFormatter()->formatCurrency($value, $this->currencyShortName, $pattern);
     }
 
     /**
@@ -114,7 +120,7 @@ class Currency
     public function getSymbol()
     {
         if (empty($this->currencySymbol)) {
-            $result = $this->formattingService->formatCurrency(0, $this->currencyShortName, '¤||');
+            $result = $this->getFormatter()->formatCurrency(0, $this->currencyShortName, '¤||');
             $parts = explode('||', $result);
             $this->currencySymbol = $parts[0];
         }
@@ -128,7 +134,7 @@ class Currency
     public function getName()
     {
         if (empty($this->currencyName)) {
-            $result = $this->formattingService->formatCurrency(0, $this->currencyShortName, '¤¤¤||');
+            $result = $this->getFormatter()->formatCurrency(0, $this->currencyShortName, '¤¤¤||');
             $parts = explode('||', $result);
             $this->currencyName = $parts[0];
         }

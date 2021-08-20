@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\EventListener;
@@ -23,9 +24,12 @@ use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Event\GetResponseEvent;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
+/**
+ * @internal
+ */
 class UserPerspectiveListener implements EventSubscriberInterface, LoggerAwareInterface
 {
     use LoggerAwareTrait;
@@ -45,16 +49,16 @@ class UserPerspectiveListener implements EventSubscriberInterface, LoggerAwareIn
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public static function getSubscribedEvents()
     {
         return [
-            KernelEvents::REQUEST => 'onKernelRequest'
+            KernelEvents::REQUEST => 'onKernelRequest',
         ];
     }
 
-    public function onKernelRequest(GetResponseEvent $event)
+    public function onKernelRequest(RequestEvent $event)
     {
         $request = $event->getRequest();
 
@@ -86,7 +90,7 @@ class UserPerspectiveListener implements EventSubscriberInterface, LoggerAwareIn
                 if (!in_array($requestedPerspective, $existingPerspectives)) {
                     $this->logger->warning('Requested perspective {perspective} for {user} is not does not exist.', [
                         'user' => $user->getName(),
-                        'perspective' => $requestedPerspective
+                        'perspective' => $requestedPerspective,
                     ]);
 
                     $requestedPerspective = null;
@@ -106,12 +110,12 @@ class UserPerspectiveListener implements EventSubscriberInterface, LoggerAwareIn
                 $this->logger->warning('User {user} is not allowed requested perspective {requestedPerspective}. Falling back to {perspective}.', [
                     'user' => $user->getName(),
                     'requestedPerspective' => $previouslyRequested,
-                    'perspective' => $requestedPerspective
+                    'perspective' => $requestedPerspective,
                 ]);
             } else {
                 $this->logger->debug('Perspective for user {user} was not requested. Falling back to {perspective}.', [
                     'user' => $user->getName(),
-                    'perspective' => $requestedPerspective
+                    'perspective' => $requestedPerspective,
                 ]);
             }
         }
@@ -119,7 +123,7 @@ class UserPerspectiveListener implements EventSubscriberInterface, LoggerAwareIn
         if ($requestedPerspective !== $user->getActivePerspective()) {
             $this->logger->info('Setting active perspective for user {user} to {perspective}.', [
                 'user' => $user->getName(),
-                'perspective' => $requestedPerspective
+                'perspective' => $requestedPerspective,
             ]);
 
             $user->setActivePerspective($requestedPerspective);

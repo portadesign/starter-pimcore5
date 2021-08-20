@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 
@@ -20,7 +20,6 @@ pimcore.settings.user.user.settings = Class.create({
 
         this.data = this.userPanel.data;
         this.currentUser = this.data.user;
-        this.wsenabled = this.data.wsenabled;
     },
 
     getPanel: function () {
@@ -150,31 +149,57 @@ pimcore.settings.user.user.settings = Class.create({
             }]
         });
 
-        var getPreviewImageHTML = function () {
-            var date = new Date();
-            var image = Routing.generate('pimcore_admin_user_getimage', {id: this.currentUser.id, '_dc': date.getTime()});
-
-            return '<img src="'+image+'" style="width: 46px" />'
-        }.bind(this);
-
         generalItems.push({
             xtype: "fieldset",
             title: t("image"),
-            items: [{
-                xtype: "container",
-                id: "pimcore_user_image_" + this.currentUser.id,
-                html: getPreviewImageHTML()
-            }, {
-                xtype: "button",
-                text: t("upload"),
-                handler: function () {
-                    pimcore.helpers.uploadDialog(Routing.generate('pimcore_admin_user_uploadimage', {id: this.currentUser.id}), null,
-                        function () {
-                            var cont = Ext.getCmp("pimcore_user_image_" + this.currentUser.id);
-                            cont.update(getPreviewImageHTML());
-                        }.bind(this));
-                }.bind(this)
-            }]
+            items: [
+                {
+                    xtype: "container",
+                    items: [{
+                        xtype: "image",
+                        id: "pimcore_user_image_" + this.currentUser.id,
+                        src: Routing.generate(
+                            'pimcore_admin_user_getimage',
+                            {id: this.currentUser.id, '_dc': Ext.Date.now()}
+                        ),
+                        width: 45,
+                        height: 45
+                    }],
+                },
+                {
+                    xtype: "button",
+                    text: t("upload"),
+                    handler: function () {
+                        pimcore.helpers.uploadDialog(
+                            Routing.generate('pimcore_admin_user_uploadimage', {id: this.currentUser.id}),
+                            null,
+                            function () {
+                                Ext.getCmp("pimcore_user_delete_image_" + this.currentUser.id).setVisible(true);
+                                pimcore.helpers.reloadUserImage(this.currentUser.id);
+                                this.currentUser.hasImage = true;
+                            }.bind(this)
+                        );
+                    }.bind(this)
+                },
+                {
+                    xtype: "button",
+                    iconCls: "pimcore_icon_cancel",
+                    tooltip: t("remove"),
+                    id: "pimcore_user_delete_image_" + this.currentUser.id,
+                    hidden: !this.currentUser.hasImage,
+                    handler: function () {
+                        Ext.Ajax.request({
+                            url: Routing.generate('pimcore_admin_user_deleteimage', {id: this.currentUser.id}),
+                            method: 'DELETE',
+                            success: function() {
+                                Ext.getCmp("pimcore_user_delete_image_" + this.currentUser.id).setVisible(false);
+                                pimcore.helpers.reloadUserImage(this.currentUser.id);
+                                this.currentUser.hasImage = false;
+                            }.bind(this)
+                        });
+                    }.bind(this)
+                }
+            ]
         });
 
         generalItems.push({
@@ -285,7 +310,7 @@ pimcore.settings.user.user.settings = Class.create({
             store: rolesStore,
             displayField: "name",
             valueField: "id",
-            value: this.currentUser.roles.join(","),
+            value: this.currentUser.roles,
             hidden: this.currentUser.admin
         });
 
@@ -390,42 +415,6 @@ pimcore.settings.user.user.settings = Class.create({
                 value: t("user_admin_description"),
                 cls: "pimcore_extra_label_bottom"
             });
-
-            this.apiKeyField = new Ext.form.TextField({
-                xtype: "textfield",
-                fieldLabel: t("apikey"),
-                name: "apiKey",
-                style: "font-family: courier;",
-                value: this.currentUser.apiKey,
-                width: 560
-            });
-
-            this.apiKeyFieldContainer = new Ext.form.FieldSet({
-                border: false,
-                layout: 'hbox',
-                style: "padding:10px 0 0 0; ",
-                items: [this.apiKeyField,
-                    {
-                        xtype: "button",
-                        test: t("Generate"),
-                        iconCls: "pimcore_icon_clear_cache",
-                        handler: function (e) {
-                            this.apiKeyField.setValue(md5(uniqid()) + md5(uniqid()));
-                        }.bind(this)
-                    }],
-                hidden: !this.wsenabled
-            });
-
-            this.apiKeyDescription = new Ext.form.DisplayField({
-                hideLabel: true,
-                width: 600,
-                value: "<b>DEPRECATED! Will be removed in 7.0!</b>  " +  t("user_apikey_description"),
-                cls: "pimcore_extra_label_bottom",
-                hidden: !this.wsenabled
-            });
-
-            adminItems.push(this.apiKeyFieldContainer);
-            adminItems.push(this.apiKeyDescription);
         }
 
         adminItems.push({
@@ -508,6 +497,8 @@ pimcore.settings.user.user.settings = Class.create({
             if (key && key != "default") {
                 title += " " + t(key);
             }
+
+            itemsPerSection[key].sort((a, b) => a.boxLabel.localeCompare(b.boxLabel));
 
             sectionArray.push(new Ext.form.FieldSet({
                 collapsible: true,

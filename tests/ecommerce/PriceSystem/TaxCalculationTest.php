@@ -1,5 +1,18 @@
 <?php
 
+/**
+ * Pimcore
+ *
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Commercial License (PCL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
+ *
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ */
+
 namespace Pimcore\Tests\Ecommerce\PriceSystem;
 
 use Codeception\Util\Stub;
@@ -24,9 +37,9 @@ class TaxCalculationTest extends EcommerceTestCase
     private $calculationService;
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
-    protected function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -118,7 +131,7 @@ class TaxCalculationTest extends EcommerceTestCase
 
         // single tax entry 10%
         $price->setTaxEntries([
-            new TaxEntry(10, Decimal::create(0))
+            new TaxEntry(10, Decimal::create(0)),
         ]);
 
         $this->calculationService->updateTaxes($price, TaxCalculationService::CALCULATION_FROM_NET);
@@ -139,7 +152,7 @@ class TaxCalculationTest extends EcommerceTestCase
     {
         $price = new Price(Decimal::create(0), new Currency('EUR'));
         $price->setTaxEntries([
-            new TaxEntry(15, Decimal::create(0))
+            new TaxEntry(15, Decimal::create(0)),
         ]);
         $price->setGrossAmount(Decimal::create(110), true);
 
@@ -257,7 +270,7 @@ class TaxCalculationTest extends EcommerceTestCase
         $pricingManagers = Stub::make(PricingManagerLocator::class, [
             'getPricingManager' => function () {
                 return new PricingManager([], [], $this->buildSession());
-            }
+            },
         ]);
 
         $priceSystem = Stub::construct(AttributePriceSystem::class, [$pricingManagers, $environment], [
@@ -272,7 +285,7 @@ class TaxCalculationTest extends EcommerceTestCase
             },
             'calculateAmount' => function () {
                 return Decimal::create(100);
-            }
+            },
         ]);
 
         /** @var AbstractProduct $product */
@@ -285,7 +298,7 @@ class TaxCalculationTest extends EcommerceTestCase
             },
             'getCategories' => function () {
                 return [];
-            }
+            },
         ]);
 
         $this->assertEquals(

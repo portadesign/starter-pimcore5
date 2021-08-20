@@ -1,34 +1,61 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\Command\IndexService;
 
-use Pimcore\Bundle\EcommerceFrameworkBundle\Factory;
-use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\Tool\IndexUpdater;
+use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\IndexService;
+use Pimcore\Bundle\EcommerceFrameworkBundle\Model\IndexableInterface;
+use Pimcore\Console\Traits\Parallelization;
+use Pimcore\Console\Traits\Timeout;
+use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\Listing;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * @internal
+ */
 class BootstrapCommand extends AbstractIndexServiceCommand
 {
+    use Timeout;
+    use Parallelization
+    {
+        Parallelization::runBeforeFirstCommand as parentRunBeforeFirstCommand;
+        Parallelization::runAfterBatch as parentRunAfterBatch;
+    }
+
     /**
-     * @inheritDoc
+     * @var IndexService
+     */
+    protected $indexService;
+
+    public function __construct(IndexService $indexService, string $name = null)
+    {
+        parent::__construct($name);
+        $this->indexService = $indexService;
+    }
+
+    /**
+     * {@inheritdoc}
      */
     protected function configure()
     {
         parent::configure();
-
+        self::configureParallelization($this);
+        self::configureTimeout($this);
         $this
             ->setName('ecommerce:indexservice:bootstrap')
             ->setDescription('Bootstrap tasks creating/updating index (for all tenants), use one of the options --create-or-update-index-structure or --update-index')
@@ -41,38 +68,114 @@ class BootstrapCommand extends AbstractIndexServiceCommand
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function runBeforeFirstCommand(InputInterface $input, OutputInterface $output): void
+    {
+        $this->parentRunBeforeFirstCommand($input, $output);
+        $this->initTimeout($input);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function fetchItems(InputInterface $input): array
     {
         $updateIndex = $input->getOption('update-index');
         $createOrUpdateIndexStructure = $input->getOption('create-or-update-index-structure');
-        $objectListClass = $input->getOption('object-list-class');
-        $listCondition = $input->getOption('list-condition');
-        $tenants = count($input->getOption('tenant')) ? $input->getOption('tenant') : null;
 
-        //set active tenant workers.
-        if (!empty($tenants)) {
-            $tenantWorkerList = [];
-            foreach ($tenants as $tenantName) {
-                $tenantWorkerList[] = Factory::getInstance()->getIndexService()->getTenantWorker($tenantName);
-            }
-            Factory::getInstance()->getIndexService()->setTenantWorkers($tenantWorkerList);
-        }
+        $indexService = $this->initIndexService($input);
 
-        if ($createOrUpdateIndexStructure && $updateIndex) {
-            // create/update structure and update index
-            IndexUpdater::updateIndex($objectListClass, $listCondition, true, self::LOGGER_NAME);
-        } elseif ($createOrUpdateIndexStructure) {
-            // just create/update structure
-            Factory::getInstance()->getIndexService()->createOrUpdateIndexStructures();
-        } elseif ($updateIndex) {
-            // just update index
-            IndexUpdater::updateIndex($objectListClass, $listCondition, false, self::LOGGER_NAME);
-        } else {
+        if (!$createOrUpdateIndexStructure && !$updateIndex) {
             throw new \Exception('At least one option (--create-or-update-index-structure or --update-index) needs to be given');
         }
 
-        return 0;
+        if ($createOrUpdateIndexStructure) {
+            $indexService->createOrUpdateIndexStructures();
+        }
+
+        $fullIdList = [];
+        if ($updateIndex) {
+            $objectListClass = $input->getOption('object-list-class');
+            $listCondition = $input->getOption('list-condition');
+
+            /** @var Listing\Concrete $products */
+            $products = new $objectListClass();
+            $products->setUnpublished(true);
+            $products->setObjectTypes(DataObject::$types);
+            $products->setIgnoreLocalizedFields(true);
+            $products->setCondition($listCondition);
+
+            $fullIdList = $products->loadIdList();
+        }
+
+        return $fullIdList;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function runSingleCommand(string $productId, InputInterface $input, OutputInterface $output): void
+    {
+        $productId = (int)$productId;
+
+        $indexService = $this->initIndexService($input);
+
+        if ($output->isVerbose()) {
+            $activeTenantNameList = $indexService->getTenants();
+            $output->writeln(sprintf('Process product ID="%d" for %d tenants (%s).', $productId,
+                    count($activeTenantNameList), implode(',', $activeTenantNameList))
+            );
+        }
+
+        if ($object = DataObject::getById($productId)) {
+            if ($object instanceof IndexableInterface) {
+                $indexService->updateIndex($object);
+            } else {
+                $output->writeln("<error>Object ID $productId is not indexable.</error>");
+            }
+        } else {
+            $output->writeln("<error>Object $productId does not exist anymore.</error>");
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function runAfterBatch(InputInterface $input, OutputInterface $output, array $items): void
+    {
+        $this->parentRunAfterBatch($input, $output, $items);
+        $this->handleTimeout(function (string $abortMessage) use ($output) {
+            $output->writeln($abortMessage);
+            exit(0); //exit with success
+        });
+    }
+
+    /**
+     * @param InputInterface $input
+     *
+     * @return IndexService
+     */
+    protected function initIndexService(InputInterface $input): IndexService
+    {
+        //set active tenant workers.
+        $tenants = count($input->getOption('tenant')) ? $input->getOption('tenant') : null;
+        if (!empty($tenants)) {
+            $tenantWorkerList = [];
+            foreach ($tenants as $tenantName) {
+                $tenantWorkerList[] = $this->indexService->getTenantWorker($tenantName);
+            }
+            $this->indexService->setTenantWorkers($tenantWorkerList);
+        }
+
+        return $this->indexService;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function getItemName(int $count): string
+    {
+        return $count == 1 ? 'Product' : 'Products';
     }
 }

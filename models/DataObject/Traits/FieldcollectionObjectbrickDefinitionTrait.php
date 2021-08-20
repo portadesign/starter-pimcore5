@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Element
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\Traits;
@@ -20,6 +18,9 @@ namespace Pimcore\Model\DataObject\Traits;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\DataObject\ClassDefinition\Layout;
 
+/**
+ * @internal
+ */
 trait FieldcollectionObjectbrickDefinitionTrait
 {
     /**
@@ -53,6 +54,11 @@ trait FieldcollectionObjectbrickDefinitionTrait
      * @var Layout|null
      */
     public $layoutDefinitions;
+
+    /**
+     * @var bool
+     */
+    public $generateTypeDeclarations = true;
 
     /**
      * @var Data[]
@@ -169,9 +175,9 @@ trait FieldcollectionObjectbrickDefinitionTrait
      *
      * @return $this
      */
-    public function setFieldDefinitions($fieldDefinitions)
+    public function setFieldDefinitions(array $fieldDefinitions)
     {
-        $this->fieldDefinitions = is_array($fieldDefinitions) ? $fieldDefinitions : [];
+        $this->fieldDefinitions = $fieldDefinitions;
 
         return $this;
     }
@@ -258,4 +264,34 @@ trait FieldcollectionObjectbrickDefinitionTrait
 
         return $this;
     }
+
+    /**
+     * @return bool
+     */
+    public function getGenerateTypeDeclarations()
+    {
+        return (bool) $this->generateTypeDeclarations;
+    }
+
+    /**
+     * @param bool $generateTypeDeclarations
+     *
+     * @return $this
+     */
+    public function setGenerateTypeDeclarations($generateTypeDeclarations)
+    {
+        $this->generateTypeDeclarations = (bool) $generateTypeDeclarations;
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     *
+     * @param $fieldDefinition
+     * @param array $context
+     *
+     * @return mixed
+     */
+    abstract protected function doEnrichFieldDefinition($fieldDefinition, $context = []);
 }

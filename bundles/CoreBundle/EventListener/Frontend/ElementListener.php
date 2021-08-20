@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\CoreBundle\EventListener\Frontend;
@@ -23,82 +24,58 @@ use Pimcore\Http\RequestHelper;
 use Pimcore\Model\DataObject\Service;
 use Pimcore\Model\Document;
 use Pimcore\Model\Staticroute;
+use Pimcore\Model\User;
 use Pimcore\Model\Version;
 use Pimcore\Targeting\Document\DocumentTargetingConfigurator;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Handles element setup logic from request. Basically this does what the init() method
- * on the ZF frontend controller did.
+ * Handles element setup logic from request.
+ *
+ * @internal
  */
 class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
 {
     use LoggerAwareTrait;
     use PimcoreContextAwareTrait;
 
-    const FORCE_ALLOW_PROCESSING_UNPUBLISHED_ELEMENTS = '_force_allow_processing_unpublished_elements';
-
-    /**
-     * @var DocumentResolver
-     */
-    protected $documentResolver;
-
-    /**
-     * @var EditmodeResolver
-     */
-    protected $editmodeResolver;
-
-    /**
-     * @var RequestHelper
-     */
-    protected $requestHelper;
-
-    /**
-     * @var UserLoader
-     */
-    protected $userLoader;
-
-    /**
-     * @var DocumentTargetingConfigurator
-     */
-    private $targetingConfigurator;
+    public const FORCE_ALLOW_PROCESSING_UNPUBLISHED_ELEMENTS = '_force_allow_processing_unpublished_elements';
 
     public function __construct(
-        DocumentResolver $documentResolver,
-        EditmodeResolver $editmodeResolver,
-        RequestHelper $requestHelper,
-        UserLoader $userLoader,
-        DocumentTargetingConfigurator $targetingConfigurator
+        protected DocumentResolver $documentResolver,
+        protected EditmodeResolver $editmodeResolver,
+        protected RequestHelper $requestHelper,
+        protected UserLoader $userLoader,
+        private DocumentTargetingConfigurator $targetingConfigurator
     ) {
-        $this->documentResolver = $documentResolver;
-        $this->editmodeResolver = $editmodeResolver;
-        $this->requestHelper = $requestHelper;
-        $this->userLoader = $userLoader;
-        $this->targetingConfigurator = $targetingConfigurator;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public static function getSubscribedEvents()
     {
         return [
-            KernelEvents::CONTROLLER => ['onKernelController', 3], // has to be after DocumentFallbackListener
+            KernelEvents::CONTROLLER => ['onKernelController', 30], // has to be after DocumentFallbackListener
         ];
     }
 
-    public function onKernelController(FilterControllerEvent $event)
+    public function onKernelController(ControllerEvent $event)
     {
         if ($event->isMasterRequest()) {
             $request = $event->getRequest();
             if (!$this->matchesPimcoreContext($request, PimcoreContextResolver::CONTEXT_DEFAULT)) {
+                return;
+            }
+
+            if ($request->attributes->get('_route') === 'fos_js_routing_js') {
                 return;
             }
 
@@ -114,7 +91,7 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
 
             if ($document && !$document->isPublished() && !$user && !$request->attributes->get(self::FORCE_ALLOW_PROCESSING_UNPUBLISHED_ELEMENTS)) {
                 $this->logger->warning('Denying access to document {document} as it is unpublished and there is no user in the session.', [
-                    $document->getFullPath()
+                    $document->getFullPath(),
                 ]);
 
                 throw new AccessDeniedHttpException(sprintf('Access denied for %s', $document->getFullPath()));
@@ -122,7 +99,7 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
 
             // editmode, pimcore_preview & pimcore_version
             if ($user) {
-                $document = $this->handleAdminUserDocumentParams($request, $document);
+                $document = $this->handleAdminUserDocumentParams($request, $document, $user);
                 $this->handleObjectParams($request);
             }
 
@@ -151,7 +128,7 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
                 if ($version->getPublic()) {
                     $this->logger->info('Setting version to {version} for document {document}', [
                         'version' => $version->getId(),
-                        'document' => $document->getFullPath()
+                        'document' => $document->getFullPath(),
                     ]);
 
                     $document = $version->getData();
@@ -159,7 +136,7 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
             } else {
                 $this->logger->notice('Failed to load {version} for document {document}', [
                     'version' => $request->get('v'),
-                    'document' => $document->getFullPath()
+                    'document' => $document->getFullPath(),
                 ]);
             }
         }
@@ -181,7 +158,7 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
         if ($document->getUseTargetGroup()) {
             $this->logger->info('Setting target group to {targetGroup} for document {document}', [
                 'targetGroup' => $document->getUseTargetGroup(),
-                'document' => $document->getFullPath()
+                'document' => $document->getFullPath(),
             ]);
         }
     }
@@ -189,10 +166,11 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
     /**
      * @param Request $request
      * @param Document|null $document
+     * @param User $user
      *
      * @return Document|null
      */
-    protected function handleAdminUserDocumentParams(Request $request, ?Document $document)
+    private function handleAdminUserDocumentParams(Request $request, ?Document $document, User $user)
     {
         if (!$document) {
             return null;
@@ -200,7 +178,7 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
 
         // editmode document
         if ($this->editmodeResolver->isEditmode($request)) {
-            $document = $this->handleEditmode($document);
+            $document = $this->handleEditmode($document, $user);
         }
 
         // document preview
@@ -214,7 +192,7 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
             if ($documentFromSession = Document\Service::getElementFromSession('document', $document->getId())) {
                 // if there is a document in the session use it
                 $this->logger->debug('Loading preview document {document} from session', [
-                    'document' => $document->getFullPath()
+                    'document' => $document->getFullPath(),
                 ]);
                 $document = $documentFromSession;
             }
@@ -228,12 +206,12 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
 
                 $this->logger->debug('Loading version {version} for document {document} from pimcore_version parameter', [
                     'version' => $version->getId(),
-                    'document' => $document->getFullPath()
+                    'document' => $document->getFullPath(),
                 ]);
             } else {
                 $this->logger->warning('Failed to load {version} for document {document} from pimcore_version parameter', [
                     'version' => $request->get('pimcore_version'),
-                    'document' => $document->getFullPath()
+                    'document' => $document->getFullPath(),
                 ]);
 
                 throw new NotFoundHttpException(
@@ -247,30 +225,33 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
 
     /**
      * @param Document $document
+     * @param User $user
      *
-     * @return mixed|Document|Document\PageSnippet
+     * @return Document
      */
-    protected function handleEditmode(Document $document)
+    protected function handleEditmode(Document $document, User $user)
     {
         // check if there is the document in the session
         if ($documentFromSession = Document\Service::getElementFromSession('document', $document->getId())) {
             // if there is a document in the session use it
             $this->logger->debug('Loading editmode document {document} from session', [
-                'document' => $document->getFullPath()
+                'document' => $document->getFullPath(),
             ]);
             $document = $documentFromSession;
         } else {
             $this->logger->debug('Loading editmode document {document} from latest version', [
-                'document' => $document->getFullPath()
+                'document' => $document->getFullPath(),
             ]);
 
             // set the latest available version for editmode if there is no doc in the session
-            $latestVersion = $document->getLatestVersion();
-            if ($latestVersion) {
-                $latestDoc = $latestVersion->loadData();
+            if ($document instanceof Document\PageSnippet) {
+                $latestVersion = $document->getLatestVersion($user->getId());
+                if ($latestVersion) {
+                    $latestDoc = $latestVersion->loadData();
 
-                if ($latestDoc instanceof Document\PageSnippet) {
-                    $document = $latestDoc;
+                    if ($latestDoc instanceof Document\PageSnippet) {
+                        $document = $latestDoc;
+                    }
                 }
             }
         }
@@ -288,7 +269,7 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
             if ($object = Service::getElementFromSession('object', $objectId)) {
                 $this->logger->debug('Loading object {object} ({objectId}) from session', [
                     'object' => $object->getFullPath(),
-                    'objectId' => $object->getId()
+                    'objectId' => $object->getId(),
                 ]);
 
                 // TODO remove \Pimcore\Cache\Runtime

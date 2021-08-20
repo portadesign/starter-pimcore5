@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\CoreBundle\EventListener\Frontend;
@@ -22,8 +23,8 @@ use Pimcore\Http\Request\Resolver\SiteResolver;
 use Pimcore\Model\Document;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
-use Symfony\Component\HttpKernel\Event\GetResponseEvent;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -33,53 +34,30 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  *
  *  - if request is a sub-request, try to read document from master request
  *  - if all fails, try to find the nearest document by path
+ *
+ * @internal
  */
 class DocumentFallbackListener implements EventSubscriberInterface
 {
     use PimcoreContextAwareTrait;
 
     /**
-     * @var RequestStack
-     */
-    protected $requestStack;
-
-    /**
-     * @var DocumentResolver
-     */
-    protected $documentResolver;
-
-    /**
-     * @var SiteResolver
-     */
-    protected $siteResolver;
-
-    /**
-     * @var Document\Service
-     */
-    protected $documentService;
-
-    /**
      * @var array
      */
-    protected $options;
+    protected array $options;
 
     /**
-     * @var Document
+     * @var Document|null
      */
-    private $fallbackDocument;
+    private ?Document $fallbackDocument = null;
 
     public function __construct(
-        RequestStack $requestStack,
-        DocumentResolver $documentResolver,
-        SiteResolver $siteResolver,
-        Document\Service $documentService,
+        protected RequestStack $requestStack,
+        protected DocumentResolver $documentResolver,
+        protected SiteResolver $siteResolver,
+        protected Document\Service $documentService,
         array $options = []
     ) {
-        $this->requestStack = $requestStack;
-        $this->documentResolver = $documentResolver;
-        $this->siteResolver = $siteResolver;
-        $this->documentService = $documentService;
-
         $optionsResolver = new OptionsResolver();
         $this->configureOptions($optionsResolver);
 
@@ -89,7 +67,7 @@ class DocumentFallbackListener implements EventSubscriberInterface
     protected function configureOptions(OptionsResolver $optionsResolver)
     {
         $optionsResolver->setDefaults([
-            'nearestDocumentTypes' => ['page', 'snippet', 'hardlink', 'link', 'folder']
+            'nearestDocumentTypes' => ['page', 'snippet', 'hardlink', 'link', 'folder'],
         ]);
 
         $optionsResolver->setAllowedTypes('nearestDocumentTypes', 'array');
@@ -105,16 +83,16 @@ class DocumentFallbackListener implements EventSubscriberInterface
             // -> Symfony\Component\HttpKernel\EventListener\LocaleListener::onKernelRequest()
             // -> Pimcore\Bundle\CoreBundle\EventListener\Frontend\EditmodeListener::onKernelRequest()
             KernelEvents::REQUEST => ['onKernelRequest', 20],
-            KernelEvents::CONTROLLER => ['onKernelController', 20],
+            KernelEvents::CONTROLLER => ['onKernelController', 50],
         ];
     }
 
     /**
      * Finds the nearest document for the current request if the routing/document router didn't find one (e.g. static routes)
      *
-     * @param GetResponseEvent $event
+     * @param RequestEvent $event
      */
-    public function onKernelRequest(GetResponseEvent $event)
+    public function onKernelRequest(RequestEvent $event)
     {
         $request = $event->getRequest();
         if (!$this->matchesPimcoreContext($request, PimcoreContextResolver::CONTEXT_DEFAULT)) {
@@ -169,7 +147,7 @@ class DocumentFallbackListener implements EventSubscriberInterface
         }
     }
 
-    public function onKernelController(FilterControllerEvent $event)
+    public function onKernelController(ControllerEvent $event)
     {
         $controller = $event->getController();
         if (is_array($controller) && isset($controller[0]) && $controller[0] instanceof PublicServicesController) {

@@ -1,37 +1,42 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Asset
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Asset;
 
+use Pimcore\Db;
+use Pimcore\Loader\ImplementationLoader\Exception\UnsupportedException;
 use Pimcore\Logger;
 use Pimcore\Model;
+use Pimcore\Model\Asset\MetaData\ClassDefinition\Data\Data;
 use Pimcore\Tool\Serialize;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Asset $model
  */
 class Dao extends Model\Element\Dao
 {
+    use Model\Element\Traits\VersionDaoTrait;
+
     /**
      * Get the data for the object by id from database and assign it to the object (model)
      *
      * @param int $id
      *
-     * @throws \Exception
+     * @throws Model\Exception\NotFoundException
      */
     public function getById($id)
     {
@@ -39,20 +44,34 @@ class Dao extends Model\Element\Dao
             LEFT JOIN tree_locks ON assets.id = tree_locks.id AND tree_locks.type = 'asset'
                 WHERE assets.id = ?", $id);
 
-        if ($data['id'] > 0) {
+        if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
 
             if ($data['hasMetaData']) {
                 $metadataRaw = $this->db->fetchAll('SELECT * FROM assets_metadata WHERE cid = ?', [$data['id']]);
                 $metadata = [];
                 foreach ($metadataRaw as $md) {
+                    $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
+
+                    $transformedData = $md['data'];
+
+                    $md['type'] = $md['type'] ?? 'input';
+
+                    try {
+                        /** @var Data $instance */
+                        $instance = $loader->build($md['type']);
+                        $transformedData = $instance->getDataFromResource($md['data'], $md);
+                    } catch (UnsupportedException $e) {
+                    }
+
+                    $md['data'] = $transformedData;
                     unset($md['cid']);
                     $metadata[] = $md;
                 }
-                $this->model->setMetadata($metadata);
+                $this->model->setMetadataRaw($metadata);
             }
         } else {
-            throw new \Exception('Asset with ID ' . $id . " doesn't exists");
+            throw new Model\Exception\NotFoundException('Asset with ID ' . $id . " doesn't exists");
         }
     }
 
@@ -61,17 +80,17 @@ class Dao extends Model\Element\Dao
      *
      * @param string $path
      *
-     * @throws \Exception
+     * @throws Model\Exception\NotFoundException
      */
     public function getByPath($path)
     {
         $params = $this->extractKeyAndPath($path);
         $data = $this->db->fetchRow('SELECT id FROM assets WHERE path = :path AND `filename` = :key', $params);
 
-        if ($data['id']) {
+        if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
         } else {
-            throw new \Exception('asset with path: ' . $path . " doesn't exist");
+            throw new Model\Exception\NotFoundException('asset with path: ' . $path . " doesn't exist");
         }
     }
 
@@ -80,7 +99,7 @@ class Dao extends Model\Element\Dao
         $this->db->insert('assets', [
             'filename' => $this->model->getFilename(),
             'path' => $this->model->getRealPath(),
-            'parentId' => $this->model->getParentId()
+            'parentId' => $this->model->getParentId(),
         ]);
 
         $this->model->setId($this->db->lastInsertId());
@@ -101,20 +120,30 @@ class Dao extends Model\Element\Dao
 
         // metadata
         $this->db->delete('assets_metadata', ['cid' => $this->model->getId()]);
-        $metadata = $this->model->getMetadata();
+        $metadata = $this->model->getMetadata(null, null, false, true);
+
         $data['hasMetaData'] = 0;
         if (!empty($metadata)) {
             foreach ($metadata as $metadataItem) {
                 $metadataItem['cid'] = $this->model->getId();
                 unset($metadataItem['config']);
 
-                if ($metadataItem['data'] instanceof Model\Element\ElementInterface) {
-                    $metadataItem['data'] = $metadataItem['data']->getId();
+                $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
+
+                $dataForResource = $metadataItem['data'];
+
+                try {
+                    /** @var Data $instance */
+                    $instance = $loader->build($metadataItem['type']);
+                    $dataForResource = $instance->getDataForResource($metadataItem['data'], $metadataItem);
+                } catch (UnsupportedException $e) {
                 }
+
+                $metadataItem['data'] = $dataForResource;
 
                 $metadataItem['language'] = (string) $metadataItem['language']; // language column cannot be NULL -> see SQL schema
 
-                if (is_scalar($metadataItem['data']) && strlen($metadataItem['data']) > 0) {
+                if (is_scalar($metadataItem['data'])) {
                     $this->db->insert('assets_metadata', $metadataItem);
                     $data['hasMetaData'] = 1;
                 }
@@ -129,7 +158,7 @@ class Dao extends Model\Element\Dao
             $this->db->insert('tree_locks', [
                 'id' => $this->model->getId(),
                 'type' => 'asset',
-                'locked' => $this->model->getLocked()
+                'locked' => $this->model->getLocked(),
             ]);
         }
     }
@@ -142,9 +171,9 @@ class Dao extends Model\Element\Dao
     public function updateWorkspaces()
     {
         $this->db->update('users_workspaces_asset', [
-            'cpath' => $this->model->getRealFullPath()
+            'cpath' => $this->model->getRealFullPath(),
         ], [
-            'cid' => $this->model->getId()
+            'cid' => $this->model->getId(),
         ]);
     }
 
@@ -158,7 +187,7 @@ class Dao extends Model\Element\Dao
     public function updateChildPaths($oldPath)
     {
         //get assets to empty their cache
-        $assets = $this->db->fetchCol('SELECT id FROM assets WHERE path LIKE ' . $this->db->quote($oldPath . '%'));
+        $assets = $this->db->fetchCol('SELECT id FROM assets WHERE path LIKE ' . $this->db->quote($this->db->escapeLike($oldPath) . '%'));
 
         $userId = '0';
         if ($user = \Pimcore\Tool\Admin::getCurrentUser()) {
@@ -167,13 +196,13 @@ class Dao extends Model\Element\Dao
 
         //update assets child paths
         // we don't update the modification date here, as this can have side-effects when there's an unpublished version for an element
-        $this->db->query('update assets set path = replace(path,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . "), userModification = '" . $userId . "' where path like " . $this->db->quote($oldPath . '/%') . ';');
+        $this->db->query('update assets set path = replace(path,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . "), userModification = '" . $userId . "' where path like " . $this->db->quote($this->db->escapeLike($oldPath) . '/%') . ';');
 
         //update assets child permission paths
-        $this->db->query('update users_workspaces_asset set cpath = replace(cpath,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . ') where cpath like ' . $this->db->quote($oldPath . '/%') . ';');
+        $this->db->query('update users_workspaces_asset set cpath = replace(cpath,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . ') where cpath like ' . $this->db->quote($this->db->escapeLike($oldPath) . '/%') . ';');
 
         //update assets child properties paths
-        $this->db->query('update properties set cpath = replace(cpath,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . ') where cpath like ' . $this->db->quote($oldPath . '/%') . ';');
+        $this->db->query('update properties set cpath = replace(cpath,' . $this->db->quote($oldPath . '/') . ',' . $this->db->quote($this->model->getRealFullPath() . '/') . ') where cpath like ' . $this->db->quote($this->db->escapeLike($oldPath) . '/%') . ';');
 
         return $assets;
     }
@@ -249,25 +278,6 @@ class Dao extends Model\Element\Dao
     public function deleteAllMetadata()
     {
         $this->db->delete('assets_metadata', ['cid' => $this->model->getId()]);
-    }
-
-    /**
-     * get versions from database, and assign it to object
-     *
-     * @return Model\Version[]
-     */
-    public function getVersions()
-    {
-        $versionIds = $this->db->fetchAll("SELECT id FROM versions WHERE cid = ? AND ctype='asset' ORDER BY `id` ASC", [$this->model->getId()]);
-
-        $versions = [];
-        foreach ($versionIds as $versionId) {
-            $versions[] = Model\Version::getById($versionId['id']);
-        }
-
-        $this->model->setVersions($versions);
-
-        return $versions;
     }
 
     public function deleteAllPermissions()
@@ -365,7 +375,7 @@ class Dao extends Model\Element\Dao
     public function isLocked()
     {
         // check for an locked element below this element
-        $belowLocks = $this->db->fetchOne("SELECT tree_locks.id FROM tree_locks INNER JOIN assets ON tree_locks.id = assets.id WHERE assets.path LIKE ? AND tree_locks.type = 'asset' AND tree_locks.locked IS NOT NULL AND tree_locks.locked != '' LIMIT 1", $this->model->getRealFullPath() . '/%');
+        $belowLocks = $this->db->fetchOne("SELECT tree_locks.id FROM tree_locks INNER JOIN assets ON tree_locks.id = assets.id WHERE assets.path LIKE ? AND tree_locks.type = 'asset' AND tree_locks.locked IS NOT NULL AND tree_locks.locked != '' LIMIT 1", $this->db->escapeLike($this->model->getRealFullPath()) . '/%');
 
         if ($belowLocks > 0) {
             return true;
@@ -386,32 +396,10 @@ class Dao extends Model\Element\Dao
      */
     public function unlockPropagate()
     {
-        $lockIds = $this->db->fetchCol('SELECT id from assets WHERE path LIKE ' . $this->db->quote($this->model->getRealFullPath() . '/%') . ' OR id = ' . $this->model->getId());
+        $lockIds = $this->db->fetchCol('SELECT id from assets WHERE path LIKE ' . $this->db->quote($this->db->escapeLike($this->model->getRealFullPath()) . '/%') . ' OR id = ' . $this->model->getId());
         $this->db->deleteWhere('tree_locks', "type = 'asset' AND id IN (" . implode(',', $lockIds) . ')');
 
         return $lockIds;
-    }
-
-    /**
-     * Get latest available version, using $force always returns a version no matter if it is the same as the published one
-     *
-     * @param bool $force
-     *
-     * @return Model\Version|null
-     */
-    public function getLatestVersion($force = false)
-    {
-        if ($this->model->getType() != 'folder') {
-            $versionData = $this->db->fetchRow("SELECT id,date FROM versions WHERE cid = ? AND ctype='asset' ORDER BY `id` DESC LIMIT 1", $this->model->getId());
-
-            if ($versionData && $versionData['id'] && ($versionData['date'] > $this->model->getModificationDate() || $force)) {
-                $version = Model\Version::getById($versionData['id']);
-
-                return $version;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -439,7 +427,7 @@ class Dao extends Model\Element\Dao
         $userIds[] = $user->getId();
 
         try {
-            $permissionsParent = $this->db->fetchOne('SELECT `' . $type . '` FROM users_workspaces_asset WHERE cid IN (' . implode(',', $parentIds) . ') AND userId IN (' . implode(',', $userIds) . ') ORDER BY LENGTH(cpath) DESC, ABS(userId-' . $user->getId() . ') ASC LIMIT 1');
+            $permissionsParent = $this->db->fetchOne('SELECT ' . $this->db->quoteIdentifier($type) . ' FROM users_workspaces_asset WHERE cid IN (' . implode(',', $parentIds) . ') AND userId IN (' . implode(',', $userIds) . ') ORDER BY LENGTH(cpath) DESC, FIELD(userId, ' . $user->getId() . ') DESC, ' . $this->db->quoteIdentifier($type) . ' DESC  LIMIT 1');
 
             if ($permissionsParent) {
                 return true;
@@ -453,7 +441,7 @@ class Dao extends Model\Element\Dao
                     $path = '/';
                 }
 
-                $permissionsChildren = $this->db->fetchOne('SELECT list FROM users_workspaces_asset WHERE cpath LIKE ? AND userId IN (' . implode(',', $userIds) . ') AND list = 1 LIMIT 1', $path . '%');
+                $permissionsChildren = $this->db->fetchOne('SELECT list FROM users_workspaces_asset WHERE cpath LIKE ? AND userId IN (' . implode(',', $userIds) . ') AND list = 1 LIMIT 1', $this->db->escapeLike($path) . '%');
                 if ($permissionsChildren) {
                     return true;
                 }

@@ -1,32 +1,45 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\CoreBundle\Command;
 
 use Pimcore\Cache;
 use Pimcore\Console\AbstractCommand;
+use Pimcore\Event\SystemEvents;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\EventDispatcher\GenericEvent;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
+/**
+ * @internal
+ */
 class CacheClearCommand extends AbstractCommand
 {
+    protected static $defaultName = 'pimcore:cache:clear';
+
+    public function __construct(private EventDispatcherInterface $eventDispatcher)
+    {
+        parent::__construct();
+    }
+
     protected function configure()
     {
         $this
-            ->setName('pimcore:cache:clear')
             ->setDescription('Clear caches')
             ->addOption(
                 'tags',
@@ -63,6 +76,9 @@ class CacheClearCommand extends AbstractCommand
             $io->success('Pimcore output cache cleared successfully');
         } else {
             Cache::clearAll();
+
+            $this->eventDispatcher->dispatch(new GenericEvent(), SystemEvents::CACHE_CLEAR);
+
             $io->success('Pimcore data cache cleared successfully');
         }
 

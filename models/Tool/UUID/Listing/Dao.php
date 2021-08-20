@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Tool
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Tool\UUID\Listing;
@@ -21,12 +19,14 @@ use Pimcore\Model;
 use Pimcore\Model\Tool\UUID;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Tool\UUID\Listing $model
  */
 class Dao extends Model\Listing\Dao\AbstractDao
 {
     /**
-     * Loads a list of Email_Log for the specified parameters, returns an array of Email_Log elements
+     * Loads a list of UUID for the specified parameters, returns an array of UUID elements
      *
      * @return array
      */
@@ -42,19 +42,16 @@ class Dao extends Model\Listing\Dao\AbstractDao
     }
 
     /**
-     * Returns the total amount of Email_Log entries
+     * Returns the total amount of UUID entries
      *
      * @return int
      */
     public function getTotalCount()
     {
-        $amount = 0;
-
         try {
-            $amount = (int) $this->db->fetchOne('SELECT COUNT(*) as amount FROM ' . UUID\Dao::TABLE_NAME .' ' . $this->getCondition(), $this->model->getConditionVariables());
+            return (int) $this->db->fetchOne('SELECT COUNT(*) FROM ' . UUID\Dao::TABLE_NAME .' ' . $this->getCondition(), $this->model->getConditionVariables());
         } catch (\Exception $e) {
+            return 0;
         }
-
-        return $amount;
     }
 }

@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\CartItem;
@@ -27,13 +28,6 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing
 {
     /**
      * @var array
-     *
-     * @deprecated use getter/setter methods or $this->data
-     */
-    public $cartItems;
-
-    /**
-     * @var array
      */
     protected $order = ['ASC'];
 
@@ -42,13 +36,8 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing
      */
     protected $orderKey = ['`sortIndex`', '`addedDateTimestamp`'];
 
-    public function __construct()
-    {
-        $this->cartItems = & $this->data;
-    }
-
     /**
-     * @var array
+     * @param string $key
      *
      * @return bool
      */

@@ -3,16 +3,20 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.fieldcollection");
 pimcore.object.fieldcollection = Class.create({
+
+    forbiddenNames: [
+        "abstract", "class", "data", "folder", "list", "permissions", "resource", "concrete", "interface"
+    ],
 
     initialize: function () {
 
@@ -185,11 +189,9 @@ pimcore.object.fieldcollection = Class.create({
 
     addFieldComplete: function (button, value, object) {
 
-        var regresult = value.match(/[a-zA-Z]+/);
-        var forbiddennames = ["abstract","class","data","folder","list","permissions","resource",
-                                                        "concrete","interface"];
+        var isValidName = /^[a-zA-Z]+$/;
 
-        if (button == "ok" && value.length > 2 && regresult == value && !in_array(value, forbiddennames)) {
+        if (button == "ok" && value.length > 2 && isValidName.test(value) && !in_arrayi(value, this.forbiddenNames)) {
             Ext.Ajax.request({
                 url: Routing.generate('pimcore_admin_dataobject_class_fieldcollectionupdate'),
                 method: 'POST',

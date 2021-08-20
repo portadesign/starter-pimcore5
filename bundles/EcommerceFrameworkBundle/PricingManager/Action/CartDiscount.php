@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\Action;
@@ -20,7 +21,7 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\EnvironmentInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Type\Decimal;
 
 // TODO use Decimal for amounts?
-class CartDiscount implements DiscountInterface
+class CartDiscount implements DiscountInterface, CartActionInterface
 {
     /**
      * @var float
@@ -37,16 +38,6 @@ class CartDiscount implements DiscountInterface
      *
      * @return ActionInterface
      */
-    public function executeOnProduct(EnvironmentInterface $environment)
-    {
-        return $this;
-    }
-
-    /**
-     * @param EnvironmentInterface $environment
-     *
-     * @return ActionInterface
-     */
     public function executeOnCart(EnvironmentInterface $environment)
     {
         $priceCalculator = $environment->getCart()->getPriceCalculator();
@@ -54,6 +45,8 @@ class CartDiscount implements DiscountInterface
         $amount = Decimal::create($this->amount);
         if ($amount->isZero()) {
             $amount = $priceCalculator->getSubTotal()->getAmount()->toPercentage($this->getPercent());
+            //round to 2 digits for further calculations to avoid rounding issues at later point
+            $amount = Decimal::fromDecimal($amount->withScale(2));
         }
 
         $amount = $amount->mul(-1);
@@ -85,7 +78,7 @@ class CartDiscount implements DiscountInterface
         return json_encode([
             'type' => 'CartDiscount',
             'amount' => $this->getAmount(),
-            'percent' => $this->getPercent()
+            'percent' => $this->getPercent(),
         ]);
     }
 

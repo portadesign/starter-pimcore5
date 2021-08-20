@@ -1,38 +1,40 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Helper;
 
-use Doctrine\Common\Persistence\ConnectionRegistry;
 use Doctrine\DBAL\Connection;
+use Doctrine\Persistence\ConnectionRegistry;
 use Monolog\Handler\HandlerInterface;
 use Psr\Log\LoggerAwareTrait;
 
-class LongRunningHelper
+final class LongRunningHelper
 {
     use LoggerAwareTrait;
 
     protected $connectionRegistry;
+
     protected $pimcoreRuntimeCacheProtectedItems = [
         'Config_system',
         'pimcore_admin_user',
         'Config_website',
-        'pimcore_editmode',
         'pimcore_error_document',
         'pimcore_site',
-        'Pimcore_Db'
+        'Pimcore_Db',
     ];
+
     protected $monologHandlers = [];
 
     /**
@@ -63,8 +65,9 @@ class LongRunningHelper
                 if (!($connection instanceof Connection)) {
                     throw new \LogicException('Expected only instances of Connection');
                 }
-
-                $connection->close();
+                if ($connection->isTransactionActive() === false) {
+                    $connection->close();
+                }
             }
         } catch (\Exception $e) {
             // connection couldn't be established, this is e.g. the case when Pimcore isn't installed yet
@@ -117,7 +120,7 @@ class LongRunningHelper
         }
     }
 
-    public function cleanupMonolog()
+    protected function cleanupMonolog()
     {
         foreach ($this->monologHandlers as $handler) {
             $handler->close();
@@ -125,6 +128,8 @@ class LongRunningHelper
     }
 
     /**
+     * @internal
+     *
      * @param HandlerInterface $handler
      */
     public function addMonologHandler(HandlerInterface $handler)

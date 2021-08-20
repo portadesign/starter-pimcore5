@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.element.selector.asset");
@@ -198,8 +198,16 @@ pimcore.element.selector.asset = Class.create(pimcore.element.selector.abstract,
                 {text: t("filename"), width: 200, sortable: false, dataIndex: 'filename', hidden: true, renderer: Ext.util.Format.htmlEncode},
                 {text: t("preview"), width: 150, sortable: false, dataIndex: 'subtype',
                     renderer: function (value, metaData, record, rowIndex, colIndex, store) {
-                        if(record.data.subtype == "image") {
-                            var route = 'pimcore_admin_asset_getimagethumbnail';
+                        var routes = {
+                            image: "pimcore_admin_asset_getimagethumbnail",
+                            video: "pimcore_admin_asset_getvideothumbnail",
+                            document: "pimcore_admin_asset_getdocumentthumbnail"
+                        };
+
+                        if (record.data.subtype in routes) {
+                            
+                            var route = routes[record.data.subtype];
+
                             var params = {
                                 id: record.data.id,
                                 width: 100,
@@ -211,7 +219,7 @@ pimcore.element.selector.asset = Class.create(pimcore.element.selector.abstract,
                             var uri = Routing.generate(route, params);
 
                             return '<div name="' + t(record.data.subtype)
-                                + '"><img src="'+uri+'" /></div>';
+                                + '"><img src="' + uri + '" /></div>';
                         }
                     }
                 }

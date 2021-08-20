@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Routing;
@@ -21,7 +22,6 @@ use Pimcore\Http\RequestHelper;
 use Pimcore\Model\Document;
 use Pimcore\Model\Redirect;
 use Pimcore\Model\Site;
-use Pimcore\Model\Tool\Lock;
 use Pimcore\Routing\Redirect\RedirectUrlPartResolver;
 use Pimcore\Tool;
 use Psr\Log\LoggerAwareInterface;
@@ -29,8 +29,13 @@ use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
 
-class RedirectHandler implements LoggerAwareInterface
+/**
+ * @internal
+ */
+final class RedirectHandler implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
@@ -57,15 +62,21 @@ class RedirectHandler implements LoggerAwareInterface
     private $config;
 
     /**
+     * @var null|LockInterface
+     */
+    private $lock = null;
+
+    /**
      * @param RequestHelper $requestHelper
      * @param SiteResolver $siteResolver
      * @param Config $config
      */
-    public function __construct(RequestHelper $requestHelper, SiteResolver $siteResolver, Config $config)
+    public function __construct(RequestHelper $requestHelper, SiteResolver $siteResolver, Config $config, LockFactory $lockFactory)
     {
         $this->requestHelper = $requestHelper;
         $this->siteResolver = $siteResolver;
         $this->config = $config;
+        $this->lock = $lockFactory->createLock(self::class);
     }
 
     /**
@@ -159,7 +170,7 @@ class RedirectHandler implements LoggerAwareInterface
             } else {
                 $this->logger->error('Target of redirect {redirect} not found (Document-ID: {document})', [
                     'redirect' => $redirect->getId(),
-                    'document' => $target
+                    'document' => $target,
                 ]);
 
                 return null;
@@ -184,7 +195,7 @@ class RedirectHandler implements LoggerAwareInterface
                 } else {
                     $this->logger->error('Site with ID {targetSite} not found', [
                         'redirect' => $redirect->getId(),
-                        'targetSite' => $redirect->getTargetSite()
+                        'targetSite' => $redirect->getTargetSite(),
                     ]);
 
                     return null;
@@ -241,7 +252,7 @@ class RedirectHandler implements LoggerAwareInterface
         $cacheKey = 'system_route_redirect';
         if (($this->redirects = Cache::load($cacheKey)) === false) {
             // acquire lock to avoid concurrent redirect cache warm-up
-            Lock::acquire($cacheKey);
+            $this->lock->acquire(true);
 
             //check again if redirects are cached to avoid re-warming cache
             if (($this->redirects = Cache::load($cacheKey)) === false) {
@@ -259,12 +270,12 @@ class RedirectHandler implements LoggerAwareInterface
                 }
             }
 
-            Lock::release($cacheKey);
+            $this->lock->release();
         }
 
         if (!is_array($this->redirects)) {
             $this->logger->warning('Failed to load redirects', [
-                'redirects' => $this->redirects
+                'redirects' => $this->redirects,
             ]);
 
             $this->redirects = [];

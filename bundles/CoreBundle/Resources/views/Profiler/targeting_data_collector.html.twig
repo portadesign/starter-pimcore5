@@ -1,9 +1,9 @@
-{% extends 'WebProfilerBundle:Profiler:layout.html.twig' %}
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
 
 {% block toolbar %}
     {% if collector.hasData %}
         {% set icon %}
-            {{ include("PimcoreCoreBundle:Profiler:target.svg.twig") }}
+            {{ include("@PimcoreCore/Profiler/target.svg.twig") }}
 
             {% if collector.documentTargetGroup is not null %}
                 <span class="sf-toolbar-value">{{ collector.documentTargetGroup.name }}</span>
@@ -51,7 +51,7 @@
 {% block menu %}
     <span class="label {{ (not collector.hasData) ? 'disabled' }}">
         <span class="icon">
-            {{ include("PimcoreCoreBundle:Profiler:target.svg.twig") }}
+            {{ include("@PimcoreCore/Profiler/target.svg.twig") }}
         </span>
         <strong>Targeting</strong>
     </span>

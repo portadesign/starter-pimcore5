@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Security\Guard;
@@ -20,6 +21,7 @@ use Pimcore\Bundle\AdminBundle\Security\User\User;
 use Pimcore\Cache\Runtime;
 use Pimcore\Event\Admin\Login\LoginCredentialsEvent;
 use Pimcore\Event\Admin\Login\LoginFailedEvent;
+use Pimcore\Event\Admin\Login\LoginRedirectEvent;
 use Pimcore\Event\AdminEvents;
 use Pimcore\Model\User as UserModel;
 use Pimcore\Tool\Admin;
@@ -43,6 +45,9 @@ use Symfony\Component\Security\Guard\AbstractGuardAuthenticator;
 use Symfony\Component\Security\Http\HttpUtils;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
+/**
+ * @internal
+ */
 class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
@@ -108,7 +113,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function supports(Request $request)
     {
@@ -117,7 +122,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function start(Request $request, AuthenticationException $authException = null)
     {
@@ -129,13 +134,16 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
             return $response;
         }
 
-        $url = $this->router->generate('pimcore_admin_login', ['perspective' => strip_tags($request->get('perspective'))]);
+        $event = new LoginRedirectEvent('pimcore_admin_login', ['perspective' => strip_tags($request->get('perspective'))]);
+        $this->dispatcher->dispatch($event, AdminEvents::LOGIN_REDIRECT);
+
+        $url = $this->router->generate($event->getRouteName(), $event->getRouteParams());
 
         return new RedirectResponse($url);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function getCredentials(Request $request)
     {
@@ -147,27 +155,28 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
                 $this->bruteforceProtectionHandler->checkProtection($username);
                 $credentials = [
                     'username' => $username,
-                    'password' => $request->get('password')
+                    'password' => $request->get('password'),
                 ];
             } elseif ($token = $request->get('token')) {
                 $this->bruteforceProtectionHandler->checkProtection();
                 $credentials = [
                     'token' => $token,
-                    'reset' => (bool) $request->get('reset', false)
+                    'reset' => (bool) $request->get('reset', false),
                 ];
             } else {
                 $this->bruteforceProtectionHandler->checkProtection();
+
                 throw new AuthenticationException('Missing username or token');
             }
 
             $event = new LoginCredentialsEvent($request, $credentials);
-            $this->dispatcher->dispatch(AdminEvents::LOGIN_CREDENTIALS, $event);
+            $this->dispatcher->dispatch($event, AdminEvents::LOGIN_CREDENTIALS);
 
             return $event->getCredentials();
         } else {
             if ($pimcoreUser = Authentication::authenticateSession($request)) {
                 return [
-                    'user' => $pimcoreUser
+                    'user' => $pimcoreUser,
                 ];
             }
         }
@@ -176,7 +185,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function getUser($credentials, UserProviderInterface $userProvider)
     {
@@ -206,7 +215,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
                 } else {
                     // trigger LOGIN_FAILED event if user could not be authenticated via username/password
                     $event = new LoginFailedEvent($credentials);
-                    $this->dispatcher->dispatch(AdminEvents::LOGIN_FAILED, $event);
+                    $this->dispatcher->dispatch($event, AdminEvents::LOGIN_FAILED);
 
                     if ($event->hasUser()) {
                         $user = new User($event->getUser());
@@ -256,7 +265,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function checkCredentials($credentials, UserInterface $user)
     {
@@ -269,21 +278,21 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception)
     {
         $this->bruteforceProtectionHandler->addEntry($request->get('username'), $request);
 
         $url = $this->router->generate('pimcore_admin_login', [
-            'auth_failed' => 'true'
+            'auth_failed' => 'true',
         ]);
 
         return new RedirectResponse($url);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, $providerKey)
     {
@@ -308,7 +317,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
         // every request. therefore we only redirect if we're on the login page
         if (!in_array($request->attributes->get('_route'), [
             'pimcore_admin_login',
-            'pimcore_admin_login_check'
+            'pimcore_admin_login_check',
         ])) {
             return null;
         }
@@ -320,7 +329,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
         } else {
             $url = $this->router->generate('pimcore_admin_index', [
                 '_dc' => time(),
-                'perspective' => strip_tags($request->get('perspective'))
+                'perspective' => strip_tags($request->get('perspective')),
             ]);
         }
 
@@ -335,7 +344,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function supportsRememberMe()
     {

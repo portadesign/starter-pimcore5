@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\Action;
@@ -54,17 +55,6 @@ class ProductDiscount implements ProductDiscountInterface
     }
 
     /**
-     * @param EnvironmentInterface $environment
-     *
-     * @return ActionInterface
-     */
-    public function executeOnCart(EnvironmentInterface $environment)
-    {
-        //nothing to to here
-        return $this;
-    }
-
-    /**
      * @return string
      */
     public function toJSON()
@@ -72,7 +62,7 @@ class ProductDiscount implements ProductDiscountInterface
         return json_encode([
             'type' => 'ProductDiscount',
             'amount' => $this->getAmount(),
-            'percent' => $this->getPercent()
+            'percent' => $this->getPercent(),
         ]);
     }
 

@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.asset.metadata.tags.select");
@@ -32,6 +32,15 @@ pimcore.asset.metadata.tags.select = Class.create(pimcore.asset.metadata.tags.ab
             getEditor: this.getGridColumnEditor.bind(this, field),
             renderer: this.getRenderer(field)
         };
+    },
+
+    addGridOptionsFromColumnConfig: function (key, v, rec) {
+        if (v && typeof v.options !== "undefined") {
+            // split it up and store the options in a separate field
+            rec.set(key + "%options", v.options, {convert: false, dirty: false});
+            return v.value;
+        }
+        return v;
     },
 
     getCellEditor: function (field, record) {

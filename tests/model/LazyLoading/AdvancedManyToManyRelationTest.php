@@ -1,8 +1,22 @@
 <?php
 
+/**
+ * Pimcore
+ *
+ * This source file is available under two different licenses:
+ * - GNU General Public License version 3 (GPLv3)
+ * - Pimcore Commercial License (PCL)
+ * Full copyright and license information is available in
+ * LICENSE.md which is distributed with this source code.
+ *
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ */
+
 namespace Pimcore\Tests\Model\LazyLoading;
 
 use Pimcore\Cache;
+use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\DataObject\Data\BlockElement;
 use Pimcore\Model\DataObject\Data\ElementMetadata;
 use Pimcore\Model\DataObject\Fieldcollection;
@@ -310,9 +324,32 @@ class AdvancedManyToManyRelationTest extends AbstractLazyLoadingTest
         //prepare data object
         $object = $this->createDataObject();
         $brick = new LazyLoadingLocalizedTest($object);
-        $brick->getLocalizedfields()->setLocalizedValue('ladvancedRelations', $this->loadMetadataRelations('ladvancedRelations'));
+        $relations = $this->loadMetadataRelations('ladvancedRelations');
+
+        $brick->getLocalizedfields()->setLocalizedValue('ladvancedRelations', $relations, 'en');
+        $brick->getLocalizedfields()->setLocalizedValue('ladvancedRelations', $relations, 'de');
+
         $object->getBricks()->setLazyLoadingLocalizedTest($brick);
         $object->save();
+
+        $object = Concrete::getById($object->getId(), true);
+        $this->assertTrue(count($object->getBricks()->getLazyLoadingLocalizedTest()->getLadvancedRelations('en')) > 0);
+        $this->assertTrue(count($object->getBricks()->getLazyLoadingLocalizedTest()->getLadvancedRelations('de')) > 0);
+
+        $object = Concrete::getById($object->getId(), true);
+        array_pop($relations);
+        $brick = $object->getBricks()->getLazyLoadingLocalizedTest();
+
+        $lFields = $brick->getLocalizedfields();
+
+        // change one language and make sure that it does not affect the other one
+        $lFields->setLocalizedValue('ladvancedRelations', $relations, 'de');
+        $object->save();
+
+        $object = Concrete::getById($object->getId(), true);
+        $this->assertTrue(count($object->getBricks()->getLazyLoadingLocalizedTest()->getLadvancedRelations('en')) > 0);
+        $this->assertTrue(count($object->getBricks()->getLazyLoadingLocalizedTest()->getLadvancedRelations('de')) > 0);
+
         $parentId = $object->getId();
         $childId = $this->createChildDataObject($object)->getId();
 

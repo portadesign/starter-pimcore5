@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Analytics\Google;
@@ -28,19 +28,25 @@ use Pimcore\Analytics\SiteId\SiteIdProvider;
 use Pimcore\Config\Config as ConfigObject;
 use Pimcore\Event\Analytics\GoogleAnalyticsEvents;
 use Psr\Log\LoggerAwareTrait;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
-use Symfony\Component\Templating\EngineInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Twig\Environment;
 
 class Tracker extends AbstractTracker
 {
     use LoggerAwareTrait;
 
     const BLOCK_BEFORE_SCRIPT_TAG = 'beforeScriptTag';
+
     const BLOCK_BEFORE_SCRIPT = 'beforeScript';
+
     const BLOCK_BEFORE_INIT = 'beforeInit';
+
     const BLOCK_BEFORE_TRACK = 'beforeTrack';
+
     const BLOCK_AFTER_TRACK = 'afterTrack';
+
     const BLOCK_AFTER_SCRIPT = 'afterScript';
+
     const BLOCK_AFTER_SCRIPT_TAG = 'afterScriptTag';
 
     /**
@@ -59,9 +65,9 @@ class Tracker extends AbstractTracker
     private $eventDispatcher;
 
     /**
-     * @var EngineInterface
+     * @var Environment
      */
-    private $templatingEngine;
+    private $twig;
 
     /**
      * @var string|null
@@ -85,14 +91,14 @@ class Tracker extends AbstractTracker
         SiteIdProvider $siteIdProvider,
         ConfigProvider $configProvider,
         EventDispatcherInterface $eventDispatcher,
-        EngineInterface $templatingEngine
+        Environment $twig
     ) {
         parent::__construct($siteIdProvider);
 
         $this->siteIdProvider = $siteIdProvider;
         $this->configProvider = $configProvider;
         $this->eventDispatcher = $eventDispatcher;
-        $this->templatingEngine = $templatingEngine;
+        $this->twig = $twig;
     }
 
     public function getDefaultPath()
@@ -160,7 +166,7 @@ class Tracker extends AbstractTracker
             $template = '@PimcoreCore/Analytics/Tracking/Google/Analytics/gtagTrackingCode.html.twig';
 
             $data['gtagConfig'] = $this->getTrackerConfigurationFromJson($siteConfig->get('universal_configuration') ?? null, [
-                'anonymize_ip' => true
+                'anonymize_ip' => true,
             ]);
         } elseif ($siteConfig->get('asynchronouscode') || $siteConfig->get('retargetingcode')) {
             $template = '@PimcoreCore/Analytics/Tracking/Google/Analytics/asynchronousTrackingCode.html.twig';
@@ -171,7 +177,7 @@ class Tracker extends AbstractTracker
         $blocks = $this->buildCodeBlocks($siteId, $siteConfig);
 
         $event = new TrackingDataEvent($config, $siteId, $data, $blocks, $template);
-        $this->eventDispatcher->dispatch(GoogleAnalyticsEvents::CODE_TRACKING_DATA, $event);
+        $this->eventDispatcher->dispatch($event, GoogleAnalyticsEvents::CODE_TRACKING_DATA);
 
         return $this->renderTemplate($event);
     }
@@ -185,7 +191,7 @@ class Tracker extends AbstractTracker
                 $config = $jsonConfig;
             } else {
                 $this->logger->warning('Failed to parse analytics tracker custom configuration: {error}', [
-                    'error' => json_last_error_msg() ?? 'not an array'
+                    'error' => json_last_error_msg() ?? 'not an array',
                 ]);
             }
         }
@@ -237,7 +243,7 @@ class Tracker extends AbstractTracker
         $data = $event->getData();
         $data['blocks'] = $event->getBlocks();
 
-        $code = $this->templatingEngine->render(
+        $code = $this->twig->render(
             $event->getTemplate(),
             $data
         );

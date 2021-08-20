@@ -1,17 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
@@ -20,10 +19,10 @@ use Pimcore\Model;
 
 class Time extends Model\DataObject\ClassDefinition\Data\Input
 {
-    use Model\DataObject\Traits\SimpleComparisonTrait;
-
     /**
      * Static type of this element
+     *
+     * @internal
      *
      * @var string
      */
@@ -32,21 +31,29 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
     /**
      * Column length
      *
+     * @internal
+     *
      * @var int
      */
     public $columnLength = 5;
 
     /**
+     * @internal
+     *
      * @var string|null
      */
     public $minValue;
 
     /**
+     * @internal
+     *
      * @var string|null
      */
     public $maxValue;
 
     /**
+     * @internal
+     *
      * @var int
      */
     public $increment = 15 ;
@@ -92,14 +99,9 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
     }
 
     /**
-     * Checks if data is valid for current data field
-     *
-     * @param mixed $data
-     * @param bool $omitMandatoryCheck
-     *
-     * @throws \Exception
+     * {@inheritdoc}
      */
-    public function checkValidity($data, $omitMandatoryCheck = false)
+    public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
         parent::checkValidity($data, $omitMandatoryCheck);
 
@@ -122,11 +124,8 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
         }
     }
 
-    /** True if change is allowed in edit mode.
-     * @param Model\DataObject\Concrete $object
-     * @param mixed $params
-     *
-     * @return bool
+    /**
+     * {@inheritdoc}
      */
     public function isDiffChangeAllowed($object, $params = [])
     {
@@ -150,7 +149,7 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
      *
      * @return null|string
      */
-    public function toTime($timestamp)
+    private function toTime($timestamp)
     {
         $time = @date('H:i', strtotime($timestamp));
         if (!$time) {
@@ -164,11 +163,11 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
      * Returns a timestamp representation of a given time
      *
      * @param string $string
-     * @param null $baseTimestamp
+     * @param int|null $baseTimestamp
      *
      * @return int
      */
-    protected function toTimestamp($string, $baseTimestamp = null)
+    private function toTimestamp($string, $baseTimestamp = null)
     {
         if ($baseTimestamp === null) {
             $baseTimestamp = time();
@@ -185,7 +184,7 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
      *
      * @return bool
      */
-    public function isEarlier($subject, $comparison)
+    private function isEarlier($subject, $comparison)
     {
         $baseTs = time();
 
@@ -200,7 +199,7 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
      *
      * @return bool
      */
-    public function isLater($subject, $comparison)
+    private function isLater($subject, $comparison)
     {
         $baseTs = time();
 
@@ -208,10 +207,7 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
     }
 
     /**
-     * @param Model\DataObject\Concrete\Dao|Model\DataObject\Localizedfield|Model\DataObject\Objectbrick\Data\AbstractData|\Pimcore\Model\DataObject\Fieldcollection\Data\AbstractData $object
-     * @param mixed $params
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function getDataForSearchIndex($object, $params = [])
     {

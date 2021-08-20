@@ -1,21 +1,21 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\Document;
 
 use Pimcore\Controller\Traits\ElementEditLockHelperTrait;
-use Pimcore\Event\Admin\ElementAdminStyleEvent;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,6 +24,8 @@ use Symfony\Component\Routing\Annotation\Route;
 
 /**
  * @Route("/hardlink")
+ *
+ * @internal
  */
 class HardlinkController extends DocumentControllerBase
 {
@@ -138,15 +140,15 @@ class HardlinkController extends DocumentControllerBase
         if (($request->get('task') == 'publish' && $link->isAllowed('publish')) || ($request->get('task') == 'unpublish' && $link->isAllowed('unpublish'))) {
             $link->save();
 
-            $this->addAdminStyle($link, ElementAdminStyleEvent::CONTEXT_EDITOR, $treeData);
+            $treeData = $this->getTreeNodeConfig($link);
 
             return $this->adminJson([
                 'success' => true,
                  'data' => [
                      'versionDate' => $link->getModificationDate(),
-                     'versionCount' => $link->getVersionCount()
+                     'versionCount' => $link->getVersionCount(),
                  ],
-                'treeData' => $treeData
+                'treeData' => $treeData,
             ]);
         } else {
             throw $this->createAccessDeniedHttpException();

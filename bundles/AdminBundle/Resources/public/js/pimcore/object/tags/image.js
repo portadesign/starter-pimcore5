@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.tags.image");
@@ -35,7 +35,7 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
             renderer: function (key, value, metaData, record, rowIndex, colIndex, store, view) {
                 this.applyPermissionStyle(key, value, metaData, record);
 
-                if (record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
+                if (record.data.inheritedFields && record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
                     metaData.tdCls += " grid_value_inherited";
                 }
 
@@ -68,11 +68,10 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
     },
 
     getLayoutEdit: function () {
-
-        if (intval(this.fieldConfig.width) < 1) {
+        if (!this.fieldConfig.width) {
             this.fieldConfig.width = 300;
         }
-        if (intval(this.fieldConfig.height) < 1) {
+        if (!this.fieldConfig.height) {
             this.fieldConfig.height = 300;
         }
 
@@ -117,7 +116,7 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
                         handler: this.openSearchEditor.bind(this)
                     }]
             },
-            componentCls: "object_field",
+            componentCls: "object_field object_field_type_" + this.type,
             bodyCls: "pimcore_droptarget_image pimcore_image_container"
         };
 
@@ -166,20 +165,31 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
     },
 
     getLayoutShow: function () {
-
-        if (intval(this.fieldConfig.width) < 1) {
+        if (!this.fieldConfig.width) {
             this.fieldConfig.width = 300;
         }
-        if (intval(this.fieldConfig.height) < 1) {
+        if (!this.fieldConfig.height) {
             this.fieldConfig.height = 300;
         }
 
         var conf = {
             width: this.fieldConfig.width,
             height: this.fieldConfig.height,
-            title: this.fieldConfig.title,
             border: true,
             style: "padding-bottom: 10px",
+            tbar: {
+                overflowHandler: 'menu',
+                items:
+                    [{
+                        xtype: "tbtext",
+                        text: "<b>" + this.fieldConfig.title + "</b>"
+                    }, "->",{
+                        xtype: "button",
+                        iconCls: "pimcore_icon_open",
+                        overflowText: t("open"),
+                        handler: this.openImage.bind(this)
+                    }]
+            },
             cls: "object_field",
             bodyCls: "pimcore_droptarget_image pimcore_image_container"
         };
@@ -187,6 +197,7 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
         this.component = new Ext.Panel(conf);
 
         this.component.on("afterrender", function (el) {
+            el.getEl().on("contextmenu", this.onContextMenu.bind(this));
             this.updateImage();
         }.bind(this));
 
@@ -308,15 +319,17 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
         var menu = new Ext.menu.Menu();
 
         if (this.data) {
-            menu.add(new Ext.menu.Item({
-                text: t('empty'),
-                iconCls: "pimcore_icon_delete",
-                handler: function (item) {
-                    item.parentMenu.destroy();
+            if(!this.fieldConfig.noteditable) {
+                menu.add(new Ext.menu.Item({
+                    text: t('empty'),
+                    iconCls: "pimcore_icon_delete",
+                    handler: function (item) {
+                        item.parentMenu.destroy();
 
-                    this.empty();
-                }.bind(this)
-            }));
+                        this.empty();
+                    }.bind(this)
+                }));
+            }
 
             menu.add(new Ext.menu.Item({
                 text: t('open'),
@@ -328,8 +341,7 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
                 }.bind(this)
             }));
 
-            if (this instanceof pimcore.object.tags.hotspotimage) {
-
+            if (!this.fieldConfig.noteditable && this instanceof pimcore.object.tags.hotspotimage) {
                 menu.add(new Ext.menu.Item({
                     text: t('select_specific_area_of_image'),
                     iconCls: "pimcore_icon_image_region",
@@ -352,24 +364,26 @@ pimcore.object.tags.image = Class.create(pimcore.object.tags.abstract, {
             }
         }
 
-        menu.add(new Ext.menu.Item({
-            text: t('search'),
-            iconCls: "pimcore_icon_search",
-            handler: function (item) {
-                item.parentMenu.destroy();
-                this.openSearchEditor();
-            }.bind(this)
-        }));
+        if(!this.fieldConfig.noteditable) {
+            menu.add(new Ext.menu.Item({
+                text: t('search'),
+                iconCls: "pimcore_icon_search",
+                handler: function (item) {
+                    item.parentMenu.destroy();
+                    this.openSearchEditor();
+                }.bind(this)
+            }));
 
-        menu.add(new Ext.menu.Item({
-            text: t('upload'),
-            cls: "pimcore_inline_upload",
-            iconCls: "pimcore_icon_upload",
-            handler: function (item) {
-                item.parentMenu.destroy();
-                this.uploadDialog();
-            }.bind(this)
-        }));
+            menu.add(new Ext.menu.Item({
+                text: t('upload'),
+                cls: "pimcore_inline_upload",
+                iconCls: "pimcore_icon_upload",
+                handler: function (item) {
+                    item.parentMenu.destroy();
+                    this.uploadDialog();
+                }.bind(this)
+            }));
+        }
 
         menu.showAt(e.getXY());
 

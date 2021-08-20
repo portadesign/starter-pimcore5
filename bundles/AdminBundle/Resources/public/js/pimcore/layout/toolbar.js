@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.layout.toolbar");
@@ -324,7 +324,7 @@ pimcore.layout.toolbar = Class.create({
 
             if (user.isAllowed("plugins") && perspectiveCfg.inToolbar("extras.plugins")) {
                 extrasItems.push({
-                    text: t("bundles"),
+                    text: t("bundles") + ' & ' + t('bricks'),
                     iconCls: "pimcore_nav_icon_bundles",
                     handler: this.extensionAdmin
                 });
@@ -427,16 +427,6 @@ pimcore.layout.toolbar = Class.create({
                         );
                     }
 
-                    if (perspectiveCfg.inToolbar("extras.systemtools.serverinfo")) {
-                        systemItems.push(
-                            {
-                                text: t("server_info"),
-                                iconCls: "pimcore_nav_icon_server_info",
-                                handler: this.showServerInfo
-                            }
-                        );
-                    }
-
                     if (perspectiveCfg.inToolbar("extras.systemtools.database")) {
                         systemItems.push(
                             {
@@ -497,22 +487,6 @@ pimcore.layout.toolbar = Class.create({
                     text: t("reports"),
                     iconCls: "pimcore_nav_icon_reports",
                     handler: this.showReports.bind(this, null)
-                });
-            }
-
-            if (user.isAllowed("tag_snippet_management") && perspectiveCfg.inToolbar("marketing.tagmanagement")) {
-                marketingItems.push({
-                    text: t("tag_snippet_management"),
-                    iconCls: "pimcore_nav_icon_tag",
-                    handler: this.showTagManagement
-                });
-            }
-
-            if (user.isAllowed("qr_codes")) {
-                marketingItems.push({
-                    text: t("qr_codes"),
-                    iconCls: "pimcore_nav_icon_qrcode",
-                    handler: this.showQRCode
                 });
             }
 
@@ -602,70 +576,6 @@ pimcore.layout.toolbar = Class.create({
                         handler: this.reportSettings
                     });
                 }
-            }
-
-            if (user.isAllowed("piwik_reports") && 'undefined' !== typeof pimcore.settings.piwik && pimcore.settings.piwik.iframe_configured) {
-                marketingItems.push({
-                    text: "Matomo / Piwik",
-                    iconCls: "pimcore_nav_icon_matomo",
-                    handler: (function() {
-                        // create a promise which is resolved if the request succeeds
-                        var promise = new Ext.Promise(function (resolve, reject) {
-                            Ext.Ajax.request({
-                                url: Routing.generate('pimcore_admin_reports_piwik_iframeintegration'),
-                                ignoreErrors: true, // do not pop up error window on failure
-                                success: function (response) {
-                                    var data = {};
-
-                                    try {
-                                        data = Ext.decode(response.responseText);
-                                    } catch (e) {
-                                        reject(e);
-                                        return;
-                                    }
-
-                                    if (data && data.configured && data.url) {
-                                        resolve(data.url);
-                                    }
-
-                                    reject('Matomo iframe integration is not configured.');
-                                },
-
-                                failure: function(response) {
-                                    try {
-                                        var data = Ext.decode(response.responseText);
-                                        if (data && data.message) {
-                                            reject(data.message);
-                                            return;
-                                        }
-                                    } catch (e) {}
-
-                                    reject(response.responseText);
-                                }
-                            });
-                        });
-
-                        // the actual handler
-                        return function () {
-                            promise.then(
-                                function (url) {
-                                    // only open window after promise was resolved
-                                    pimcore.helpers.openGenericIframeWindow(
-                                        "piwik_iframe_integration",
-                                        url,
-                                        "pimcore_icon_matomo",
-                                        "Matomo / Piwik"
-                                    );
-                                },
-                                function (message) {
-                                    if (message) {
-                                        console.error(message);
-                                    }
-                                }
-                            );
-                        };
-                    }())
-                });
             }
 
             if (marketingItems.length > 0) {
@@ -1175,7 +1085,7 @@ pimcore.layout.toolbar = Class.create({
                     text: t("mail_settings_incomplete"),
                     iconCls: "pimcore_nav_icon_email",
                     handler: function () {
-                        window.open('https://pimcore.com/docs/6.x/Development_Documentation/Tools_and_Features/System_Settings.html#page_E-Mail-Settings');
+                        window.open('https://pimcore.com/docs/pimcore/current/Development_Documentation/Development_Tools_and_Details/Email_Framework');
                     }
                 });
                 pimcore.notification.helper.incrementCount();
@@ -1443,24 +1353,6 @@ pimcore.layout.toolbar = Class.create({
         }
     },
 
-    showTagManagement: function () {
-        try {
-            pimcore.globalmanager.get("tagmanagement").activate();
-        }
-        catch (e) {
-            pimcore.globalmanager.add("tagmanagement", new pimcore.settings.tagmanagement.panel());
-        }
-    },
-
-    showQRCode: function () {
-        try {
-            pimcore.globalmanager.get("qrcode").activate();
-        }
-        catch (e) {
-            pimcore.globalmanager.add("qrcode", new pimcore.report.qrcode.panel());
-        }
-    },
-
     showCustomReports: function () {
         try {
             pimcore.globalmanager.get("custom_reports_settings").activate();
@@ -1717,10 +1609,6 @@ pimcore.layout.toolbar = Class.create({
 
     showPhpInfo: function () {
         pimcore.helpers.openGenericIframeWindow("phpinfo", Routing.generate('pimcore_admin_misc_phpinfo'), "pimcore_icon_php", "PHP Info");
-    },
-
-    showServerInfo: function () {
-        pimcore.helpers.openGenericIframeWindow("serverinfo", Routing.generate('pimcore_admin_external_linfo_index'), "pimcore_icon_server_info", "Server Info");
     },
 
     showOpcacheStatus: function () {

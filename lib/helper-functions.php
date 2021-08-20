@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 /**
@@ -42,19 +43,22 @@ function gzcompressfile($source, $level = null, $target = null)
         $dest = $source.'.gz';
     }
 
-    $mode = 'wb'.$level;
     $error = false;
 
-    $fp_out = gzopen($dest, $mode);
     $fp_in = fopen($source, 'rb');
+
+    $fp_out = fopen($dest, 'wb');
+    $deflateContext = deflate_init(ZLIB_ENCODING_GZIP, ['level' => $level]);
 
     if ($fp_out && $fp_in) {
         while (!feof($fp_in)) {
-            gzwrite($fp_out, fread($fp_in, 1024 * 512));
+            fwrite($fp_out, deflate_add($deflateContext, fread($fp_in, 1024 * 512), ZLIB_NO_FLUSH));
         }
 
         fclose($fp_in);
-        gzclose($fp_out);
+
+        fwrite($fp_out, deflate_add($deflateContext, '', ZLIB_FINISH));
+        fclose($fp_out);
     } else {
         $error = true;
     }
@@ -67,7 +71,7 @@ function gzcompressfile($source, $level = null, $target = null)
 }
 
 /**
- * @param string $string
+ * @param mixed $string
  *
  * @return bool
  */
@@ -77,9 +81,9 @@ function is_json($string)
         json_decode($string);
 
         return json_last_error() == JSON_ERROR_NONE;
-    } else {
-        return false;
     }
+
+    return false;
 }
 
 /**
@@ -219,23 +223,23 @@ function array_toquerystring($args)
 }
 
 /**
- * @param array $array
+ * @param array $array with attribute names as keys, and values as values
  *
  * @return string
  */
 function array_to_html_attribute_string($array)
 {
-    $data = '';
+    $data = [];
+
     foreach ($array as $key => $value) {
         if (is_scalar($value)) {
-            if (!empty($data)) {
-                $data .= ' ';
-            }
-            $data .= $key . '="' . htmlspecialchars($value) . '"';
+            $data[] = $key . '="' . htmlspecialchars($value) . '"';
+        } elseif (is_string($key) && is_null($value)) {
+            $data[] = $key;
         }
     }
 
-    return $data;
+    return implode(' ', $data);
 }
 
 /**
@@ -312,12 +316,10 @@ function formatBytes($bytes, $precision = 2)
 /**
  * @param string $str
  *
- * @return float|int
+ * @return int
  */
 function filesize2bytes($str)
 {
-    $bytes = 0;
-
     $bytes_array = [
         'K' => 1024,
         'M' => 1024 * 1024,
@@ -326,13 +328,13 @@ function filesize2bytes($str)
         'P' => 1024 * 1024 * 1024 * 1024 * 1024,
     ];
 
-    $bytes = floatval($str);
+    $bytes = (float)$str;
 
     if (preg_match('#([KMGTP])?B?$#si', $str, $matches) && (array_key_exists(1, $matches) && !empty($bytes_array[$matches[1]]))) {
         $bytes *= $bytes_array[$matches[1]];
     }
 
-    $bytes = intval(round($bytes, 2));
+    $bytes = (int)round($bytes, 2);
 
     return $bytes;
 }
@@ -534,6 +536,7 @@ function resolvePath($filename)
         }
         if ($part == '..') {
             array_pop($out);
+
             continue;
         }
         $out[] = $part;
@@ -562,7 +565,7 @@ function closureHash(Closure $closure)
 
     $hash = md5(json_encode([
         $content,
-        $ref->getStaticVariables()
+        $ref->getStaticVariables(),
     ]));
 
     return $hash;
@@ -627,7 +630,7 @@ function to_php_data_file_format($contents, $comments = null)
 {
     $contents = var_export_pretty($contents);
 
-    $export = '<?php ';
+    $export = '<?php';
 
     if (!empty($comments)) {
         $export .= "\n\n";

@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.tags.datetime");
@@ -43,7 +43,7 @@ pimcore.object.tags.datetime = Class.create(pimcore.object.tags.abstract, {
             renderer:function (key, value, metaData, record) {
                         this.applyPermissionStyle(key, value, metaData, record);
 
-                        if (record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
+                        if (record.data.inheritedFields && record.data.inheritedFields[key] && record.data.inheritedFields[key].inherited == true) {
                             metaData.tdCls += " grid_value_inherited";
                         }
 
@@ -82,16 +82,26 @@ pimcore.object.tags.datetime = Class.create(pimcore.object.tags.abstract, {
         this.datefield = Ext.create('Ext.form.field.Date', date);
         this.timefield = Ext.create('Ext.form.field.Time', time);
 
-        this.component = Ext.create('Ext.form.FieldContainer', {
+        var componentCfg = {
             layout: 'hbox',
             fieldLabel:this.fieldConfig.title,
             combineErrors:false,
             items:[this.datefield, this.timefield],
-            componentCls:"object_field",
+            componentCls: "object_field object_field_type_" + this.type,
             isDirty: function() {
                 return this.datefield.isDirty() || this.timefield.isDirty()
             }.bind(this)
-        });
+        };
+
+        if (this.fieldConfig.labelWidth) {
+            componentCfg.labelWidth = this.fieldConfig.labelWidth;
+        }
+
+        if (this.fieldConfig.labelAlign) {
+            componentCfg.labelAlign = this.fieldConfig.labelAlign;
+        }
+
+        this.component = Ext.create('Ext.form.FieldContainer', componentCfg);
 
         return this.component;
     },
@@ -122,8 +132,12 @@ pimcore.object.tags.datetime = Class.create(pimcore.object.tags.abstract, {
                 dateString += " 00:00";
             }
 
-            var date = Ext.Date.parseDate(dateString, "Y-m-d H:i").getTime();
-            return date;
+            value = Ext.Date.parseDate(dateString, "Y-m-d H:i");
+            if (value && typeof value.getTime == "function") {
+                return value.getTime();
+            }
+
+            return value;
         }
         return false;
     },

@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Dependency
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Dependency;
@@ -24,6 +22,8 @@ use Pimcore\Model\Element;
 use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Dependency $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -44,7 +44,14 @@ class Dao extends Model\Dao\AbstractDao
         }
 
         // requires
-        $data = $this->db->fetchAll('SELECT `targetid`,`targettype`  FROM dependencies WHERE sourceid = ? AND sourcetype = ?', [$this->model->getSourceId(), $this->model->getSourceType()]);
+        $data = $this->db->fetchAll('SELECT dependencies.targetid,dependencies.targettype
+            FROM dependencies
+            LEFT JOIN objects ON dependencies.targetid=objects.o_id AND dependencies.targettype="object"
+            LEFT JOIN assets ON dependencies.targetid=assets.id AND dependencies.targettype="asset"
+            LEFT JOIN documents ON dependencies.targetid=documents.id AND dependencies.targettype="document"
+            WHERE dependencies.sourceid = ? AND dependencies.sourcetype = ?
+            ORDER BY objects.o_path, objects.o_key, documents.path, documents.key, assets.path, assets.filename',
+            [$this->model->getSourceId(), $this->model->getSourceType()]);
 
         if (is_array($data) && count($data) > 0) {
             foreach ($data as $d) {
@@ -157,7 +164,7 @@ class Dao extends Model\Dao\AbstractDao
                         'sourceid' => $this->model->getSourceId(),
                         'sourcetype' => $this->model->getSourceType(),
                         'targetid' => $target['id'],
-                        'targettype' => $target['type']
+                        'targettype' => $target['type'],
                     ]);
                 } catch (UniqueConstraintViolationException $e) {
                 }
@@ -175,7 +182,14 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function getRequiredBy($offset = null, $limit = null)
     {
-        $query = 'SELECT sourceid, sourcetype FROM dependencies WHERE targetid = ? AND targettype = ?';
+        $query = '
+            SELECT dependencies.sourceid, dependencies.sourcetype FROM dependencies
+            LEFT JOIN objects ON dependencies.sourceid=objects.o_id AND dependencies.sourcetype="object"
+            LEFT JOIN assets ON dependencies.sourceid=assets.id AND dependencies.sourcetype="asset"
+            LEFT JOIN documents ON dependencies.sourceid=documents.id AND dependencies.sourcetype="document"
+            WHERE dependencies.targetid = ? AND dependencies.targettype = ?
+            ORDER BY objects.o_path, objects.o_key, documents.path, documents.key, assets.path, assets.filename
+        ';
 
         if ($offset !== null && $limit !== null) {
             $query = sprintf($query . ' LIMIT %d,%d', $offset, $limit);
@@ -189,7 +203,7 @@ class Dao extends Model\Dao\AbstractDao
             foreach ($data as $d) {
                 $requiredBy[] = [
                     'id' => $d['sourceid'],
-                    'type' => $d['sourcetype']
+                    'type' => $d['sourcetype'],
                 ];
             }
         }
@@ -207,7 +221,7 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function getRequiredByWithPath($offset = null, $limit = null, $orderBy = null, $orderDirection = null)
     {
-        $targetId = intval($this->model->getSourceId());
+        $targetId = (int)$this->model->getSourceId();
 
         if (in_array($this->model->getSourceType(), ['object', 'document', 'asset'])) {
             $targetType = $this->model->getSourceType();
@@ -229,17 +243,17 @@ class Dao extends Model\Dao\AbstractDao
                 SELECT d.sourceid as id, d.sourcetype as type, CONCAT(o.o_path, o.o_key) as path
                 FROM dependencies d
                 JOIN objects o ON o.o_id = d.sourceid
-                WHERE d.targetid = ' . $targetId . " AND  d.targettype = '" . $targetType. "'
+                WHERE d.targetid = ' . $targetId . " AND  d.targettype = '" . $targetType. "' AND d.sourceType = 'object'
                 UNION
                 SELECT d.sourceid as id, d.sourcetype as type, CONCAT(doc.path, doc.key) as path
                 FROM dependencies d
                 JOIN documents doc ON doc.id = d.sourceid
-                WHERE d.targetid = " . $targetId . " AND  d.targettype = '" . $targetType. "'
+                WHERE d.targetid = " . $targetId . " AND  d.targettype = '" . $targetType. "' AND d.sourceType = 'document'
                 UNION
                 SELECT d.sourceid as id, d.sourcetype as type, CONCAT(a.path, a.filename) as path
                 FROM dependencies d
                 JOIN assets a ON a.id = d.sourceid
-                WHERE d.targetid = " . $targetId . " AND  d.targettype = '" . $targetType. "'
+                WHERE d.targetid = " . $targetId . " AND  d.targettype = '" . $targetType. "' AND d.sourceType = 'asset'
             ) dep
             ORDER BY " . $orderBy . ' ' . $orderDirection;
 

@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Tests\Ecommerce\Type;
@@ -64,11 +64,9 @@ class DecimalTest extends TestCase
         $this->assertSame('16', $noScale->asString(0));
     }
 
-    /**
-     * @expectedException \DomainException
-     */
     public function testInvalidScaleThrowsException()
     {
+        $this->expectException(\DomainException::class);
         Decimal::create(10000, -1);
     }
 
@@ -105,19 +103,17 @@ class DecimalTest extends TestCase
     }
 
     /**
-     * @expectedException \TypeError
      * @dataProvider invalidValueCreateProvider
      */
     public function testErrorOnInvalidCreateArgument($value)
     {
+        $this->expectException(\TypeError::class);
         Decimal::create($value);
     }
 
-    /**
-     * @expectedException \DomainException
-     */
     public function testInvalidScaleThrowsExceptionOnCreate()
     {
+        $this->expectException(\DomainException::class);
         Decimal::create('10.0', -1);
     }
 
@@ -154,11 +150,9 @@ class DecimalTest extends TestCase
         $this->assertEquals(15.99, $decimalValue->asNumeric());
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     */
     public function testExceptionOnInvalidFromNumeric()
     {
+        $this->expectException(\InvalidArgumentException::class);
         Decimal::fromNumeric('ABC');
     }
 
@@ -439,10 +433,10 @@ class DecimalTest extends TestCase
 
     /**
      * @dataProvider zeroDataProvider
-     * @expectedException \DivisionByZeroError
      */
     public function testExceptionOnDivisionByZero($val)
     {
+        $this->expectException(\DivisionByZeroError::class);
         $valA = Decimal::fromRawValue(159900, 4);
         $valA->div(Decimal::create($val));
     }
@@ -575,7 +569,7 @@ class DecimalTest extends TestCase
         return [
             [new \DateTime()],
             [true],
-            [false]
+            [false],
         ];
     }
 
@@ -602,7 +596,7 @@ class DecimalTest extends TestCase
             [100, 50, 'div', 2],
             [100, -100, 'toAdditiveInverse'],
             [100, 50, 'toPercentage', 50],
-            [100, 85, 'discount', 15]
+            [100, 85, 'discount', 15],
         ];
     }
 
@@ -632,7 +626,7 @@ class DecimalTest extends TestCase
             [0],
             [0.0],
             ['0'],
-            [Decimal::create(0, 4)]
+            [Decimal::create(0, 4)],
         ];
     }
 
@@ -648,16 +642,16 @@ class DecimalTest extends TestCase
         $input = [
             [
                 15.50,
-                14.50
+                14.50,
             ],
             [
                 '15.50',
-                '14.50'
+                '14.50',
             ],
             [
                 Decimal::fromRawValue(155000),
-                Decimal::fromRawValue(145000)
-            ]
+                Decimal::fromRawValue(145000),
+            ],
         ];
 
         return $this->mixPairs($input, $expected);
@@ -675,20 +669,20 @@ class DecimalTest extends TestCase
         $input = [
             [
                 15,
-                2
+                2,
             ],
             [
                 15.00,
-                2.00
+                2.00,
             ],
             [
                 '15.00',
-                '2'
+                '2',
             ],
             [
                 Decimal::fromRawValue(150000),
                 Decimal::fromRawValue(20000),
-            ]
+            ],
         ];
 
         return $this->mixPairs($input, $expected);
@@ -712,7 +706,7 @@ class DecimalTest extends TestCase
                 $data[] = [
                     $input[$i][0],
                     $input[$j][1],
-                    $expected
+                    $expected,
                 ];
             }
         }

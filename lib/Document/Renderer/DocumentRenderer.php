@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Document\Renderer;
@@ -24,10 +24,10 @@ use Pimcore\Localization\LocaleService;
 use Pimcore\Model\Document;
 use Pimcore\Routing\Dynamic\DocumentRouteHandler;
 use Pimcore\Targeting\Document\DocumentTargetingConfigurator;
-use Pimcore\Templating\Helper\Placeholder\ContainerService;
 use Pimcore\Templating\Renderer\ActionRenderer;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Pimcore\Twig\Extension\Templating\Placeholder\ContainerService;
 use Symfony\Component\HttpKernel\Fragment\FragmentRendererInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class DocumentRenderer implements DocumentRendererInterface
 {
@@ -107,13 +107,13 @@ class DocumentRenderer implements DocumentRendererInterface
     }
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public function render(Document\PageSnippet $document, array $attributes = [], array $query = [], array $options = []): string
     {
         $this->eventDispatcher->dispatch(
-            DocumentEvents::RENDERER_PRE_RENDER,
-            new DocumentEvent($document)
+            new DocumentEvent($document),
+            DocumentEvents::RENDERER_PRE_RENDER
         );
 
         // apply best matching target group (if any)
@@ -147,8 +147,8 @@ class DocumentRenderer implements DocumentRendererInterface
         $this->localeService->setLocale($tempLocale);
 
         $this->eventDispatcher->dispatch(
-            DocumentEvents::RENDERER_POST_RENDER,
-            new DocumentEvent($document)
+            new DocumentEvent($document),
+            DocumentEvents::RENDERER_POST_RENDER
         );
 
         return $response->getContent();

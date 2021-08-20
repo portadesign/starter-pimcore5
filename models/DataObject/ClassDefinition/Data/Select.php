@@ -1,17 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
@@ -19,17 +18,32 @@ namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
+use Pimcore\Model\DataObject\ClassDefinition\Service;
+use Pimcore\Model\DataObject\Concrete;
+use Pimcore\Normalizer\NormalizerInterface;
 
-class Select extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface
+class Select extends Data implements
+    ResourcePersistenceAwareInterface,
+    QueryResourcePersistenceAwareInterface,
+    TypeDeclarationSupportInterface,
+    EqualComparisonInterface,
+    VarExporterInterface,
+    \JsonSerializable,
+    NormalizerInterface,
+    LayoutDefinitionEnrichmentInterface,
+    FieldDefinitionEnrichmentInterface
 {
     use Model\DataObject\Traits\SimpleComparisonTrait;
     use Extension\ColumnType;
     use Extension\QueryColumnType;
+    use DataObject\Traits\SimpleNormalizerTrait;
 
     use DataObject\Traits\DefaultValueTrait;
 
     /**
      * Static type of this element
+     *
+     * @internal
      *
      * @var string
      */
@@ -38,32 +52,48 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     /**
      * Available options to select
      *
+     * @internal
+     *
      * @var array|null
      */
     public $options;
 
     /**
-     * @var int
+     * @internal
+     *
+     * @var string|int
      */
-    public $width;
+    public $width = 0;
 
     /**
+     * @internal
+     *
      * @var string|null
      */
     public $defaultValue;
 
-    /** Options provider class
+    /**
+     * Options provider class
+     *
+     * @internal
+     *
      * @var string
      */
     public $optionsProviderClass;
 
-    /** Options provider data
+    /**
+     * Options provider data
+     *
+     * @internal
+     *
      * @var string
      */
     public $optionsProviderData;
 
     /**
      * Type for the column to query
+     *
+     * @internal
      *
      * @var string
      */
@@ -72,6 +102,8 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     /**
      * Type for the column
      *
+     * @internal
+     *
      * @var string
      */
     public $columnType = 'varchar';
@@ -79,18 +111,15 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     /**
      * Column length
      *
+     * @internal
+     *
      * @var int
      */
     public $columnLength = 190;
 
     /**
-     * Type for the generated phpdoc
+     * @internal
      *
-     * @var string
-     */
-    public $phpdocType = 'string';
-
-    /**
      * @var bool
      */
     public $dynamicOptions = false;
@@ -122,7 +151,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
      *
      * @param string $type
      */
-    protected function correctColumnDefinition($type)
+    private function correctColumnDefinition($type)
     {
         if (preg_match("/(.*)\((\d+)\)/i", $this->$type, $matches)) {
             $this->{'set' . ucfirst($type)}($matches[1]);
@@ -134,7 +163,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @return string
+     * {@inheritdoc}
      */
     public function getColumnType()
     {
@@ -144,7 +173,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @return string
+     * {@inheritdoc}
      */
     public function getQueryColumnType()
     {
@@ -174,7 +203,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @return int
+     * @return string|int
      */
     public function getWidth()
     {
@@ -182,13 +211,16 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @param string|int|null $width
+     * @param string|int $width
      *
      * @return $this
      */
     public function setWidth($width)
     {
-        $this->width = $this->getAsIntegerCast($width);
+        if (is_numeric($width)) {
+            $width = (int)$width;
+        }
+        $this->width = $width;
 
         return $this;
     }
@@ -197,7 +229,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
      * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return string
@@ -213,7 +245,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return string
@@ -227,7 +259,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
      * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
      * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return string
@@ -241,7 +273,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
      * @see Data::getDataForEditmode
      *
      * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return string
@@ -255,7 +287,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
      * @see Data::getDataFromEditmode
      *
      * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return string
@@ -279,11 +311,8 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
         return $data;
     }
 
-    /** True if change is allowed in edit mode.
-     * @param DataObject\Concrete $object
-     * @param mixed $params
-     *
-     * @return bool
+    /**
+     * {@inheritdoc}
      */
     public function isDiffChangeAllowed($object, $params = [])
     {
@@ -310,8 +339,9 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
 
         $value = '';
         foreach ($this->options as $option) {
-            if ($option->value == $data) {
-                $value = $option->key;
+            if ($option['value'] == $data) {
+                $value = $option['key'];
+
                 break;
             }
         }
@@ -325,14 +355,9 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * Checks if data is valid for current data field
-     *
-     * @param mixed $data
-     * @param bool $omitMandatoryCheck
-     *
-     * @throws \Exception
+     * {@inheritdoc}
      */
-    public function checkValidity($data, $omitMandatoryCheck = false)
+    public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
         if (!$omitMandatoryCheck && $this->getMandatory() && $this->isEmpty($data)) {
             throw new Model\Element\ValidationException('Empty mandatory field [ ' . $this->getName() . ' ]');
@@ -409,7 +434,10 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
         $this->optionsProviderData = $optionsProviderData;
     }
 
-    public function enrichFieldDefinition($context = [])
+    /**
+     * { @inheritdoc }
+     */
+    public function enrichFieldDefinition(/** array */ $context = []) /** : Data */
     {
         $optionsProvider = DataObject\ClassDefinition\Helper\OptionsProviderResolver::resolveProvider(
             $this->getOptionsProviderClass(),
@@ -426,14 +454,9 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * Override point for Enriching the layout definition before the layout is returned to the admin interface.
-     *
-     * @param DataObject\Concrete $object
-     * @param array $context additional contextual data
-     *
-     * @return self
+     * {@inheritdoc}
      */
-    public function enrichLayoutDefinition($object, $context = [])
+    public function enrichLayoutDefinition(/*?Concrete */ $object, /**  array */ $context = []) // : self
     {
         $optionsProvider = DataObject\ClassDefinition\Helper\OptionsProviderResolver::resolveProvider(
             $this->getOptionsProviderClass(),
@@ -481,7 +504,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
         );
 
         if ($optionsProvider) {
-            $context = $params['context'] ? $params['context'] : [];
+            $context = $params['context'] ?? [];
             $context['object'] = $object;
             if ($object) {
                 $context['class'] = $object->getClass();
@@ -491,10 +514,10 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
             $options = $optionsProvider->{'getOptions'}($context, $this);
             $this->setOptions($options);
 
-            if ($params['purpose'] == 'editmode') {
+            if (isset($params['purpose']) && $params['purpose'] == 'editmode') {
                 $result = $data;
             } else {
-                $result = ['value' => $data ? $data : null, 'options' => $this->getOptions()];
+                $result = ['value' => $data ?? null, 'options' => $this->getOptions()];
             }
 
             return $result;
@@ -506,7 +529,7 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
     /**
      * returns sql query statement to filter according to this data types value(s)
      *
-     * @param string $value
+     * @param string|array $value
      * @param string $operator
      * @param array $params optional params used to change the behavior
      *
@@ -517,29 +540,36 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
         $value = is_array($value) ? current($value) : $value;
         $name = $params['name'] ?: $this->name;
 
+        $db = \Pimcore\Db::get();
+        $key = $db->quoteIdentifier($name);
+        if (!empty($params['brickPrefix'])) {
+            $key = $params['brickPrefix'].$key;
+        }
+
         if ($operator === '=') {
-            return '`'.$name.'` = '."'$value'".' ';
-        } elseif ($operator === 'LIKE') {
-            return '`'.$name.'` LIKE '."'%$value%'".' ';
+            return $key.' = '."\"$value\"".' ';
+        }
+        if ($operator === 'LIKE') {
+            return $key.' LIKE '."\"%$value%\"".' ';
         }
 
         return null;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function isFilterable(): bool
     {
         return true;
     }
 
     /**
-     * @param DataObject\Concrete $object
-     * @param array $context
-     *
-     * @return null|string
+     * {@inheritdoc}
      */
     protected function doGetDefaultValue($object, $context = [])
     {
-        /** @var DataObject\ClassDefinition\DynamicOptionsProvider\SelectOptionsProviderInterface $optionsProvider */
+        /** @var DataObject\ClassDefinition\DynamicOptionsProvider\SelectOptionsProviderInterface|null $optionsProvider */
         $optionsProvider = DataObject\ClassDefinition\Helper\OptionsProviderResolver::resolveProvider(
             $this->getOptionsProviderClass(),
             DataObject\ClassDefinition\Helper\OptionsProviderResolver::MODE_SELECT
@@ -559,5 +589,63 @@ class Select extends Data implements ResourcePersistenceAwareInterface, QueryRes
         }
 
         return $this->getDefaultValue();
+    }
+
+    /**
+     * @return $this
+     */
+    public function jsonSerialize()
+    {
+        if ($this->getOptionsProviderClass() && Service::doRemoveDynamicOptions()) {
+            $this->options = null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function resolveBlockedVars(): array
+    {
+        $blockedVars = parent::resolveBlockedVars();
+
+        if ($this->getOptionsProviderClass()) {
+            $blockedVars[] = 'options';
+        }
+
+        return $blockedVars;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getParameterTypeDeclaration(): ?string
+    {
+        return '?string';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getReturnTypeDeclaration(): ?string
+    {
+        return '?string';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocInputType(): ?string
+    {
+        return 'string|null';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocReturnType(): ?string
+    {
+        return 'string|null';
     }
 }

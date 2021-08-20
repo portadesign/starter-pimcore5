@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Document
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Document\Page;
@@ -21,6 +19,8 @@ use Pimcore\Model;
 use Pimcore\Model\Document\Targeting\TargetingDocumentDaoInterface;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Document\Page $model
  */
 class Dao extends Model\Document\PageSnippet\Dao implements TargetingDocumentDaoInterface
@@ -45,7 +45,7 @@ class Dao extends Model\Document\PageSnippet\Dao implements TargetingDocumentDao
             LEFT JOIN tree_locks ON documents.id = tree_locks.id AND tree_locks.type = 'document'
                 WHERE documents.id = ?", [$this->model->getId()]);
 
-        if ($data['id'] > 0) {
+        if (!empty($data['id'])) {
             $data['metaData'] = @unserialize($data['metaData']);
             if (!is_array($data['metaData'])) {
                 $data['metaData'] = [];
@@ -61,7 +61,7 @@ class Dao extends Model\Document\PageSnippet\Dao implements TargetingDocumentDao
         parent::create();
 
         $this->db->insert('documents_page', [
-            'id' => $this->model->getId()
+            'id' => $this->model->getId(),
         ]);
     }
 

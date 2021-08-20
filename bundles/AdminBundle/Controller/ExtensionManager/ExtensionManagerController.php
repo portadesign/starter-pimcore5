@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\ExtensionManager;
@@ -18,24 +19,27 @@ use ForceUTF8\Encoding;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
 use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
 use Pimcore\Cache\Symfony\CacheClearer;
-use Pimcore\Controller\EventedControllerInterface;
+use Pimcore\Controller\KernelControllerEventInterface;
 use Pimcore\Extension\Bundle\Exception\BundleNotFoundException;
 use Pimcore\Extension\Bundle\PimcoreBundleInterface;
 use Pimcore\Extension\Bundle\PimcoreBundleManager;
 use Pimcore\Extension\Document\Areabrick\AreabrickInterface;
 use Pimcore\Extension\Document\Areabrick\AreabrickManagerInterface;
+use Pimcore\Logger;
 use Pimcore\Routing\RouteReferenceInterface;
 use Pimcore\Tool\AssetsInstaller;
 use SensioLabs\AnsiConverter\AnsiToHtmlConverter;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
-use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Routing\Annotation\Route;
 
-class ExtensionManagerController extends AdminController implements EventedControllerInterface
+/**
+ * @internal
+ */
+class ExtensionManagerController extends AdminController implements KernelControllerEventInterface
 {
     /**
      * @var PimcoreBundleManager
@@ -56,19 +60,11 @@ class ExtensionManagerController extends AdminController implements EventedContr
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
-    public function onKernelController(FilterControllerEvent $event)
+    public function onKernelControllerEvent(ControllerEvent $event)
     {
         $this->checkPermission('plugins');
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function onKernelResponse(FilterResponseEvent $event)
-    {
-        // noop
     }
 
     /**
@@ -131,7 +127,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
         $this->bundleManager->setStates($updates);
 
         return $this->adminJson([
-            'extensions' => $this->getBundleList(array_keys($updates))
+            'extensions' => $this->getBundleList(array_keys($updates)),
         ]);
     }
 
@@ -159,7 +155,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
 
         $data = [
             'success' => true,
-            'errors' => []
+            'errors' => [],
         ];
 
         if ($type === 'bundle') {
@@ -172,7 +168,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
             if (!$kernel->isDebug()) {
                 try {
                     $cacheClearer->clear($kernel->getEnvironment(), [
-                        'no-warmup' => true
+                        'no-warmup' => true,
                     ]);
                 } catch (\Throwable $e) {
                     $data['errors'][] = $e->getMessage();
@@ -267,7 +263,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
 
             $data = [
                 'success' => true,
-                'reload' => $this->bundleManager->needsReloadAfterInstall($bundle)
+                'reload' => $this->bundleManager->needsReloadAfterInstall($bundle),
             ];
 
             if (!empty($message = $this->getInstallerOutput($bundle))) {
@@ -278,12 +274,12 @@ class ExtensionManagerController extends AdminController implements EventedContr
         } catch (BundleNotFoundException $e) {
             return $this->adminJson([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 404);
         } catch (\Exception $e) {
             return $this->adminJson([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 400);
         }
     }
@@ -304,7 +300,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
 
                 $results[$bm->getBundleIdentifier($bundle)] = $this->buildBundleInfo($bundle, true, $bm->isInstalled($bundle));
             } catch (\Throwable $e) {
-                $this->get('monolog.logger.pimcore')->error($e);
+                Logger::error($e);
             }
         }
 
@@ -362,13 +358,13 @@ class ExtensionManagerController extends AdminController implements EventedContr
         try {
             /** @var PimcoreBundleInterface $bundle */
             $bundle = new $bundleName();
-            $bundle->setContainer($this->container);
+            $bundle->setContainer(\Pimcore::getContainer());
 
             return $bundle;
         } catch (\Exception $e) {
-            $this->get('monolog.logger.pimcore')->error('Failed to build instance of bundle {bundle}: {error}', [
+            Logger::error('Failed to build instance of bundle {bundle}: {error}', [
                 'bundle' => $bundleName,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
 
@@ -400,7 +396,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
             'configuration' => $this->getIframePath($bundle),
             'version' => $bundle->getVersion(),
             'priority' => $state['priority'],
-            'environments' => implode(', ', $state['environments'])
+            'environments' => implode(', ', $state['environments']),
         ];
 
         // only check for installation specifics if the bundle is enabled
@@ -435,7 +431,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
     {
         if ($iframePath = $bundle->getAdminIframePath()) {
             if ($iframePath instanceof RouteReferenceInterface) {
-                return $this->get('router')->generate(
+                return $this->generateUrl(
                     $iframePath->getRoute(),
                     $iframePath->getParameters(),
                     $iframePath->getType()
@@ -479,7 +475,7 @@ class ExtensionManagerController extends AdminController implements EventedContr
             'uninstallable' => false,
             'installed' => true,
             'active' => $this->areabrickManager->isEnabled($brick->getId()),
-            'version' => $brick->getVersion()
+            'version' => $brick->getVersion(),
         ];
     }
 
@@ -491,11 +487,12 @@ class ExtensionManagerController extends AdminController implements EventedContr
 
         $installer = $this->bundleManager->getInstaller($bundle);
         if (null !== $installer) {
-            $output = $installer->getOutputWriter()->getOutput();
+            /** @var \Symfony\Component\Console\Output\BufferedOutput $output */
+            $output = $installer->getOutput();
             if (!empty($output)) {
                 $converter = new AnsiToHtmlConverter(null);
 
-                $converted = Encoding::fixUTF8($output);
+                $converted = Encoding::fixUTF8($output->fetch());
                 $converted = $converter->convert($converted);
 
                 if (!$decorated) {

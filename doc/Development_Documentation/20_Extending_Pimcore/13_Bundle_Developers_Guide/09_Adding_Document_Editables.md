@@ -2,7 +2,7 @@
 
 With bundles, it is also possible to add an individual Document Editable. 
 
-Previously, the only way to define editables was to create them in a special namespace `Pimcore\Model\Document\Tag`. This
+Previously, the only way to define editables was to create them in a special namespace `Pimcore\Model\Document\Editable`. This
 is still possible, but now editables can be in any namespace as long as the editable is correctly registered. Registration
 can be done via 2 config entries which define a list of prefixes (namespaces) to be searched and a static mapping from
 editable name to class name. For best performance, you should always use the class mapping as it avoids having to look
@@ -12,72 +12,85 @@ To register a new editable, you need to follow 3 steps:
 
 ## 1) Create the editable class
 
-The editable **must** extend `Pimcore\Model\Document\Tag`. Lets create a `Markdown` editable (the namespace does not matter
-but it's best practice to put your editables into a `Model\Document\Tag` sub-namespace):
+The editable **must** extend `Pimcore\Model\Document\Editable`. Lets create a `Markdown` editable (the namespace does not matter
+but it's best practice to put your editables into a `Model\Document\Editable` sub-namespace):
 
 ```php
 <?php
-// src/AppBundle/Model/Document/Tag
+// src/Model/Document/Editable/Markdown.php
 
-namespace AppBundle\Model\Document\Tag;
+namespace App\Model\Document\Editable;
 
-class Markdown extends \Pimcore\Model\Document\Tag
+class Markdown extends \Pimcore\Model\Document\Editable
 {
-    // methods as required by Pimcore\Model\Document\Tag and Pimcore\Model\Document\Tag\TagInterface
+    // methods as required by Pimcore\Model\Document\Editable and Pimcore\Model\Document\Editable\EditableInterface
 }
 ```
 
 ## 2) Register the editable on the editable map
 
-Next we need to update `pimcore.documents.tag.map` configuration to include our editable. This can be done in any config
-file which is loaded (e.g. `app/config/config.yml`), but if you provide the editable with a bundle you should define it
+Next we need to update `pimcore.documents.editables.map` configuration to include our editable. This can be done in any config
+file which is loaded (e.g. `/config/config.yml`), but if you provide the editable with a bundle you should define it
 in a configuration file which is [automatically loaded](./03_Auto_Loading_Config_And_Routing_Definitions.md). Example:
 
 ```yaml
-# src/AppBundle/Resources/config/pimcore/config.yml
+# /config/config.yaml
 
 pimcore:
     documents:
-        tags:
+        editables:
             map:
-                markdown: \AppBundle\Model\Document\Tag\Markdown
+                markdown: \App\Model\Document\Editable\Markdown
 ```
 
 ## 3) Create frontend JS
 
-For the frontend, a JavaScript class needs to be added `pimcore.document.tags.markdown`. It can 
-extend any of the existing `pimcore.document.tags` and must return it's type by overwriting 
-the function `getType()`. If you extend from other bundles tags make sure your bundle is loaded after your parent tag has been initialized.
+For the frontend, a JavaScript class needs to be added `pimcore.document.editables.markdown`. It can 
+extend any of the existing `pimcore.document.editables.*` class and must return it's type by overwriting 
+the function `getType()`. If you extend from other bundles editables make sure your bundle is loaded after your parent editable has been initialized.
 
 ```js
-// src/Resources/public/js/pimcore/document/tags/markdown.js
+// /public/js/pimcore/document/editables/markdown.js
 
-pimcore.registerNS("pimcore.document.tags.markdown");
-pimcore.document.tags.markdown = Class.create(pimcore.document.tags.markdown, {
+pimcore.registerNS("pimcore.document.editables.markdown");
+pimcore.document.editables.markdown = Class.create(pimcore.document.editables.textarea, {
     getType: function () {
         return "markdown";
     }
 });
 ```
 
-This JS file must be included in editmode. You can tell Pimcore to do so by implementing `getEditmodeJsPaths()`
-in your bundle class. 
+This JS file must be included in editmode. You can tell Pimcore to do so by implementing `addJSFiles()`
+in event listener. 
 
 ```php
-// src/AppBundle/AppBundle.php
+// src/EventListener/PimcoreAdminListener.php
 
-namespace AppBundle;
+namespace App\EventListener;
 
-use Pimcore\Extension\Bundle\AbstractPimcoreBundle;
+use Pimcore\Event\BundleManager\PathsEvent;
 
-class AppBundle extends AbstractPimcoreBundle
+class PimcoreAdminListener
 {
-    public function getEditmodeJsPaths()
+    public function addJSFiles(PathsEvent $event)
     {
-        return [
-            '/bundles/app/js/pimcore/document/tags/markdown.js'
-        ];
+        $event->setPaths(
+            array_merge(
+                $event->getPaths(),
+                [
+                    '/bundles/app/js/pimcore/document/editables/markdown.js'
+                ]
+            )
+        );
     }
 }
 
+```
+
+Register event listener:
+```yaml
+services:
+  App\EventListener\PimcoreAdminListener:
+    tags:
+      - { name: kernel.event_listener, event: pimcore.bundle_manager.paths.js, method: addJSFiles }
 ```

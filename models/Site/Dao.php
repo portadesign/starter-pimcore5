@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Site
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Site;
@@ -20,6 +18,8 @@ namespace Pimcore\Model\Site;
 use Pimcore\Model;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Site $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -32,7 +32,7 @@ class Dao extends Model\Dao\AbstractDao
     public function getById($id)
     {
         $data = $this->db->fetchRow('SELECT * FROM sites WHERE id = ?', $id);
-        if (!$data['id']) {
+        if (empty($data['id'])) {
             throw new \Exception(sprintf('Unable to load site with ID `%s`', $id));
         }
         $this->assignVariablesToModel($data);
@@ -46,7 +46,7 @@ class Dao extends Model\Dao\AbstractDao
     public function getByRootId($id)
     {
         $data = $this->db->fetchRow('SELECT * FROM sites WHERE rootId = ?', $id);
-        if (!$data['id']) {
+        if (empty($data['id'])) {
             throw new \Exception(sprintf('Unable to load site with ID `%s`', $id));
         }
         $this->assignVariablesToModel($data);
@@ -60,7 +60,7 @@ class Dao extends Model\Dao\AbstractDao
     public function getByDomain($domain)
     {
         $data = $this->db->fetchRow('SELECT * FROM sites WHERE mainDomain = ? OR domains LIKE ?', [$domain, '%"' . $domain . '"%']);
-        if (!$data['id']) {
+        if (empty($data['id'])) {
 
             // check for wildcards
             // @TODO: refactor this to be more clear
@@ -88,7 +88,7 @@ class Dao extends Model\Dao\AbstractDao
                 }
             }
 
-            if (!$data['id']) {
+            if (empty($data['id'])) {
                 throw new \Exception('there is no site for the requested domain: `' . $domain . '´');
             }
         }

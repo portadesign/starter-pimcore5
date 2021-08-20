@@ -1,35 +1,37 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Reports;
 
 use Pimcore\Analytics\Google\Config\SiteConfigProvider;
-use Pimcore\Controller\EventedControllerInterface;
+use Pimcore\Controller\KernelControllerEventInterface;
 use Pimcore\Google;
 use Pimcore\Model\Document;
 use Pimcore\Model\Site;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
-use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\Routing\Annotation\Route;
 
 /**
  * @Route("/analytics")
+ *
+ * @internal
  */
-class AnalyticsController extends ReportsControllerBase implements EventedControllerInterface
+class AnalyticsController extends ReportsControllerBase implements KernelControllerEventInterface
 {
     /**
      * @var \Google_Service_Analytics
@@ -75,16 +77,31 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
             }
 
             foreach ($accountIds as $accountId) {
+                $propertyNames = [];
+                $properties = $this->service->management_webproperties->listManagementWebproperties($accountId);
+
+                if (is_array($properties['items'])) {
+                    foreach ($properties['items'] as $property) {
+                        $propertyNames[$property['id']] = $property['name'];
+                    }
+                }
+
                 $details = $this->service->management_profiles->listManagementProfiles($accountId, '~all');
 
                 if (is_array($details['items'])) {
                     foreach ($details['items'] as $detail) {
+                        $name = $detail['name'];
+
+                        if (array_key_exists($detail['webPropertyId'], $propertyNames)) {
+                            $name = $propertyNames[$detail['webPropertyId']] . ': ' . $name;
+                        }
+
                         $data['data'][] = [
                             'id' => $detail['id'],
-                            'name' => $detail['name'],
+                            'name' => $name,
                             'trackid' => $detail['webPropertyId'],
                             'internalid' => $detail['internalWebPropertyId'],
-                            'accountid' => $detail['accountId']
+                            'accountid' => $detail['accountId'],
                         ];
                     }
                 }
@@ -178,7 +195,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
         }
 
         $opts = [
-            'dimensions' => 'ga:date'
+            'dimensions' => 'ga:date',
         ];
 
         if (!empty($filters)) {
@@ -200,7 +217,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
 
             $tmpData = [
                 'timestamp' => strtotime($date),
-                'datetext' => $this->formatDimension('date', $date)
+                'datetext' => $this->formatDimension('date', $date),
             ];
 
             foreach ($result['columnHeaders'] as $index => $metric) {
@@ -242,7 +259,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
         }
 
         $opts = [
-            'dimensions' => 'ga:date'
+            'dimensions' => 'ga:date',
         ];
 
         if (!empty($filters)) {
@@ -264,6 +281,9 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
             foreach ($result['columnHeaders'] as $index => $metric) {
                 if ($index) {
                     $dailyDataGrouped[$metric['name']][] = $row[$index];
+                    if (!isset($data[$metric['name']])) {
+                        $data[$metric['name']] = 0;
+                    }
                     $data[$metric['name']] += $row[$index];
                 }
             }
@@ -274,7 +294,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
             'ga:uniquePageviews' => 1,
             'ga:exits' => 2,
             'ga:entrances' => 3,
-            'ga:bounces' => 4
+            'ga:bounces' => 4,
         ];
 
         $outputData = [];
@@ -283,7 +303,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
                 'label' => str_replace('ga:', '', $key),
                 'value' => round($value, 2),
                 'chart' => \Pimcore\Helper\ImageChart::lineSmall($dailyDataGrouped[$key]),
-                'metric' => str_replace('ga:', '', $key)
+                'metric' => str_replace('ga:', '', $key),
             ];
         }
 
@@ -319,7 +339,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
         $opts = [
             'dimensions' => 'ga:source',
             'max-results' => '10',
-            'sort' => '-ga:pageviews'
+            'sort' => '-ga:pageviews',
         ];
 
         if (!empty($filters)) {
@@ -339,7 +359,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
         foreach ((array) $result['rows'] as $row) {
             $data[] = [
                 'pageviews' => $row[1],
-                'source' => $row[0]
+                'source' => $row[0],
             ];
         }
 
@@ -391,7 +411,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
         $opts = [
             'dimensions' => $dimension,
             'max-results' => $limit,
-            'sort' => ($descending ? '-' : '') . $metric
+            'sort' => ($descending ? '-' : '') . $metric,
         ];
 
         if (!empty($filters)) {
@@ -410,7 +430,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
         foreach ($result['rows'] as $row) {
             $data[] = [
                 'dimension' => $this->formatDimension($dimension, $row[0]),
-                'metric' => (float) $row[1]
+                'metric' => (float) $row[1],
             ];
         }
 
@@ -457,7 +477,7 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
         foreach ($result['items'] as $row) {
             $data[] = [
                 'id' => $row['segmentId'],
-                'name' => $row['name']
+                'name' => $row['name'],
             ];
         }
 
@@ -483,9 +503,9 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
     }
 
     /**
-     * @param FilterControllerEvent $event
+     * {@inheritdoc}
      */
-    public function onKernelController(FilterControllerEvent $event)
+    public function onKernelControllerEvent(ControllerEvent $event)
     {
         $isMasterRequest = $event->isMasterRequest();
         if (!$isMasterRequest) {
@@ -498,13 +518,5 @@ class AnalyticsController extends ReportsControllerBase implements EventedContro
         }
 
         $this->service = new \Google_Service_Analytics($client);
-    }
-
-    /**
-     * @param FilterResponseEvent $event
-     */
-    public function onKernelResponse(FilterResponseEvent $event)
-    {
-        // nothing to do
     }
 }

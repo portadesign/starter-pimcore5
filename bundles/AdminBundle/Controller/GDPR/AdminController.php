@@ -7,21 +7,26 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Controller\GDPR;
 
 use Pimcore\Bundle\AdminBundle\GDPR\DataProvider\Manager;
-use Symfony\Component\HttpKernel\Event\FilterControllerEvent;
+use Pimcore\Controller\KernelControllerEventInterface;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\Routing\Annotation\Route;
 
-class AdminController extends \Pimcore\Bundle\AdminBundle\Controller\AdminController
+/**
+ *
+ * @internal
+ */
+class AdminController extends \Pimcore\Bundle\AdminBundle\Controller\AdminController implements KernelControllerEventInterface
 {
     /**
      * @Route("/get-data-providers", name="pimcore_admin_gdpr_admin_getdataproviders", methods={"GET"})
@@ -32,14 +37,17 @@ class AdminController extends \Pimcore\Bundle\AdminBundle\Controller\AdminContro
         foreach ($manager->getServices() as $service) {
             $response[] = [
                 'name' => $service->getName(),
-                'jsClass' => $service->getJsClassName()
+                'jsClass' => $service->getJsClassName(),
             ];
         }
 
         return $this->adminJson($response);
     }
 
-    public function onKernelController(FilterControllerEvent $event)
+    /**
+     * {@inheritdoc}
+     */
+    public function onKernelControllerEvent(ControllerEvent $event)
     {
         if (!$event->isMasterRequest()) {
             return;

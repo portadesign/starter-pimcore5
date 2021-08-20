@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.asset.asset");
@@ -29,13 +29,18 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
     },
 
     getDataComplete: function (response) {
-
         try {
             this.data = Ext.decode(response.responseText);
 
             if (typeof this.data.editlock == "object") {
                 pimcore.helpers.lockManager(this.id, "asset", this.type, this.data);
                 throw "asset is locked";
+            }
+
+            if(this.type !== this.data.type) {
+                pimcore.helpers.closeAsset(this.id);
+                pimcore.helpers.openAsset(this.id, this.data.type);
+                return;
             }
 
             this.addTab();
@@ -281,6 +286,17 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
         tabPanel.setActiveItem(tabId);
     },
 
+    saveToSession: function (onCompleteCallback) {
+
+        if (typeof onCompleteCallback != "function") {
+            onCompleteCallback = function () {
+            };
+        }
+
+        this.save(false, onCompleteCallback, "session")
+    },
+
+
     getSaveData : function (only) {
         var parameters = {};
 
@@ -305,15 +321,15 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
             parameters.metadata = Ext.encode(this.metadata.getValues());
         }
         catch (e2) {
-            //console.log(e);
+            // console.log(e2);
         }
 
         // properties
         try {
             parameters.properties = Ext.encode(this.properties.getValues());
         }
-        catch (e2) {
-            //console.log(e);
+        catch (e3) {
+            //console.log(e3);
         }
 
         // scheduler
@@ -322,14 +338,14 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
                 parameters.scheduler = Ext.encode(this.scheduler.getValues());
             }
         }
-        catch (e3) {
-            //console.log(e);
+        catch (e4) {
+            //console.log(e4);
         }
 
         return parameters;
     },
 
-    save : function (only, callback) {
+    save : function (only, callback, task) {
 
         if(this.tab.disabled || this.tab.isMasked()) {
             return;
@@ -351,6 +367,11 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
                 pimcore.helpers.showNotification(t("Info"), 'Asset not saved: ' + e.message, 'info');
                 return false;
             }
+        }
+
+        let params = this.getSaveData(only);
+        if (task) {
+            params.task = task
         }
 
         Ext.Ajax.request({
@@ -387,7 +408,7 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
             failure: function () {
                 this.tab.unmask();
             }.bind(this),
-            params: this.getSaveData(only)
+            params: params
         });
     },
 

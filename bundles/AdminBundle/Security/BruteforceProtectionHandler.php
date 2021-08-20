@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\AdminBundle\Security;
@@ -21,6 +22,9 @@ use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\HttpFoundation\Request;
 
+/**
+ * @internal
+ */
 class BruteforceProtectionHandler implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
@@ -66,7 +70,7 @@ class BruteforceProtectionHandler implements LoggerAwareInterface
 
         $this->logger->info('Checking bruteforce protection for user {username} with ip {ip}', [
             'username' => $username,
-            'ip' => $ip
+            'ip' => $ip,
         ]);
 
         $matchesIpOnly = 0;
@@ -99,7 +103,7 @@ class BruteforceProtectionHandler implements LoggerAwareInterface
         if ($matchesIpOnly > 49 || $matchesUserOnly > 9 || $matchesUserIp > 4) {
             $this->logger->warning('Security Alert: Too many login attempts for username {username} with IP {ip}', [
                 'username' => $username,
-                'ip' => $ip
+                'ip' => $ip,
             ]);
 
             throw new BruteforceProtectionException('Security Alert: Too many login attempts, please wait 5 minutes and try again.');
@@ -119,7 +123,7 @@ class BruteforceProtectionHandler implements LoggerAwareInterface
 
         $this->logger->warning('Adding bruteforce entry for username {username} with IP {ip}', [
             'username' => $username,
-            'ip' => $ip
+            'ip' => $ip,
         ]);
 
         $this->writeLogEntry($username, $ip);
@@ -160,7 +164,7 @@ class BruteforceProtectionHandler implements LoggerAwareInterface
         $lines = explode("\n", $data);
         $entries = [];
 
-        if (is_array($lines) && count($lines) > 0) {
+        if (is_array($lines)) {
             foreach ($lines as $line) {
                 $entries[] = explode(',', $line);
             }
@@ -181,7 +185,7 @@ class BruteforceProtectionHandler implements LoggerAwareInterface
         $entries[] = [
             date(\DateTime::ISO8601),
             $ip ?: '',
-            $username ?: ''
+            $username ?: '',
         ];
 
         $this->writeLogFile($entries);
@@ -200,7 +204,7 @@ class BruteforceProtectionHandler implements LoggerAwareInterface
 
         if (!is_writable($this->logFile)) {
             $this->logger->critical('It seems that the log file {logfile} is not writable.', [
-                'logfile' => $this->logFile
+                'logfile' => $this->logFile,
             ]);
 
             throw new BruteforceProtectionException('It seems that the log file is not writable.');

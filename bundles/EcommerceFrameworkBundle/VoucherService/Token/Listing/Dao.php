@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\Token\Listing;
@@ -17,6 +18,8 @@ namespace Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\Token\Listing;
 use Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\Token\Listing;
 
 /**
+ * @internal
+ *
  * @property Listing $model
  */
 class Dao extends \Pimcore\Model\Listing\Dao\AbstractDao
@@ -42,19 +45,20 @@ class Dao extends \Pimcore\Model\Listing\Dao\AbstractDao
         return $tokens;
     }
 
+    /**
+     * @return int
+     */
     public function getTotalCount()
     {
         try {
-            $amount = (int)$this->db->fetchOne(
+            return (int)$this->db->fetchOne(
                 'SELECT COUNT(*) as amount FROM ' .
                 \Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\Token\Dao::TABLE_NAME .
                 $this->getCondition(),
                 $this->model->getConditionVariables()
             );
         } catch (\Exception $e) {
-            return false;
+            return 0;
         }
-
-        return $amount;
     }
 }

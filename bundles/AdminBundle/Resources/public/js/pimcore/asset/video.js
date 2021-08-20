@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.asset.video");
@@ -35,7 +35,7 @@ pimcore.asset.video = Class.create(pimcore.asset.asset, {
         }
 
         this.tagAssignment = new pimcore.element.tag.assignment(this, "asset");
-        this.metadata = new pimcore.asset.metadata.grid(this);
+        this.metadata = new pimcore.asset.metadata.editor(this);
         this.workflows = new pimcore.element.workflows(this, "asset");
         this.embeddedMetaData = new pimcore.asset.embedded_meta_data(this);
 
@@ -125,7 +125,7 @@ pimcore.asset.video = Class.create(pimcore.asset.asset, {
                 detailsData[t("height")] = this.data.customSettings.videoHeight;
             }
             if(this.data.customSettings['duration']) {
-                detailsData[t("duration")] = this.data.customSettings.duration;
+                detailsData[t("duration")] = pimcore.helpers.formatTimeDuration(this.data.customSettings.duration);
             }
 
             var dimensionPanel = new Ext.create('Ext.grid.property.Grid', {
@@ -202,17 +202,19 @@ pimcore.asset.video = Class.create(pimcore.asset.asset, {
                             try {
                                 this.previewImagePanel.getComponent("inner").getComponent("assetPath").setValue("");
 
+                                var time = window[this.previewFrameId].document.getElementById("video").currentTime;
+                                var date = new Date();
+                                var cmp = Ext.getCmp("pimcore_asset_video_imagepreview_" + this.id);
+
                                 var url = Routing.generate('pimcore_admin_asset_getvideothumbnail', {
                                     id: this.id,
                                     width: 265,
                                     aspectratio: true,
+                                    time: time,
                                     settime: true,
                                     '_dc': date.getTime()
                                 });
 
-                                var time = window[this.previewFrameId].document.getElementById("video").currentTime;
-                                var date = new Date();
-                                var cmp = Ext.getCmp("pimcore_asset_video_imagepreview_" + this.id);
                                 cmp.update('<img class="pimcore_video_preview_image" align="center" src="'+url+'" />');
 
                             } catch (e) {
@@ -255,7 +257,7 @@ pimcore.asset.video = Class.create(pimcore.asset.asset, {
                                                     image: data.id,
                                                     width: 265,
                                                     aspectratio: true,
-                                                    settime: true,
+                                                    setimage: true,
                                                     '_dc': date.getTime()
                                                 });
                                                 var cmp = Ext.getCmp("pimcore_asset_video_imagepreview_" + this.id);

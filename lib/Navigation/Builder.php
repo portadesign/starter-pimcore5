@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Navigation;
@@ -20,7 +21,11 @@ use Pimcore\Logger;
 use Pimcore\Model\Document;
 use Pimcore\Model\Site;
 use Pimcore\Navigation\Page\Document as DocumentPage;
+use Pimcore\Navigation\Page\Url;
 
+/**
+ * @internal
+ */
 class Builder
 {
     /**
@@ -42,6 +47,11 @@ class Builder
      * @var int
      */
     private $currentLevel = 0;
+
+    /**
+     * @var array
+     */
+    private $navCacheTags = [];
 
     /**
      * @param RequestHelper $requestHelper
@@ -105,6 +115,8 @@ class Builder
         if (!$navigation || !$cacheEnabled) {
             $navigation = new \Pimcore\Navigation\Container();
 
+            $this->navCacheTags = ['output', 'navigation'];
+
             if ($navigationRootDocument->hasChildren()) {
                 $this->currentLevel = 0;
                 $rootPage = $this->buildNextLevel($navigationRootDocument, true, $pageCallback, [], $maxDepth);
@@ -114,19 +126,23 @@ class Builder
             // we need to force caching here, otherwise the active classes and other settings will be set and later
             // also written into cache (pass-by-reference) ... when serializing the data directly here, we don't have this problem
             if ($cacheEnabled) {
-                CacheManager::save($navigation, $cacheKey, ['output', 'navigation'], $cacheLifetime, 999, true);
+                CacheManager::save($navigation, $cacheKey, $this->navCacheTags, $cacheLifetime, 999, true);
             }
         }
 
         // set active path
-        $request = $this->requestHelper->getMasterRequest();
+        $activePages = [];
 
-        // try to find a page matching exactly the request uri
-        $activePages = $navigation->findAllBy('uri', $request->getRequestUri());
+        if ($this->requestHelper->hasMasterRequest()) {
+            $request = $this->requestHelper->getMasterRequest();
 
-        if (empty($activePages)) {
-            // try to find a page matching the path info
-            $activePages = $navigation->findAllBy('uri', $request->getPathInfo());
+            // try to find a page matching exactly the request uri
+            $activePages = $navigation->findAllBy('uri', $request->getRequestUri());
+
+            if (empty($activePages)) {
+                // try to find a page matching the path info
+                $activePages = $navigation->findAllBy('uri', $request->getPathInfo());
+            }
         }
 
         if ($activeDocument instanceof Document) {
@@ -145,7 +161,7 @@ class Builder
         // pages have priority, if we don't find any active page, we use all we found
         $tmpPages = [];
         foreach ($activePages as $page) {
-            if ($page instanceof DocumentPage && $page->getDocumentType() != 'link') {
+            if ($page instanceof DocumentPage && $page->getDocumentType() !== 'link') {
                 $tmpPages[] = $page;
             }
         }
@@ -158,26 +174,22 @@ class Builder
             foreach ($activePages as $activePage) {
                 $this->addActiveCssClasses($activePage, true);
             }
-        } else {
-            // we don't have an active document, so we try to build the trail on our own
+        } elseif ($activeDocument instanceof Document) {
+            // we didn't find the active document, so we try to build the trail on our own
             $allPages = $navigation->findAllBy('uri', '/.*/', true);
 
-            /** @var Page|Page\Document $page */
             foreach ($allPages as $page) {
                 $activeTrail = false;
 
-                if ($activeDocument instanceof Document) {
-                    if ($page->getUri() && strpos($activeDocument->getRealFullPath(), $page->getUri() . '/') === 0) {
+                if ($page instanceof Url && $page->getUri()) {
+                    if (strpos($activeDocument->getRealFullPath(), $page->getUri() . '/') === 0) {
                         $activeTrail = true;
-                    }
-
-                    if ($page instanceof DocumentPage) {
-                        if ($page->getDocumentType() == 'link') {
-                            if ($page->getUri() && strpos($activeDocument->getFullPath(),
-                                    $page->getUri() . '/') === 0) {
-                                $activeTrail = true;
-                            }
-                        }
+                    } elseif (
+                        $page instanceof DocumentPage &&
+                        $page->getDocumentType() === 'link' &&
+                        strpos($activeDocument->getFullPath(), $page->getUri() . '/') === 0
+                    ) {
+                        $activeTrail = true;
                     }
                 }
 
@@ -293,6 +305,7 @@ class Builder
             // infinite loop detection, we use array keys here, because key lookups are much faster
             if (isset($parents[$child->getId()])) {
                 Logger::critical('Navigation: Document with ID ' . $child->getId() . ' would produce an infinite loop -> skipped, parent IDs (' . implode(',', array_keys($parents)) . ')');
+
                 continue;
             }
 
@@ -329,13 +342,15 @@ class Builder
                 $page->setClass($page->getClass() . $classes);
 
                 if ($child->hasChildren() && (!$maxDepth || $maxDepth > $this->currentLevel)) {
-                    $childPages = $this->buildNextLevel($child, false, $pageCallback, $parents);
+                    $childPages = $this->buildNextLevel($child, false, $pageCallback, $parents, $maxDepth);
                     $page->setPages($childPages);
                 }
 
                 if ($pageCallback instanceof \Closure) {
                     $pageCallback($page, $child);
                 }
+
+                $this->navCacheTags[] = $page->getDocument()->getCacheTag();
 
                 $pages[] = $page;
             }

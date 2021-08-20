@@ -1,17 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\ClassDefinition;
@@ -19,18 +18,36 @@ namespace Pimcore\Model\DataObject\ClassDefinition;
 use Pimcore\Loader\ImplementationLoader\LoaderInterface;
 use Pimcore\Logger;
 use Pimcore\Model\DataObject;
-use Pimcore\Model\Webservice;
 use Pimcore\Tool;
 
-/**
- * Class Service
- *
- * @package Pimcore\Model\DataObject\ClassDefinition
- */
 class Service
 {
     /**
-     * @static
+     * @var bool
+     */
+    private static $doRemoveDynamicOptions = false;
+
+    /**
+     * @internal
+     *
+     * @return bool
+     */
+    public static function doRemoveDynamicOptions(): bool
+    {
+        return self::$doRemoveDynamicOptions;
+    }
+
+    /**
+     * @internal
+     *
+     * @param bool $doRemoveDynamicOptions
+     */
+    public static function setDoRemoveDynamicOptions(bool $doRemoveDynamicOptions): void
+    {
+        self::$doRemoveDynamicOptions = $doRemoveDynamicOptions;
+    }
+
+    /**
      *
      * @param  DataObject\ClassDefinition $class
      *
@@ -38,26 +55,36 @@ class Service
      */
     public static function generateClassDefinitionJson($class)
     {
-        $data = Webservice\Data\Mapper::map($class, '\\Pimcore\\Model\\Webservice\\Data\\ClassDefinition\\Out', 'out');
+        $class = clone $class;
+        self::removeDynamicOptionsFromLayoutDefinition($class->layoutDefinitions);
+
+        self::setDoRemoveDynamicOptions(true);
+        $data = json_decode(json_encode($class));
+        self::setDoRemoveDynamicOptions(false);
         unset($data->name);
         unset($data->creationDate);
-        unset($data->modificationDate);
         unset($data->userOwner);
         unset($data->userModification);
         unset($data->fieldDefinitions);
 
-        self::removeDynamicOptionsFromLayoutDefinition($data->layoutDefinitions);
-
-        //add propertyVisibility to export data
-        $data->propertyVisibility = $class->propertyVisibility;
-
-        $json = json_encode($data, JSON_PRETTY_PRINT);
-
-        return $json;
+        return json_encode($data, JSON_PRETTY_PRINT);
     }
 
-    public static function removeDynamicOptionsFromLayoutDefinition(&$layout)
+    private static function removeDynamicOptionsFromLayoutDefinition(&$layout)
     {
+        if (method_exists($layout, 'resolveBlockedVars')) {
+            $blockedVars = $layout->resolveBlockedVars();
+            foreach ($blockedVars as $blockedVar) {
+                if (isset($layout->{$blockedVar})) {
+                    unset($layout->{$blockedVar});
+                }
+            }
+
+            if (isset($layout->blockedVarsForExport)) {
+                unset($layout->blockedVarsForExport);
+            }
+        }
+
         if (method_exists($layout, 'getChildren')) {
             $children = $layout->getChildren();
             if (is_array($children)) {
@@ -109,7 +136,7 @@ class Service
 
         foreach (['description', 'icon', 'group', 'allowInherit', 'allowVariants', 'showVariants', 'parentClass',
                     'implementsInterfaces', 'listingParentClass', 'useTraits', 'listingUseTraits', 'previewUrl', 'propertyVisibility',
-                    'linkGeneratorReference', 'compositeIndices'] as $importPropertyName) {
+                    'linkGeneratorReference', 'compositeIndices', 'generateTypeDeclarations', ] as $importPropertyName) {
             if (isset($importData[$importPropertyName])) {
                 $class->{'set' . ucfirst($importPropertyName)}($importData[$importPropertyName]);
             }
@@ -150,7 +177,7 @@ class Service
             $fieldCollection->setLayoutDefinitions($layout);
         }
 
-        foreach (['parentClass', 'implementsInterfaces', 'title', 'group'] as $importPropertyName) {
+        foreach (['parentClass', 'implementsInterfaces', 'title', 'group', 'generateTypeDeclarations'] as $importPropertyName) {
             if (isset($importData[$importPropertyName])) {
                 $fieldCollection->{'set' . ucfirst($importPropertyName)}($importData[$importPropertyName]);
             }
@@ -174,8 +201,8 @@ class Service
 
         // set classname attribute to the real class name not to the class ID
         // this will allow to import the brick on a different instance with identical class names but different class IDs
-        if (is_array($objectBrick->classDefinitions)) {
-            foreach ($objectBrick->classDefinitions as &$cd) {
+        if (is_array($objectBrick->getClassDefinitions())) {
+            foreach ($objectBrick->getClassDefinitions() as &$cd) {
                 // for compatibility (upgraded pimcore4s that may deliver class ids in $cd['classname'] we need to
                 // get the class by id in order to be able to correctly set the classname for the generated json
                 if (!$class = DataObject\ClassDefinition::getByName($cd['classname'])) {
@@ -229,6 +256,7 @@ class Service
         $objectBrick->setClassDefinitions($toAssignClassDefinitions);
         $objectBrick->setParentClass($importData['parentClass']);
         $objectBrick->setImplementsInterfaces($importData['implementsInterfaces'] ?? null);
+        $objectBrick->setGenerateTypeDeclarations($importData['generateTypeDeclarations'] ?? null);
         if (isset($importData['title'])) {
             $objectBrick->setTitle($importData['title']);
         }
@@ -241,6 +269,8 @@ class Service
     }
 
     /**
+     * @internal
+     *
      * @param array $array
      * @param bool $throwException
      * @param bool $insideLocalizedField
@@ -285,6 +315,12 @@ class Service
                         }
                     }
                 } else {
+                    //for BC reasons
+                    $blockedVars = [];
+                    if (method_exists($item, 'resolveBlockedVars')) {
+                        $blockedVars = $item->resolveBlockedVars();
+                    }
+                    self::removeDynamicOptionsFromArray($array, $blockedVars);
                     $item->setValues($array);
 
                     if ($item instanceof DataObject\ClassDefinition\Data\EncryptedField) {
@@ -303,6 +339,21 @@ class Service
     }
 
     /**
+     * @param mixed $data
+     * @param array $blockedVars
+     */
+    private static function removeDynamicOptionsFromArray(&$data, $blockedVars)
+    {
+        foreach ($blockedVars as $blockedVar) {
+            if (isset($data[$blockedVar])) {
+                unset($data[$blockedVar]);
+            }
+        }
+    }
+
+    /**
+     * @internal
+     *
      * @param array $tableDefinitions
      * @param array $tableNames
      */
@@ -332,6 +383,8 @@ class Service
     }
 
     /**
+     * @internal
+     *
      * @param array $tableDefinitions
      * @param string $table
      * @param string $colName
@@ -351,8 +404,9 @@ class Service
                     $default = null;
                 }
 
-                if ($colDefinition['Type'] == $type && strtolower($colDefinition['Null']) == strtolower($null)
-                    && $colDefinition['Default'] == $default) {
+                if (str_replace(' ', '', strtolower($colDefinition['Type'])) === str_replace(' ', '', strtolower($type)) &&
+                        strtolower($colDefinition['Null']) == strtolower($null) &&
+                        $colDefinition['Default'] == $default) {
                     return true;
                 }
             }
@@ -362,6 +416,8 @@ class Service
     }
 
     /**
+     * @internal
+     *
      * @param array $implementsParts
      * @param string|null $newInterfaces A comma separated list of interfaces
      *
@@ -391,6 +447,8 @@ class Service
     }
 
     /**
+     * @internal
+     *
      * @param array $useParts
      * @param string|null $newTraits
      *
@@ -420,6 +478,8 @@ class Service
     }
 
     /**
+     * @internal
+     *
      * @param array $useParts
      *
      * @return string

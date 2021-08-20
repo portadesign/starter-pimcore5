@@ -16,7 +16,7 @@ Put the following script into the file `/bin/example.php` (or any other PHP file
 ```php
 <?php
 
-namespace AppBundle\Command;
+namespace App\Command;
 
 use Pimcore\Console\AbstractCommand;
 use Symfony\Component\Console\Input\InputInterface;
@@ -98,7 +98,7 @@ prevent memory issues
 
 To avoid this, you can pass an array with keys (indexes) which should stay in the registry eg. 
 
-```php 
+```php
 \Pimcore::collectGarbage(["myImportantKey", "myConfig"]);
 
 // You can also add items to the static list of globally protected keys by passing them to

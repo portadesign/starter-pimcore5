@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Targeting;
@@ -28,8 +28,8 @@ use Pimcore\Targeting\ActionHandler\ActionHandlerInterface;
 use Pimcore\Targeting\ActionHandler\DelegatingActionHandler;
 use Pimcore\Targeting\Model\VisitorInfo;
 use Pimcore\Targeting\Storage\TargetingStorageInterface;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class VisitorInfoResolver
 {
@@ -38,7 +38,9 @@ class VisitorInfoResolver
     const ATTRIBUTE_VISITOR_INFO = '_visitor_info';
 
     const STORAGE_KEY_RULE_CONDITION_VARIABLES = 'vi:var';
+
     const STORAGE_KEY_MATCHED_SESSION_RULES = 'vi:sru'; // visitorInfo:sessionRules
+
     const STORAGE_KEY_MATCHED_VISITOR_RULES = 'vi:vru'; // visitorInfo:visitorRules
 
     /**
@@ -111,19 +113,13 @@ class VisitorInfoResolver
 
         $event = new TargetingResolveVisitorInfoEvent($visitorInfo);
 
-        $this->eventDispatcher->dispatch(
-            TargetingEvents::PRE_RESOLVE,
-            $event
-        );
+        $this->eventDispatcher->dispatch($event, TargetingEvents::PRE_RESOLVE);
 
         $visitorInfo = $event->getVisitorInfo();
 
         $this->matchTargetingRuleConditions($visitorInfo);
 
-        $this->eventDispatcher->dispatch(
-            TargetingEvents::POST_RESOLVE,
-            new TargetingEvent($visitorInfo)
-        );
+        $this->eventDispatcher->dispatch(new TargetingEvent($visitorInfo), TargetingEvents::POST_RESOLVE);
 
         $this->visitorInfoStorage->setVisitorInfo($visitorInfo);
 
@@ -136,7 +132,7 @@ class VisitorInfoResolver
             return $this->targetingConfigured;
         }
 
-        $configuredRules = $this->db->fetchColumn(
+        $configuredRules = $this->db->fetchOne(
             'SELECT id FROM targeting_target_groups UNION SELECT id FROM targeting_rules LIMIT 1'
         );
 
@@ -202,18 +198,12 @@ class VisitorInfoResolver
         // store info about matched rule
         $visitorInfo->addMatchingTargetingRule($rule);
 
-        $this->eventDispatcher->dispatch(
-            TargetingEvents::PRE_RULE_ACTIONS,
-            new TargetingRuleEvent($visitorInfo, $rule)
-        );
+        $this->eventDispatcher->dispatch(new TargetingRuleEvent($visitorInfo, $rule), TargetingEvents::PRE_RULE_ACTIONS);
 
         // execute rule actions
         $this->handleTargetingRuleActions($visitorInfo, $rule);
 
-        $this->eventDispatcher->dispatch(
-            TargetingEvents::POST_RULE_ACTIONS,
-            new TargetingRuleEvent($visitorInfo, $rule)
-        );
+        $this->eventDispatcher->dispatch(new TargetingRuleEvent($visitorInfo, $rule), TargetingEvents::POST_RULE_ACTIONS);
     }
 
     private function handleTargetingRuleActions(VisitorInfo $visitorInfo, Rule $rule)

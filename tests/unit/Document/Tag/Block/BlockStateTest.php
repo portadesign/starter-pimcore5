@@ -7,18 +7,18 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Tests\Unit\Document\Tag\Block;
 
-use Pimcore\Document\Tag\Block\BlockName;
-use Pimcore\Document\Tag\Block\BlockState;
+use Pimcore\Document\Editable\Block\BlockName;
+use Pimcore\Document\Editable\Block\BlockState;
 use Pimcore\Tests\Test\TestCase;
 
 /**
@@ -35,7 +35,7 @@ class BlockStateTest extends TestCase
 
         $blockNames = [
             new BlockName('A', 'realA'),
-            new BlockName('B', 'realB')
+            new BlockName('B', 'realB'),
         ];
 
         $state->pushBlock($blockNames[0]);
@@ -57,11 +57,9 @@ class BlockStateTest extends TestCase
         $this->assertFalse($state->hasBlocks());
     }
 
-    /**
-     * @expectedException \UnderflowException
-     */
     public function testPopBlocksThrowsExceptionIfEmpty()
     {
+        $this->expectException(\UnderflowException::class);
         $state = new BlockState();
         $state->popBlock();
     }
@@ -108,11 +106,9 @@ class BlockStateTest extends TestCase
         $this->assertFalse($state->hasIndexes());
     }
 
-    /**
-     * @expectedException \UnderflowException
-     */
     public function testPopIndexesThrowsExceptionIfEmpty()
     {
+        $this->expectException(\UnderflowException::class);
         $state = new BlockState();
         $state->popIndex();
     }

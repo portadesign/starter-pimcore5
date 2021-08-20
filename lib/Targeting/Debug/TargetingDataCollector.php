@@ -7,12 +7,12 @@ declare(strict_types=1);
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Targeting\Debug;
@@ -26,7 +26,6 @@ use Pimcore\Targeting\DataProvider\VisitedPagesCounter;
 use Pimcore\Targeting\Document\DocumentTargetingConfigurator;
 use Pimcore\Targeting\Model\VisitorInfo;
 use Pimcore\Targeting\Storage\TargetingStorageInterface;
-use Symfony\Component\Stopwatch\Stopwatch;
 
 class TargetingDataCollector
 {
@@ -43,16 +42,11 @@ class TargetingDataCollector
     private $targetingConfigurator;
 
     /**
-     * @var Stopwatch|null
-     */
-    private $stopwatch;
-
-    /**
      * @var array
      */
     private $filteredVisitorInfoDataObjecKeys = [
         TargetingStorage::PROVIDER_KEY,
-        VisitedPagesCounter::PROVIDER_KEY
+        VisitedPagesCounter::PROVIDER_KEY,
     ];
 
     public function __construct(
@@ -108,7 +102,7 @@ class TargetingDataCollector
 
             $storage[$scope] = array_merge([
                 'created' => $created ? $created->format('c') : null,
-                'updated' => $updated ? $updated->format('c') : null
+                'updated' => $updated ? $updated->format('c') : null,
             ], $this->targetingStorage->all($visitorInfo, $scope));
         }
 
@@ -178,7 +172,7 @@ class TargetingDataCollector
         if ($targetGroup) {
             return [
                 'id' => $targetGroup->getId(),
-                'name' => $targetGroup->getName()
+                'name' => $targetGroup->getName(),
             ];
         }
 

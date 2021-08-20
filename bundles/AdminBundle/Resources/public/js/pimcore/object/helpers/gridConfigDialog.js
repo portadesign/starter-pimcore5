@@ -3,12 +3,12 @@
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
  * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ * @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 pimcore.registerNS("pimcore.object.helpers.gridConfigDialog");
@@ -117,7 +117,7 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
             if (preview) {
                 this.requestPreview();
             } else {
-                this.callback(this.data, this.settings, save);
+                this.callback(this.data, this.settings, save, this.context);
                 this.window.close();
             }
         } else {
@@ -135,7 +135,7 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
                     if (preview) {
                         this.requestPreview();
                     } else {
-                        this.callback(this.data, this.settings, save);
+                        this.callback(this.data, this.settings, save, this.context);
                         this.window.close();
                     }
 
@@ -145,6 +145,10 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
     },
 
     requestPreview: function () {
+        if (!this.previewSettings.objectId) {
+            return;
+        }
+
         var language = this.languageField.getValue();
         var fields = this.data.columns;
         var count = fields.length;
@@ -155,33 +159,38 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
             keys.push(item.key);
         }
 
+        let csvMode = this.previewSettings && this.previewSettings.csvMode;
+
         Ext.Ajax.request({
             url: Routing.generate('pimcore_admin_dataobject_dataobject_gridproxy', {classId: this.previewSettings.classId, folderId: this.previewSettings.objectId}),
             method: 'POST',
             params: {
                 "fields[]": keys,
                 language: language,
-                limit: 1
+                limit: 1,
+                csvMode: csvMode,
+                specificId: this.previewSettings.specificId,
+                context : Ext.encode(this.context)
             },
             success: function (response) {
-                var responseData = Ext.decode(response.responseText);
+                let responseData = Ext.decode(response.responseText);
                 if (responseData && responseData.data && responseData.data.length == 1) {
-                    var rootNode = this.selectionPanel.getRootNode()
-                    var childNodes = rootNode.childNodes;
-                    var previewItem = responseData.data[0];
-                    var store = this.selectionPanel.getStore()
-                    var i;
-                    var count = childNodes.length;
+                    let rootNode = this.selectionPanel.getRootNode()
+                    let childNodes = rootNode.childNodes;
+                    let previewItem = responseData.data[0];
+                    let store = this.selectionPanel.getStore()
+                    let i;
+                    let count = childNodes.length;
 
                     for (i = 0; i < count; i++) {
-                        var node = childNodes[i];
-                        var nodeId = node.id;
-                        var column = this.data.columns[i];
+                        let node = childNodes[i];
+                        let nodeId = node.id;
+                        let column = this.data.columns[i];
 
-                        var columnKey = column.key;
-                        var value = previewItem[columnKey];
+                        let columnKey = column.key;
+                        let value = previewItem[columnKey];
 
-                        var record = store.getById(nodeId);
+                        let record = store.getById(nodeId);
                         record.set("preview", value, {
                             commit: true
                         });
@@ -273,6 +282,9 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
                     text: t('preview'),
                     flex: 90,
                     renderer: function (value, metaData, record) {
+                        if (this.previewSettings && this.previewSettings.csvMode) {
+                            return value;
+                        }
 
                         if (record && record.parentNode.id == 0) {
 
@@ -287,7 +299,7 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
                             } else if (key == "published") {
                                 return Ext.String.format('<div style="text-align: left"><div role="button" class="x-grid-checkcolumn{0}" style=""></div></div>', value ? '-checked' : '');
                             } else {
-                                var layout = Ext.clone(record.data.layout);
+                                var layout = Ext.clone(record.data.layout) || {};
                                 var fieldType = record.data.dataType;
 
                                 try {
@@ -305,7 +317,9 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
                                             layout: layout
                                         }, true);
 
-                                        value = fc.renderer(value, null, record);
+                                        if (fc.renderer) {
+                                            value = fc.renderer(value, null, record);
+                                        }
                                     }
                                 } catch (e) {
                                     console.log(e);
@@ -345,25 +359,8 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
                                 }
 
                                 if (isOperator || this.parentIsOperator(realOverModel)) {
-                                    var attr = record.data;
-                                    if (record.data.configAttributes) {
-                                        attr = record.data.configAttributes;
-                                    }
-                                    var element = this.getConfigElement(attr);
-                                    var copy = element.getCopyNode(record);
+                                    let copy = this.handleOperator(record);
                                     data.records = [copy]; // assign the copy as the new dropNode
-                                    var configWindow = element.getConfigDialog(copy,
-                                        {
-                                            callback: this.updatePreview.bind(this)
-                                        });
-
-                                    if (configWindow) {
-                                        //this is needed because of new focus management of extjs6
-                                        setTimeout(function () {
-                                            configWindow.focus();
-                                        }, 250);
-                                    }
-
                                 } else {
                                     if (this.selectionPanel.getRootNode().findChild("key", record.data.key)) {
                                         dropHandlers.cancelDrop();
@@ -440,6 +437,12 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
                                     allowed = allowed && realOverModel.data.isChildAllowed(realOverModel, sourceNode);
                                 }
 
+                                if(realOverModel.data.maxChildCount) {
+                                    if (realOverModel.childNodes.length >= realOverModel.data.maxChildCount) {
+                                        allowed = false;
+                                    }
+                                }
+
                                 if (typeof sourceNode.data.isParentAllowed == "function") {
                                     console.log("parent not allowed");
                                     allowed = allowed && sourceNode.data.isParentAllowed(realOverModel, sourceNode);
@@ -458,6 +461,12 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
 
                                     if (typeof targetNode.data.isChildAllowed == "function") {
                                         allowed = allowed && targetNode.data.isChildAllowed(targetNode, sourceNode);
+                                    }
+
+                                    if(targetNode.data.maxChildCount) {
+                                        if (targetNode.childNodes.length >= targetNode.data.maxChildCount) {
+                                            allowed = false;
+                                        }
                                     }
 
                                     if (typeof sourceNode.data.isParentAllowed == "function") {
@@ -496,6 +505,27 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
         }
 
         return this.selectionPanel;
+    },
+
+    handleOperator: function(record) {
+        var attr = record.data;
+        if (record.data.configAttributes) {
+            attr = record.data.configAttributes;
+        }
+        var element = this.getConfigElement(attr);
+        var copy = element.getCopyNode(record);
+        var configWindow = element.getConfigDialog(copy,
+            {
+                callback: this.updatePreview.bind(this)
+            });
+
+        if (configWindow) {
+            //this is needed because of new focus management of extjs6
+            setTimeout(function () {
+                configWindow.focus();
+            }, 250);
+        }
+        return copy;
     },
 
     getClassDefinitionTreePanel: function () {
@@ -541,7 +571,7 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
         var operators = Object.keys(pimcore.object.gridcolumn.operator);
         var operatorGroups = [];
         // var childs = [];
-        for (var i = 0; i < operators.length; i++) {
+        for (let i = 0; i < operators.length; i++) {
             var operator = operators[i];
             if (!this.availableOperators || this.availableOperators.indexOf(operator) >= 0) {
                 var nodeConfig = pimcore.object.gridcolumn.operator[operator].prototype;
@@ -562,7 +592,7 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
         }
 
         var operatorGroupKeys = [];
-        for (k in operatorGroups) {
+        for (let k in operatorGroups) {
             if (operatorGroups.hasOwnProperty(k)) {
                 operatorGroupKeys.push(k);
             }
@@ -570,10 +600,15 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
         operatorGroupKeys.sort();
         var result = [];
         var len = operatorGroupKeys.length;
-        for (i = 0; i < len; i++) {
+        for (let i = 0; i < len; i++) {
             var operatorGroupName = operatorGroupKeys[i];
             var groupNodes = operatorGroups[operatorGroupName];
-            result.push(this.getOperatorTree(operatorGroupName, groupNodes));
+            let operatorTree = this.getOperatorTree(operatorGroupName, groupNodes);
+            operatorTree.addListener("itemdblclick", function (tree, record, item, index, e, eOpts) {
+                var copy = this.handleOperator(record);
+                this.selectionPanel.getRootNode().appendChild(copy);
+            }.bind(this));
+            result.push(operatorTree);
 
         }
         return result;

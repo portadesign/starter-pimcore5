@@ -1,32 +1,39 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
-use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data\Geo\AbstractGeo;
+use Pimcore\Model\Element\ValidationException;
+use Pimcore\Normalizer\NormalizerInterface;
 
-class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface
+class Geopoint extends AbstractGeo implements
+    ResourcePersistenceAwareInterface,
+    QueryResourcePersistenceAwareInterface,
+    EqualComparisonInterface,
+    VarExporterInterface,
+    NormalizerInterface
 {
     use Extension\ColumnType;
     use Extension\QueryColumnType;
 
     /**
      * Static type of this element
+     *
+     * @internal
      *
      * @var string
      */
@@ -35,51 +42,48 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
     /**
      * Type for the column to query
      *
+     * @internal
+     *
      * @var array
      */
     public $queryColumnType = [
         'longitude' => 'double',
-        'latitude' => 'double'
+        'latitude' => 'double',
     ];
 
     /**
      * Type for the column
      *
+     * @internal
+     *
      * @var array
      */
     public $columnType = [
         'longitude' => 'double',
-        'latitude' => 'double'
+        'latitude' => 'double',
     ];
-
-    /**
-     * Type for the generated phpdoc
-     *
-     * @var string
-     */
-    public $phpdocType = '\\Pimcore\\Model\\DataObject\\Data\\Geopoint';
 
     /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
-     * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param DataObject\Data\GeoCoordinates|null $data
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return array
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
-        if ($data instanceof DataObject\Data\Geopoint) {
+        if ($data instanceof DataObject\Data\GeoCoordinates) {
             return [
                 $this->getName() . '__longitude' => $data->getLongitude(),
-                $this->getName() . '__latitude' => $data->getLatitude()
+                $this->getName() . '__latitude' => $data->getLatitude(),
             ];
         }
 
         return [
             $this->getName() . '__longitude' => null,
-            $this->getName() . '__latitude' => null
+            $this->getName() . '__latitude' => null,
         ];
     }
 
@@ -87,18 +91,20 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param array $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return DataObject\Data\Geopoint|null
+     * @return DataObject\Data\GeoCoordinates|null
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
         if ($data[$this->getName() . '__longitude'] && $data[$this->getName() . '__latitude']) {
-            $geopoint = new DataObject\Data\Geopoint($data[$this->getName() . '__longitude'], $data[$this->getName() . '__latitude']);
+            $geopoint = new DataObject\Data\GeoCoordinates($data[$this->getName() . '__latitude'], $data[$this->getName() . '__longitude']);
 
             if (isset($params['owner'])) {
-                $geopoint->setOwner($params['owner'], $params['fieldname'], $params['language']);
+                $geopoint->_setOwner($params['owner']);
+                $geopoint->_setOwnerFieldname($params['fieldname']);
+                $geopoint->_setOwnerLanguage($params['language'] ?? null);
             }
 
             return $geopoint;
@@ -111,7 +117,7 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
      * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
      * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return array
@@ -124,18 +130,18 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
     /**
      * @see Data::getDataForEditmode
      *
-     * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param DataObject\Data\GeoCoordinates|null $data
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return array|null
      */
     public function getDataForEditmode($data, $object = null, $params = [])
     {
-        if ($data instanceof DataObject\Data\Geopoint) {
+        if ($data instanceof DataObject\Data\GeoCoordinates) {
             return [
                 'longitude' => $data->getLongitude(),
-                'latitude' => $data->getLatitude()
+                'latitude' => $data->getLatitude(),
             ];
         }
 
@@ -145,16 +151,16 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
     /**
      * @see Data::getDataFromEditmode
      *
-     * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param array|null $data
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return DataObject\Data\Geopoint|null
+     * @return DataObject\Data\GeoCoordinates|null
      */
     public function getDataFromEditmode($data, $object = null, $params = [])
     {
         if (is_array($data) && ($data['longitude'] || $data['latitude'])) {
-            return new DataObject\Data\Geopoint($data['longitude'], $data['latitude']);
+            return new DataObject\Data\GeoCoordinates($data['latitude'], $data['longitude']);
         }
 
         return null;
@@ -162,10 +168,10 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
 
     /**
      * @param string $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return DataObject\Data\Geopoint|null
+     * @return DataObject\Data\GeoCoordinates|null
      */
     public function getDataFromGridEditor($data, $object = null, $params = [])
     {
@@ -175,7 +181,7 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
     /**
      * @see Data::getVersionPreview
      *
-     * @param DataObject\Data\Geopoint|null $data
+     * @param DataObject\Data\GeoCoordinates|null $data
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
@@ -183,28 +189,20 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
      */
     public function getVersionPreview($data, $object = null, $params = [])
     {
-        if ($data instanceof DataObject\Data\Geopoint) {
-            return $data->getLongitude() . ',' . $data->getLatitude();
+        if ($data instanceof DataObject\Data\GeoCoordinates) {
+            return $data->getLatitude().','.$data->getLongitude();
         }
 
         return '';
     }
 
     /**
-     * converts object data to a simple string value or CSV Export
-     *
-     * @abstract
-     *
-     * @param DataObject\Concrete $object
-     * @param array $params
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function getForCsvExport($object, $params = [])
     {
         $data = $this->getDataFromObjectParam($object, $params);
-        if ($data instanceof DataObject\Data\Geopoint) {
-            //TODO latitude and longitude should be switched - but doing this we will loose compatitbilty to old export files
+        if ($data instanceof DataObject\Data\GeoCoordinates) {
             return $data->getLatitude() . ',' . $data->getLongitude();
         }
 
@@ -212,30 +210,7 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
     }
 
     /**
-     * @param string $importValue
-     * @param null|DataObject\Concrete $object
-     * @param mixed $params
-     *
-     * @return null|DataObject\ClassDefinition\Data|DataObject\Data\Geopoint
-     */
-    public function getFromCsvImport($importValue, $object = null, $params = [])
-    {
-        $coords = explode(',', $importValue);
-
-        $value = null;
-        if ($coords[1] && $coords[0]) {
-            //TODO latitude and longitude should be switched - but doing this we will loose compatitbilty to old export files
-            $value = new DataObject\Data\Geopoint($coords[1], $coords[0]);
-        }
-
-        return $value;
-    }
-
-    /**
-     * @param DataObject\Concrete|DataObject\Objectbrick\Data\AbstractData|DataObject\Fieldcollection\Data\AbstractData $object
-     * @param mixed $params
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function getDataForSearchIndex($object, $params = [])
     {
@@ -243,101 +218,42 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
     }
 
     /**
-     * converts data to be exposed via webservices
-     *
-     * @deprecated
-     *
-     * @param DataObject\Concrete $object
-     * @param mixed $params
-     *
-     * @return mixed
-     */
-    public function getForWebserviceExport($object, $params = [])
-    {
-        $data = $this->getDataFromObjectParam($object, $params);
-
-        if ($data instanceof DataObject\Data\Geopoint) {
-            return [
-                'longitude' => $data->getLongitude(),
-                'latitude' => $data->getLatitude()
-            ];
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * @deprecated
-     *
-     * @param mixed $value
-     * @param null|DataObject\Concrete $object
-     * @param mixed $params
-     * @param Model\Webservice\IdMapperInterface|null $idMapper
-     *
-     * @return mixed|void
-     *
-     * @throws \Exception
-     */
-    public function getFromWebserviceImport($value, $object = null, $params = [], $idMapper = null)
-    {
-        if (empty($value)) {
-            return null;
-        } else {
-            $value = (array) $value;
-            if ($value['longitude'] !== null && $value['latitude'] !== null) {
-                return new DataObject\Data\Geopoint($value['longitude'], $value['latitude']);
-            } else {
-                throw new \Exception('cannot get values from web service import - invalid data');
-            }
-        }
-    }
-
-    /** True if change is allowed in edit mode.
-     * @param DataObject\Concrete $object
-     * @param mixed $params
-     *
-     * @return bool
+     * {@inheritdoc}
      */
     public function isDiffChangeAllowed($object, $params = [])
     {
         return true;
     }
 
-    /** Encode value for packing it into a single column.
-     * @param mixed $value
-     * @param DataObject\Concrete|null $object
-     * @param mixed $params
-     *
-     * @return mixed
+    /**
+     * {@inheritdoc}
      */
-    public function marshal($value, $object = null, $params = [])
+    public function normalize($data, $params = [])
     {
-        if ($value instanceof DataObject\Data\Geopoint) {
+        if ($data instanceof DataObject\Data\GeoCoordinates) {
             return [
-                'value' => $value->getLatitude(),
-                'value2' => $value->getLongitude()
+                'latitude' => $data->getLatitude(),
+                'longitude' => $data->getLongitude(),
             ];
         }
-    }
 
-    /** See marshal
-     * @param mixed $value
-     * @param DataObject\Concrete|null $object
-     * @param mixed $params
-     *
-     * @return mixed
-     */
-    public function unmarshal($value, $object = null, $params = [])
-    {
-        if (is_array($value)) {
-            $data = new DataObject\Data\Geopoint($value['value2'], $value['value']);
-
-            return $data;
-        }
+        return null;
     }
 
     /**
-     * @param DataObject\Data\Geopoint|null $data
+     * {@inheritdoc}
+     */
+    public function denormalize($data, $params = [])
+    {
+        if (is_array($data)) {
+            return new DataObject\Data\GeoCoordinates($data['latitude'], $data['longitude']);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param DataObject\Data\GeoCoordinates|null $data
      * @param DataObject\Concrete|null $object
      * @param array $params
      *
@@ -346,5 +262,78 @@ class Geopoint extends AbstractGeo implements ResourcePersistenceAwareInterface,
     public function getDataForGrid($data, $object = null, $params = [])
     {
         return $this->getDataForEditmode($data, $object, $params);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
+    {
+        $isEmpty = true;
+
+        if ($data) {
+            if (!$data instanceof DataObject\Data\GeoCoordinates) {
+                throw new ValidationException('Expected an instance of GeoCoordinates');
+            }
+            $isEmpty = false;
+        }
+
+        if (!$omitMandatoryCheck && $this->getMandatory() && $isEmpty) {
+            throw new ValidationException('Empty mandatory field [ ' . $this->getName() . ' ]');
+        }
+    }
+
+    /**
+     *
+     * @param DataObject\Data\GeoCoordinates|null $oldValue
+     * @param DataObject\Data\GeoCoordinates|null $newValue
+     *
+     * @return bool
+     */
+    public function isEqual($oldValue, $newValue): bool
+    {
+        if ($oldValue === null && $newValue === null) {
+            return true;
+        }
+
+        if (!$oldValue instanceof DataObject\Data\GeoCoordinates
+            || !$newValue instanceof DataObject\Data\GeoCoordinates) {
+            return false;
+        }
+
+        return (abs($oldValue->getLongitude() - $newValue->getLongitude()) < 0.000000000001)
+            && (abs($oldValue->getLatitude() - $newValue->getLatitude()) < 0.000000000001);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getParameterTypeDeclaration(): ?string
+    {
+        return '?\\' . DataObject\Data\GeoCoordinates::class;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getReturnTypeDeclaration(): ?string
+    {
+        return '?\\' . DataObject\Data\GeoCoordinates::class;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocInputType(): ?string
+    {
+        return '\\' . DataObject\Data\GeoCoordinates::class . '|null';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocReturnType(): ?string
+    {
+        return '\\' . DataObject\Data\GeoCoordinates::class . '|null';
     }
 }

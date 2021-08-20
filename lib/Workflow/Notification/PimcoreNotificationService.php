@@ -1,20 +1,21 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Workflow\Notification;
 
-use Pimcore\Model\Element\AbstractElement;
+use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\Notification\Service\NotificationService;
 use Symfony\Component\Workflow\Workflow;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -43,7 +44,7 @@ class PimcoreNotificationService extends AbstractNotificationService
         $this->translator = $translator;
     }
 
-    public function sendPimcoreNotification(array $users, array $roles, Workflow $workflow, string $subjectType, AbstractElement $subject, string $action)
+    public function sendPimcoreNotification(array $users, array $roles, Workflow $workflow, string $subjectType, ElementInterface $subject, string $action)
     {
         try {
             $recipients = $this->getNotificationUsersByName($users, $roles, true);
@@ -59,7 +60,7 @@ class PimcoreNotificationService extends AbstractNotificationService
                         $subjectType . ' ' . $subject->getFullPath(),
                         $subject->getId(),
                         $this->translator->trans($action, [], 'admin', $language),
-                        $this->translator->trans($workflow->getName(), [], 'admin', $language)
+                        $this->translator->trans($workflow->getName(), [], 'admin', $language),
                     ],
                     'admin',
                     $language

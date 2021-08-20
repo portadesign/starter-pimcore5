@@ -1,15 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList\DefaultMysql;
@@ -18,6 +19,9 @@ use Monolog\Logger;
 use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList\DefaultMysql;
 use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList\ProductListInterface;
 
+/**
+ * @internal
+ */
 class Dao
 {
     /**
@@ -40,7 +44,7 @@ class Dao
      */
     protected $logger;
 
-    public function __construct(ProductListInterface $model, Logger $logger)
+    public function __construct(DefaultMysql $model, Logger $logger)
     {
         $this->model = $model;
         $this->db = \Pimcore\Db::get();
@@ -273,7 +277,7 @@ class Dao
                 throw new \Exception('Field array for given object id is empty');
             }
         } catch (\Exception $e) {
-            $this->logger->err($e);
+            $this->logger->error($e);
 
             return '';
         }

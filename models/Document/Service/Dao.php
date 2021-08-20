@@ -1,18 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- * @package    Document
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\Document\Service;
@@ -22,6 +20,8 @@ use Pimcore\Model\Document;
 use Pimcore\Model\Site;
 
 /**
+ * @internal
+ *
  * @property \Pimcore\Model\Document\Service $model
  */
 class Dao extends Model\Dao\AbstractDao
@@ -38,7 +38,7 @@ class Dao extends Model\Dao\AbstractDao
             'SELECT documents.id FROM documents
             LEFT JOIN documents_page ON documents.id = documents_page.id
             WHERE documents.path LIKE ? AND documents_page.prettyUrl = ?',
-        [$site->getRootPath() . '/%', rtrim($path, '/')]
+        [$this->db->escapeLike($site->getRootPath()) . '/%', rtrim($path, '/')]
         );
     }
 
@@ -114,7 +114,7 @@ class Dao extends Model\Dao\AbstractDao
         $this->db->insertOrUpdate('documents_translations', [
             'id' => $translation->getId(),
             'sourceId' => $sourceId,
-            'language' => $language
+            'language' => $language,
         ]);
     }
 

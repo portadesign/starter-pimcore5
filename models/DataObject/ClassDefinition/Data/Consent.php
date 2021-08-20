@@ -1,17 +1,16 @@
 <?php
+
 /**
  * Pimcore
  *
  * This source file is available under two different licenses:
  * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Enterprise License (PEL)
+ * - Pimcore Commercial License (PCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- * @category   Pimcore
- *
- * @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- * @license    http://www.pimcore.org/license     GPLv3 and PEL
+ *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
+ *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
@@ -20,27 +19,33 @@ use Pimcore\DataObject\Consent\Service;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
+use Pimcore\Normalizer\NormalizerInterface;
 
-class Consent extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface
+class Consent extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface, TypeDeclarationSupportInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface
 {
-    use Model\DataObject\Traits\SimpleComparisonTrait;
     use Extension\ColumnType;
     use Extension\QueryColumnType;
 
     /**
      * Static type of this element
      *
+     * @internal
+     *
      * @var string
      */
     public $fieldtype = 'consent';
 
     /**
+     * @internal
+     *
      * @var int
      */
     public $defaultValue = 0;
 
     /**
      * Type for the column to query
+     *
+     * @internal
      *
      * @var string
      */
@@ -49,32 +54,29 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
     /**
      * Type for the column
      *
+     * @internal
+     *
      * @var array
      */
     public $columnType = [
         'consent' => 'tinyint(1)',
-        'note' => 'int(11)'
+        'note' => 'int(11)',
     ];
-
-    /**
-     * Type for the generated phpdoc
-     *
-     * @var string
-     */
-    public $phpdocType = '\\Pimcore\\Model\\DataObject\\Data\\Consent';
 
     /**
      * Width of field
      *
-     * @var int
+     * @internal
+     *
+     * @var string|int
      */
     public $width = 0;
 
     /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
-     * @param DataObject\Data\Consent $data
-     * @param null|DataObject\AbstractObject $object
+     * @param DataObject\Data\Consent|null $data
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return array
@@ -84,13 +86,13 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
         if ($data instanceof DataObject\Data\Consent) {
             return [
                 $this->getName() . '__consent' => $data->getConsent(),
-                $this->getName() . '__note' => $data->getNoteId()
+                $this->getName() . '__note' => $data->getNoteId(),
             ];
         }
 
         return [
             $this->getName() . '__consent' => false,
-            $this->getName() . '__note' => null
+            $this->getName() . '__note' => null,
         ];
     }
 
@@ -98,7 +100,7 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
      * @param array $data
-     * @param null|Model\DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return DataObject\Data\Consent
@@ -112,7 +114,9 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
         }
 
         if (isset($params['owner'])) {
-            $consent->setOwner($params['owner'], $params['fieldname'], $params['language']);
+            $consent->_setOwner($params['owner']);
+            $consent->_setOwnerFieldname($params['fieldname']);
+            $consent->_setOwnerLanguage($params['language'] ?? null);
         }
 
         return $consent;
@@ -121,8 +125,8 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
     /**
      * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
-     * @param DataObject\Data\Consent $data
-     * @param null|DataObject\AbstractObject $object
+     * @param DataObject\Data\Consent|null $data
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return bool
@@ -139,8 +143,8 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
     /**
      * @see Data::getDataForEditmode
      *
-     * @param DataObject\Data\Consent $data
-     * @param null|DataObject\AbstractObject $object
+     * @param DataObject\Data\Consent|null $data
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return array|null
@@ -152,7 +156,7 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
             return [
                 'consent' => $data->getConsent(),
                 'noteContent' => $data->getSummaryString(),
-                'noteId' => $data->getNoteId()
+                'noteId' => $data->getNoteId(),
             ];
         }
 
@@ -163,7 +167,7 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
      * @see Data::getDataFromEditmode
      *
      * @param string|bool $data
-     * @param null|DataObject\AbstractObject $object
+     * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
      * @return DataObject\Data\Consent
@@ -239,7 +243,7 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
 
                 $noteId = $note->getId();
             }
-        } elseif ($originalNote) {
+        } else {
             $noteId = $originalNote->getId();
         }
 
@@ -273,7 +277,7 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
     /**
      * @see Data::getVersionPreview
      *
-     * @param DataObject\Data\Consent $data
+     * @param DataObject\Data\Consent|null $data
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
@@ -285,14 +289,9 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
     }
 
     /**
-     * Checks if data is valid for current data field
-     *
-     * @param mixed $data
-     * @param bool $omitMandatoryCheck
-     *
-     * @throws \Exception
+     * {@inheritdoc}
      */
-    public function checkValidity($data, $omitMandatoryCheck = false)
+    public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
         if (!$omitMandatoryCheck and $this->getMandatory() and $data === null) {
             throw new Model\Element\ValidationException('Empty mandatory field [ ' . $this->getName() . ' ]');
@@ -305,75 +304,17 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
     }
 
     /**
-     * converts object data to a simple string value or CSV Export
-     *
-     * @abstract
-     *
-     * @param DataObject\Concrete $object
-     * @param array $params
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function getForCsvExport($object, $params = [])
     {
         $data = $this->getDataFromObjectParam($object, $params);
 
-        return $data ? strval($data->getConsent()) : '';
+        return $data ? (string)$data->getConsent() : '';
     }
 
     /**
-     * fills object field data values from CSV Import String
-     *
-     * @abstract
-     *
-     * @param string $importValue
-     * @param null|DataObject\Concrete $object
-     * @param mixed $params
-     *
-     * @return DataObject\Data\Consent
-     */
-    public function getFromCsvImport($importValue, $object = null, $params = [])
-    {
-        return new DataObject\Data\Consent((bool)$importValue);
-    }
-
-    /**
-     * @deprecated
-     *
-     * @param DataObject\Concrete $object
-     * @param array $params
-     *
-     * @return bool
-     */
-    public function getForWebserviceExport($object, $params = [])
-    {
-        $data = $this->getDataFromObjectParam($object, $params);
-
-        return $data ? (bool) $data->getConsent() : false;
-    }
-
-    /**
-     * converts data to be imported via webservices
-     *
-     * @deprecated
-     *
-     * @param mixed $value
-     * @param null|Model\DataObject\AbstractObject $object
-     * @param mixed $params
-     * @param Model\Webservice\IdMapperInterface|null $idMapper
-     *
-     * @return DataObject\Data\Consent
-     */
-    public function getFromWebserviceImport($value, $object = null, $params = [], $idMapper = null)
-    {
-        return new DataObject\Data\Consent((bool)$value);
-    }
-
-    /** True if change is allowed in edit mode.
-     * @param DataObject\Concrete $object
-     * @param mixed $params
-     *
-     * @return bool
+     * {@inheritdoc}
      */
     public function isDiffChangeAllowed($object, $params = [])
     {
@@ -430,10 +371,7 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
     }
 
     /**
-     * @param DataObject\Concrete|DataObject\Objectbrick\Data\AbstractData|DataObject\Fieldcollection\Data\AbstractData $object
-     * @param mixed $params
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function getDataForSearchIndex($object, $params = [])
     {
@@ -441,26 +379,102 @@ class Consent extends Data implements ResourcePersistenceAwareInterface, QueryRe
     }
 
     /**
-     * @return int
+     * @return string|int
      */
-    public function getWidth(): int
+    public function getWidth()
     {
-        return (int) $this->width;
+        return $this->width;
     }
 
     /**
-     * @param int $width
+     * @param string|int $width
      */
     public function setWidth($width)
     {
+        if (is_numeric($width)) {
+            $width = (int)$width;
+        }
         $this->width = $width;
     }
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public function supportsInheritance()
     {
         return false;
+    }
+
+    /**
+     * @param DataObject\Data\Consent|null $oldValue
+     * @param DataObject\Data\Consent|null $newValue
+     *
+     * @return bool
+     */
+    public function isEqual($oldValue, $newValue): bool
+    {
+        $oldValue = $oldValue instanceof DataObject\Data\Consent ? $oldValue->getConsent() : null;
+        $newValue = $newValue instanceof DataObject\Data\Consent ? $newValue->getConsent() : null;
+
+        return $oldValue === $newValue;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getParameterTypeDeclaration(): ?string
+    {
+        return '?\\' . DataObject\Data\Consent::class;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getReturnTypeDeclaration(): ?string
+    {
+        return '?\\' . DataObject\Data\Consent::class;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocInputType(): ?string
+    {
+        return '\\' . DataObject\Data\Consent::class . '|null';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocReturnType(): ?string
+    {
+        return '\\' . DataObject\Data\Consent::class . '|null';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function normalize($value, $params = [])
+    {
+        if ($value instanceof DataObject\Data\Consent) {
+            return [
+                'consent' => $value->getConsent(),
+                'noteId' => $value->getNoteId(),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function denormalize($value, $params = [])
+    {
+        if (is_array($value)) {
+            return new DataObject\Data\Consent($value['consent'], $value['noteId']);
+        }
+
+        return null;
     }
 }
