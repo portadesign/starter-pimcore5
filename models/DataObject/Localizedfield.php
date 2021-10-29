@@ -640,7 +640,7 @@ final class Localizedfield extends Model\AbstractModel implements
         }
 
         //TODO Pimcore 11: remove method_exists BC layer
-        if ($fieldDefinition instanceof PreSetDataInterface || method_exists($fieldDefinition, 'preSetData')) {
+        if ($fieldDefinition instanceof PreSetDataInterface || ($fieldDefinition && method_exists($fieldDefinition, 'preSetData'))) {
             if (!$fieldDefinition instanceof PreSetDataInterface) {
                 trigger_deprecation('pimcore/pimcore', '10.1',
                     sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
