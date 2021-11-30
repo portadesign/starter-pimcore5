@@ -72,6 +72,7 @@ pimcore.object.classes.data.data = Class.create({
         this.specificPanel = new Ext.form.FormPanel({
             title: t("specific_settings"),
             bodyStyle: "padding: 10px;",
+            autoScroll: true,
             style: "margin: 10px 0 10px 0",
             items: [],
             defaults: {
@@ -222,6 +223,7 @@ pimcore.object.classes.data.data = Class.create({
         this.standardSettingsForm = new Ext.form.FormPanel(
             {
                 bodyStyle: "padding: 10px;",
+                autoScroll: true,
                 style: "margin: 0 0 10px 0",
                 defaults: {
                     labelWidth: 140
@@ -235,6 +237,7 @@ pimcore.object.classes.data.data = Class.create({
             {
                 title: t("layout_settings"),
                 bodyStyle: "padding: 10px;",
+                autoScroll: true,
                 style: "margin: 10px 0 10px 0",
                 defaults: {
                     labelWidth: 230
@@ -247,6 +250,7 @@ pimcore.object.classes.data.data = Class.create({
         this.layout = new Ext.Panel({
             title: '<b>' + this.datax.name + " (" + t("type") + ": " + niceName + ")</b>",
             bodyStyle: 'padding: 10px;',
+            autoScroll: true,
             items: [
                 this.standardSettingsForm,
                 this.layoutSettingsForm,
@@ -282,8 +286,10 @@ pimcore.object.classes.data.data = Class.create({
         if (this.treeNode) {
             for (var i = 0; i < items.length; i++) {
                 if (items[i].name == "name") {
-                    this.treeNode.set("text", items[i].getValue());
-                    break;
+                    if(this.isValidName(items[i].getValue())) {
+                        this.treeNode.set("text", htmlspecialchars(items[i].getValue()));
+                        break;
+                    }
                 }
             }
         }
@@ -298,10 +304,9 @@ pimcore.object.classes.data.data = Class.create({
         var data = this.getData();
         data.name = trim(data.name);
 
-        var isValidName = /^[a-zA-Z][a-zA-Z0-9_]*$/;
         var isForbiddenName = in_arrayi(data.name, this.forbiddenNames);
 
-        if (data.name.length > 1 && isValidName.test(data.name) && !isForbiddenName) {
+        if (data.name.length > 1 && this.isValidName(data.name) && !isForbiddenName) {
             return true;
         }
 
@@ -310,6 +315,11 @@ pimcore.object.classes.data.data = Class.create({
         }
 
         return false;
+    },
+
+    isValidName: function (name) {
+        let isValidName = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+        return isValidName.test(name);
     },
 
     applyData: function () {

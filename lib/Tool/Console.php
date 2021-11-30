@@ -90,11 +90,15 @@ final class Console
             }
         }
 
-        $systemConfig = Config::getSystemConfiguration('general');
-
         $paths = [];
-        if (!empty($systemConfig['path_variable'])) {
-            $paths = explode(PATH_SEPARATOR, $systemConfig['path_variable']);
+
+        try {
+            $systemConfig = Config::getSystemConfiguration('general');
+            if (!empty($systemConfig['path_variable'])) {
+                $paths = explode(PATH_SEPARATOR, $systemConfig['path_variable']);
+            }
+        } catch (\Exception $e) {
+            Logger::warning($e);
         }
 
         array_push($paths, '');
@@ -358,9 +362,9 @@ final class Console
      *
      * @param array|string $cmd
      *
-     * @return array|string
+     * @return void
      */
-    public static function addLowProcessPriority($cmd)
+    public static function addLowProcessPriority(&$cmd): void
     {
         $nice = (string) self::getExecutable('nice');
         if ($nice) {
@@ -370,7 +374,5 @@ final class Console
                 array_unshift($cmd, $nice, '-n 19');
             }
         }
-
-        return $cmd;
     }
 }

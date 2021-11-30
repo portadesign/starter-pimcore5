@@ -150,7 +150,7 @@ pimcore.object.tags.manyToOneRelation = Class.create(pimcore.object.tags.abstrac
             labelWidth: labelWidth,
             layout: 'hbox',
             items: items,
-            componentCls: "object_field object_field_type_" + this.type,
+            componentCls: this.getWrapperClassNames(),
             border: false,
             style: {
                 padding: 0
@@ -175,10 +175,9 @@ pimcore.object.tags.manyToOneRelation = Class.create(pimcore.object.tags.abstrac
     getLayoutShow: function () {
 
         var href = {
-            fieldLabel: this.fieldConfig.title,
-            name: this.fieldConfig.name,
-            labelWidth: this.fieldConfig.labelWidth ? this.fieldConfig.labelWidth : 100
+            name: this.fieldConfig.name
         };
+        var labelWidth = this.fieldConfig.labelWidth ? this.fieldConfig.labelWidth : 100;
 
         if (this.data) {
             if (this.data.path) {
@@ -191,7 +190,6 @@ pimcore.object.tags.manyToOneRelation = Class.create(pimcore.object.tags.abstrac
         } else {
             href.width = 300;
         }
-        href.width = href.labelWidth + href.width;
         href.disabled = true;
 
         this.component = new Ext.form.TextField(href);
@@ -200,14 +198,16 @@ pimcore.object.tags.manyToOneRelation = Class.create(pimcore.object.tags.abstrac
             this.component.addCls("strikeThrough");
         }
 
-        this.composite = Ext.create('Ext.form.FieldContainer', {
+        var compositeCfg = {
+            fieldLabel: this.fieldConfig.title,
+            labelWidth: labelWidth,
             layout: 'hbox',
             items: [this.component, {
                 xtype: "button",
                 iconCls: "pimcore_icon_open",
                 handler: this.openElement.bind(this)
             }],
-            componentCls: "object_field object_field_type_" + this.type,
+            componentCls: this.getWrapperClassNames(),
             border: false,
             style: {
                 padding: 0
@@ -217,7 +217,13 @@ pimcore.object.tags.manyToOneRelation = Class.create(pimcore.object.tags.abstrac
                     this.requestNicePathData();
                 }.bind(this)
             }
-        });
+        };
+
+        if (this.fieldConfig.labelAlign) {
+            compositeCfg.labelAlign = this.fieldConfig.labelAlign;
+        }
+
+        this.composite = Ext.create('Ext.form.FieldContainer', compositeCfg);
 
         return this.composite;
 

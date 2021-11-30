@@ -414,12 +414,6 @@ CREATE TABLE `redirects` (
   INDEX `routing_lookup` (`active`, `regex`, `sourceSite`, `source`, `type`, `expiry`, `priority`)
 ) DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC;
 
-DROP TABLE IF EXISTS `sanitycheck`;
-CREATE TABLE `sanitycheck` (
-  `id` int(11) unsigned NOT NULL,
-  `type` enum('document','asset','object') NOT NULL,
-  PRIMARY KEY  (`id`,`type`)
-) DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `schedule_tasks`;
 CREATE TABLE `schedule_tasks` (
@@ -953,7 +947,7 @@ CREATE TABLE `object_url_slugs` (
       `ownertype` ENUM('object','fieldcollection','localizedfield','objectbrick') NOT NULL DEFAULT 'object',
       `ownername` VARCHAR(70) NOT NULL DEFAULT '',
       `position` VARCHAR(70) NOT NULL DEFAULT '0',
-      `slug` varchar(765) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL, /* slug in utf8 (3-byte) using the full key length of 3072 bytes */
+      `slug` varchar(765) NOT NULL, /* slug in utf8mb4 (4-byte) using the full key length of 3072 bytes */
       `siteId` INT(11) NOT NULL DEFAULT '0',
       PRIMARY KEY (`slug`, `siteId`),
       INDEX `index` (`index`),

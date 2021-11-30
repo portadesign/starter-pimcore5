@@ -53,7 +53,8 @@ pimcore.object.classes.klass = Class.create({
                 text: t("general_settings"),
                 leaf: true,
                 iconCls: "pimcore_icon_class",
-                isTarget: true
+                isTarget: true,
+                className: this.data.name
             },
             listeners: this.getTreeNodeListeners(),
             viewConfig: {
@@ -126,6 +127,7 @@ pimcore.object.classes.klass = Class.create({
             border: false,
             layout: "border",
             closable: true,
+            autoScroll: true,
             title: name,
             //id: "pimcore_class_editor_panel_" + this.getId(),
             id: this.editorPrefix + this.getId(),
@@ -738,6 +740,7 @@ pimcore.object.classes.klass = Class.create({
         this.rootPanel = new Ext.form.FormPanel({
             title: '<b>' + t("general_settings") + '</b>',
             bodyStyle: 'padding: 10px;',
+            autoScroll: true,
             defaults: {
                 labelWidth: 200
             },
@@ -1164,12 +1167,12 @@ pimcore.object.classes.klass = Class.create({
         }
 
         var newNode = {
-            text: nodeLabel,
+            text: htmlspecialchars(nodeLabel),
             type: "layout",
             iconCls: pimcore.object.classes.layout[type].prototype.getIconClass(),
             leaf: false,
             expandable: false,
-            expanded: true
+            expanded: true,
         };
         newNode = this.appendChild(newNode);
 
@@ -1214,7 +1217,7 @@ pimcore.object.classes.klass = Class.create({
         }
 
         var newNode = {
-            text: nodeLabel,
+            text: htmlspecialchars(nodeLabel),
             type: "data",
             leaf: true,
             iconCls: pimcore.object.classes.data[type].prototype.getIconClass()

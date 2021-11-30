@@ -23,7 +23,7 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
             }.bind(this),
             params: {
                 id: this.id,
-                type: this.type
+                    type: this.type
             }
         });
     },
@@ -32,15 +32,17 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
         try {
             this.data = Ext.decode(response.responseText);
 
+            if (this.data.success === false && this.options && this.options.ignoreNotFoundError) {
+                return;
+            }
+
             if (typeof this.data.editlock == "object") {
                 pimcore.helpers.lockManager(this.id, "asset", this.type, this.data);
                 throw "asset is locked";
             }
 
-            if(this.type !== this.data.type) {
-                pimcore.helpers.closeAsset(this.id);
-                pimcore.helpers.openAsset(this.id, this.data.type);
-                return;
+            if (this.type !== this.data.type) {
+                Ext.MessageBox.alert(t("warning"), t("asset_type_changed"));
             }
 
             this.addTab();

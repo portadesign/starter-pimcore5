@@ -54,6 +54,7 @@ pimcore.object.classes.layout.panel = Class.create(pimcore.object.classes.layout
         this.layout.add({
             xtype: "form",
             bodyStyle: "padding: 10px;",
+            autoScroll: true,
             style: "margin: 10px 0 10px 0",
             items: [
                 {
@@ -74,15 +75,10 @@ pimcore.object.classes.layout.panel = Class.create(pimcore.object.classes.layout
                     checked: this.datax.border,
                 },
                 {
-                    xtype: "textfield",
+                    xtype: "numberfield",
                     name: "labelWidth",
                     fieldLabel: t("label_width"),
                     value: this.datax.labelWidth
-                },
-                {
-                    xtype: "displayfield",
-                    hideLabel: true,
-                    value: t('width_explanation')
                 },
                 {
                     xtype: "combo",

@@ -30,7 +30,7 @@ class Dao extends Model\Dao\AbstractDao
     /**
      * @param int $id
      *
-     * @throws \Exception
+     * @throws Model\Exception\NotFoundException
      */
     public function getById($id)
     {
@@ -40,23 +40,23 @@ class Dao extends Model\Dao\AbstractDao
             $data = $this->db->fetchRow('SELECT * FROM users WHERE `id` = ?', $id);
         }
 
-        if (!empty($data['id'])) {
+        if ($data) {
             $this->assignVariablesToModel($data);
         } else {
-            throw new \Exception("user doesn't exist");
+            throw new Model\Exception\NotFoundException("user doesn't exist");
         }
     }
 
     /**
      * @param string $name
      *
-     * @throws \Exception
+     * @throws Model\Exception\NotFoundException
      */
     public function getByName($name)
     {
         $data = $this->db->fetchRow('SELECT * FROM users WHERE `type` = ? AND `name` = ?', [$this->model->getType(), $name]);
 
-        if (!empty($data['id'])) {
+        if ($data) {
             $this->assignVariablesToModel($data);
         } else {
             throw new Model\Exception\NotFoundException(sprintf('User with name "%s" does not exist', $name));
