@@ -265,7 +265,7 @@ class DocumentController extends ElementControllerBase implements KernelControll
 
                 // check for a docType
                 $docType = Document\DocType::getById($request->get('docTypeId'));
-                if ($docType) {
+                if ($docType && $docType->getId()) {
                     $createValues['template'] = $docType->getTemplate();
                     $createValues['controller'] = $docType->getController();
                     $createValues['staticGeneratorEnabled'] = $docType->getStaticGeneratorEnabled();
