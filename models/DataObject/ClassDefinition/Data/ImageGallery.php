@@ -278,7 +278,9 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
             ];
 
             $itemResult = $fd->getDataFromResource($itemData, $object, $params);
-            $resultItems[] = $itemResult;
+            if ($itemResult instanceof DataObject\Data\Hotspotimage) {
+                $resultItems[] = $itemResult;
+            }
         }
 
         $imageGallery = new DataObject\Data\ImageGallery($resultItems);
@@ -372,7 +374,7 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
     }
 
     /**
-     * @param DataObject\Data\ImageGallery $data
+     * @param array|null $data
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *

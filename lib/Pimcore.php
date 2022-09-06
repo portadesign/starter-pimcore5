@@ -29,11 +29,6 @@ class Pimcore
     /**
      * @var bool
      */
-    private static $inShutdown = false;
-
-    /**
-     * @var bool
-     */
     private static $shutdownEnabled = true;
 
     /**
@@ -59,7 +54,15 @@ class Pimcore
      */
     public static function inDevMode(): bool
     {
-        return (bool) ($_SERVER['PIMCORE_DEV_MODE'] ?? false);
+        if (!isset($_SERVER['PIMCORE_DEV_MODE']) || !is_bool($_SERVER['PIMCORE_DEV_MODE'])) {
+            $value = $_SERVER['PIMCORE_DEV_MODE'] ?? false;
+            if (!is_bool($value)) {
+                $value = filter_var($value, \FILTER_VALIDATE_BOOLEAN);
+            }
+            $_SERVER['PIMCORE_DEV_MODE'] = (bool) $value;
+        }
+
+        return $_SERVER['PIMCORE_DEV_MODE'];
     }
 
     /**
@@ -127,7 +130,7 @@ class Pimcore
      */
     public static function getKernel()
     {
-        return static::$kernel;
+        return self::$kernel;
     }
 
     /**
@@ -137,7 +140,7 @@ class Pimcore
      */
     public static function hasKernel()
     {
-        if (static::$kernel) {
+        if (self::$kernel) {
             return true;
         }
 
@@ -151,7 +154,7 @@ class Pimcore
      */
     public static function setKernel(KernelInterface $kernel)
     {
-        static::$kernel = $kernel;
+        self::$kernel = $kernel;
     }
 
     /**
@@ -175,9 +178,12 @@ class Pimcore
     public static function hasContainer()
     {
         if (static::hasKernel()) {
-            $container = static::getContainer();
-            if ($container) {
-                return true;
+            try {
+                $container = static::getContainer();
+                if ($container) {
+                    return true;
+                }
+            } catch (\LogicException) {
             }
         }
 
@@ -222,15 +228,24 @@ class Pimcore
     }
 
     /**
+     * Deletes temporary files which got created during the runtime of current process
+     *
+     * @static
+     */
+    public static function deleteTemporaryFiles()
+    {
+        /** @var \Pimcore\Helper\LongRunningHelper $longRunningHelper */
+        $longRunningHelper = self::getContainer()->get(\Pimcore\Helper\LongRunningHelper::class);
+        $longRunningHelper->deleteTemporaryFiles();
+    }
+
+    /**
      * this method is called with register_shutdown_function() and writes all data queued into the cache
      *
      * @internal
      */
     public static function shutdown()
     {
-        // set inShutdown to true so that the output-buffer knows that he is allowed to send the headers
-        self::$inShutdown = true;
-
         try {
             self::getContainer();
         } catch (\LogicException $e) {

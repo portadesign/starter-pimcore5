@@ -31,6 +31,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
     use DataObject\ClassDefinition\Data\Relations\AllowAssetRelationTrait;
     use DataObject\ClassDefinition\Data\Relations\AllowDocumentRelationTrait;
     use DataObject\ClassDefinition\Data\Relations\ManyToManyRelationTrait;
+    use DataObject\ClassDefinition\Data\Extension\RelationFilterConditionParser;
 
     /**
      * Static type of this element
@@ -60,7 +61,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $maxItems;
 
@@ -643,7 +644,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
     }
 
     /**
-     * @param string|int|null $maxItems
+     * @param int|null $maxItems
      *
      * @return $this
      */
@@ -655,7 +656,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getMaxItems()
     {
@@ -697,7 +698,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return array|string
+     * @return array
      */
     public function getDiffVersionPreview($data, $object = null, $params = [])
     {
@@ -774,7 +775,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
      * @param mixed $value
      * @param mixed $params
      *
-     * @return mixed
+     * @return array|null
      */
     public function denormalize($value, $params = [])
     {
@@ -888,7 +889,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return mixed
+     * @return array|null
      */
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
@@ -906,7 +907,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
             return $this->getDataFromEditmode($result, $object, $params);
         }
 
-        return;
+        return null;
     }
 
     /**
@@ -964,5 +965,21 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
         }
 
         throw new \InvalidArgumentException('Filtering '.__CLASS__.' does only support "=" operator');
+    }
+
+    /**
+     * Filter by relation feature
+     *
+     * @param array|string|null $value
+     * @param string            $operator
+     * @param array             $params
+     *
+     * @return string
+     */
+    public function getFilterConditionExt($value, $operator, $params = [])
+    {
+        $name = $params['name'] ?: $this->name;
+
+        return $this->getRelationFilterCondition($value, $operator, $name);
     }
 }

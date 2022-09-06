@@ -65,7 +65,7 @@ class IndexFieldSelectionCombo extends Select
                     ];
                 }
             } catch (\Exception $e) {
-                Logger::error($e);
+                Logger::error((string) $e);
             }
         }
 
@@ -105,7 +105,8 @@ class IndexFieldSelectionCombo extends Select
     /**
      * @return $this
      */
-    public function jsonSerialize()
+    #[\ReturnTypeWillChange]
+    public function jsonSerialize()// : static
     {
         if (Service::doRemoveDynamicOptions()) {
             $this->options = null;

@@ -40,7 +40,7 @@ final class Config
         if (!self::$locationAwareConfigRepository) {
             $config = [];
             $containerConfig = \Pimcore::getContainer()->getParameter('pimcore.config');
-            if (isset($containerConfig['documents']['web_to_print']['generalTool'])) {
+            if ($containerConfig['documents']['web_to_print']['generalTool']) {
                 $config = [
                     self::CONFIG_ID => $containerConfig['documents']['web_to_print'],
                 ];
@@ -64,7 +64,7 @@ final class Config
             self::$locationAwareConfigRepository = new LocationAwareConfigRepository(
                 $config,
                 'pimcore_web_to_print',
-                PIMCORE_CONFIGURATION_DIRECTORY . '/web-to-print',
+                $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_WEB_TO_PRINT'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/web-to-print',
                 'PIMCORE_WRITE_TARGET_WEB_TO_PRINT',
                 null,
                 self::LEGACY_FILE,

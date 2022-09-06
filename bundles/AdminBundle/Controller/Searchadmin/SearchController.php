@@ -71,7 +71,7 @@ class SearchController extends AdminController
 
         $allParams = $filterPrepareEvent->getArgument('requestParams');
 
-        $query = $this->filterQueryParam($allParams['query']);
+        $query = $this->filterQueryParam($allParams['query'] ?? '');
 
         $types = explode(',', $allParams['type'] ?? '');
         $subtypes = explode(',', $allParams['subtype'] ?? '');
@@ -87,11 +87,7 @@ class SearchController extends AdminController
         $conditionParts = [];
         $db = \Pimcore\Db::get();
 
-        $forbiddenConditions = $this->getForbiddenCondition($types);
-
-        if ($forbiddenConditions) {
-            $conditionParts[] = '(' . implode(' AND ', $forbiddenConditions) . ')';
-        }
+        $conditionParts[] = $this->getPermittedPaths($types);
 
         $queryCondition = '';
         if (!empty($query)) {
@@ -215,17 +211,23 @@ class SearchController extends AdminController
         //filtering for tags
         if (!empty($allParams['tagIds'])) {
             $tagIds = $allParams['tagIds'];
+
+            $tagsTypeCondition = '';
+            if (is_array($types) && !empty($types[0])) {
+                $tagsTypeCondition = 'ctype IN (\'' . implode('\',\'', $types) . '\') AND';
+            } elseif (!is_array($types)) {
+                $tagsTypeCondition = 'ctype = ' . $db->quote($types) . ' AND ';
+            }
+
             foreach ($tagIds as $tagId) {
-                foreach ($types as $type) {
-                    if (($allParams['considerChildTags'] ?? 'false') === 'true') {
-                        $tag = Element\Tag::getById($tagId);
-                        if ($tag) {
-                            $tagPath = $tag->getFullIdPath();
-                            $conditionParts[] = 'id IN (SELECT cId FROM tags_assignment INNER JOIN tags ON tags.id = tags_assignment.tagid WHERE ctype = ' . $db->quote($type) . ' AND (id = ' .(int)$tagId. ' OR idPath LIKE ' . $db->quote($db->escapeLike($tagPath) . '%') . '))';
-                        }
-                    } else {
-                        $conditionParts[] = 'id IN (SELECT cId FROM tags_assignment WHERE ctype = ' . $db->quote($type) . ' AND tagid = ' .(int)$tagId. ')';
+                if (($allParams['considerChildTags'] ?? 'false') === 'true') {
+                    $tag = Element\Tag::getById($tagId);
+                    if ($tag) {
+                        $tagPath = $tag->getFullIdPath();
+                        $conditionParts[] = 'id IN (SELECT cId FROM tags_assignment INNER JOIN tags ON tags.id = tags_assignment.tagid WHERE '.$tagsTypeCondition.' (id = ' .(int)$tagId. ' OR idPath LIKE ' . $db->quote($db->escapeLike($tagPath) . '%') . '))';
                     }
+                } else {
+                    $conditionParts[] = 'id IN (SELECT cId FROM tags_assignment WHERE '.$tagsTypeCondition.' tagid = ' .(int)$tagId. ')';
                 }
             }
         }
@@ -343,63 +345,68 @@ class SearchController extends AdminController
     }
 
     /**
+     * @internal
+     *
      * @param array $types
      *
-     * @return array
+     * @return string
      */
-    protected function getForbiddenCondition($types = ['assets', 'documents', 'objects'])
+    protected function getPermittedPaths($types = ['asset', 'document', 'object'])
     {
         $user = $this->getAdminUser();
         $db = \Pimcore\Db::get();
 
-        $forbiddenConditions = [];
+        $allowedTypes = [];
 
-        //exclude forbidden assets
-        if (in_array('asset', $types)) {
-            if (!$user->isAllowed('assets')) {
-                $forbiddenConditions[] = " `type` != 'asset' ";
-            } else {
-                $forbiddenAssetPaths = Element\Service::findForbiddenPaths('asset', $user);
-                if (count($forbiddenAssetPaths) > 0) {
-                    for ($i = 0; $i < count($forbiddenAssetPaths); $i++) {
-                        $forbiddenAssetPaths[$i] = " (maintype = 'asset' AND fullpath not like " . $db->quote($forbiddenAssetPaths[$i] . '%') . ')';
+        foreach ($types as $type) {
+            if ($user->isAllowed($type . 's')) { //the permissions are just plural
+                $elementPaths = Element\Service::findForbiddenPaths($type, $user);
+
+                $forbiddenPathSql = [];
+                $allowedPathSql = [];
+                foreach ($elementPaths['forbidden'] as $forbiddenPath => $allowedPaths) {
+                    $exceptions = '';
+                    $folderSuffix = '';
+                    if ($allowedPaths) {
+                        $exceptionsConcat = implode("%' OR fullpath LIKE '", $allowedPaths);
+                        $exceptions = " OR (fullpath LIKE '" . $exceptionsConcat . "%')";
+                        $folderSuffix = '/'; //if allowed children are found, the current folder is listable but its content is still blocked, can easily done by adding a trailing slash
                     }
-                    $forbiddenConditions[] = implode(' AND ', $forbiddenAssetPaths) ;
+                    $forbiddenPathSql[] = ' (fullpath NOT LIKE ' . $db->quote($forbiddenPath . $folderSuffix . '%') . $exceptions . ') ';
                 }
+                foreach ($elementPaths['allowed'] as $allowedPaths) {
+                    $allowedPathSql[] = ' fullpath LIKE ' . $db->quote($allowedPaths  . '%');
+                }
+
+                // this is to avoid query error when implode is empty.
+                // the result would be like `(maintype = type AND ((path1 OR path2) AND (not_path3 AND not_path4)))`
+                $forbiddenAndAllowedSql = '(maintype = \'' . $type . '\'';
+
+                if ($allowedPathSql || $forbiddenPathSql) {
+                    $forbiddenAndAllowedSql .= ' AND (';
+                    $forbiddenAndAllowedSql .= $allowedPathSql ? '( ' . implode(' OR ', $allowedPathSql) . ' )' : '';
+
+                    if ($forbiddenPathSql) {
+                        //if $allowedPathSql "implosion" is present, we need `AND` in between
+                        $forbiddenAndAllowedSql .= $allowedPathSql ? ' AND ' : '';
+                        $forbiddenAndAllowedSql .= implode(' AND ', $forbiddenPathSql);
+                    }
+                    $forbiddenAndAllowedSql .= ' )';
+                }
+
+                $forbiddenAndAllowedSql.= ' )';
+
+                $allowedTypes[] = $forbiddenAndAllowedSql;
             }
         }
 
-        //exclude forbidden documents
-        if (in_array('document', $types)) {
-            if (!$user->isAllowed('documents')) {
-                $forbiddenConditions[] = " `type` != 'document' ";
-            } else {
-                $forbiddenDocumentPaths = Element\Service::findForbiddenPaths('document', $user);
-                if (count($forbiddenDocumentPaths) > 0) {
-                    for ($i = 0; $i < count($forbiddenDocumentPaths); $i++) {
-                        $forbiddenDocumentPaths[$i] = " (maintype = 'document' AND fullpath not like " . $db->quote($forbiddenDocumentPaths[$i] . '%') . ')';
-                    }
-                    $forbiddenConditions[] = implode(' AND ', $forbiddenDocumentPaths) ;
-                }
-            }
+        //if allowedTypes is still empty after getting the workspaces, it means that there are no any master permissions set
+        // by setting a `false` condition in the query makes sure that nothing would be displayed.
+        if (!$allowedTypes) {
+            $allowedTypes = ['false'];
         }
 
-        //exclude forbidden objects
-        if (in_array('object', $types)) {
-            if (!$user->isAllowed('objects')) {
-                $forbiddenConditions[] = " `type` != 'object' ";
-            } else {
-                $forbiddenObjectPaths = Element\Service::findForbiddenPaths('object', $user);
-                if (count($forbiddenObjectPaths) > 0) {
-                    for ($i = 0; $i < count($forbiddenObjectPaths); $i++) {
-                        $forbiddenObjectPaths[$i] = " (maintype = 'object' AND fullpath not like " . $db->quote($forbiddenObjectPaths[$i] . '%') . ')';
-                    }
-                    $forbiddenConditions[] = implode(' AND ', $forbiddenObjectPaths);
-                }
-            }
-        }
-
-        return $forbiddenConditions;
+        return '('.implode(' OR ', $allowedTypes) .')';
     }
 
     /**
@@ -413,6 +420,7 @@ class SearchController extends AdminController
             $query = '';
         }
 
+        $query = str_replace('&quot;', '"', $query);
         $query = str_replace('%', '*', $query);
         $query = str_replace('@', '#', $query);
         $query = preg_replace("@([^ ])\-@", '$1 ', $query);
@@ -433,13 +441,12 @@ class SearchController extends AdminController
      *
      * @param Request $request
      * @param EventDispatcherInterface $eventDispatcher
-     * @param Config $config
      *
      * @return JsonResponse
      */
-    public function quicksearchAction(Request $request, EventDispatcherInterface $eventDispatcher, Config $config)
+    public function quicksearchAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
-        $query = $this->filterQueryParam($request->get('query'));
+        $query = $this->filterQueryParam($request->get('query', ''));
         if (!preg_match('/[\+\-\*"]/', $query)) {
             // check for a boolean operator (which was not filtered by filterQueryParam()),
             // if present, do not add asterisk at the end of the query
@@ -451,10 +458,7 @@ class SearchController extends AdminController
 
         $conditionParts = [];
 
-        $forbiddenConditions = $this->getForbiddenCondition();
-        if ($forbiddenConditions) {
-            $conditionParts[] = '(' . implode(' AND ', $forbiddenConditions) . ')';
-        }
+        $conditionParts[] = $this->getPermittedPaths();
 
         $matchCondition = '( MATCH (`data`,`properties`) AGAINST (' . $db->quote($query) . ' IN BOOLEAN MODE) )';
         $conditionParts[] = '(' . $matchCondition . " AND type != 'folder') ";
@@ -484,21 +488,10 @@ class SearchController extends AdminController
                     'type' => $hit->getId()->getType(),
                     'subtype' => $element->getType(),
                     'className' => ($element instanceof DataObject\Concrete) ? $element->getClassName() : '',
-                    'fullpath' => htmlspecialchars($element->getRealFullPath()),
                     'fullpathList' => htmlspecialchars($this->shortenPath($element->getRealFullPath())),
-                    'iconCls' => 'pimcore_icon_asset_default',
                 ];
 
                 $this->addAdminStyle($element, ElementAdminStyleEvent::CONTEXT_SEARCH, $data);
-
-                $validLanguages = \Pimcore\Tool::getValidLanguages();
-
-                $data['preview'] = $this->renderView('@PimcoreAdmin/SearchAdmin/Search/Quicksearch/' . $hit->getId()->getType() . '.html.twig', [
-                    'element' => $element,
-                    'iconCls' => $data['iconCls'],
-                    'config' => $config,
-                    'validLanguages' => $validLanguages,
-                ]);
 
                 $elements[] = $data;
             }
@@ -517,6 +510,60 @@ class SearchController extends AdminController
     }
 
     /**
+     * @Route("/quicksearch-get-by-id", name="pimcore_admin_searchadmin_search_quicksearch_by_id", methods={"GET"})
+     *
+     * @param Request $request
+     * @param Config $config
+     *
+     * @return JsonResponse
+     */
+    public function quicksearchByIdAction(Request $request, Config $config)
+    {
+        $type = $request->get('type');
+        $id = $request->get('id');
+        $db = \Pimcore\Db::get();
+        $searcherList = new Data\Listing();
+
+        $searcherList->addConditionParam('id = :id', ['id' => $id]);
+        $searcherList->addConditionParam('maintype = :type', ['type' => $type]);
+        $searcherList->setLimit(1);
+
+        $hits = $searcherList->load();
+
+        //There will always be one result in hits but load returns array.
+        $data = [];
+        foreach ($hits as $hit) {
+            $element = Element\Service::getElementById($hit->getId()->getType(), $hit->getId()->getId());
+            if ($element->isAllowed('list')) {
+                $data = [
+                    'id' => $element->getId(),
+                    'type' => $hit->getId()->getType(),
+                    'subtype' => $element->getType(),
+                    'className' => ($element instanceof DataObject\Concrete) ? $element->getClassName() : '',
+                    'fullpath' => htmlspecialchars($element->getRealFullPath()),
+                    'fullpathList' => htmlspecialchars($this->shortenPath($element->getRealFullPath())),
+                    'iconCls' => 'pimcore_icon_asset_default',
+                ];
+
+                $this->addAdminStyle($element, ElementAdminStyleEvent::CONTEXT_SEARCH, $data);
+
+                $validLanguages = \Pimcore\Tool::getValidLanguages();
+
+                $data['preview'] = $this->renderView(
+                    '@PimcoreAdmin/SearchAdmin/Search/Quicksearch/' . $hit->getId()->getType() . '.html.twig', [
+                        'element' => $element,
+                        'iconCls' => $data['iconCls'],
+                        'config' => $config,
+                        'validLanguages' => $validLanguages,
+                    ]
+                );
+            }
+        }
+
+        return $this->adminJson($data);
+    }
+
+    /**
      * @param string $path
      *
      * @return string
@@ -525,11 +572,10 @@ class SearchController extends AdminController
     {
         $parts = explode('/', trim($path, '/'));
         $count = count($parts) - 1;
-        $shortPath = '';
 
-        for ($i = $count; $i >= 0; $i--) {
+        for ($i = $count; ; $i--) {
             $shortPath = '/' . implode('/', array_unique($parts));
-            if (strlen($shortPath) <= 50 || $i == 0) {
+            if ($i === 0 || strlen($shortPath) <= 50) {
                 break;
             }
             array_splice($parts, $i - 1, 1, '…');

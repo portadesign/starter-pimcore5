@@ -231,7 +231,7 @@ class HeadLink extends CacheBusterAware
     /**
      * append()
      *
-     * @param  array $value
+     * @param  \stdClass $value
      *
      * @return void
      */
@@ -252,7 +252,8 @@ class HeadLink extends CacheBusterAware
      *
      * @return void
      */
-    public function offsetSet($index, $value)
+    #[\ReturnTypeWillChange]
+    public function offsetSet($index, $value)// : void
     {
         if (!$this->_isValid($value)) {
             throw new Exception('offsetSet() expects a data token; please use one of the custom offsetSet*() methods');
@@ -264,7 +265,7 @@ class HeadLink extends CacheBusterAware
     /**
      * prepend()
      *
-     * @param array $value
+     * @param \stdClass $value
      */
     public function prepend($value)
     {
@@ -278,7 +279,7 @@ class HeadLink extends CacheBusterAware
     /**
      * set()
      *
-     * @param array $value
+     * @param \stdClass $value
      */
     public function set($value)
     {

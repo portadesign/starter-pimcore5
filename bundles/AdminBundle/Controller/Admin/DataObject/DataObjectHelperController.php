@@ -15,6 +15,8 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\DataObject;
 
+use League\Flysystem\FilesystemException;
+use League\Flysystem\UnableToReadFile;
 use PhpOffice\PhpSpreadsheet\Reader\Csv;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
@@ -31,18 +33,21 @@ use Pimcore\Model\GridConfigFavourite;
 use Pimcore\Model\GridConfigShare;
 use Pimcore\Model\User;
 use Pimcore\Tool;
+use Pimcore\Tool\Storage;
 use Pimcore\Version;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
- * @Route("/object-helper")
+ * @Route("/object-helper", name="pimcore_admin_dataobject_dataobjecthelper_")
  *
  * @internal
  */
@@ -51,7 +56,7 @@ class DataObjectHelperController extends AdminController
     const SYSTEM_COLUMNS = ['id', 'fullpath', 'key', 'published', 'creationDate', 'modificationDate', 'filename', 'classname'];
 
     /**
-     * @Route("/load-object-data", name="pimcore_admin_dataobject_dataobjecthelper_loadobjectdata", methods={"GET"})
+     * @Route("/load-object-data", name="loadobjectdata", methods={"GET"})
      *
      * @param Request $request
      *
@@ -59,7 +64,7 @@ class DataObjectHelperController extends AdminController
      */
     public function loadObjectDataAction(Request $request)
     {
-        $object = DataObject::getById($request->get('id'));
+        $object = DataObject::getById((int) $request->get('id'));
         $result = [];
         if ($object) {
             $result['success'] = true;
@@ -75,11 +80,11 @@ class DataObjectHelperController extends AdminController
     /**
      * @param int $userId
      * @param string $classId
-     * @param string $searchType
+     * @param string|null $searchType
      *
      * @return array
      */
-    public function getMyOwnGridColumnConfigs($userId, $classId, $searchType)
+    public function getMyOwnGridColumnConfigs($userId, $classId, $searchType = null)
     {
         $db = Db::get();
         $configListingConditionParts = [];
@@ -150,7 +155,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/get-export-configs", name="pimcore_admin_dataobject_dataobjecthelper_getexportconfigs", methods={"GET"})
+     * @Route("/get-export-configs", name="getexportconfigs", methods={"GET"})
      *
      * @param Request $request
      *
@@ -159,11 +164,11 @@ class DataObjectHelperController extends AdminController
     public function getExportConfigsAction(Request $request)
     {
         $classId = $request->get('classId');
-        $list = $this->getMyOwnGridColumnConfigs($this->getAdminUser()->getId(), $classId, null);
+        $list = $this->getMyOwnGridColumnConfigs($this->getAdminUser()->getId(), $classId);
         if (!is_array($list)) {
             $list = [];
         }
-        $list = array_merge($list, $this->getSharedGridColumnConfigs($this->getAdminUser(), $classId, null));
+        $list = array_merge($list, $this->getSharedGridColumnConfigs($this->getAdminUser(), $classId));
         $result = [];
 
         $result[] = [
@@ -185,7 +190,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/grid-delete-column-config", name="pimcore_admin_dataobject_dataobjecthelper_griddeletecolumnconfig", methods={"DELETE"})
+     * @Route("/grid-delete-column-config", name="griddeletecolumnconfig", methods={"DELETE"})
      *
      * @param Request $request
      * @param Config $config
@@ -213,7 +218,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/grid-get-column-config", name="pimcore_admin_dataobject_dataobjecthelper_gridgetcolumnconfig", methods={"GET"})
+     * @Route("/grid-get-column-config", name="gridgetcolumnconfig", methods={"GET"})
      *
      * @param Request $request
      * @param Config $config
@@ -251,7 +256,7 @@ class DataObjectHelperController extends AdminController
             $gridType = $request->get('gridtype');
         }
 
-        $objectId = $request->get('objectId');
+        $objectId = (int) $request->get('objectId');
 
         if ($objectId) {
             $fields = DataObject\Service::getCustomGridFieldDefinitions($class->getId(), $objectId);
@@ -298,7 +303,7 @@ class DataObjectHelperController extends AdminController
 
         if (is_numeric($requestedGridConfigId) && $requestedGridConfigId > 0) {
             $db = Db::get();
-            $savedGridConfig = GridConfig::getById($requestedGridConfigId);
+            $savedGridConfig = GridConfig::getById((int) $requestedGridConfigId);
 
             if ($savedGridConfig) {
                 $shared = false;
@@ -328,6 +333,7 @@ class DataObjectHelperController extends AdminController
                 $modificationDate = $savedGridConfig->getModificationDate();
                 $gridConfigDescription = $savedGridConfig->getDescription();
                 $sharedGlobally = $savedGridConfig->isShareGlobally();
+                $setAsFavourite = $savedGridConfig->isSetAsFavourite();
             }
         }
 
@@ -379,7 +385,7 @@ class DataObjectHelperController extends AdminController
                             $type = $keyParts[1];
                             //                            $field = $keyParts[2];
                             $groupAndKeyId = explode('-', $keyParts[3]);
-                            $keyId = $groupAndKeyId[1];
+                            $keyId = (int) $groupAndKeyId[1];
 
                             if ($type == 'classificationstore') {
                                 $keyDef = DataObject\Classificationstore\KeyConfig::getById($keyId);
@@ -500,10 +506,6 @@ class DataObjectHelperController extends AdminController
             $language = $gridConfig['language'];
         }
 
-        if (!empty($gridConfig) && !empty($gridConfig['pageSize'])) {
-            $pageSize = $gridConfig['pageSize'];
-        }
-
         $availableConfigs = $class ? $this->getMyOwnGridColumnConfigs($userId, $class->getId(), $searchType) : [];
         $sharedConfigs = $class ? $this->getSharedGridColumnConfigs($this->getAdminUser(), $class->getId(), $searchType) : [];
         $settings = $this->getShareSettings((int)$gridConfigId);
@@ -513,6 +515,7 @@ class DataObjectHelperController extends AdminController
         $settings['owner'] = $owner ?? null;
         $settings['modificationDate'] = $modificationDate ?? null;
         $settings['shareGlobally'] = $sharedGlobally ?? null;
+        $settings['setAsFavourite'] = $setAsFavourite ?? null;
         $settings['isShared'] = !$gridConfigId || ($shared ?? null);
 
         $context = $gridConfig['context'] ?? null;
@@ -706,12 +709,12 @@ class DataObjectHelperController extends AdminController
 
             return $calculatedColumnConfig;
         } catch (\Exception $e) {
-            Logger::error($e);
+            Logger::error((string) $e);
         }
     }
 
     /**
-     * @Route("/prepare-helper-column-configs", name="pimcore_admin_dataobject_dataobjecthelper_preparehelpercolumnconfigs", methods={"POST"})
+     * @Route("/prepare-helper-column-configs", name="preparehelpercolumnconfigs", methods={"POST"})
      *
      * @param Request $request
      *
@@ -745,7 +748,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/grid-config-apply-to-all", name="pimcore_admin_dataobject_dataobjecthelper_gridconfigapplytoall", methods={"POST"})
+     * @Route("/grid-config-apply-to-all", name="gridconfigapplytoall", methods={"POST"})
      *
      * @param Request $request
      *
@@ -774,7 +777,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/grid-mark-favourite-column-config", name="pimcore_admin_dataobject_dataobjecthelper_gridmarkfavouritecolumnconfig", methods={"POST"})
+     * @Route("/grid-mark-favourite-column-config", name="gridmarkfavouritecolumnconfig", methods={"POST"})
      *
      * @param Request $request
      *
@@ -867,7 +870,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/grid-save-column-config", name="pimcore_admin_dataobject_dataobjecthelper_gridsavecolumnconfig", methods={"POST"})
+     * @Route("/grid-save-column-config", name="gridsavecolumnconfig", methods={"POST"})
      *
      * @param Request $request
      *
@@ -875,7 +878,8 @@ class DataObjectHelperController extends AdminController
      */
     public function gridSaveColumnConfigAction(Request $request)
     {
-        $object = DataObject::getById($request->get('id'));
+        $objectId = $request->get('id');
+        $object   = DataObject::getById($objectId);
 
         if ($object->isAllowed('list')) {
             try {
@@ -897,13 +901,17 @@ class DataObjectHelperController extends AdminController
                 $metadata = json_decode($metadata, true);
 
                 $gridConfigId = $metadata['gridConfigId'];
-                $gridConfig = $gridConfig = GridConfig::getById($gridConfigId);
+                $gridConfig = GridConfig::getById($gridConfigId);
 
                 if ($gridConfig && $gridConfig->getOwnerId() != $this->getAdminUser()->getId() && !$this->getAdminUser()->isAdmin()) {
                     throw new \Exception("don't mess around with somebody elses configuration");
                 }
 
                 $this->updateGridConfigShares($gridConfig, $metadata);
+
+                if ($metadata['setAsFavourite'] && $this->getAdminUser()->isAdmin()) {
+                    $this->updateGridConfigFavourites($gridConfig, $metadata, $objectId);
+                }
 
                 if (!$gridConfig) {
                     $gridConfig = new GridConfig();
@@ -918,6 +926,7 @@ class DataObjectHelperController extends AdminController
                     $gridConfig->setName($metadata['gridConfigName']);
                     $gridConfig->setDescription($metadata['gridConfigDescription']);
                     $gridConfig->setShareGlobally($metadata['shareGlobally'] && $this->getAdminUser()->isAdmin());
+                    $gridConfig->setSetAsFavourite($metadata['setAsFavourite'] && $this->getAdminUser()->isAdmin());
                 }
 
                 $gridConfigData = json_encode($gridConfigData);
@@ -934,6 +943,7 @@ class DataObjectHelperController extends AdminController
                 $settings['gridConfigName'] = $gridConfig->getName();
                 $settings['gridConfigDescription'] = $gridConfig->getDescription();
                 $settings['shareGlobally'] = $gridConfig->isShareGlobally();
+                $settings['setAsFavourite'] = $gridConfig->isSetAsFavourite();
                 $settings['isShared'] = $gridConfig->getOwnerId() != $this->getAdminUser()->getId() && !$this->getAdminUser()->isAdmin();
 
                 return $this->adminJson([
@@ -986,8 +996,113 @@ class DataObjectHelperController extends AdminController
         foreach ($combinedShares as $id) {
             $share = new GridConfigShare();
             $share->setGridConfigId($gridConfig->getId());
-            $share->setSharedWithUserId($id);
+            $share->setSharedWithUserId((int) $id);
             $share->save();
+        }
+    }
+
+    /**
+     * @param GridConfig|null $gridConfig
+     * @param array $metadata
+     * @param int $objectId
+     *
+     * @throws \Exception
+     */
+    protected function updateGridConfigFavourites($gridConfig, $metadata, $objectId)
+    {
+        $currentUser = $this->getAdminUser();
+
+        if (!$gridConfig || $currentUser === null || !$currentUser->isAllowed('share_configurations')) {
+            // nothing to do
+            return;
+        }
+
+        if (!$currentUser->isAdmin() && (int) $gridConfig->getOwnerId() !== $currentUser->getId()) {
+            throw new \Exception("don't mess with someone elses grid config");
+        }
+
+        $sharedUsers = [];
+
+        if ($metadata['shareGlobally'] === false) {
+            $sharedUserIds = $metadata['sharedUserIds'];
+
+            if ($sharedUserIds) {
+                $sharedUsers = explode(',', $sharedUserIds);
+            }
+        }
+
+        if ($metadata['shareGlobally'] === true) {
+            $users = new User\Listing();
+            $users->setCondition('id = ?', $currentUser->getId());
+
+            foreach ($users as $user) {
+                $sharedUsers[] = $user->getId();
+            }
+        }
+
+        foreach ($sharedUsers as $id) {
+            $global    = true;
+            $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId(
+                (int) $id,
+                $gridConfig->getClassId(),
+                (int) $objectId,
+                $gridConfig->getSearchType()
+            );
+
+            // If the user has already a favourite for that object we check the current favourite and decide if we update
+            if ($favourite instanceof GridConfigFavourite) {
+                $favouriteGridConfig = GridConfig::getById($favourite->getGridConfigId());
+
+                if ($favouriteGridConfig instanceof GridConfig) {
+                    // Check if the grid config was shared globally if that is *not* the case we also not update
+                    if ((bool) $favouriteGridConfig->isShareGlobally() === false) {
+                        continue;
+                    }
+
+                    // Check if the user is the owner. If that is the case we do not update the favourite
+                    if ((int) $favouriteGridConfig->getOwnerId() === (int) $id) {
+                        continue;
+                    }
+                }
+            }
+
+            // Check if the user has already a global favourite then we do not save the favourite as global
+            $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId(
+                (int) $id,
+                $gridConfig->getClassId(),
+                0,
+                $gridConfig->getSearchType()
+            );
+
+            if ($favourite instanceof GridConfigFavourite) {
+                $favouriteGridConfig = GridConfig::getById($favourite->getGridConfigId());
+
+                if ($favouriteGridConfig instanceof GridConfig) {
+                    // Check if the grid config was shared globally if that is *not* the case we also not update
+                    if ($favouriteGridConfig->isShareGlobally() === false) {
+                        $global = false;
+                    }
+
+                    // Check if the user is the owner. If that is the case we do not update the global favourite
+                    if ($favouriteGridConfig->getOwnerId() === (int) $id) {
+                        $global = false;
+                    }
+                }
+            }
+
+            $favourite = new GridConfigFavourite();
+            $favourite->setGridConfigId($gridConfig->getId());
+            $favourite->setClassId($gridConfig->getClassId());
+            $favourite->setObjectId($objectId);
+            $favourite->setOwnerId($id);
+            $favourite->setType($gridConfig->getType());
+            $favourite->setSearchType($gridConfig->getSearchType());
+            $favourite->save();
+
+            if ($global === true) {
+                $favourite->setObjectId(0);
+                $favourite->save();
+            }
         }
     }
 
@@ -1071,7 +1186,7 @@ class DataObjectHelperController extends AdminController
      */
 
     /**
-     * @Route("/import-upload", name="pimcore_admin_dataobject_dataobjecthelper_importupload", methods={"POST"})
+     * @Route("/import-upload", name="importupload", methods={"POST"})
      *
      * @param Request $request
      *
@@ -1157,11 +1272,11 @@ class DataObjectHelperController extends AdminController
      */
     protected function getCsvFile($fileHandle)
     {
-        return PIMCORE_SYSTEM_TEMP_DIRECTORY . '/' . $fileHandle . '.csv';
+        return $fileHandle . '.csv';
     }
 
     /**
-     * @Route("/get-export-jobs", name="pimcore_admin_dataobject_dataobjecthelper_getexportjobs", methods={"GET"})
+     * @Route("/get-export-jobs", name="getexportjobs", methods={"GET"})
      *
      * @param Request $request
      * @param GridHelperService $gridHelperService
@@ -1189,13 +1304,15 @@ class DataObjectHelperController extends AdminController
         $jobs = array_chunk($ids, 20);
 
         $fileHandle = uniqid('export-');
-        file_put_contents($this->getCsvFile($fileHandle), '');
+
+        $storage = Storage::get('temp');
+        $storage->write($this->getCsvFile($fileHandle), '');
 
         return $this->adminJson(['success' => true, 'jobs' => $jobs, 'fileHandle' => $fileHandle]);
     }
 
     /**
-     * @Route("/do-export", name="pimcore_admin_dataobject_dataobjecthelper_doexport", methods={"POST"})
+     * @Route("/do-export", name="doexport", methods={"POST"})
      *
      * @param Request $request
      * @param LocaleServiceInterface $localeService
@@ -1268,13 +1385,19 @@ class DataObjectHelperController extends AdminController
 
         $csv = DataObject\Service::getCsvData($requestedLanguage, $localeService, $list, $fields, $addTitles, $context);
 
-        $fp = fopen($this->getCsvFile($fileHandle), 'a');
+        $storage = Storage::get('temp');
+        $csvFile = $this->getCsvFile($fileHandle);
+
+        $fileStream = $storage->readStream($csvFile);
+
+        $temp = tmpfile();
+        stream_copy_to_stream($fileStream, $temp, null, 0);
 
         $firstLine = true;
         $lineCount = count($csv);
 
         if (!$addTitles && $lineCount > 0) {
-            fwrite($fp, "\r\n");
+            fwrite($temp, "\r\n");
         }
 
         for ($i = 0; $i < $lineCount; $i++) {
@@ -1282,16 +1405,15 @@ class DataObjectHelperController extends AdminController
             if ($addTitles && $firstLine) {
                 $firstLine = false;
                 $line = implode($delimiter, $line);
-                fwrite($fp, $line);
+                fwrite($temp, $line);
             } else {
-                fwrite($fp, implode($delimiter, array_map([$this, 'encodeFunc'], $line)));
+                fwrite($temp, implode($delimiter, array_map([$this, 'encodeFunc'], $line)));
             }
             if ($i < $lineCount - 1) {
-                fwrite($fp, "\r\n");
+                fwrite($temp, "\r\n");
             }
         }
-
-        fclose($fp);
+        $storage->writeStream($csvFile, $temp);
 
         return $this->adminJson(['success' => true]);
     }
@@ -1304,30 +1426,39 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/download-csv-file", name="pimcore_admin_dataobject_dataobjecthelper_downloadcsvfile", methods={"GET"})
+     * @Route("/download-csv-file", name="downloadcsvfile", methods={"GET"})
      *
      * @param Request $request
      *
-     * @return BinaryFileResponse
+     * @return Response
      */
     public function downloadCsvFileAction(Request $request)
     {
+        $storage = Storage::get('temp');
         $fileHandle = \Pimcore\File::getValidFilename($request->get('fileHandle'));
         $csvFile = $this->getCsvFile($fileHandle);
-        if (file_exists($csvFile)) {
-            $response = new BinaryFileResponse($csvFile);
+
+        try {
+            $csvData = $storage->read($csvFile);
+            $response = new Response($csvData);
             $response->headers->set('Content-Type', 'application/csv');
-            $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, 'export.csv');
-            $response->deleteFileAfterSend(true);
+            $disposition = HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_ATTACHMENT,
+                'export.csv'
+            );
+
+            $response->headers->set('Content-Disposition', $disposition);
+            $storage->delete($csvFile);
 
             return $response;
+        } catch (FilesystemException | UnableToReadFile $exception) {
+            // handle the error
+            throw $this->createNotFoundException('CSV file not found');
         }
-
-        throw $this->createNotFoundException('CSV file not found');
     }
 
     /**
-     * @Route("/download-xlsx-file", name="pimcore_admin_dataobject_dataobjecthelper_downloadxlsxfile", methods={"GET"})
+     * @Route("/download-xlsx-file", name="downloadxlsxfile", methods={"GET"})
      *
      * @param Request $request
      *
@@ -1335,14 +1466,23 @@ class DataObjectHelperController extends AdminController
      */
     public function downloadXlsxFileAction(Request $request)
     {
+        $storage = Storage::get('temp');
         $fileHandle = \Pimcore\File::getValidFilename($request->get('fileHandle'));
         $csvFile = $this->getCsvFile($fileHandle);
-        if (file_exists($csvFile)) {
+
+        try {
+            $csvStream= $storage->readStream($csvFile);
+
             $csvReader = new Csv();
             $csvReader->setDelimiter(';');
             $csvReader->setSheetIndex(0);
 
-            $spreadsheet = $csvReader->load($csvFile);
+            $temp = tmpfile();
+            stream_copy_to_stream($csvStream, $temp, null, 0);
+            $tempMetaData = stream_get_meta_data($temp);
+            //TODO: use this method and storage->read() to avoid the extra temp file, is not available in the current version. See: https://github.com/PHPOffice/PhpSpreadsheet/pull/2792
+            //$spreadsheet = $csvReader->loadSpreadsheetFromString($csvData);
+            $spreadsheet = $csvReader->load($tempMetaData['uri']);
             $writer = new Xlsx($spreadsheet);
             $xlsxFilename = PIMCORE_SYSTEM_TEMP_DIRECTORY. '/' .$fileHandle. '.xlsx';
             $writer->save($xlsxFilename);
@@ -1352,10 +1492,15 @@ class DataObjectHelperController extends AdminController
             $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, 'export.xlsx');
             $response->deleteFileAfterSend(true);
 
-            return $response;
-        }
+            $storage->delete($csvFile);
 
-        throw $this->createNotFoundException('XLSX file not found');
+            $storage->delete($csvFile);
+
+            return $response;
+        } catch (FilesystemException | UnableToReadFile $exception) {
+            // handle the error
+            throw $this->createNotFoundException('XLSX file not found');
+        }
     }
 
     /**
@@ -1370,10 +1515,7 @@ class DataObjectHelperController extends AdminController
     {
         $o = [];
         foreach ($object->getClass()->getFieldDefinitions() as $key => $value) {
-            //exclude remote owner fields
-            if (!$value instanceof DataObject\ClassDefinition\Data\ReverseObjectRelation) {
-                $o[$key] = $value->getForCsvExport($object);
-            }
+            $o[$key] = $value->getForCsvExport($object);
         }
 
         $o['id (system)'] = $object->getId();
@@ -1386,7 +1528,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/get-batch-jobs", name="pimcore_admin_dataobject_dataobjecthelper_getbatchjobs", methods={"GET"})
+     * @Route("/get-batch-jobs", name="getbatchjobs", methods={"GET"})
      *
      * @param Request $request
      *
@@ -1407,7 +1549,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/batch", name="pimcore_admin_dataobject_dataobjecthelper_batch", methods={"PUT"})
+     * @Route("/batch", name="batch", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -1444,7 +1586,7 @@ class DataObjectHelperController extends AdminController
                     if (substr($name, 0, 1) == '~') {
                         $type = $parts[1];
                         $field = $parts[2];
-                        $keyid = $parts[3];
+                        $keyId = $parts[3];
 
                         if ($type == 'classificationstore') {
                             $requestedLanguage = $params['language'];
@@ -1456,9 +1598,9 @@ class DataObjectHelperController extends AdminController
                                 $requestedLanguage = $request->getLocale();
                             }
 
-                            $groupKeyId = explode('-', $keyid);
-                            $groupId = $groupKeyId[0];
-                            $keyid = $groupKeyId[1];
+                            $groupKeyId = explode('-', $keyId);
+                            $groupId = (int) $groupKeyId[0];
+                            $keyId = (int) $groupKeyId[1];
 
                             $getter = 'get' . ucfirst($field);
                             if (method_exists($object, $getter)) {
@@ -1472,14 +1614,22 @@ class DataObjectHelperController extends AdminController
 
                                 /** @var DataObject\ClassDefinition\Data\Classificationstore $fd */
                                 $fd = $class->getFieldDefinition($field);
-                                $keyConfig = $fd->getKeyConfiguration($keyid);
+                                $keyConfig = $fd->getKeyConfiguration($keyId);
                                 $dataDefinition = DataObject\Classificationstore\Service::getFieldDefinitionFromKeyConfig($keyConfig);
 
                                 /** @var DataObject\Classificationstore $classificationStoreData */
                                 $classificationStoreData = $object->$getter();
+                                if ($append) {
+                                    $oldValue = $classificationStoreData->getLocalizedKeyValue($groupId, $keyId);
+                                    $value = $dataDefinition->appendData($oldValue, $value);
+                                }
+                                if ($remove) {
+                                    $oldValue = $classificationStoreData->getLocalizedKeyValue($groupId, $keyId);
+                                    $value = $dataDefinition->removeData($oldValue, $value);
+                                }
                                 $classificationStoreData->setLocalizedKeyValue(
                                     $groupId,
-                                    $keyid,
+                                    $keyId,
                                     $dataDefinition->getDataFromEditmode($value),
                                     $csLanguage
                                 );
@@ -1585,7 +1735,7 @@ class DataObjectHelperController extends AdminController
                 }
             }
         } catch (\Exception $e) {
-            Logger::err($e);
+            Logger::err((string) $e);
 
             return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
         }
@@ -1594,7 +1744,7 @@ class DataObjectHelperController extends AdminController
     }
 
     /**
-     * @Route("/get-available-visible-vields", name="pimcore_admin_dataobject_dataobjecthelper_getavailablevisiblefields", methods={"GET"})
+     * @Route("/get-available-visible-vields", name="getavailablevisiblefields", methods={"GET"})
      *
      * @param Request $request
      *

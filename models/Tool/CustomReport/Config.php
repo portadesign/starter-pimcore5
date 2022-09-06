@@ -70,62 +70,62 @@ class Config extends Model\AbstractModel implements \JsonSerializable
     /**
      * @var bool
      */
-    protected $menuShortcut;
+    protected $menuShortcut = true;
 
     /**
      * @var string
      */
-    protected $reportClass;
+    protected $reportClass = '';
 
     /**
      * @var string
      */
-    protected $chartType;
+    protected $chartType = '';
 
     /**
      * @var string
      */
-    protected $pieColumn;
+    protected $pieColumn = '';
 
     /**
      * @var string
      */
-    protected $pieLabelColumn;
+    protected $pieLabelColumn = '';
 
     /**
      * @var string
      */
-    protected $xAxis;
+    protected $xAxis = '';
 
     /**
      * @var string|array
      */
-    protected $yAxis;
+    protected $yAxis = [];
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $modificationDate;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $creationDate;
 
     /**
      * @var bool
      */
-    protected $shareGlobally;
+    protected $shareGlobally = true;
 
     /**
      * @var string[]
      */
-    protected $sharedUserNames;
+    protected $sharedUserNames = [];
 
     /**
      * @var string[]
      */
-    protected $sharedRoleNames;
+    protected $sharedRoleNames = [];
 
     /**
      * @param string $name
@@ -436,7 +436,7 @@ class Config extends Model\AbstractModel implements \JsonSerializable
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getModificationDate()
     {
@@ -452,7 +452,7 @@ class Config extends Model\AbstractModel implements \JsonSerializable
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCreationDate()
     {
@@ -518,23 +518,6 @@ class Config extends Model\AbstractModel implements \JsonSerializable
     }
 
     /**
-     * @param int[] $sharedUserIds
-     */
-    public function setSharedUserIds($sharedUserIds): void
-    {
-        $userNames = [];
-        if ($sharedUserIds) {
-            foreach ($sharedUserIds as $id) {
-                $user = Model\User::getById($id);
-                if ($user) {
-                    $userNames[] = $user->getName();
-                }
-            }
-        }
-        $this->sharedUserNames = $userNames;
-    }
-
-    /**
      * @return int[]
      */
     public function getSharedRoleIds()
@@ -550,23 +533,6 @@ class Config extends Model\AbstractModel implements \JsonSerializable
         }
 
         return $sharedRoleIds;
-    }
-
-    /**
-     * @param int[] $sharedRoleIds
-     */
-    public function setSharedRoleIds($sharedRoleIds): void
-    {
-        $roleNames = [];
-        if ($sharedRoleIds) {
-            foreach ($sharedRoleIds as $id) {
-                $role = Model\User\Role::getById($id);
-                if ($role) {
-                    $roleNames[] = $role->getName();
-                }
-            }
-        }
-        $this->sharedRoleNames = $roleNames;
     }
 
     /**
@@ -601,8 +567,7 @@ class Config extends Model\AbstractModel implements \JsonSerializable
         $this->sharedRoleNames = $sharedRoleNames;
     }
 
-    #[\ReturnTypeWillChange]
-    public function jsonSerialize()
+    public function jsonSerialize(): array
     {
         $data = $this->getObjectVars();
         $data['sharedUserIds'] = $this->getSharedUserIds();

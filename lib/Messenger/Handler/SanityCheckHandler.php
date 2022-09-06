@@ -21,27 +21,53 @@ use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\Document\PageSnippet;
 use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\Element\Service;
+use Symfony\Component\Messenger\Handler\Acknowledger;
+use Symfony\Component\Messenger\Handler\BatchHandlerInterface;
+use Symfony\Component\Messenger\Handler\BatchHandlerTrait;
 
 /**
  * @internal
  */
-class SanityCheckHandler
+class SanityCheckHandler implements BatchHandlerInterface
 {
-    public function __invoke(SanityCheckMessage $message)
+    use BatchHandlerTrait;
+    use HandlerHelperTrait;
+
+    public function __invoke(SanityCheckMessage $message, Acknowledger $ack = null)
     {
-        $element = Service::getElementById($message->getType(), $message->getId(), true);
-        if ($element) {
-            $this->performSanityCheck($element);
+        return $this->handle($message, $ack);
+    }
+
+    private function process(array $jobs): void
+    {
+        $jobs = $this->filterUnique($jobs, static function (SanityCheckMessage $message) {
+            return $message->getType() . '-' . $message->getId();
+        });
+
+        foreach ($jobs as [$message, $ack]) {
+            try {
+                $element = Service::getElementById($message->getType(), $message->getId(), true);
+                if ($element) {
+                    $this->performSanityCheck($element);
+                }
+
+                $ack->ack($message);
+            } catch (\Throwable $e) {
+                $ack->nack($e);
+            }
         }
     }
 
     /**
-     * @param PageSnippet|Asset|Concrete $element
+     * @param ElementInterface $element
      *
      * @throws \Exception
      */
     private function performSanityCheck(ElementInterface $element)
     {
+        if (!$element instanceof PageSnippet && !$element instanceof Concrete && !$element instanceof Asset) {
+            return;
+        }
         $latestNotPublishedVersion = null;
 
         if ($latestVersion = $element->getLatestVersion()) {

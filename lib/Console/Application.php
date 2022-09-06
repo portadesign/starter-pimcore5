@@ -65,6 +65,11 @@ final class Application extends \Symfony\Bundle\FrameworkBundle\Console\Applicat
         $this->setDispatcher($dispatcher);
 
         $dispatcher->addListener(ConsoleEvents::COMMAND, function (ConsoleCommandEvent $event) use ($kernel) {
+            // skip if maintenance mode is on and the flag is not set
+            if (Admin::isInMaintenanceMode() && !$event->getInput()->getOption('ignore-maintenance-mode')) {
+                throw new \RuntimeException('In maintenance mode - set the flag --ignore-maintenance-mode to force execution!');
+            }
+
             if ($event->getInput()->getOption('maintenance-mode')) {
                 // enable maintenance mode if requested
                 $maintenanceModeId = 'cache-warming-dummy-session-id';
@@ -102,7 +107,7 @@ final class Application extends \Symfony\Bundle\FrameworkBundle\Console\Applicat
         return $inputDefinition;
     }
 
-    public function add(Command $command)
+    public function add(Command $command): ?Command
     {
         if ($command instanceof DoctrineCommand) {
             $definition = $command->getDefinition();

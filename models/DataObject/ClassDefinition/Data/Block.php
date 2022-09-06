@@ -79,7 +79,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $maxItems;
 
@@ -104,7 +104,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      *
      * @var array
      */
-    public $childs = [];
+    public $children = [];
 
     /**
      * @internal
@@ -319,6 +319,10 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
                     $params['context']['containerType'] = 'block';
                     $dataForEditMode = $fd->getDataForEditmode($elementData, $object, $params);
                     $resultElement[$elementName] = $dataForEditMode;
+
+                    if (isset($params['owner'])) {
+                        $this->setBlockElementOwner($blockElement, $params);
+                    }
                 }
                 $result[] = [
                     'oIndex' => $idx,
@@ -540,7 +544,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function getChildren()
     {
-        return $this->childs;
+        return $this->children;
     }
 
     /**
@@ -550,7 +554,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function setChildren($children)
     {
-        $this->childs = $children;
+        $this->children = $children;
         $this->fieldDefinitionsCache = null;
 
         return $this;
@@ -561,7 +565,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function hasChildren()
     {
-        if (is_array($this->childs) && count($this->childs) > 0) {
+        if (is_array($this->children) && count($this->children) > 0) {
             return true;
         }
 
@@ -573,7 +577,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function addChild($child)
     {
-        $this->childs[] = $child;
+        $this->children[] = $child;
         $this->fieldDefinitionsCache = null;
     }
 
@@ -738,14 +742,23 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     /**
      * @return array
      */
-    public function __sleep()
+    public function getBlockedVarsForExport(): array
     {
-        $vars = get_object_vars($this);
-        $blockedVars = [
+        return [
             'fieldDefinitionsCache',
             'referencedFields',
             'blockedVarsForExport',
+            'childs',
         ];
+    }
+
+    /**
+     * @return array
+     */
+    public function __sleep()
+    {
+        $vars = get_object_vars($this);
+        $blockedVars = $this->getBlockedVarsForExport();
 
         foreach ($blockedVars as $blockedVar) {
             unset($vars[$blockedVar]);
@@ -1020,7 +1033,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getMaxItems()
     {
@@ -1028,11 +1041,11 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     }
 
     /**
-     * @param int $maxItems
+     * @param int|null $maxItems
      */
     public function setMaxItems($maxItems)
     {
-        $this->maxItems = $maxItems;
+        $this->maxItems = $this->getAsIntegerCast($maxItems);
     }
 
     /**
@@ -1122,10 +1135,14 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
                 }
 
                 if ($validationExceptions) {
-                    $aggregatedExceptions = new Model\Element\ValidationException();
-                    $aggregatedExceptions->setSubItems($validationExceptions);
+                    $errors = [];
+                    /** @var Element\ValidationException $e */
+                    foreach ($validationExceptions as $e) {
+                        $errors[] = $e->getAggregatedMessage();
+                    }
+                    $message = implode(' / ', $errors);
 
-                    throw $aggregatedExceptions;
+                    throw new Model\Element\ValidationException($message);
                 }
             }
         }
@@ -1279,5 +1296,15 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
         }
 
         return null;
+    }
+
+    public static function __set_state($data)
+    {
+        $obj = new static();
+        $obj->setValues($data);
+
+        $obj->childs = $obj->children;  // @phpstan-ignore-line
+
+        return $obj;
     }
 }

@@ -22,7 +22,6 @@ use Pimcore\Model;
 use Pimcore\Model\Tool\TmpStore;
 use Pimcore\Tool\Storage;
 use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * @internal
@@ -62,11 +61,6 @@ class Processor
      * @var int
      */
     protected $status;
-
-    /**
-     * @var null|string
-     */
-    protected $deleteSourceAfterFinished;
 
     /**
      * @param Model\Asset\Video $asset
@@ -127,18 +121,13 @@ class Processor
             }
         }
 
-        //generate tmp file only for new jobs
-        $sourceFile = $asset->getTemporaryFile(true);
-        $instance->setDeleteSourceAfterFinished($sourceFile);
-
         foreach ($formats as $format) {
-            $thumbDir = $asset->getRealPath() . '/video-thumb__' . $asset->getId() . '__' . $config->getName();
+            $thumbDir = $asset->getRealPath().'/'.$asset->getId().'/video-thumb__'.$asset->getId().'__'.$config->getName();
             $filename = preg_replace("/\." . preg_quote(File::getFileExtension($asset->getFilename()), '/') . '/', '', $asset->getFilename()) . '.' . $format;
             $storagePath = $thumbDir . '/' . $filename;
             $tmpPath = File::getLocalTempFilePath($format);
 
             $converter = \Pimcore\Video::getInstance();
-            $converter->load($sourceFile, ['asset' => $asset]);
             $converter->setAudioBitrate($config->getAudioBitrate());
             $converter->setVideoBitrate($config->getVideoBitrate());
             $converter->setFormat($format);
@@ -178,7 +167,7 @@ class Processor
 
         $instance->save();
 
-        \Pimcore::getContainer()->get(MessageBusInterface::class)->dispatch(
+        \Pimcore::getContainer()->get('messenger.bus.pimcore-core')->dispatch(
             new VideoConvertMessage($instance->getProcessId())
         );
 
@@ -236,45 +225,53 @@ class Processor
         $lock->acquire(true);
 
         $asset = Model\Asset::getById($instance->getAssetId());
+        $workerSourceFile = $asset->getTemporaryFile();
 
         // start converting
         foreach ($instance->queue as $converter) {
             try {
+                $converter->load($workerSourceFile, ['asset' => $asset]);
+
                 Logger::info('start video ' . $converter->getFormat() . ' to ' . $converter->getDestinationFile());
                 $success = $converter->save();
                 Logger::info('finished video ' . $converter->getFormat() . ' to ' . $converter->getDestinationFile());
 
-                $source = fopen($converter->getDestinationFile(), 'rb');
-                Storage::get('thumbnail')->writeStream($converter->getStorageFile(), $source);
-                fclose($source);
-                unlink($converter->getDestinationFile());
-
-                if ($converter->getFormat() === 'mpd') {
-                    $streamFilesPath = str_replace('.mpd', '-stream*.mp4', $converter->getDestinationFile());
-                    $streams = glob($streamFilesPath);
-                    $parentPath = dirname($converter->getStorageFile());
-
-                    foreach ($streams as $steam) {
-                        $storagePath = $parentPath . '/' . basename($steam);
-                        $source = fopen($steam, 'rb');
-                        Storage::get('thumbnail')->writeStream($storagePath, $source);
-                        fclose($source);
-                        unlink($steam);
-
-                        // set proper permissions
-                        @chmod($storagePath, File::getDefaultMode());
-                    }
-                }
-
                 if ($success) {
-                    $formats[$converter->getFormat()] =  preg_replace('/' . preg_quote($asset->getRealPath(), '/') . '/', '', $converter->getStorageFile(), 1);
+                    $source = fopen($converter->getDestinationFile(), 'rb');
+                    Storage::get('thumbnail')->writeStream($converter->getStorageFile(), $source);
+                    fclose($source);
+                    unlink($converter->getDestinationFile());
+
+                    if ($converter->getFormat() === 'mpd') {
+                        $streamFilesPath = str_replace('.mpd', '-stream*.mp4', $converter->getDestinationFile());
+                        $streams = glob($streamFilesPath);
+                        $parentPath = dirname($converter->getStorageFile());
+
+                        foreach ($streams as $steam) {
+                            $storagePath = $parentPath.'/'.basename($steam);
+                            $source = fopen($steam, 'rb');
+                            Storage::get('thumbnail')->writeStream($storagePath, $source);
+                            fclose($source);
+                            unlink($steam);
+
+                            // set proper permissions
+                            @chmod($storagePath, File::getDefaultMode());
+                        }
+                    }
+
+                    $formats[$converter->getFormat()] = preg_replace(
+                        '/'.preg_quote($asset->getRealPath(), '/').'/',
+                        '',
+                        $converter->getStorageFile(),
+                        1
+                    );
                 } else {
                     $conversionStatus = 'error';
                 }
 
                 $converter->destroy();
             } catch (\Exception $e) {
-                Logger::error($e);
+                Logger::error((string) $e);
             }
         }
 
@@ -301,27 +298,9 @@ class Processor
             Model\Version::enable();
         }
 
-        if ($instance->getDeleteSourceAfterFinished()) {
-            @unlink($instance->getDeleteSourceAfterFinished());
-        }
+        @unlink($workerSourceFile);
 
         TmpStore::delete($instance->getJobStoreId());
-    }
-
-    /**
-     * @return string|null
-     */
-    public function getDeleteSourceAfterFinished(): ?string
-    {
-        return $this->deleteSourceAfterFinished;
-    }
-
-    /**
-     * @param string|null $deleteSourceAfterFinished
-     */
-    public function setDeleteSourceAfterFinished(?string $deleteSourceAfterFinished): void
-    {
-        $this->deleteSourceAfterFinished = $deleteSourceAfterFinished;
     }
 
     /**

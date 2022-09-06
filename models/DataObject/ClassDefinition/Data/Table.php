@@ -54,7 +54,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $cols;
 
@@ -63,12 +63,12 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
      *
      * @var bool
      */
-    public $colsFixed;
+    public $colsFixed = false;
 
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $rows;
 
@@ -77,7 +77,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
      *
      * @var bool
      */
-    public $rowsFixed;
+    public $rowsFixed = false;
 
     /**
      * Default data
@@ -167,7 +167,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCols()
     {
@@ -175,7 +175,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @param int $cols
+     * @param int|null $cols
      *
      * @return $this
      */
@@ -187,7 +187,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getRows()
     {
@@ -195,7 +195,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @param int $rows
+     * @param int|null $rows
      *
      * @return $this
      */
@@ -354,7 +354,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     {
         $unserializedData = Serialize::unserialize((string) $data);
 
-        if ($data === null || $unserializedData === null) {
+        if ($data === null || empty($unserializedData)) {
             return [];
         }
 
@@ -372,7 +372,9 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
             $index = 0;
 
             foreach ($row as $col) {
-                $indexedRow[$columnConfig[$index]['key']] = $col;
+                if (isset($columnConfig[$index])) {
+                    $indexedRow[$columnConfig[$index]['key']] = $col;
+                }
                 $index++;
             }
 

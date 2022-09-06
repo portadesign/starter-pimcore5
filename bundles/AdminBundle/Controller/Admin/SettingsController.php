@@ -20,6 +20,7 @@ use Pimcore\Cache;
 use Pimcore\Cache\Core\CoreCacheHandler;
 use Pimcore\Cache\Symfony\CacheClearer;
 use Pimcore\Config;
+use Pimcore\Db;
 use Pimcore\Event\SystemEvents;
 use Pimcore\File;
 use Pimcore\Helper\StopMessengerWorkersTrait;
@@ -39,6 +40,7 @@ use Pimcore\Tool;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -90,7 +92,10 @@ class SettingsController extends AdminController
 
         return new StreamedResponse(function () use ($stream) {
             fpassthru($stream);
-        }, 200, ['Content-Type' => $mime]);
+        }, 200, [
+            'Content-Type' => $mime,
+            'Content-Security-Policy' => "script-src 'none'",
+        ]);
     }
 
     /**
@@ -104,13 +109,16 @@ class SettingsController extends AdminController
      */
     public function uploadCustomLogoAction(Request $request)
     {
-        $fileExt = File::getFileExtension($_FILES['Filedata']['name']);
-        if (!in_array($fileExt, ['svg', 'png', 'jpg'])) {
-            throw new \Exception('Unsupported file format');
+        $logoFile = $request->files->get('Filedata');
+
+        if (!$logoFile instanceof UploadedFile
+            || !in_array($logoFile->guessExtension(), ['svg', 'png', 'jpg'])
+        ) {
+            throw new \Exception('Unsupported file format.');
         }
 
         $storage = Tool\Storage::get('admin');
-        $storage->writeStream(self::CUSTOM_LOGO_PATH, fopen($_FILES['Filedata']['tmp_name'], 'rb'));
+        $storage->writeStream(self::CUSTOM_LOGO_PATH, fopen($logoFile->getPathname(), 'rb'));
 
         // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
         // Ext.form.Action.Submit and mark the submission as failed
@@ -210,14 +218,12 @@ class SettingsController extends AdminController
             }
         } else {
             // get list of types
-
             $list = new Metadata\Predefined\Listing();
 
-            if ($request->get('filter')) {
-                $filter = $request->get('filter');
-                $list->setFilter(function ($row) use ($filter) {
-                    foreach ($row as $value) {
-                        if (strpos($value, $filter) !== false) {
+            if ($filter = $request->get('filter')) {
+                $list->setFilter(function (Metadata\Predefined $predefined) use ($filter) {
+                    foreach ($predefined->getObjectVars() as $value) {
+                        if (stripos($value, $filter) !== false) {
                             return true;
                         }
                     }
@@ -226,15 +232,12 @@ class SettingsController extends AdminController
                 });
             }
 
-            $list->load();
-
             $properties = [];
-            if (is_array($list->getDefinitions())) {
-                foreach ($list->getDefinitions() as $metadata) {
-                    $data = $metadata->getObjectVars();
-                    $data['writeable'] = $metadata->isWriteable();
-                    $properties[] = $data;
-                }
+            foreach ($list->getDefinitions() as $metadata) {
+                $metadata->expand();
+                $data = $metadata->getObjectVars();
+                $data['writeable'] = $metadata->isWriteable();
+                $properties[] = $data;
             }
 
             return $this->adminJson(['data' => $properties, 'success' => true, 'total' => $list->getTotalCount()]);
@@ -333,15 +336,14 @@ class SettingsController extends AdminController
             // get list of types
             $list = new Property\Predefined\Listing();
 
-            if ($request->get('filter')) {
-                $filter = $request->get('filter');
-                $list->setFilter(function ($row) use ($filter) {
-                    foreach ($row as $value) {
+            if ($filter = $request->get('filter')) {
+                $list->setFilter(function (Property\Predefined $predefined) use ($filter) {
+                    foreach ($predefined->getObjectVars() as $value) {
                         if ($value) {
                             $cellValues = is_array($value) ? $value : [$value];
 
                             foreach ($cellValues as $cellValue) {
-                                if (strpos($cellValue, $filter) !== false) {
+                                if (stripos($cellValue, $filter) !== false) {
                                     return true;
                                 }
                             }
@@ -352,15 +354,11 @@ class SettingsController extends AdminController
                 });
             }
 
-            $list->load();
-
             $properties = [];
-            if (is_array($list->getProperties())) {
-                foreach ($list->getProperties() as $property) {
-                    $data = $property->getObjectVars();
-                    $data['writeable'] = $property->isWriteable();
-                    $properties[] = $data;
-                }
+            foreach ($list->getProperties() as $property) {
+                $data = $property->getObjectVars();
+                $data['writeable'] = $property->isWriteable();
+                $properties[] = $data;
             }
 
             return $this->adminJson(['data' => $properties, 'success' => true, 'total' => $list->getTotalCount()]);
@@ -529,7 +527,8 @@ class SettingsController extends AdminController
                     'login_screen_invert_colors' => $values['branding.login_screen_invert_colors'],
                     'color_login_screen' => $values['branding.color_login_screen'],
                     'color_admin_interface' => $values['branding.color_admin_interface'],
-                    'login_screen_custom_image' => $values['branding.login_screen_custom_image'],
+                    'color_admin_interface_background' => $values['branding.color_admin_interface_background'],
+                    'login_screen_custom_image' => str_replace('%', '%%', $values['branding.login_screen_custom_image']),
                 ],
         ];
 
@@ -809,6 +808,8 @@ class SettingsController extends AdminController
 
         // public files
         Tool\Storage::get('thumbnail')->deleteDirectory('/');
+        Db::get()->query('TRUNCATE TABLE assets_image_thumbnail_cache');
+
         Tool\Storage::get('asset_cache')->deleteDirectory('/');
 
         // system files
@@ -885,14 +886,13 @@ class SettingsController extends AdminController
 
             $list = new Staticroute\Listing();
 
-            if ($request->get('filter')) {
-                $filter = $request->get('filter');
-                $list->setFilter(function ($row) use ($filter) {
-                    foreach ($row as $value) {
-                        if (! is_scalar($value)) {
+            if ($filter = $request->get('filter')) {
+                $list->setFilter(function (Staticroute $staticRoute) use ($filter) {
+                    foreach ($staticRoute->getObjectVars() as $value) {
+                        if (!is_scalar($value)) {
                             continue;
                         }
-                        if (strpos((string)$value, $filter) !== false) {
+                        if (stripos((string)$value, $filter) !== false) {
                             return true;
                         }
                     }
@@ -901,10 +901,7 @@ class SettingsController extends AdminController
                 });
             }
 
-            $list->load();
-
             $routes = [];
-            /** @var Staticroute $routeFromList */
             foreach ($list->getRoutes() as $routeFromList) {
                 $route = $routeFromList->getObjectVars();
                 $route['writeable'] = $routeFromList->isWriteable();
@@ -1156,27 +1153,23 @@ class SettingsController extends AdminController
     /**
      * @Route("/thumbnail-tree", name="pimcore_admin_settings_thumbnailtree", methods={"GET", "POST"})
      *
-     * @param Request $request
-     *
      * @return JsonResponse
      */
-    public function thumbnailTreeAction(Request $request)
+    public function thumbnailTreeAction()
     {
         $this->checkPermission('thumbnails');
 
         $thumbnails = [];
 
         $list = new Asset\Image\Thumbnail\Config\Listing();
-        $items = $list->getThumbnails();
 
         $groups = [];
-        /** @var Asset\Image\Thumbnail\Config $item */
-        foreach ($items as $item) {
+        foreach ($list->getThumbnails() as $item) {
             if ($item->getGroup()) {
                 if (empty($groups[$item->getGroup()])) {
                     $groups[$item->getGroup()] = [
                         'id' => 'group_' . $item->getName(),
-                        'text' => $item->getGroup(),
+                        'text' => htmlspecialchars($item->getGroup()),
                         'expandable' => true,
                         'leaf' => false,
                         'allowChildren' => true,
@@ -1216,22 +1209,18 @@ class SettingsController extends AdminController
     /**
      * @Route("/thumbnail-downloadable", name="pimcore_admin_settings_thumbnaildownloadable", methods={"GET"})
      *
-     * @param Request $request
-     *
      * @return JsonResponse
      */
-    public function thumbnailDownloadableAction(Request $request)
+    public function thumbnailDownloadableAction()
     {
         $thumbnails = [];
 
         $list = new Asset\Image\Thumbnail\Config\Listing();
-        $list->setFilter(function (array $config) {
-            return array_key_exists('downloadable', $config) ? $config['downloadable'] : false;
+        $list->setFilter(function (Asset\Image\Thumbnail\Config $config) {
+            return $config->isDownloadable();
         });
-        $items = $list->getThumbnails();
 
-        /** @var Asset\Image\Thumbnail\Config $item */
-        foreach ($items as $item) {
+        foreach ($list->getThumbnails() as $item) {
             $thumbnails[] = [
                 'id' => $item->getName(),
                 'text' => $item->getName(),
@@ -1354,6 +1343,10 @@ class SettingsController extends AdminController
         });
 
         foreach ($mediaData as $mediaName => $items) {
+            if (preg_match('/["<>]/', $mediaName)) {
+                throw new \Exception('Invalid media query name');
+            }
+
             foreach ($items as $item) {
                 $type = $item['type'];
                 unset($item['type']);
@@ -1390,27 +1383,23 @@ class SettingsController extends AdminController
     /**
      * @Route("/video-thumbnail-tree", name="pimcore_admin_settings_videothumbnailtree", methods={"GET", "POST"})
      *
-     * @param Request $request
-     *
      * @return JsonResponse
      */
-    public function videoThumbnailTreeAction(Request $request)
+    public function videoThumbnailTreeAction()
     {
         $this->checkPermission('thumbnails');
 
         $thumbnails = [];
 
         $list = new Asset\Video\Thumbnail\Config\Listing();
-        $items = $list->getThumbnails();
 
         $groups = [];
-        /** @var Asset\Video\Thumbnail\Config $item */
-        foreach ($items as $item) {
+        foreach ($list->getThumbnails() as $item) {
             if ($item->getGroup()) {
-                if (!$groups[$item->getGroup()]) {
+                if (empty($groups[$item->getGroup()])) {
                     $groups[$item->getGroup()] = [
                         'id' => 'group_' . $item->getName(),
-                        'text' => $item->getGroup(),
+                        'text' => htmlspecialchars($item->getGroup()),
                         'expandable' => true,
                         'leaf' => false,
                         'allowChildren' => true,
@@ -1829,6 +1818,10 @@ class SettingsController extends AdminController
                 'appendLog' => true,
                 'enableDebugMode' => true,
             ];
+        } elseif ($adapter instanceof \Pimcore\Web2Print\Processor\HeadlessChrome) {
+            $params = Config::getWeb2PrintConfig();
+            $params = $params->get('headlessChromeSettings');
+            $params = json_decode($params, true);
         }
 
         $responseOptions = [

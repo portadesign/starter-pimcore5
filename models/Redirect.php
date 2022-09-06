@@ -15,8 +15,10 @@
 
 namespace Pimcore\Model;
 
+use Pimcore\Config;
 use Pimcore\Event\Model\RedirectEvent;
 use Pimcore\Event\RedirectEvents;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Logger;
 use Pimcore\Model\Exception\NotFoundException;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,6 +28,8 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final class Redirect extends AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     const TYPE_ENTIRE_URI = 'entire_uri';
 
     const TYPE_PATH_QUERY = 'path_query';
@@ -102,12 +106,12 @@ final class Redirect extends AbstractModel
     protected $expiry;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $creationDate;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $modificationDate;
 
@@ -124,17 +128,6 @@ final class Redirect extends AbstractModel
      * @var int
      */
     protected $userModification;
-
-    /**
-     * StatusCodes
-     */
-    protected static $statusCodes = [
-        '300' => 'Multiple Choices',
-        '301' => 'Moved Permanently',
-        '302' => 'Found',
-        '303' => 'See Other',
-        '307' => 'Temporary Redirect',
-    ];
 
     /**
      * @param int $id
@@ -319,7 +312,7 @@ final class Redirect extends AbstractModel
             $statusCode = '301';
         }
 
-        return 'HTTP/1.1 ' . $statusCode . ' ' . self::$statusCodes[$statusCode];
+        return 'HTTP/1.1 ' . $statusCode . ' ' . $this->getStatusCodes()[$statusCode];
     }
 
     public function clearDependentCache()
@@ -329,7 +322,7 @@ final class Redirect extends AbstractModel
         try {
             \Pimcore\Cache::clearTag('redirect');
         } catch (\Exception $e) {
-            Logger::crit($e);
+            Logger::crit((string) $e);
         }
     }
 
@@ -486,7 +479,7 @@ final class Redirect extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getModificationDate()
     {
@@ -506,7 +499,7 @@ final class Redirect extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCreationDate()
     {
@@ -547,17 +540,17 @@ final class Redirect extends AbstractModel
 
     public function save()
     {
-        \Pimcore::getEventDispatcher()->dispatch(new RedirectEvent($this), RedirectEvents::PRE_SAVE);
+        $this->dispatchEvent(new RedirectEvent($this), RedirectEvents::PRE_SAVE);
         $this->getDao()->save();
-        \Pimcore::getEventDispatcher()->dispatch(new RedirectEvent($this), RedirectEvents::POST_SAVE);
+        $this->dispatchEvent(new RedirectEvent($this), RedirectEvents::POST_SAVE);
         $this->clearDependentCache();
     }
 
     public function delete()
     {
-        \Pimcore::getEventDispatcher()->dispatch(new RedirectEvent($this), RedirectEvents::PRE_DELETE);
+        $this->dispatchEvent(new RedirectEvent($this), RedirectEvents::PRE_DELETE);
         $this->getDao()->delete();
-        \Pimcore::getEventDispatcher()->dispatch(new RedirectEvent($this), RedirectEvents::POST_DELETE);
+        $this->dispatchEvent(new RedirectEvent($this), RedirectEvents::POST_DELETE);
         $this->clearDependentCache();
     }
 
@@ -566,6 +559,6 @@ final class Redirect extends AbstractModel
      */
     public static function getStatusCodes(): array
     {
-        return self::$statusCodes;
+        return Config::getSystemConfiguration('redirects')['status_codes'];
     }
 }

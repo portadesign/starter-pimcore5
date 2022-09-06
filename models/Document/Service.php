@@ -15,13 +15,18 @@
 
 namespace Pimcore\Model\Document;
 
+use Pimcore\Config;
 use Pimcore\Document\Renderer\DocumentRenderer;
 use Pimcore\Document\Renderer\DocumentRendererInterface;
 use Pimcore\Event\DocumentEvents;
 use Pimcore\Event\Model\DocumentEvent;
 use Pimcore\File;
+use Pimcore\Image\Chromium;
+use Pimcore\Image\HtmlToImage;
 use Pimcore\Model;
 use Pimcore\Model\Document;
+use Pimcore\Model\Document\Editable\IdRewriterInterface;
+use Pimcore\Model\Document\Editable\LazyLoadingInterface;
 use Pimcore\Model\Element;
 use Pimcore\Tool;
 use Pimcore\Tool\Serialize;
@@ -147,6 +152,13 @@ class Service extends Model\Element\Service
 
         $source->getProperties();
 
+        // triggers actions before document cloning
+        $event = new DocumentEvent($source, [
+            'target_element' => $target,
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, DocumentEvents::PRE_COPY);
+        $target = $event->getArgument('target_element');
+
         /** @var Document $new */
         $new = Element\Service::cloneMe($source);
         $new->setId(null);
@@ -156,9 +168,9 @@ class Service extends Model\Element\Service
         $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
         $new->setUserModification($this->_user ? $this->_user->getId() : 0);
         $new->setDao(null);
-        $new->setLocked(false);
+        $new->setLocked(null);
         $new->setCreationDate(time());
-        if (method_exists($new, 'setPrettyUrl')) {
+        if ($new instanceof Page) {
             $new->setPrettyUrl(null);
         }
 
@@ -200,6 +212,13 @@ class Service extends Model\Element\Service
 
         $source->getProperties();
 
+        // triggers actions before document cloning
+        $event = new DocumentEvent($source, [
+            'target_element' => $target,
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, DocumentEvents::PRE_COPY);
+        $target = $event->getArgument('target_element');
+
         /**
          * @var Document $new
          */
@@ -211,7 +230,7 @@ class Service extends Model\Element\Service
         $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
         $new->setUserModification($this->_user ? $this->_user->getId() : 0);
         $new->setDao(null);
-        $new->setLocked(false);
+        $new->setLocked(null);
         $new->setCreationDate(time());
 
         if ($resetIndex) {
@@ -219,7 +238,7 @@ class Service extends Model\Element\Service
             $new->setIndex($new->getDao()->getNextIndex());
         }
 
-        if (method_exists($new, 'setPrettyUrl')) {
+        if ($new instanceof Page) {
             $new->setPrettyUrl(null);
         }
 
@@ -254,13 +273,12 @@ class Service extends Model\Element\Service
      * @param Document $target
      * @param Document $source
      *
-     * @return mixed
+     * @return Document
      *
      * @throws \Exception
      */
     public function copyContents($target, $source)
     {
-
         // check if the type is the same
         if (get_class($source) != get_class($target)) {
             throw new \Exception('Source and target have to be the same type');
@@ -287,7 +305,7 @@ class Service extends Model\Element\Service
         }
 
         $target->setUserModification($this->_user ? $this->_user->getId() : 0);
-        $target->setProperties($source->getProperties());
+        $target->setProperties(self::cloneProperties($source->getProperties()));
         $target->save();
 
         return $target;
@@ -321,7 +339,7 @@ class Service extends Model\Element\Service
      *
      * @param Document $doc
      *
-     * @return mixed
+     * @return Document
      */
     public static function loadAllDocumentFields($doc)
     {
@@ -329,7 +347,13 @@ class Service extends Model\Element\Service
 
         if ($doc instanceof Document\PageSnippet) {
             foreach ($doc->getEditables() as $name => $data) {
-                if (method_exists($data, 'load')) {
+                //TODO Pimcore 11: remove method_exists BC layer
+                if ($data instanceof LazyLoadingInterface || method_exists($data, 'load')) {
+                    if (!$data instanceof LazyLoadingInterface) {
+                        trigger_deprecation('pimcore/pimcore', '10.3',
+                            sprintf('Usage of method_exists is deprecated since version 10.3 and will be removed in Pimcore 11.' .
+                                'Implement the %s interface instead.', LazyLoadingInterface::class));
+                    }
                     $data->load();
                 }
             }
@@ -348,6 +372,10 @@ class Service extends Model\Element\Service
      */
     public static function pathExists($path, $type = null)
     {
+        if (!$path) {
+            return false;
+        }
+
         $path = Element\Service::correctPath($path);
 
         try {
@@ -405,7 +433,13 @@ class Service extends Model\Element\Service
                 if ($contentMaster instanceof Document\PageSnippet) {
                     $contentMasterEditables = $contentMaster->getEditables();
                     foreach ($contentMasterEditables as $contentMasterEditable) {
-                        if (method_exists($contentMasterEditable, 'rewriteIds')) {
+                        //TODO Pimcore 11: remove method_exists BC layer
+                        if ($contentMasterEditable instanceof IdRewriterInterface || method_exists($contentMasterEditable, 'rewriteIds')) {
+                            if (!$contentMasterEditable instanceof IdRewriterInterface) {
+                                trigger_deprecation('pimcore/pimcore', '10.3',
+                                    sprintf('Usage of method_exists is deprecated since version 10.3 and will be removed in Pimcore 11.' .
+                                        'Implement the %s interface instead.', IdRewriterInterface::class));
+                            }
                             $editable = clone $contentMasterEditable;
                             $editable->rewriteIds($rewriteConfig);
 
@@ -422,7 +456,13 @@ class Service extends Model\Element\Service
             } else {
                 $editables = $document->getEditables();
                 foreach ($editables as &$editable) {
-                    if (method_exists($editable, 'rewriteIds')) {
+                    //TODO Pimcore 11: remove method_exists BC layer
+                    if ($editable instanceof IdRewriterInterface || method_exists($editable, 'rewriteIds')) {
+                        if (!$editable instanceof IdRewriterInterface) {
+                            trigger_deprecation('pimcore/pimcore', '10.3',
+                                sprintf('Usage of method_exists is deprecated since version 10.3 and will be removed in Pimcore 11.' .
+                                    'Implement the %s interface instead.', IdRewriterInterface::class));
+                        }
                         $editable->rewriteIds($rewriteConfig);
                     }
                 }
@@ -530,7 +570,7 @@ class Service extends Model\Element\Service
      * @param bool $ignoreHardlinks
      * @param array $types
      *
-     * @return Document|Document\PageSnippet|null
+     * @return Document|null
      */
     public function getNearestDocumentByPath($path, $ignoreHardlinks = false, $types = [])
     {
@@ -552,9 +592,7 @@ class Service extends Model\Element\Service
                 $tmpPaths[] = $pathPart;
 
                 $t = implode('/', $tmpPaths);
-                if (!empty($t)) {
-                    $paths[] = $t;
-                }
+                $paths[] = $t;
             }
 
             $paths = array_reverse($paths);
@@ -619,7 +657,10 @@ class Service extends Model\Element\Service
         /** @var Page $doc */
         $doc = Document::getById($id);
         if (!$hostUrl) {
-            $hostUrl = Tool::getHostUrl(null, $request);
+            $hostUrl = Config::getSystemConfiguration('documents')['preview_url_prefix'];
+            if (empty($hostUrl)) {
+                $hostUrl = Tool::getHostUrl(null, $request);
+            }
         }
 
         $url = $hostUrl . $doc->getRealFullPath();
@@ -628,15 +669,25 @@ class Service extends Model\Element\Service
 
         File::mkdir(dirname($file));
 
-        if (\Pimcore\Image\HtmlToImage::convert($url, $tmpFile)) {
-            $im = \Pimcore\Image::getInstance();
-            $im->load($tmpFile);
-            $im->scaleByWidth(800);
-            $im->save($file, 'jpeg', 85);
+        $tool = false;
+        if (Chromium::isSupported()) {
+            $tool = Chromium::class;
+        } elseif (HtmlToImage::isSupported()) {
+            $tool = HtmlToImage::class;
+        }
 
-            unlink($tmpFile);
+        if ($tool) {
+            /** @var Chromium|HtmlToImage $tool */
+            if ($tool::convert($url, $tmpFile)) {
+                $im = \Pimcore\Image::getInstance();
+                $im->load($tmpFile);
+                $im->scaleByWidth(800);
+                $im->save($file, 'jpeg', 85);
 
-            $success = true;
+                unlink($tmpFile);
+
+                $success = true;
+            }
         }
 
         return $success;

@@ -115,13 +115,13 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
                         'domain' => $site ? $site->getMainDomain() : null,
                     ];
 
-                    $result[] = $resultItem;
+                    $result[$slug->getSiteId()] = $resultItem;
                 }
             }
         }
         ksort($result);
 
-        return $result;
+        return array_values($result);
     }
 
     /**
@@ -259,7 +259,7 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
                 try {
                     $db->insert(Model\DataObject\Data\UrlSlug::TABLE_NAME, $slug);
                 } catch (\Exception $e) {
-                    Logger::error($e);
+                    Logger::error((string) $e);
                     if ($e instanceof UniqueConstraintViolationException) {
 
                         // check if the slug action can be resolved.
@@ -418,6 +418,14 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
             $db = Db::get();
             $db->delete(Model\DataObject\Data\UrlSlug::TABLE_NAME, ['objectId' => $object->getId()]);
         }
+    }
+
+    /**
+     * @return bool
+     */
+    public function getUnique()
+    {
+        return true;
     }
 
     /**

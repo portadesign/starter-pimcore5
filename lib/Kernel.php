@@ -69,25 +69,37 @@ abstract class Kernel extends SymfonyKernel
     private $bundleCollection;
 
     /**
-     * {@inheritdoc}
+     * @deprecated
      */
     public function getRootDir()
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.3',
+            'Kernel::getRootDir() is deprecated and will be removed in Pimcore 11. Use Kernel::getProjectDir() instead.',
+        );
+
         return PIMCORE_PROJECT_ROOT;
     }
 
     /**
      * {@inheritdoc}
+     *
+     * @return string
      */
-    public function getProjectDir()
+    #[\ReturnTypeWillChange]
+    public function getProjectDir()// : string
     {
         return PIMCORE_PROJECT_ROOT;
     }
 
     /**
      * {@inheritdoc}
+     *
+     * @return string
      */
-    public function getCacheDir()
+    #[\ReturnTypeWillChange]
+    public function getCacheDir()// : string
     {
         if (isset($_SERVER['APP_CACHE_DIR'])) {
             return $_SERVER['APP_CACHE_DIR'].'/'.$this->environment;
@@ -98,8 +110,11 @@ abstract class Kernel extends SymfonyKernel
 
     /**
      * {@inheritdoc}
+     *
+     * @return string
      */
-    public function getLogDir()
+    #[\ReturnTypeWillChange]
+    public function getLogDir()// : string
     {
         return PIMCORE_LOG_DIRECTORY;
     }
@@ -161,8 +176,52 @@ abstract class Kernel extends SymfonyKernel
             $loader->load($systemConfigFile);
         }
 
-        foreach (['image-thumbnails', 'video-thumbnails', 'custom-reports', 'document-types', 'web-to-print', 'predefined-properties', 'predefined-asset-metadata', 'staticroutes', 'perspectives', 'custom-views'] as $configDir) {
-            $configDir = PIMCORE_CONFIGURATION_DIRECTORY . "/$configDir/";
+        $configArray = [
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_IMAGE_THUMBNAILS',
+                'defaultStorageDirectoryName' => 'image-thumbnails',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_VIDEO_THUMBNAILS',
+                'defaultStorageDirectoryName' => 'video-thumbnails',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_CUSTOM_REPORTS',
+                'defaultStorageDirectoryName' => 'custom-reports',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_DOCUMENT_TYPES',
+                'defaultStorageDirectoryName' => 'document-types',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_WEB_TO_PRINT',
+                'defaultStorageDirectoryName' => 'web-to-print',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_PREDEFINED_PROPERTIES',
+                'defaultStorageDirectoryName' => 'predefined-properties',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_PREDEFINED_ASSET_METADATA',
+                'defaultStorageDirectoryName' => 'predefined-asset-metadata',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_STATICROUTES',
+                'defaultStorageDirectoryName' => 'staticroutes',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_PERSPECTIVES',
+                'defaultStorageDirectoryName' => 'perspectives',
+            ],
+            [
+                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_CUSTOM_VIEWS',
+                'defaultStorageDirectoryName' => 'custom-views',
+            ],
+        ];
+
+        foreach ($configArray as $config) {
+            $configDir = rtrim($_SERVER[$config['storageDirectoryEnvVariableName']] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/' . $config['defaultStorageDirectoryName'], '/\\');
+            $configDir = "$configDir/";
             if (is_dir($configDir)) {
                 // @phpstan-ignore-next-line
                 $loader->import($configDir);
@@ -409,15 +468,12 @@ abstract class Kernel extends SymfonyKernel
         }
 
         //@ini_set("memory_limit", "1024M");
-        @ini_set('max_execution_time', $maxExecutionTime);
+        @ini_set('max_execution_time', (string) $maxExecutionTime);
         @set_time_limit($maxExecutionTime);
         ini_set('default_charset', 'UTF-8');
 
         // set internal character encoding to UTF-8
         mb_internal_encoding('UTF-8');
-
-        // this is for simple_dom_html
-        ini_set('pcre.recursion-limit', 100000);
 
         // zlib.output_compression conflicts with while (@ob_end_flush()) ;
         // see also: https://github.com/pimcore/pimcore/issues/291

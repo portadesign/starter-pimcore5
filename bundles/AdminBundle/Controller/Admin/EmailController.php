@@ -59,35 +59,33 @@ class EmailController extends AdminController
         $list->setOrderKey('sentDate');
 
         if ($request->get('filter')) {
-            if ($request->get('filter')) {
-                $filterTerm = $request->get('filter');
-                if ($filterTerm == '*') {
-                    $filterTerm = '';
-                }
-
-                $filterTerm = str_replace('%', '*', $filterTerm);
-                $filterTerm = htmlspecialchars($filterTerm, ENT_QUOTES);
-
-                if (strpos($filterTerm, '@')) {
-                    $parts = explode(' ', $filterTerm);
-                    $parts = array_map(function ($part) {
-                        if (strpos($part, '@')) {
-                            $part = '"' . $part . '"';
-                        }
-
-                        return $part;
-                    }, $parts);
-                    $filterTerm = implode(' ', $parts);
-                }
-
-                $condition = '( MATCH (`from`,`to`,`cc`,`bcc`,`subject`,`params`) AGAINST (' . $list->quote($filterTerm) . ' IN BOOLEAN MODE) )';
-
-                if ($request->get('documentId')) {
-                    $condition .= 'AND documentId = ' . (int)$request->get('documentId');
-                }
-
-                $list->setCondition($condition);
+            $filterTerm = $request->get('filter');
+            if ($filterTerm == '*') {
+                $filterTerm = '';
             }
+
+            $filterTerm = str_replace('%', '*', $filterTerm);
+            $filterTerm = htmlspecialchars($filterTerm, ENT_QUOTES);
+
+            if (strpos($filterTerm, '@')) {
+                $parts = explode(' ', $filterTerm);
+                $parts = array_map(function ($part) {
+                    if (strpos($part, '@')) {
+                        $part = '"' . $part . '"';
+                    }
+
+                    return $part;
+                }, $parts);
+                $filterTerm = implode(' ', $parts);
+            }
+
+            $condition = '( MATCH (`from`,`to`,`cc`,`bcc`,`subject`,`params`) AGAINST (' . $list->quote($filterTerm) . ' IN BOOLEAN MODE) )';
+
+            if ($request->get('documentId')) {
+                $condition .= 'AND documentId = ' . (int)$request->get('documentId');
+            }
+
+            $list->setCondition($condition);
         }
 
         $list->setOrder('DESC');
@@ -115,7 +113,7 @@ class EmailController extends AdminController
      * @Route("/show-email-log", name="pimcore_admin_email_showemaillog", methods={"GET"})
      *
      * @param Request $request
-     * @param Profiler $profiler
+     * @param Profiler|null $profiler
      *
      * @return JsonResponse|Response
      *
@@ -128,19 +126,23 @@ class EmailController extends AdminController
         }
 
         if (!$this->getAdminUser()->isAllowed('emails')) {
-            throw new \Exception("Permission denied, user needs 'emails' permission.");
+            throw $this->createAccessDeniedHttpException("Permission denied, user needs 'emails' permission.");
         }
 
         $type = $request->get('type');
-        $emailLog = Tool\Email\Log::getById($request->get('id'));
+        $emailLog = Tool\Email\Log::getById((int) $request->get('id'));
 
-        if ($request->get('type') == 'text') {
+        if (!$emailLog) {
+            throw $this->createNotFoundException();
+        }
+
+        if ($type === 'text') {
             return $this->render('@PimcoreAdmin/Admin/Email/text.html.twig', ['log' => $emailLog->getTextLog()]);
-        } elseif ($request->get('type') == 'html') {
+        } elseif ($type === 'html') {
             return new Response($emailLog->getHtmlLog(), 200, [
                 'Content-Security-Policy' => "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data:",
             ]);
-        } elseif ($request->get('type') == 'params') {
+        } elseif ($type === 'params') {
             try {
                 $params = $this->decodeJson($emailLog->getParams());
             } catch (\Exception $e) {
@@ -152,7 +154,7 @@ class EmailController extends AdminController
             }
 
             return $this->adminJson($params);
-        } elseif ($request->get('type') == 'details') {
+        } elseif ($type === 'details') {
             $data = $emailLog->getObjectVars();
 
             return $this->adminJson($data);
@@ -257,11 +259,11 @@ class EmailController extends AdminController
     public function deleteEmailLogAction(Request $request)
     {
         if (!$this->getAdminUser()->isAllowed('emails')) {
-            throw new \Exception("Permission denied, user needs 'emails' permission.");
+            throw $this->createAccessDeniedHttpException("Permission denied, user needs 'emails' permission.");
         }
 
         $success = false;
-        $emailLog = Tool\Email\Log::getById($request->get('id'));
+        $emailLog = Tool\Email\Log::getById((int) $request->get('id'));
         if ($emailLog instanceof Tool\Email\Log) {
             $emailLog->delete();
             $success = true;
@@ -284,11 +286,11 @@ class EmailController extends AdminController
     public function resendEmailAction(Request $request)
     {
         if (!$this->getAdminUser()->isAllowed('emails')) {
-            throw new \Exception("Permission denied, user needs 'emails' permission.");
+            throw $this->createAccessDeniedHttpException("Permission denied, user needs 'emails' permission.");
         }
 
         $success = false;
-        $emailLog = Tool\Email\Log::getById($request->get('id'));
+        $emailLog = Tool\Email\Log::getById((int) $request->get('id'));
 
         if ($emailLog instanceof Tool\Email\Log) {
             $mail = new Mail();

@@ -18,71 +18,100 @@ namespace Pimcore\Model\DataObject\ClassDefinition;
 use Pimcore\Model;
 use Pimcore\Model\Element;
 
-class Layout
+class Layout implements Model\DataObject\ClassDefinition\Data\VarExporterInterface
 {
-    use Model\DataObject\ClassDefinition\Helper\VarExport, Element\ChildsCompatibilityTrait;
+    use Model\DataObject\ClassDefinition\Helper\VarExport {
+        __set_state as private _VarExport__set_state;
+    }
+    use Element\ChildsCompatibilityTrait;
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $name;
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $type;
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $region;
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $title;
 
     /**
+     * @internal
+     *
      * @var string|int
      */
     public $width = 0;
 
     /**
+     * @internal
+     *
      * @var string|int
      */
     public $height = 0;
 
     /**
+     * @internal
+     *
      * @var bool
      */
     public $collapsible = false;
 
     /**
+     * @internal
+     *
      * @var bool
      */
     public $collapsed = false;
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $bodyStyle;
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $datatype = 'layout';
 
     /**
+     * @internal
+     *
      * @var array
      */
     public $permissions;
 
     /**
+     * @internal
+     *
      * @var array
      */
-    public $childs = [];
+    public $children = [];
 
     /**
+     * @internal
+     *
      * @var bool
      */
     public $locked = false;
@@ -260,7 +289,17 @@ class Layout
      */
     public function getChildren()
     {
-        return $this->childs;
+        return $this->children;
+    }
+
+    /**
+     * @internal
+     *
+     * @return array
+     */
+    public function &getChildrenByRef()
+    {
+        return $this->children;
     }
 
     /**
@@ -270,7 +309,7 @@ class Layout
      */
     public function setChildren($children)
     {
-        $this->childs = $children;
+        $this->children = $children;
 
         return $this;
     }
@@ -280,7 +319,7 @@ class Layout
      */
     public function hasChildren()
     {
-        if (is_array($this->childs) && count($this->childs) > 0) {
+        if (is_array($this->children) && count($this->children) > 0) {
             return true;
         }
 
@@ -292,7 +331,7 @@ class Layout
      */
     public function addChild($child)
     {
-        $this->childs[] = $child;
+        $this->children[] = $child;
     }
 
     /**
@@ -316,7 +355,7 @@ class Layout
     }
 
     /**
-     * @return mixed
+     * @return string
      */
     public function getDatatype()
     {
@@ -324,7 +363,7 @@ class Layout
     }
 
     /**
-     * @param mixed $datatype
+     * @param string $datatype
      *
      * @return $this
      */
@@ -407,5 +446,33 @@ class Layout
         $this->collapsible = $this->getCollapsed() || $this->getCollapsible();
 
         return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function getBlockedVarsForExport(): array
+    {
+        return ['blockedVarsForExport', 'childs'];
+    }
+
+    public function __sleep(): array
+    {
+        $vars = get_object_vars($this);
+        foreach ($this->getBlockedVarsForExport() as $blockedVar) {
+            unset($vars[$blockedVar]);
+        }
+
+        return array_keys($vars);
+    }
+
+    public static function __set_state($data)
+    {
+        $obj = new static();
+        $obj->setValues($data);
+
+        $obj->childs = $obj->children;  // @phpstan-ignore-line
+
+        return $obj;
     }
 }

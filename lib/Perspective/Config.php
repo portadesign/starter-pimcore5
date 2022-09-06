@@ -16,9 +16,13 @@
 namespace Pimcore\Perspective;
 
 use Pimcore\Config\LocationAwareConfigRepository;
+use Pimcore\Event\AdminEvents;
 use Pimcore\Logger;
+use Pimcore\Model\User;
+use Pimcore\Model\User\Role;
 use Pimcore\Model\User\UserRole;
 use Pimcore\Tool;
+use Symfony\Component\EventDispatcher\GenericEvent;
 
 /**
  * @internal
@@ -40,16 +44,13 @@ final class Config
     private static function getRepository()
     {
         if (!self::$locationAwareConfigRepository) {
-            $config = [];
             $containerConfig = \Pimcore::getContainer()->getParameter('pimcore.config');
-            if (isset($containerConfig[self::CONFIG_ID]['definitions'])) {
-                $config = $containerConfig[self::CONFIG_ID]['definitions'];
-            }
+            $config = $containerConfig[self::CONFIG_ID]['definitions'];
 
             self::$locationAwareConfigRepository = new LocationAwareConfigRepository(
                 $config,
                 'pimcore_perspectives',
-                PIMCORE_CONFIGURATION_DIRECTORY . '/perspectives',
+                $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_PERSPECTIVES'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/perspectives',
                 'PIMCORE_WRITE_TARGET_PERSPECTIVES',
                 null,
                 self::LEGACY_FILE,
@@ -84,18 +85,16 @@ final class Config
         }
 
         if (!count($config)) {
-            $config = static::getStandardPerspective();
+            $config = self::getStandardPerspective();
             $config['default']['writeable'] = $repository->isWriteable();
         }
 
-        $config = new \Pimcore\Config\Config($config);
-
-        return $config;
+        return new \Pimcore\Config\Config($config);
     }
 
     /**
      * @param array $data
-     * @param array $deletedRecords
+     * @param array|null $deletedRecords
      *
      * @throws \Exception
      */
@@ -223,7 +222,7 @@ final class Config
         ];
     }
 
-    public static function getRuntimePerspective(\Pimcore\Model\User $currentUser = null)
+    public static function getRuntimePerspective(User $currentUser = null)
     {
         if (null === $currentUser) {
             $currentUser = Tool\Admin::getCurrentUser();
@@ -254,7 +253,13 @@ final class Config
 
         $result['elementTree'] = self::getRuntimeElementTreeConfig($currentConfigName);
 
-        return $result;
+        $event = new GenericEvent(null, [
+            'result' => $result,
+            'configName' => $currentConfigName,
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, AdminEvents::PERSPECTIVE_POST_GET_RUNTIME);
+
+        return $event->getArgument('result');
     }
 
     /**
@@ -335,8 +340,8 @@ final class Config
         }
 
         usort($result, static function ($treeA, $treeB) {
-            $a = $treeA['sort'] ?: 0;
-            $b = $treeB['sort'] ?: 0;
+            $a = $treeA['sort'] ?? 0;
+            $b = $treeB['sort'] ?? 0;
 
             return $a <=> $b;
         });
@@ -349,7 +354,7 @@ final class Config
         $currentConfigName = null;
         $masterConfig = self::get()->toArray();
 
-        if ($user instanceof  \Pimcore\Model\User) {
+        if ($user instanceof User) {
             if ($user->isAdmin()) {
                 $config = self::get()->toArray();
             } else {
@@ -360,9 +365,9 @@ final class Config
 
                 foreach ($userIds as $userId) {
                     if (in_array($userId, $roleIds)) {
-                        $userOrRoleToCheck = \Pimcore\Model\User\Role::getById($userId);
+                        $userOrRoleToCheck = Role::getById($userId);
                     } else {
-                        $userOrRoleToCheck = \Pimcore\Model\User::getById($userId);
+                        $userOrRoleToCheck = User::getById($userId);
                     }
                     if ($userOrRoleToCheck instanceof UserRole) {
                         $perspectives = $userOrRoleToCheck->getPerspectives();
@@ -408,8 +413,8 @@ final class Config
         foreach ($config as $configName => $configItem) {
             $item = [
                 'name' => $configName,
-                'icon' => isset($configItem['icon']) ? $configItem['icon'] : null,
-                'iconCls' => isset($configItem['iconCls']) ? $configItem['iconCls'] : null,
+                'icon' => $configItem['icon'] ?? null,
+                'iconCls' => $configItem['iconCls'] ?? null,
             ];
             if ($user) {
                 $item['active'] = $configName == $currentConfigName;

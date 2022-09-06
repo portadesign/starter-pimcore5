@@ -29,7 +29,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     public $name;
 
     /**
-     * @var string
+     * @var string|null
      */
     public $title;
 
@@ -117,13 +117,13 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     /**
      * @var array
      */
-    protected $forbiddenNames = [
+    protected const FORBIDDEN_NAMES = [
         'id', 'key', 'path', 'type', 'index', 'classname', 'creationdate', 'userowner', 'value', 'class', 'list',
-        'fullpath', 'childs', 'values', 'cachetag', 'cachetags', 'parent', 'published', 'valuefromparent',
+        'fullpath', 'childs', 'children', 'values', 'cachetag', 'cachetags', 'parent', 'published', 'valuefromparent',
         'userpermissions', 'dependencies', 'modificationdate', 'usermodification', 'byid', 'bypath', 'data',
         'versions', 'properties', 'permissions', 'permissionsforuser', 'childamount', 'apipluginbroker', 'resource',
         'parentClass', 'definition', 'locked', 'language', 'omitmandatorycheck', 'idpath', 'object', 'fieldname',
-        'property', 'parentid', 'children', 'scheduledtasks',
+        'property', 'parentid', 'children', 'scheduledtasks', 'latestVersion',
     ];
 
     /**
@@ -217,7 +217,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
      */
     public function getTitle()
     {
-        return $this->title;
+        return $this->title ?? '';
     }
 
     /**
@@ -403,7 +403,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param int|bool|null $locked
+     * @param bool $locked
      *
      * @return $this
      */
@@ -1165,23 +1165,23 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param int|string|null $number
+     * @param mixed $number
      *
      * @return int|null
      */
     public function getAsIntegerCast($number)
     {
-        return strlen($number) === 0 ? '' : (int)$number;
+        return strlen((string) $number) === 0 ? null : (int)$number;
     }
 
     /**
      * @param mixed $number
      *
-     * @return float
+     * @return float|null
      */
     public function getAsFloatCast($number)
     {
-        return strlen($number) === 0 ? '' : (float)$number;
+        return strlen((string) $number) === 0 ? null : (float)$number;
     }
 
     /**
@@ -1250,7 +1250,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
      *
      *
      * @param mixed $data
-     * @param null|DataObject\AbstractObject $object
+     * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
      * @return null|array
@@ -1449,7 +1449,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
      * @param array|null $existingData
      * @param array $additionalData
      *
-     * @return mixed
+     * @return array|null
      */
     public function appendData($existingData, $additionalData)
     {
@@ -1519,6 +1519,6 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
 
     public function isForbiddenName()
     {
-        return in_array($this->getName(), $this->forbiddenNames);
+        return in_array($this->getName(), self::FORBIDDEN_NAMES);
     }
 }

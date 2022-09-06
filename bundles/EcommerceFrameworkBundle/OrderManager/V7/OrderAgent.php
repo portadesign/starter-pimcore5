@@ -119,7 +119,7 @@ class OrderAgent implements OrderAgentInterface
         //        $cancel = true;
         //        foreach($this->getOrder()->getItems() as $i)
         //        {
-        //            /* @var OrderItem $i */
+        //            /** @var OrderItem $i */
         //            if($i->getOrderState() != Order::ORDER_STATE_CANCELLED)
         //            {
         //                $cancel = false;
@@ -368,8 +368,9 @@ class OrderAgent implements OrderAgentInterface
         $order = $this->getOrder();
 
         $paymentInformation = $order->getPaymentInfo();
-        $currentPaymentInformation = null;
+
         if ($paymentInformation) {
+            /** @var AbstractPaymentInformation $paymentInfo */
             foreach ($paymentInformation as $paymentInfo) {
                 if ($paymentInfo->getPaymentState() == $order::ORDER_STATE_PAYMENT_PENDING || $paymentInfo->getPaymentState() == $order::ORDER_STATE_PAYMENT_INIT) {
                     return $paymentInfo;
@@ -568,6 +569,7 @@ class OrderAgent implements OrderAgentInterface
 
         $event = new OrderAgentEvent($this, ['status' => $status]);
         $this->eventDispatcher->dispatch($event, OrderAgentEvents::PRE_UPDATE_PAYMENT);
+        /** @var StatusInterface $status */
         $status = $event->getArgument('status');
 
         $order = $this->getOrder();
@@ -575,13 +577,13 @@ class OrderAgent implements OrderAgentInterface
 
         $paymentInformationCollection = $order->getPaymentInfo();
 
-        /** @var PaymentInfo $currentPaymentInformation */
         $currentPaymentInformation = null;
         if (empty($paymentInformationCollection)) {
             $paymentInformationCollection = new Fieldcollection();
             $order->setPaymentInfo($paymentInformationCollection);
         }
 
+        /** @var AbstractPaymentInformation $paymentInfo */
         foreach ($paymentInformationCollection as $paymentInfoIndex => $paymentInfo) {
             if ($paymentInfo->getInternalPaymentId() == $status->getInternalPaymentId()) {
                 $currentPaymentInformation = $paymentInfo;
@@ -616,7 +618,10 @@ class OrderAgent implements OrderAgentInterface
         $currentPaymentInformation->setPaymentReference($status->getPaymentReference());
         $currentPaymentInformation->setPaymentState($status->getStatus());
         $currentPaymentInformation->setMessage($currentPaymentInformation->getMessage() . ' ' . $status->getMessage());
-        $currentPaymentInformation->setProviderData(json_encode($status->getData()));
+
+        if (method_exists($currentPaymentInformation, 'setProviderData')) {
+            $currentPaymentInformation->setProviderData(json_encode($status->getData()));
+        }
 
         // opt. save additional payment data separately
         foreach ($status->getData() as $field => $value) {
@@ -662,9 +667,9 @@ class OrderAgent implements OrderAgentInterface
      * Hook to extract and save additional information in payment information
      *
      * @param StatusInterface $status
-     * @param PaymentInfo $currentPaymentInformation
+     * @param AbstractPaymentInformation $currentPaymentInformation
      */
-    protected function extractAdditionalPaymentInformation(StatusInterface $status, PaymentInfo $currentPaymentInformation)
+    protected function extractAdditionalPaymentInformation(StatusInterface $status, AbstractPaymentInformation $currentPaymentInformation)
     {
     }
 

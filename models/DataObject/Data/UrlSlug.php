@@ -163,7 +163,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getSiteId(): ?int
     {
@@ -183,7 +183,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getFieldname(): ?string
     {
@@ -203,7 +203,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getIndex(): ?int
     {
@@ -243,7 +243,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOwnername(): ?string
     {
@@ -263,7 +263,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getPosition(): ?string
     {
@@ -341,11 +341,16 @@ class UrlSlug implements OwnerAwareFieldInterface
         $db = Db::get();
 
         try {
+            $filterSiteId = 'siteId = 0';
+            if ($siteId) {
+                $filterSiteId = sprintf('(siteId = %d OR siteId = 0)', $siteId);
+            }
+
             $query = sprintf(
-                'SELECT * FROM %s WHERE slug = %s AND (siteId = %d OR siteId = 0) ORDER BY siteId DESC LIMIT 1',
+                'SELECT * FROM %s WHERE slug = %s AND %s ORDER BY siteId DESC LIMIT 1',
                 self::TABLE_NAME,
                 $db->quote($path),
-                $siteId
+                $filterSiteId
             );
 
             $rawItem = $db->fetchRow($query);
@@ -354,7 +359,7 @@ class UrlSlug implements OwnerAwareFieldInterface
                 $slug = self::createFromDataRow($rawItem);
             }
         } catch (\Exception $e) {
-            Logger::error($e);
+            Logger::error((string) $e);
         }
 
         self::$cache[$cacheKey] = $slug;

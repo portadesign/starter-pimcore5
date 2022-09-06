@@ -94,6 +94,13 @@ class Input extends Data implements
     /**
      * @internal
      *
+     * @var array
+     */
+    public $regexFlags = [];
+
+    /**
+     * @internal
+     *
      * @var bool
      */
     public $unique;
@@ -201,7 +208,7 @@ class Input extends Data implements
     }
 
     /**
-     * @param float $data
+     * @param string $data
      * @param Model\DataObject\Concrete $object
      * @param mixed $params
      *
@@ -248,6 +255,22 @@ class Input extends Data implements
     public function getRegex()
     {
         return $this->regex;
+    }
+
+    /**
+     * @return array
+     */
+    public function getRegexFlags(): array
+    {
+        return $this->regexFlags;
+    }
+
+    /**
+     * @param array $regexFlags
+     */
+    public function setRegexFlags(array $regexFlags): void
+    {
+        $this->regexFlags = $regexFlags;
     }
 
     /**
@@ -304,7 +327,7 @@ class Input extends Data implements
     public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
         if (!$omitMandatoryCheck && $this->getRegex() && strlen($data) > 0) {
-            if (!preg_match('#' . $this->getRegex() . '#', $data)) {
+            if (!preg_match('#' . $this->getRegex() . '#' . implode('', $this->getRegexFlags()), $data)) {
                 throw new Model\Element\ValidationException('Value in field [ ' . $this->getName() . " ] doesn't match input validation '" . $this->getRegex() . "'");
             }
         }

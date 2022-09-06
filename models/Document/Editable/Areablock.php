@@ -183,7 +183,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
                 $disabled = true;
             }
 
-            if (!$this->getEditableHandler()->isBrickEnabled($this, $index['type']) && $config['dontCheckEnabled'] != true) {
+            if (!$this->getEditableHandler()->isBrickEnabled($this, $index['type']) && ($config['dontCheckEnabled'] ?? false) !== true) {
                 $disabled = true;
             }
 
@@ -224,7 +224,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
             $info->setEditable($this);
             $info->setIndex($this->current);
         } catch (\Exception $e) {
-            Logger::err($e);
+            Logger::err((string) $e);
         }
 
         $params = [];
@@ -452,7 +452,11 @@ class Areablock extends Model\Document\Editable implements BlockInterface
         $brick = $areabrickManager->getBrick($this->indices[$this->current]['type']);
         if ($this->getEditmode() && $brick instanceof EditableDialogBoxInterface) {
             $dialogConfig = $brick->getEditableDialogBoxConfiguration($this, $info);
-            $dialogConfig->setId('dialogBox-' . $this->getName() . '-' . $this->indices[$this->current]['key']);
+            if ($dialogConfig->getItems()) {
+                $dialogConfig->setId('dialogBox-' . $this->getName() . '-' . $this->indices[$this->current]['key']);
+            } else {
+                $dialogConfig = null;
+            }
         }
 
         $attr = HtmlUtils::assembleAttributeString($attributes);
@@ -481,14 +485,18 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     }
 
     /**
+     * This method needs to be `protected` as it is used in other bundles such as pimcore/headless-documents
+     *
      * @param array $config
      * @param EditableRenderer $editableRenderer
      * @param string $dialogId
      * @param string $html
      *
      * @throws \Exception
+     *
+     * @internal
      */
-    private function renderDialogBoxEditables(array $config, EditableRenderer $editableRenderer, string $dialogId, string &$html)
+    protected function renderDialogBoxEditables(array $config, EditableRenderer $editableRenderer, string $dialogId, string &$html)
     {
         if (isset($config['items']) && is_array($config['items'])) {
             // layout component

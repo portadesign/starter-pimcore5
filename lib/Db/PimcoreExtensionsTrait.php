@@ -37,10 +37,14 @@ trait PimcoreExtensionsTrait
      */
     protected $autoQuoteIdentifiers = true;
 
+    private static array $tablePrimaryKeyCache = [];
+
     /**
-     * @see \Doctrine\DBAL\Connection::connect
+     *@return bool
+     *
+     *@see \Doctrine\DBAL\Connection::connect
      */
-    public function connect()
+    public function connect()// : bool
     {
         $returnValue = parent::connect();
 
@@ -261,7 +265,7 @@ trait PimcoreExtensionsTrait
      * @param array|scalar $params
      * @param array $types
      *
-     * @return mixed
+     * @return array
      *
      * @throws DBALException
      * @throws DriverException
@@ -274,8 +278,10 @@ trait PimcoreExtensionsTrait
         $stmt = $this->executeQuery($sql, $params, $types);
         $data = [];
         if ($stmt instanceof Result) {
-            while ($row = $stmt->fetchOne()) {
+            $row = $stmt->fetchOne();
+            while (false !== $row) {
                 $data[] = $row;
+                $row = $stmt->fetchOne();
             }
             $stmt->free();
         }
@@ -340,22 +346,24 @@ trait PimcoreExtensionsTrait
      */
     public function insertOrUpdate($table, array $data)
     {
+        // get the field name of the primary key
+        $fieldsPrimaryKey = self::$tablePrimaryKeyCache[$table] ??= $this->getPrimaryKeyColumns($table);
+
         // extract and quote col names from the array keys
         $i = 0;
         $bind = [];
         $cols = [];
         $vals = [];
+        $set = [];
         foreach ($data as $col => $val) {
             $cols[] = $this->quoteIdentifier($col);
             $bind[':col' . $i] = $val;
             $vals[] = ':col' . $i;
-            $i++;
-        }
 
-        // build the statement
-        $set = [];
-        foreach ($cols as $i => $col) {
-            $set[] = sprintf('%s = %s', $col, $vals[$i]);
+            if (!($val === null && in_array($col, $fieldsPrimaryKey))) {
+                $set[] = sprintf('%s = %s', $this->quoteIdentifier($col), ':col' . $i);
+            }
+            $i++;
         }
 
         $sql = sprintf(
@@ -365,8 +373,6 @@ trait PimcoreExtensionsTrait
             implode(', ', $vals),
             implode(', ', $set)
         );
-
-        $bind = array_merge($bind, $bind);
 
         return $this->executeUpdate($sql, $bind);
     }
@@ -542,7 +548,7 @@ trait PimcoreExtensionsTrait
      */
     protected function prepareParams($params)
     {
-        if (is_scalar($params)) {
+        if (!is_array($params)) {
             $params = [$params];
         }
 
@@ -608,5 +614,19 @@ trait PimcoreExtensionsTrait
     public function escapeLike(string $like): string
     {
         return str_replace(['_', '%'], ['\\_', '\\%'], $like);
+    }
+
+    /**
+     * @param string $table
+     *
+     * @return string[]
+     */
+    private function getPrimaryKeyColumns(string $table): array
+    {
+        try {
+            return $this->getSchemaManager()->listTableDetails($table)->getPrimaryKeyColumns();
+        } catch (DBALException) {
+            return [];
+        }
     }
 }

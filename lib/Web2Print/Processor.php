@@ -27,7 +27,6 @@ use Pimcore\Web2Print\Processor\PdfReactor;
 use Pimcore\Web2Print\Processor\WkHtmlToPdf;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\LockInterface;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 abstract class Processor
 {
@@ -82,7 +81,7 @@ abstract class Processor
         $disableBackgroundExecution = $config['disableBackgroundExecution'] ?? false;
 
         if (!$disableBackgroundExecution) {
-            \Pimcore::getContainer()->get(MessageBusInterface::class)->dispatch(
+            \Pimcore::getContainer()->get('messenger.bus.pimcore-core')->dispatch(
                 new GenerateWeb2PrintPdfMessage($jobConfig->documentId)
             );
 
@@ -129,7 +128,7 @@ abstract class Processor
             $document->setLastGenerateMessage('');
             $document->save();
         } catch (\Exception $e) {
-            Logger::err($e);
+            Logger::err((string) $e);
             $document->setLastGenerateMessage($e->getMessage());
             $document->save();
         }
@@ -283,7 +282,7 @@ abstract class Processor
     }
 
     /**
-     * returns the path to the generated pdf file
+     * Returns the generated pdf file. Its path or data depending supplied parameter
      *
      * @param string $html
      * @param array $params

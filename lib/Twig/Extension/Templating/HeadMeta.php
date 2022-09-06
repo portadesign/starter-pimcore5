@@ -230,7 +230,7 @@ class HeadMeta extends AbstractExtension implements RuntimeExtensionInterface
     /**
      * Append
      *
-     * @param  string $value
+     * @param  \stdClass $value
      *
      * @return void
      *
@@ -249,13 +249,14 @@ class HeadMeta extends AbstractExtension implements RuntimeExtensionInterface
      * OffsetSet
      *
      * @param  string|int $index
-     * @param  string $value
+     * @param  \stdClass $value
      *
      * @return void
      *
      * @throws Exception
      */
-    public function offsetSet($index, $value)
+    #[\ReturnTypeWillChange]
+    public function offsetSet($index, $value)// : void
     {
         if (!$this->_isValid($value)) {
             throw new Exception('Invalid value passed to offsetSet; please use offsetSetName() or offsetSetHttpEquiv()');
@@ -273,7 +274,8 @@ class HeadMeta extends AbstractExtension implements RuntimeExtensionInterface
      *
      * @throws Exception
      */
-    public function offsetUnset($index)
+    #[\ReturnTypeWillChange]
+    public function offsetUnset($index)// : void
     {
         if (!in_array($index, $this->getContainer()->getKeys())) {
             throw new Exception('Invalid index passed to offsetUnset()');

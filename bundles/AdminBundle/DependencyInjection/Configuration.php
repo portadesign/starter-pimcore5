@@ -15,6 +15,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\DependencyInjection;
 
+use Pimcore\Bundle\AdminBundle\Security\ContentSecurityPolicyHandler;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
@@ -29,7 +30,7 @@ final class Configuration implements ConfigurationInterface
     /**
      * {@inheritdoc}
      */
-    public function getConfigTreeBuilder()
+    public function getConfigTreeBuilder(): TreeBuilder
     {
         $treeBuilder = new TreeBuilder('pimcore_admin');
         /** @var ArrayNodeDefinition $rootNode */
@@ -54,6 +55,46 @@ final class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
             ->end()
+            ->arrayNode('admin_csp_header')
+                ->canBeEnabled()
+                ->info('Can be used to enable or disable the Content Security Policy headers.')
+                ->children()
+                    ->arrayNode('exclude_paths')
+                        ->scalarPrototype()->end()
+                        ->info('Regular Expressions like: /^\/path\/toexclude/')
+                    ->end()
+                    ->arrayNode('additional_urls')
+                        ->addDefaultsIfNotSet()
+                        ->normalizeKeys(false)
+                        ->children()
+                            ->arrayNode(ContentSecurityPolicyHandler::DEFAULT_OPT)
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode(ContentSecurityPolicyHandler::IMG_OPT)
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode(ContentSecurityPolicyHandler::SCRIPT_OPT)
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode(ContentSecurityPolicyHandler::STYLE_OPT)
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode(ContentSecurityPolicyHandler::CONNECT_OPT)
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode(ContentSecurityPolicyHandler::FONT_OPT)
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode(ContentSecurityPolicyHandler::MEDIA_OPT)
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode(ContentSecurityPolicyHandler::FRAME_OPT)
+                                ->scalarPrototype()->end()
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
+            ->end()
             ->scalarNode('custom_admin_path_identifier')
                 ->defaultNull()
                 ->validate()
@@ -62,6 +103,9 @@ final class Configuration implements ConfigurationInterface
                     })
                     ->thenInvalid('custom_admin_path_identifier must be at least 20 characters long')
                 ->end()
+            ->end()
+            ->scalarNode('custom_admin_route_name')
+                ->defaultValue('my_custom_admin_entry_point')
             ->end()
             ->arrayNode('branding')
                 ->addDefaultsIfNotSet()
@@ -73,6 +117,9 @@ final class Configuration implements ConfigurationInterface
                         ->defaultNull()
                     ->end()
                     ->scalarNode('color_admin_interface')
+                        ->defaultNull()
+                    ->end()
+                    ->scalarNode('color_admin_interface_background')
                         ->defaultNull()
                     ->end()
                     ->scalarNode('login_screen_custom_image')

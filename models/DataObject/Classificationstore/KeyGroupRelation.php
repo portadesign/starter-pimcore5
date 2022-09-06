@@ -16,6 +16,7 @@
 namespace Pimcore\Model\DataObject\Classificationstore;
 
 use Pimcore\Model;
+use Pimcore\Model\Exception\NotFoundException;
 
 /**
  * @method \Pimcore\Model\DataObject\Classificationstore\KeyGroupRelation\Dao getDao()
@@ -79,10 +80,7 @@ final class KeyGroupRelation extends Model\AbstractModel
      */
     public static function create()
     {
-        $config = new self();
-        $config->save();
-
-        return $config;
+        return new self();
     }
 
     /**
@@ -242,7 +240,7 @@ final class KeyGroupRelation extends Model\AbstractModel
             $relation->getDao()->getById((int)$keyId, (int)$groupId);
 
             return $relation;
-        } catch (\Exception $e) {
+        } catch (NotFoundException) {
             return null;
         }
     }

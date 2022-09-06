@@ -182,6 +182,11 @@ pimcore.object.tree = Class.create({
             },
             "itemmouseleave": function () {
                 pimcore.helpers.treeToolTipHide();
+            },
+            "beforeload": function (store, operation, options) {
+                // add the parent path as an additional diagnostic parameter
+                // can be used by bundles that work with dynamic children nodes
+                store.proxy.setExtraParam('parentPath', operation.node.data.path)
             }
         };
 
@@ -191,6 +196,13 @@ pimcore.object.tree = Class.create({
     onTreeNodeClick: function (tree, record, item, index, event, eOpts ) {
         if (event.ctrlKey === false && event.shiftKey === false && event.altKey === false) {
             try {
+
+                var eventData =  {record: record, preventDefault: false};
+                pimcore.plugin.broker.fireEvent("prepareOnObjectTreeNodeClick", eventData);
+                if (eventData.preventDefault) {
+                    return;
+                }
+
                 if (record.data.permissions.view) {
                     pimcore.helpers.openObject(record.data.id, record.data.type);
                 }
@@ -276,6 +288,12 @@ pimcore.object.tree = Class.create({
         //dropping variants only allowed in the same parent
         if(node.data.type == 'variant' && oldParent.data.id != newParent.data.id){
             pimcore.helpers.showNotification(t("error"), t("element_cannot_be_moved"), "error");
+            return false;
+        }
+
+        // dropping objects not allowed if the tree/folder is paginated and sort by index (manual indexes) is enabled
+        if(((newParent.needsPaging) || (newParent.childNodes.length > pimcore.settings['object_tree_paging_limit'])) && (newParent.data.sortBy == "index")){
+            pimcore.helpers.showNotification(t("error"), t("element_cannot_be_moved_because_target_is_paginated"), "error");
             return false;
         }
 
@@ -655,7 +673,7 @@ pimcore.object.tree = Class.create({
             }
 
             // expand and collapse complete tree
-            if (!record.data.leaf) {
+            if (record.data.expandable) {
                 if (record.data.expanded) {
                     advancedMenuItems.push({
                         text: t('collapse_children'),
@@ -697,7 +715,7 @@ pimcore.object.tree = Class.create({
 
                     let currentSortMethod = record.data.sortBy;
 
-                    if (currentSortMethod == "key" || user.admin) {
+                    if (currentSortMethod !== "key" || user.admin || user.isAllowed("objects_sort_method")) {
                         sortByItems.push({
                             text: t('by_key'),
                             iconCls: "pimcore_icon_alphabetical_sorting_az",
@@ -710,7 +728,7 @@ pimcore.object.tree = Class.create({
                         });
                     }
 
-                    if (currentSortMethod == "index" || user.admin) {
+                    if (currentSortMethod !== "index" || user.admin || user.isAllowed("objects_sort_method")) {
                         sortByItems.push({
                             text: t('by_index'),
                             iconCls: "pimcore_icon_index_sorting",
@@ -1116,12 +1134,21 @@ pimcore.object.tree = Class.create({
         let currentSortMethod = record.data.sortBy;
 
         if (currentSortMethod != sortBy && sortBy == "index") {
-            Ext.MessageBox.confirm(t("warning"), t("reindex_warning"),
-                function (tree, record, sortBy, childrenSortOrder, buttonValue) {
-                    if (buttonValue == "yes") {
-                        this.doChangeObjectChildrenSortBy(tree, record, sortBy, childrenSortOrder);
-                    }
-                }.bind(this, tree, record, sortBy, childrenSortOrder));
+
+            // Do not allow sort by index(Manual Indexes) for a paginated tree/folder
+            if(record.needsPaging) {
+                Ext.MessageBox.alert(
+                    t("error"),
+                    t("error_object_change_children_sort_to_index"));
+            }
+            else {
+                Ext.MessageBox.confirm(t("warning"), t("reindex_warning"),
+                    function (tree, record, sortBy, childrenSortOrder, buttonValue) {
+                        if (buttonValue == "yes") {
+                            this.doChangeObjectChildrenSortBy(tree, record, sortBy, childrenSortOrder);
+                        }
+                    }.bind(this, tree, record, sortBy, childrenSortOrder));
+            }
         } else {
             this.doChangeObjectChildrenSortBy(tree, record, sortBy, childrenSortOrder);
         }

@@ -27,7 +27,7 @@ use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\Routing\Annotation\Route;
 
 /**
- * @Route("/classificationstore")
+ * @Route("/classificationstore", name="pimcore_admin_dataobject_classificationstore_")
  *
  * @internal
  */
@@ -36,13 +36,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     /**
      * Delete collection with the group-relations
      *
-     * @Route("/delete-collection", name="pimcore_admin_dataobject_classificationstore_deletecollection", methods={"DELETE"})
+     * @Route("/delete-collection", name="deletecollection", methods={"DELETE"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function deleteCollectionAction(Request $request)
+    public function deleteCollectionAction(Request $request): JsonResponse
     {
         $id = $request->get('id');
 
@@ -60,13 +60,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/delete-collection-relation", name="pimcore_admin_dataobject_classificationstore_deletecollectionrelation", methods={"DELETE"})
+     * @Route("/delete-collection-relation", name="deletecollectionrelation", methods={"DELETE"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function deleteCollectionRelationAction(Request $request)
+    public function deleteCollectionRelationAction(Request $request): JsonResponse
     {
         $colId = $request->get('colId');
         $groupId = $request->get('groupId');
@@ -81,16 +81,16 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/delete-relation", name="pimcore_admin_dataobject_classificationstore_deleterelation", methods={"DELETE"})
+     * @Route("/delete-relation", name="deleterelation", methods={"DELETE"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function deleteRelationAction(Request $request)
+    public function deleteRelationAction(Request $request): JsonResponse
     {
-        $keyId = $request->get('keyId');
-        $groupId = $request->get('groupId');
+        $keyId = (int) $request->get('keyId');
+        $groupId = (int) $request->get('groupId');
 
         $config = new Classificationstore\KeyGroupRelation();
         $config->setKeyId($keyId);
@@ -102,13 +102,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/delete-group", name="pimcore_admin_dataobject_classificationstore_deletegroup", methods={"DELETE"})
+     * @Route("/delete-group", name="deletegroup", methods={"DELETE"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function deleteGroupAction(Request $request)
+    public function deleteGroupAction(Request $request): JsonResponse
     {
         $id = $request->get('id');
 
@@ -119,13 +119,15 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/create-group", name="pimcore_admin_dataobject_classificationstore_creategroup", methods={"POST"})
+     * @Route("/create-group", name="creategroup", methods={"POST"})
      *
      * @param Request $request
      *
      * @return JsonResponse
+     *
+     * @throws \Exception
      */
-    public function createGroupAction(Request $request)
+    public function createGroupAction(Request $request): JsonResponse
     {
         $name = $request->get('name');
         $storeId = $request->get('storeId');
@@ -144,7 +146,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/create-store", name="pimcore_admin_dataobject_classificationstore_createstore", methods={"POST"})
+     * @Route("/create-store", name="createstore", methods={"POST"})
      *
      * @param Request $request
      *
@@ -152,7 +154,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
      *
      * @throws \Exception
      */
-    public function createStoreAction(Request $request)
+    public function createStoreAction(Request $request): JsonResponse
     {
         $name = $request->get('name');
 
@@ -170,13 +172,15 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/create-collection", name="pimcore_admin_dataobject_classificationstore_createcollection", methods={"POST"})
+     * @Route("/create-collection", name="createcollection", methods={"POST"})
      *
      * @param Request $request
      *
      * @return JsonResponse
+     *
+     * @throws \Exception
      */
-    public function createCollectionAction(Request $request)
+    public function createCollectionAction(Request $request): JsonResponse
     {
         $name = $request->get('name');
         $storeId = $request->get('storeId');
@@ -193,13 +197,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/collections", name="pimcore_admin_dataobject_classificationstore_collectionsactionget", methods={"GET"})
+     * @Route("/collections", name="collectionsactionget", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function collectionsActionGet(Request $request)
+    public function collectionsActionGet(Request $request): JsonResponse
     {
         $this->checkPermission('objects');
 
@@ -234,8 +238,8 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
         $storeIdFromDefinition = 0;
         $allowedCollectionIds = [];
-        if ($request->get('oid')) {
-            $object = DataObject\Concrete::getById($request->get('oid'));
+        if ($oid = $request->get('oid')) {
+            $object = DataObject\Concrete::getById((int) $oid);
             $class = $object->getClass();
             /** @var DataObject\ClassDefinition\Data\Classificationstore $fd */
             $fd = $class->getFieldDefinition($request->get('fieldname'));
@@ -279,8 +283,12 @@ class ClassificationstoreController extends AdminController implements KernelCon
         if ($request->get('filter')) {
             $filterString = $request->get('filter');
             $filters = json_decode($filterString);
-
+            /** @var \stdClass $f */
             foreach ($filters as $f) {
+                if (!isset($f->value)) {
+                    continue;
+                }
+
                 $conditionParts[] = $db->quoteIdentifier($f->property) . ' LIKE ' . $db->quote('%' . $f->value . '%');
             }
         }
@@ -328,13 +336,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/collections", name="pimcore_admin_dataobject_classificationstore_collections", methods={"POST", "PUT"})
+     * @Route("/collections", name="collections", methods={"POST", "PUT"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function collectionsAction(Request $request)
+    public function collectionsAction(Request $request): JsonResponse
     {
         if ($request->get('data')) {
             $dataParam = $request->get('data');
@@ -359,13 +367,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/groups", name="pimcore_admin_dataobject_classificationstore_groupsactionget", methods={"GET"})
+     * @Route("/groups", name="groupsactionget", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function groupsActionGet(Request $request)
+    public function groupsActionGet(Request $request): JsonResponse
     {
         $this->checkPermission('objects');
 
@@ -423,14 +431,18 @@ class ClassificationstoreController extends AdminController implements KernelCon
         if ($request->get('filter')) {
             $filterString = $request->get('filter');
             $filters = json_decode($filterString);
-
+            /** @var \stdClass $f */
             foreach ($filters as $f) {
+                if (!isset($f->value)) {
+                    continue;
+                }
+
                 $conditionParts[] = $db->quoteIdentifier($f->property) . ' LIKE ' . $db->quote('%' . $f->value . '%');
             }
         }
 
-        if ($request->get('oid')) {
-            $object = DataObject\Concrete::getById($request->get('oid'));
+        if ($oid = $request->get('oid')) {
+            $object = DataObject\Concrete::getById((int) $oid);
             $class = $object->getClass();
             /** @var DataObject\ClassDefinition\Data\Classificationstore $fd */
             $fd = $class->getFieldDefinition($request->get('fieldname'));
@@ -479,13 +491,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/groups", name="pimcore_admin_dataobject_classificationstore_groupsaction", methods={"POST", "PUT"})
+     * @Route("/groups", name="groupsaction", methods={"POST", "PUT"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function groupsAction(Request $request)
+    public function groupsAction(Request $request): JsonResponse
     {
         if ($request->get('data')) {
             $dataParam = $request->get('data');
@@ -510,13 +522,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/collection-relations", name="pimcore_admin_dataobject_classificationstore_collectionrelationsget", methods={"GET"})
+     * @Route("/collection-relations", name="collectionrelationsget", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function collectionRelationsGetAction(Request $request)
+    public function collectionRelationsGetAction(Request $request): JsonResponse
     {
         $mapping = ['groupName' => 'name', 'groupDescription' => 'description'];
 
@@ -564,8 +576,12 @@ class ClassificationstoreController extends AdminController implements KernelCon
             $filters = json_decode($filterString);
 
             $count = 0;
-
+            /** @var \stdClass $f */
             foreach ($filters as $f) {
+                if (!isset($f->value)) {
+                    continue;
+                }
+
                 if ($count > 0) {
                     $condition .= ' AND ';
                 }
@@ -607,13 +623,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/collection-relations", name="pimcore_admin_dataobject_classificationstore_collectionrelations", methods={"POST", "PUT"})
+     * @Route("/collection-relations", name="collectionrelations", methods={"POST", "PUT"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function collectionRelationsAction(Request $request)
+    public function collectionRelationsAction(Request $request): JsonResponse
     {
         if ($request->get('data')) {
             $dataParam = $request->get('data');
@@ -645,11 +661,11 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/list-stores", name="pimcore_admin_dataobject_classificationstore_liststores", methods={"GET"})
+     * @Route("/list-stores", name="liststores", methods={"GET"})
      *
      * @return JsonResponse
      */
-    public function listStoresAction()
+    public function listStoresAction(): JsonResponse
     {
         $storeConfigs = [];
         $storeConfigListing = new Classificationstore\StoreConfig\Listing();
@@ -663,13 +679,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/search-relations", name="pimcore_admin_dataobject_classificationstore_searchrelations", methods={"GET"})
+     * @Route("/search-relations", name="searchrelations", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function searchRelationsAction(Request $request)
+    public function searchRelationsAction(Request $request): JsonResponse
     {
         $db = Db::get();
 
@@ -678,7 +694,8 @@ class ClassificationstoreController extends AdminController implements KernelCon
         $mapping = [
             'groupName' => DataObject\Classificationstore\GroupConfig\Dao::TABLE_NAME_GROUPS .'.name',
             'keyName' => DataObject\Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS .'.name',
-            'keyDescription' => DataObject\Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS. '.description', ];
+            'keyDescription' => DataObject\Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS. '.description',
+        ];
 
         $start = 0;
         $limit = 15;
@@ -726,11 +743,12 @@ class ClassificationstoreController extends AdminController implements KernelCon
             $db = Db::get();
             $filterString = $request->get('filter');
             $filters = json_decode($filterString);
-
-            $count = 0;
-
+            /** @var \stdClass $f */
             foreach ($filters as $f) {
-                $count++;
+                if (!isset($f->value)) {
+                    continue;
+                }
+
                 $fieldname = $mapping[$f->property];
                 $conditionParts[] = $fieldname . ' LIKE ' . $db->quote('%' . $f->value . '%');
             }
@@ -747,14 +765,12 @@ class ClassificationstoreController extends AdminController implements KernelCon
         }
         $condition = implode(' AND ', $conditionParts);
         $list->setCondition($condition);
-        $list->setResolveGroupName(1);
-
-        $listItems = $list->load();
+        $list->setResolveGroupName(true);
 
         $rootElement = [];
 
         $data = [];
-        foreach ($listItems as $config) {
+        foreach ($list->getList() as $config) {
             $item = [
                 'keyId' => $config->getKeyId(),
                 'groupId' => $config->getGroupId(),
@@ -779,13 +795,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/relations", name="pimcore_admin_dataobject_classificationstore_relationsactionget", methods={"GET"})
+     * @Route("/relations", name="relationsactionget", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function relationsActionGet(Request $request)
+    public function relationsActionGet(Request $request): JsonResponse
     {
         $mapping = ['keyName' => 'name', 'keyDescription' => 'description'];
 
@@ -841,8 +857,12 @@ class ClassificationstoreController extends AdminController implements KernelCon
             $db = Db::get();
             $filterString = $request->get('filter');
             $filters = json_decode($filterString);
-
+            /** @var \stdClass $f */
             foreach ($filters as $f) {
+                if (!isset($f->value)) {
+                    continue;
+                }
+
                 $fieldname = $mapping[$f->field];
                 $conditionParts[] = $db->quoteIdentifier($fieldname) . ' LIKE ' . $db->quote('%' . $f->value . '%');
             }
@@ -901,13 +921,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/relations", name="pimcore_admin_dataobject_classificationstore_relations", methods={"POST", "PUT"})
+     * @Route("/relations", name="relations", methods={"POST", "PUT"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function relationsAction(Request $request)
+    public function relationsAction(Request $request): JsonResponse
     {
         if ($request->get('data')) {
             $dataParam = $request->get('data');
@@ -934,13 +954,15 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/add-collections", name="pimcore_admin_dataobject_classificationstore_addcollections", methods={"POST"})
+     * @Route("/add-collections", name="addcollections", methods={"POST"})
      *
      * @param Request $request
      *
      * @return JsonResponse
+     *
+     * @throws \Exception
      */
-    public function addCollectionsAction(Request $request)
+    public function addCollectionsAction(Request $request): JsonResponse
     {
         $this->checkPermission('objects');
 
@@ -966,8 +988,8 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
             $allowedGroupIds = null;
 
-            if ($request->get('oid')) {
-                $object = DataObject\Concrete::getById($request->get('oid'));
+            if ($oid = $request->get('oid')) {
+                $object = DataObject\Concrete::getById((int) $oid);
                 $class = $object->getClass();
                 /** @var DataObject\ClassDefinition\Data\Classificationstore $fd */
                 $fd = $class->getFieldDefinition($request->get('fieldname'));
@@ -1052,13 +1074,15 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/add-groups", name="pimcore_admin_dataobject_classificationstore_addgroups", methods={"POST"})
+     * @Route("/add-groups", name="addgroups", methods={"POST"})
      *
      * @param Request $request
      *
      * @return JsonResponse
+     *
+     * @throws \Exception
      */
-    public function addGroupsAction(Request $request)
+    public function addGroupsAction(Request $request): JsonResponse
     {
         $this->checkPermission('objects');
 
@@ -1137,13 +1161,15 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/properties", name="pimcore_admin_dataobject_classificationstore_propertiesget", methods={"GET"})
+     * @Route("/properties", name="propertiesget", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
+     *
+     * @throws \Exception
      */
-    public function propertiesGetAction(Request $request)
+    public function propertiesGetAction(Request $request): JsonResponse
     {
         $storeId = $request->get('storeId');
         $frameName = $request->get('frameName');
@@ -1226,14 +1252,18 @@ class ClassificationstoreController extends AdminController implements KernelCon
         }
 
         if ($storeId) {
-            $conditionParts[] = '(storeId = ' . $storeId . ')';
+            $conditionParts[] = '(storeId = '. $db->quote($storeId) . ')';
         }
 
         if ($request->get('filter')) {
             $filterString = $request->get('filter');
             $filters = json_decode($filterString);
-
+            /** @var \stdClass $f */
             foreach ($filters as $f) {
+                if (!isset($f->value)) {
+                    continue;
+                }
+
                 $conditionParts[] = $db->quoteIdentifier($f->property) . ' LIKE ' . $db->quote('%' . $f->value . '%');
             }
         }
@@ -1283,13 +1313,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/properties", name="pimcore_admin_dataobject_classificationstore_properties", methods={"POST", "PUT"})
+     * @Route("/properties", name="properties", methods={"POST", "PUT"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function propertiesAction(Request $request)
+    public function propertiesAction(Request $request): JsonResponse
     {
         if ($request->get('data')) {
             $dataParam = $request->get('data');
@@ -1321,7 +1351,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
      *
      * @return array
      */
-    protected function getConfigItem($config)
+    protected function getConfigItem($config): array
     {
         $name = $config->getName();
 
@@ -1354,13 +1384,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/add-property", name="pimcore_admin_dataobject_classificationstore_addproperty", methods={"POST"})
+     * @Route("/add-property", name="addproperty", methods={"POST"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function addPropertyAction(Request $request)
+    public function addPropertyAction(Request $request): JsonResponse
     {
         $name = $request->get('name');
         $storeId = $request->get('storeId');
@@ -1376,7 +1406,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
         $config->setTitle($name);
         $config->setType('input');
         $config->setStoreId($storeId);
-        $config->setEnabled(1);
+        $config->setEnabled(true);
         $config->setDefinition(json_encode($definition));
         $config->save();
 
@@ -1384,13 +1414,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/delete-property", name="pimcore_admin_dataobject_classificationstore_deleteproperty", methods={"DELETE"})
+     * @Route("/delete-property", name="deleteproperty", methods={"DELETE"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function deletePropertyAction(Request $request)
+    public function deletePropertyAction(Request $request): JsonResponse
     {
         $id = $request->get('id');
 
@@ -1403,7 +1433,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/edit-store", name="pimcore_admin_dataobject_classificationstore_editstore", methods={"PUT"})
+     * @Route("/edit-store", name="editstore", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -1411,7 +1441,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
      *
      * @throws \Exception
      */
-    public function editStoreAction(Request $request)
+    public function editStoreAction(Request $request): JsonResponse
     {
         $id = $request->get('id');
         $data = json_decode($request->get('data'), true);
@@ -1442,13 +1472,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/storetree", name="pimcore_admin_dataobject_classificationstore_storetree", methods={"GET"})
+     * @Route("/storetree", name="storetree", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function storetreeAction(Request $request)
+    public function storetreeAction(Request $request): JsonResponse
     {
         $result = [];
         $list = new Classificationstore\StoreConfig\Listing();
@@ -1456,11 +1486,11 @@ class ClassificationstoreController extends AdminController implements KernelCon
         foreach ($list as $item) {
             $resultItem = [
                 'id' => $item->getId(),
-                'text' => $item->getName(),
+                'text' => htmlspecialchars($item->getName(), ENT_QUOTES),
                 'expandable' => false,
                 'leaf' => true,
                 'expanded' => true,
-                'description' => $item->getDescription(),
+                'description' => htmlspecialchars($item->getDescription(), ENT_QUOTES),
                 'iconCls' => 'pimcore_icon_classificationstore',
             ];
 
@@ -1468,7 +1498,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
             if ($item->getDescription()) {
             }
-            $resultItem['qtip'] = $item->getDescription() ? $item->getDescription() : ' ';
+            $resultItem['qtip'] = $item->getDescription() ? htmlspecialchars($item->getDescription(), ENT_QUOTES) : ' ';
             $result[] = $resultItem;
         }
 
@@ -1476,13 +1506,13 @@ class ClassificationstoreController extends AdminController implements KernelCon
     }
 
     /**
-     * @Route("/get-page", name="pimcore_admin_dataobject_classificationstore_getpage", methods={"GET"})
+     * @Route("/get-page", name="getpage", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function getPageAction(Request $request)
+    public function getPageAction(Request $request): JsonResponse
     {
         $tableSuffix = $request->get('table');
         if (!in_arrayi($tableSuffix, ['keys', 'groups'])) {
@@ -1548,7 +1578,14 @@ class ClassificationstoreController extends AdminController implements KernelCon
             return;
         }
 
-        $unrestrictedActions = ['collectionsActionGet', 'groupsActionGet', 'relationsActionGet', 'addGroupsAction', 'addCollectionsAction', 'searchRelationsAction'];
+        $unrestrictedActions = [
+            'collectionsActionGet',
+            'groupsActionGet',
+            'relationsActionGet',
+            'addGroupsAction',
+            'addCollectionsAction',
+            'searchRelationsAction',
+        ];
         $this->checkActionPermission($event, 'classes', $unrestrictedActions);
     }
 }

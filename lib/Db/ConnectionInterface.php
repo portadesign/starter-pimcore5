@@ -24,6 +24,9 @@ use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Pimcore\Model\Element\ValidationException;
 
+/**
+ * @method \Doctrine\DBAL\Schema\AbstractSchemaManager getSchemaManager()
+ */
 interface ConnectionInterface extends Connection
 {
     /**
@@ -119,7 +122,7 @@ interface ConnectionInterface extends Connection
      * @param array|scalar $params
      * @param array $types
      *
-     * @return mixed
+     * @return array
      *
      * @throws DBALException
      * @throws DriverException

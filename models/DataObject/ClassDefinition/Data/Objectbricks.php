@@ -46,7 +46,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $maxItems;
 
@@ -58,7 +58,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
     public $border = false;
 
     /**
-     * @param string|int|null $maxItems
+     * @param int|null $maxItems
      *
      * @return $this
      */
@@ -70,7 +70,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getMaxItems()
     {
@@ -117,6 +117,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
                         'containerType' => 'objectbrick',
                         'containerKey' => $allowedBrickType,
                     ],
+                    'owner' => $data,
                     'fieldname' => $this->getName(),
                 ];
 
@@ -129,7 +130,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
 
     /**
      * @param string $getter
-     * @param Objectbrick\Data\AbstractData $data
+     * @param DataObject\Objectbrick $data
      * @param array|null $params
      * @param string $allowedBrickType
      * @param int $level
@@ -211,7 +212,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
      * @param string $getter
      * @param array|null $params
      *
-     * @return mixed
+     * @return \stdClass
      */
     private function getDataForField($item, $key, $fielddefinition, $level, $baseObject, $getter, $params)
     {
@@ -249,8 +250,8 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
             }
             $data = [];
 
-            if ($fielddefinition instanceof ManyToOneRelation && isset($relations[0])) {
-                $data = $relations[0];
+            if ($fielddefinition instanceof ManyToOneRelation) {
+                $data = $relations[0] ?? null;
             } else {
                 foreach ($relations as $rel) {
                     $data[] = ['id' => $rel['id'], 'fullpath' => $rel['path'],  'type' => $rel['type'], 'subtype' => $rel['subtype'], 'published' => ($rel['published'] ? true : false)];
@@ -261,12 +262,9 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
             $result->metaData['inherited'] = $level != 0;
         } else {
             $fieldValue = null;
-            $editmodeValue = null;
-            if (!empty($item)) {
-                $fieldValue = $item->$valueGetter();
+            $fieldValue = $item->$valueGetter();
+            $editmodeValue = $fielddefinition->getDataForEditmode($fieldValue, $baseObject, $params);
 
-                $editmodeValue = $fielddefinition->getDataForEditmode($fieldValue, $baseObject, $params);
-            }
             if ($fielddefinition->isEmpty($fieldValue) && !empty($parent)) {
                 $backup = DataObject::getGetInheritedValues();
                 DataObject::setGetInheritedValues(true);
@@ -619,13 +617,32 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
 
                     if (!$omitMandatoryCheck) {
                         foreach ($collectionDef->getFieldDefinitions() as $fd) {
+                            $key = $fd->getName();
+                            $getter = 'get' . ucfirst($key);
+
                             try {
-                                $key = $fd->getName();
-                                $getter = 'get' . ucfirst($key);
                                 $fd->checkValidity($item->$getter(), false, $params);
                             } catch (Model\Element\ValidationException $ve) {
-                                $ve->addContext($this->getName());
-                                $validationExceptions[] = $ve;
+                                if ($item->getObject()->getClass()->getAllowInherit() && $fd->supportsInheritance() && $fd->isEmpty($item->$getter())) {
+                                    //try again with parent data when inheritance is activated
+                                    try {
+                                        $getInheritedValues = DataObject::doGetInheritedValues();
+                                        DataObject::setGetInheritedValues(true);
+
+                                        $fd->checkValidity($item->$getter(), $omitMandatoryCheck, $params);
+
+                                        DataObject::setGetInheritedValues($getInheritedValues);
+                                    } catch (\Exception $e) {
+                                        if (!$e instanceof Model\Element\ValidationException) {
+                                            throw $e;
+                                        }
+                                        $e->addContext($this->getName());
+                                        $validationExceptions[] = $e;
+                                    }
+                                } else {
+                                    $ve->addContext($this->getName());
+                                    $validationExceptions[] = $ve;
+                                }
                             }
                         }
                     }
@@ -633,10 +650,14 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
             }
 
             if ($validationExceptions) {
-                $aggregatedExceptions = new Model\Element\ValidationException('invalid brick ' . $this->getName());
-                $aggregatedExceptions->setSubItems($validationExceptions);
+                $errors = [];
+                /** @var Model\Element\ValidationException $e */
+                foreach ($validationExceptions as $e) {
+                    $errors[] = $e->getAggregatedMessage();
+                }
+                $message = implode(' / ', $errors);
 
-                throw $aggregatedExceptions;
+                throw new Model\Element\ValidationException('invalid brick ' . $this->getName().': '.$message);
             }
         }
     }
@@ -662,7 +683,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
      * @param string $getter
      * @param array $params
      *
-     * @return mixed
+     * @return array|null
      */
     private function getDiffDataForField($item, $key, $fielddefinition, $level, $baseObject, $getter, $params = [])
     {
@@ -674,7 +695,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
     }
 
     /**
-     * @param Objectbrick\Data\AbstractData $data
+     * @param Objectbrick $data
      * @param string $getter
      * @param array $params
      * @param int $level

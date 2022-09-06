@@ -395,8 +395,10 @@ final class Tool
     {
         $request = self::resolveRequest($request);
 
-        if (null === $request) {
-            return null;
+        if (null === $request || !$request->getHost()) {
+            $domain = \Pimcore\Config::getSystemConfiguration('general')['domain'];
+
+            return $domain ?: null;
         }
 
         return $request->getHost();
@@ -444,7 +446,7 @@ final class Tool
         }
 
         // get it from System settings
-        if (!$hostname || $hostname == 'localhost') {
+        if (!$hostname || $hostname === 'localhost') {
             $systemConfig = Config::getSystemConfiguration('general');
             $hostname = $systemConfig['domain'] ?? null;
 
@@ -561,13 +563,17 @@ final class Tool
 
         if (is_array($paramsGet) && count($paramsGet) > 0) {
 
-            //need to insert get params from url to $paramsGet because otherwise the would be ignored
+            //need to insert get params from url to $paramsGet because otherwise they would be ignored
             $urlParts = parse_url($url);
-            $urlParams = [];
-            parse_str($urlParts['query'], $urlParams);
 
-            if ($urlParams) {
-                $paramsGet = array_merge($urlParams, $paramsGet);
+            if (isset($urlParts['query'])) {
+                $urlParams = [];
+
+                parse_str($urlParts['query'], $urlParams);
+
+                if ($urlParams) {
+                    $paramsGet = array_merge($urlParams, $paramsGet);
+                }
             }
 
             $options[RequestOptions::QUERY] = $paramsGet;

@@ -18,6 +18,7 @@ namespace Pimcore\Tool;
 use Pimcore\Config;
 use Pimcore\Logger;
 use Symfony\Component\Process\ExecutableFinder;
+use Symfony\Component\Process\PhpExecutableFinder;
 use Symfony\Component\Process\Process;
 
 final class Console
@@ -64,6 +65,10 @@ final class Console
     public static function getExecutable($name, $throwException = false)
     {
         if (isset(self::$executableCache[$name])) {
+            if (!self::$executableCache[$name] && $throwException) {
+                throw new \Exception("No '$name' executable found, please install the application or add it to the PATH (in system settings or to your PATH environment variable");
+            }
+
             return self::$executableCache[$name];
         }
 
@@ -98,7 +103,7 @@ final class Console
                 $paths = explode(PATH_SEPARATOR, $systemConfig['path_variable']);
             }
         } catch (\Exception $e) {
-            Logger::warning($e);
+            Logger::warning((string) $e);
         }
 
         array_push($paths, '');
@@ -178,7 +183,17 @@ final class Console
      */
     public static function getPhpCli()
     {
-        return self::getExecutable('php', true);
+        try {
+            return self::getExecutable('php', true);
+        } catch (\Exception $e) {
+            $phpFinder = new PhpExecutableFinder();
+            $phpPath = $phpFinder->find(true);
+            if (!$phpPath) {
+                throw $e;
+            }
+
+            return $phpPath;
+        }
     }
 
     /**
@@ -216,7 +231,7 @@ final class Console
      * @param string $script
      * @param array $arguments
      * @param string|null $outputFile
-     * @param int|null $timeout
+     * @param float|null $timeout
      *
      * @return string
      */
@@ -371,7 +386,7 @@ final class Console
             if (is_string($cmd)) {
                 $cmd = $nice . ' -n 19 ' . $cmd;
             } elseif (is_array($cmd)) {
-                array_unshift($cmd, $nice, '-n 19');
+                array_unshift($cmd, $nice, '-n', '19');
             }
         }
     }

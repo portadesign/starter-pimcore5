@@ -15,7 +15,8 @@
 
 namespace Pimcore\Model\DataObject\Fieldcollection;
 
-use Pimcore\File;
+use Pimcore\DataObject\ClassBuilder\FieldDefinitionDocBlockBuilderInterface;
+use Pimcore\DataObject\ClassBuilder\PHPFieldCollectionClassDumperInterface;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data\FieldDefinitionEnrichmentInterface;
@@ -173,17 +174,13 @@ class Definition extends Model\AbstractModel
      * @param bool $generateDefinitionFile
      *
      * @throws \Exception
+     * @throws DataObject\Exception\DefinitionWriteException
      */
     protected function generateClassFiles($generateDefinitionFile = true)
     {
-        $existingDefinition = Definition::getByKey($this->getKey());
-        $isUpdate = $existingDefinition != null;
-
-        if ($isUpdate && !$this->isWritable()) {
-            throw new \Exception('fieldcollection updates in config folder not allowed');
+        if ($generateDefinitionFile && !$this->isWritable()) {
+            throw new DataObject\Exception\DefinitionWriteException();
         }
-
-        $infoDocBlock = $this->getInfoDocBlock();
 
         $definitionFile = $this->getDefinitionFile();
 
@@ -198,70 +195,15 @@ class Definition extends Model\AbstractModel
 
             $data = '<?php';
             $data .= "\n\n";
-            $data .= $infoDocBlock;
+            $data .=  $this->getInfoDocBlock();
             $data .= "\n\n";
 
-            $data .= "\nreturn " . $exportedClass . ";\n";
+            $data .= 'return ' . $exportedClass . ";\n";
 
             \Pimcore\File::put($definitionFile, $data);
         }
 
-        $extendClass = 'DataObject\\Fieldcollection\\Data\\AbstractData';
-        if ($this->getParentClass()) {
-            $extendClass = $this->getParentClass();
-            $extendClass = '\\' . ltrim($extendClass, '\\');
-        }
-
-        // create class file
-        $cd = '<?php';
-        $cd .= "\n\n";
-        $cd .= $infoDocBlock;
-        $cd .= "\n\n";
-        $cd .= 'namespace Pimcore\\Model\\DataObject\\Fieldcollection\\Data;';
-        $cd .= "\n\n";
-        $cd .= 'use Pimcore\\Model\\DataObject;';
-        $cd .= "\n";
-        $cd .= 'use Pimcore\Model\DataObject\PreGetValueHookInterface;';
-        $cd .= "\n\n";
-
-        $implementsParts = [];
-
-        $implements = DataObject\ClassDefinition\Service::buildImplementsInterfacesCode($implementsParts, $this->getImplementsInterfaces());
-
-        $cd .= 'class ' . ucfirst($this->getKey()) . ' extends ' . $extendClass . $implements . "\n";
-        $cd .= '{' . "\n";
-
-        $cd .= 'protected $type = "' . $this->getKey() . "\";\n";
-
-        if (is_array($this->getFieldDefinitions()) && count($this->getFieldDefinitions())) {
-            foreach ($this->getFieldDefinitions() as $key => $def) {
-                $cd .= 'protected $' . $key . ";\n";
-            }
-        }
-
-        $cd .= "\n\n";
-
-        $fdDefs = $this->getFieldDefinitions();
-        if (is_array($fdDefs) && count($fdDefs)) {
-            foreach ($fdDefs as $key => $def) {
-                $cd .= $def->getGetterCodeFieldcollection($this);
-
-                if ($def instanceof DataObject\ClassDefinition\Data\Localizedfields) {
-                    $cd .= $def->getGetterCode($this);
-                }
-
-                $cd .= $def->getSetterCodeFieldcollection($this);
-
-                if ($def instanceof DataObject\ClassDefinition\Data\Localizedfields) {
-                    $cd .= $def->getSetterCode($this);
-                }
-            }
-        }
-
-        $cd .= "}\n";
-        $cd .= "\n";
-
-        File::put($this->getPhpClassFile(), $cd);
+        \Pimcore::getContainer()->get(PHPFieldCollectionClassDumperInterface::class)->dumpPHPClass($this);
 
         $fieldDefinitions = $this->getFieldDefinitions();
         foreach ($fieldDefinitions as $fd) {
@@ -301,7 +243,7 @@ class Definition extends Model\AbstractModel
      */
     public function isWritable(): bool
     {
-        if (getenv('PIMCORE_CLASS_DEFINITION_WRITABLE')) {
+        if ($_SERVER['PIMCORE_CLASS_DEFINITION_WRITABLE'] ?? false) {
             return true;
         }
 
@@ -317,15 +259,16 @@ class Definition extends Model\AbstractModel
      */
     public function getDefinitionFile($key = null)
     {
-        return $this->locateFile($key ?? $this->getKey(), 'fieldcollections/%s.php');
+        return $this->locateDefinitionFile($key ?? $this->getKey(), 'fieldcollections/%s.php');
     }
 
     /**
      * @internal
+     * @internal
      *
      * @return string
      */
-    protected function getPhpClassFile()
+    public function getPhpClassFile()
     {
         return $this->locateFile(ucfirst($this->getKey()), 'DataObject/Fieldcollection/Data/%s.php');
     }
@@ -335,38 +278,18 @@ class Definition extends Model\AbstractModel
      *
      * @return string
      */
-    protected function getInfoDocBlock()
+    protected function getInfoDocBlock(): string
     {
         $cd = '/**' . "\n";
-        $cd .= "Fields Summary:\n";
+        $cd .= " * Fields Summary:\n";
 
-        $cd = $this->getInfoDocBlockForFields($this, $cd, 1);
-
-        $cd .= '*/';
-
-        return $cd;
-    }
-
-    /**
-     * @internal
-     *
-     * @param Definition|DataObject\ClassDefinition\Data $definition
-     * @param string $text
-     * @param int $level
-     *
-     * @return string
-     */
-    protected function getInfoDocBlockForFields($definition, $text, $level)
-    {
-        if (is_array($definition->getFieldDefinitions())) {
-            foreach ($definition->getFieldDefinitions() as $fd) {
-                $text .= str_pad('', $level, '-') . ' ' . $fd->getName() . ' [' . $fd->getFieldtype() . "]\n";
-                if (method_exists($fd, 'getFieldDefinitions')) {
-                    $text = $this->getInfoDocBlockForFields($fd, $text, $level + 1);
-                }
-            }
+        $fieldDefinitionDocBlockBuilder = \Pimcore::getContainer()->get(FieldDefinitionDocBlockBuilderInterface::class);
+        foreach ($this->getFieldDefinitions() as $fieldDefinition) {
+            $cd .= ' * ' . str_replace("\n", "\n * ", trim($fieldDefinitionDocBlockBuilder->buildFieldDefinitionDocBlock($fieldDefinition))) . "\n";
         }
 
-        return $text;
+        $cd .= ' */';
+
+        return $cd;
     }
 }

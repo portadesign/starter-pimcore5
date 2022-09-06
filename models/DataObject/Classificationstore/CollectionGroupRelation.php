@@ -16,6 +16,7 @@
 namespace Pimcore\Model\DataObject\Classificationstore;
 
 use Pimcore\Model;
+use Pimcore\Model\Exception\NotFoundException;
 
 /**
  * @method \Pimcore\Model\DataObject\Classificationstore\CollectionGroupRelation\Dao getDao()
@@ -54,10 +55,7 @@ final class CollectionGroupRelation extends Model\AbstractModel
      */
     public static function create()
     {
-        $config = new self();
-        $config->save();
-
-        return $config;
+        return new self();
     }
 
     /**
@@ -73,7 +71,7 @@ final class CollectionGroupRelation extends Model\AbstractModel
             $config->getDao()->getById((int)$colId, (int)$groupId);
 
             return $config;
-        } catch (\Exception $e) {
+        } catch (NotFoundException) {
             return null;
         }
     }

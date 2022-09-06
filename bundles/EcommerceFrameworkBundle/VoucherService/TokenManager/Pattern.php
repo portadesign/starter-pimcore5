@@ -86,7 +86,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
      *
      * @throws VoucherServiceException
      *
-     * @return bool|int
+     * @return bool
      */
     public function checkToken($code, CartInterface $cart)
     {
@@ -113,7 +113,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
      */
     public function reserveToken($code, CartInterface $cart)
     {
-        if ($token = Token::getByCode($code)) {
+        if (Token::getByCode($code)) {
             if (Reservation::create($code, $cart)) {
                 return true;
             }
@@ -147,7 +147,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
                 $orderToken->setVoucherSeries($series);
                 $orderToken->setParent($series);
                 $orderToken->setKey(File::getValidFilename($token->getToken()));
-                $orderToken->setPublished(1);
+                $orderToken->setPublished(true);
                 $orderToken->save();
 
                 return $orderToken;
@@ -243,8 +243,6 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
                 foreach ($codeSets as $query) {
                     $db->query($this->buildInsertQuery($query));
                 }
-            } else {
-                $db->query($this->buildInsertQuery($codeSets));
             }
 
             return $codeSets;
@@ -392,24 +390,21 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
      */
     protected function buildInsertQuery($insertTokens)
     {
-        $query = 'INSERT INTO ' . Token\Dao::TABLE_NAME . '(token,length,voucherSeriesId) ';
         $finalLength = $this->getFinalTokenLength();
         $insertParts = [];
 
-        if (count($insertTokens) > 0) {
-            foreach ($insertTokens as $token) {
-                $insertParts[] =
-                    "('" .
-                    $token .
-                    "'," .
-                    $finalLength .
-                    ',' .
-                    $this->seriesId .
-                    ')';
-            }
+        foreach ($insertTokens as $token) {
+            $insertParts[] =
+                "('" .
+                $token .
+                "'," .
+                $finalLength .
+                ',' .
+                $this->seriesId .
+                ')';
         }
 
-        return $query . 'VALUES ' . implode(',', $insertParts);
+        return 'INSERT INTO ' . Token\Dao::TABLE_NAME . '(token,length,voucherSeriesId) VALUES ' . implode(',', $insertParts);
     }
 
     /**
@@ -429,7 +424,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
             // Check if a max_packet_size Error is possible
             $possibleMaxQuerySizeError = ($finalTokenLength * $this->configuration->getCount() / 1024 / 1024) > 15;
             // Return Query
-            $resultTokenSet = false;
+            $resultTokenSet = [];
             // Tokens of one Insert Query
             $insertTokens = [];
             // Tokens of all Insert Queries together
@@ -553,8 +548,8 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
         $viewParamsBag['paginator'] = $paginator;
         $viewParamsBag['count'] = count($tokens);
 
-        $viewParamsBag['msg']['error'] = $params['error'] ?? '';
-        $viewParamsBag['msg']['success'] = $params['success'] ?? '';
+        $viewParamsBag['msg']['error'] = $params['error'] ?? null;
+        $viewParamsBag['msg']['success'] = $params['success'] ?? null;
 
         // Settings parsed via foreach in view -> key is translation
         $viewParamsBag['settings'] = [
@@ -696,7 +691,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
     }
 
     /**
-     * @param mixed $seriesId
+     * @param string|int|null $seriesId
      */
     public function setSeriesId($seriesId)
     {
@@ -704,7 +699,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
     }
 
     /**
-     * @return mixed
+     * @return string|int|null
      */
     public function getSeriesId()
     {

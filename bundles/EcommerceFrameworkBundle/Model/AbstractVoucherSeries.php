@@ -21,7 +21,7 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\TokenManager\TokenMan
 abstract class AbstractVoucherSeries extends \Pimcore\Model\DataObject\Concrete
 {
     /**
-     * @return \Pimcore\Model\DataObject\Fieldcollection
+     * @return \Pimcore\Model\DataObject\Fieldcollection|null
      */
     abstract public function getTokenSettings();
 
@@ -32,8 +32,9 @@ abstract class AbstractVoucherSeries extends \Pimcore\Model\DataObject\Concrete
     {
         $items = $this->getTokenSettings();
 
-        if ($items->get(0)) {
+        if ($items && $items->get(0)) {
             // name of fieldcollection class
+            /** @var AbstractVoucherTokenType $configuration */
             $configuration = $items->get(0);
 
             return Factory::getInstance()->getTokenManager($configuration);

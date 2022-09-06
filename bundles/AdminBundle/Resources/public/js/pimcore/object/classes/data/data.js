@@ -17,11 +17,11 @@ pimcore.object.classes.data.data = Class.create({
     invalidFieldNames: false,
     forbiddenNames: [
         "id", "key", "path", "type", "index", "classname", "creationdate", "userowner", "value", "class", "list",
-        "fullpath", "childs", "values", "cachetag", "cachetags", "parent", "published", "valuefromparent",
+        "fullpath", "childs", "children", "values", "cachetag", "cachetags", "parent", "published", "valuefromparent",
         "userpermissions", "dependencies", "modificationdate", "usermodification", "byid", "bypath", "data",
         "versions", "properties", "permissions", "permissionsforuser", "childamount", "apipluginbroker", "resource",
         "parentClass", "definition", "locked", "language", "omitmandatorycheck", "idpath", "object", "fieldname",
-        "property", "localizedfields", "parentid", "children", "scheduledtasks"
+        "property", "localizedfields", "parentid", "children", "scheduledtasks", "latestVersion"
     ],
 
     /**
@@ -114,7 +114,12 @@ pimcore.object.classes.data.data = Class.create({
                         // autofill title field if untouched and empty
                         var title = el.ownerCt.getComponent("title");
                         if (title["_autooverwrite"] === true) {
-                            el.ownerCt.getComponent("title").setValue(el.getValue());
+                            let fixedTitle = '';
+                            for (let i = 0; i < el.getValue().length; i++) {
+                                let currentChar = el.getValue()[i];
+                                fixedTitle += i === 0 ? currentChar.toUpperCase() : (currentChar === currentChar.toUpperCase() && (currentChar.charCodeAt(0) < 48 ||  currentChar.charCodeAt(0) > 57)) ? ' ' + currentChar : currentChar;
+                            }
+                            el.ownerCt.getComponent("title").setValue(fixedTitle);
                         }
                     }
                 }

@@ -24,12 +24,15 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * @property Document|Document\PageSnippet $document
+ * @property Document\PageSnippet $document
  * @property bool $editmode
  */
 abstract class FrontendController extends Controller
 {
-    public static function getSubscribedServices()
+    /**
+     * @return string[]
+     */
+    public static function getSubscribedServices()// : array
     {
         $services = parent::getSubscribedServices();
         $services[EditmodeResolver::class] = '?'.EditmodeResolver::class;

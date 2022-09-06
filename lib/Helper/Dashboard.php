@@ -83,10 +83,18 @@ final class Dashboard
                 }
             }
 
+            $perspectiveCfg = \Pimcore\Perspective\Config::getRuntimePerspective();
+            $dashboardCfg = $perspectiveCfg['dashboards'] ?? [];
+            $dashboardsPerspective = $dashboardCfg['predefined'] ?? [];
+
             if (empty($this->dashboards)) {
-                $perspectiveCfg = \Pimcore\Perspective\Config::getRuntimePerspective();
-                $dasboardCfg = $perspectiveCfg['dashboards'] ?? [];
-                $this->dashboards = $dasboardCfg['predefined'] ?? [];
+                $this->dashboards = $dashboardsPerspective;
+            } else {
+                foreach ($dashboardsPerspective as $key => $dashboard) {
+                    if (!isset($this->dashboards[$key])) {
+                        $this->dashboards[$key] = $dashboard;
+                    }
+                }
             }
         }
 
@@ -163,8 +171,8 @@ final class Dashboard
     public function getDisabledPortlets()
     {
         $perspectiveCfg = \Pimcore\Perspective\Config::getRuntimePerspective($this->user);
-        $dasboardCfg = $perspectiveCfg['dashboards'] ?? [];
+        $dashboardCfg = $perspectiveCfg['dashboards'] ?? [];
 
-        return $dasboardCfg['disabledPortlets'] ?? [];
+        return $dashboardCfg['disabledPortlets'] ?? [];
     }
 }

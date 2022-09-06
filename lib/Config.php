@@ -45,8 +45,7 @@ final class Config implements \ArrayAccess
      *
      * @return bool
      */
-    #[\ReturnTypeWillChange]
-    public function offsetExists($offset)
+    public function offsetExists($offset): bool
     {
         return self::getSystemConfiguration($offset) !== null;
     }
@@ -57,8 +56,7 @@ final class Config implements \ArrayAccess
      *
      * @throws \Exception
      */
-    #[\ReturnTypeWillChange]
-    public function offsetSet($offset, $value)
+    public function offsetSet($offset, $value): void
     {
         throw new \Exception("modifying the config isn't allowed");
     }
@@ -68,8 +66,7 @@ final class Config implements \ArrayAccess
      *
      * @throws \Exception
      */
-    #[\ReturnTypeWillChange]
-    public function offsetUnset($offset)
+    public function offsetUnset($offset): void
     {
         throw new \Exception("modifying the config isn't allowed");
     }
@@ -79,8 +76,7 @@ final class Config implements \ArrayAccess
      *
      * @return array|null
      */
-    #[\ReturnTypeWillChange]
-    public function offsetGet($offset)
+    public function offsetGet($offset): ?array
     {
         return self::getSystemConfiguration($offset);
     }
@@ -198,7 +194,7 @@ final class Config implements \ArrayAccess
     /**
      * @static
      *
-     * @return mixed|\Pimcore\Config\Config
+     * @return \Pimcore\Config\Config
      */
     public static function getWebsiteConfig($language = null)
     {
@@ -241,7 +237,7 @@ final class Config implements \ArrayAccess
                 foreach ($list as $item) {
                     $itemSiteId = $item->getSiteId();
 
-                    if ($itemSiteId !== 0 && $itemSiteId !== $siteId) {
+                    if ($itemSiteId && $itemSiteId !== $siteId) {
                         continue;
                     }
 
@@ -279,7 +275,8 @@ final class Config implements \ArrayAccess
                     }
 
                     if ($s instanceof Model\Element\ElementInterface) {
-                        $cacheTags = $s->getCacheTags($cacheTags);
+                        $elementCacheKey = $s->getCacheTag();
+                        $cacheTags[$elementCacheKey] = $elementCacheKey;
                     }
 
                     if (isset($s)) {
@@ -337,22 +334,6 @@ final class Config implements \ArrayAccess
         }
 
         return $config;
-    }
-
-    private static function getArrayValue($keys, $array)
-    {
-        $len = count($keys);
-        $pointer = $array;
-        for ($i = 0; $i < $len; $i++) {
-            $key = $keys[$i];
-            if (array_key_exists($key, $pointer)) {
-                $pointer = $pointer[$key];
-            } else {
-                return null;
-            }
-        }
-
-        return $pointer;
     }
 
     /**

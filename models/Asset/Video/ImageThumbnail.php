@@ -25,6 +25,9 @@ use Pimcore\Tool\Storage;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\Lock\LockFactory;
 
+/**
+ * @property Model\Asset\Video|null $asset
+ */
 final class ImageThumbnail
 {
     use Model\Asset\Thumbnail\ImageThumbnailTrait;
@@ -32,7 +35,7 @@ final class ImageThumbnail
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     protected $timeOffset;
 
@@ -44,7 +47,7 @@ final class ImageThumbnail
     protected $imageAsset;
 
     /**
-     * @param Model\Asset\Video $asset
+     * @param Model\Asset\Video|null $asset
      * @param string|array|Image\Thumbnail\Config|null $config
      * @param int|null $timeOffset
      * @param Image|null $imageAsset
@@ -110,18 +113,20 @@ final class ImageThumbnail
 
             if (empty($this->pathReference)) {
                 $timeOffset = $this->timeOffset;
-                if (!$this->timeOffset && $cs) {
+                if (!is_numeric($timeOffset) && is_numeric($cs)) {
                     $timeOffset = $cs;
                 }
 
                 // fallback
-                if (!$timeOffset && $this->asset instanceof Model\Asset\Video) {
+                if (!is_numeric($timeOffset) && $this->asset instanceof Model\Asset\Video) {
                     $timeOffset = ceil($this->asset->getDuration() / 3);
                 }
 
                 $storage = Storage::get('asset_cache');
-                $cacheFilePath = sprintf('%s/image-thumb__%s__video_original_image/time_%s.png',
+                $cacheFilePath = sprintf(
+                    '%s/%s/image-thumb__%s__video_original_image/time_%s.png',
                     rtrim($this->asset->getRealPath(), '/'),
+                    $this->asset->getId(),
                     $this->asset->getId(),
                     $timeOffset
                 );
@@ -159,7 +164,7 @@ final class ImageThumbnail
                         );
                     } catch (\Exception $e) {
                         Logger::error("Couldn't create image-thumbnail of video " . $this->asset->getRealFullPath());
-                        Logger::error($e);
+                        Logger::error($e->getMessage());
                     }
                 }
             }

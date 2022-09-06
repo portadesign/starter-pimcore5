@@ -29,7 +29,7 @@ class Country extends AbstractVariableCondition implements DataProviderDependent
     private $country;
 
     /**
-     * @param string $country
+     * @param string|null $country
      */
     public function __construct(string $country = null)
     {
@@ -67,7 +67,7 @@ class Country extends AbstractVariableCondition implements DataProviderDependent
     {
         $city = $visitorInfo->get(GeoIp::PROVIDER_KEY);
 
-        if (!$city) {
+        if (!$city || ! isset($city['country'])) {
             return false;
         }
 

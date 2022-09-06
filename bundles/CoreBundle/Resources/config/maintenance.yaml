@@ -8,7 +8,7 @@ services:
             - 'maintenance.pid'
             - '@logger'
             - '@Symfony\Component\Lock\LockFactory'
-            - '@Symfony\Component\Messenger\MessageBusInterface'
+            - '@messenger.bus.pimcore-core'
 
     Pimcore\Maintenance\Tasks\ScheduledTasksTask:
         arguments:
@@ -107,3 +107,7 @@ services:
             - '@logger'
         tags:
             - { name: pimcore.maintenance.task, type: documents_static_page_generate }
+
+    Pimcore\Maintenance\Tasks\FullTextIndexOptimizeTask:
+        tags:
+            - { name: pimcore.maintenance.task, type: optimize_fulltext_indexes }

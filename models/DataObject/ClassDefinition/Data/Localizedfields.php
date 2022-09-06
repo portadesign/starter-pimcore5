@@ -24,7 +24,7 @@ use Pimcore\Model\Element;
 use Pimcore\Normalizer\NormalizerInterface;
 use Pimcore\Tool;
 
-class Localizedfields extends Data implements CustomResourcePersistingInterface, TypeDeclarationSupportInterface, NormalizerInterface, DataContainerAwareInterface, IdRewriterInterface, PreGetDataInterface
+class Localizedfields extends Data implements CustomResourcePersistingInterface, TypeDeclarationSupportInterface, NormalizerInterface, DataContainerAwareInterface, IdRewriterInterface, PreGetDataInterface, VarExporterInterface
 {
     use Element\ChildsCompatibilityTrait;
     use Layout\Traits\LabelTrait;
@@ -44,7 +44,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      *
      * @var array
      */
-    public $childs = [];
+    public $children = [];
 
     /**
      * @internal
@@ -112,7 +112,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     public $tabPosition = 'top';
 
@@ -437,7 +437,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function getChildren()
     {
-        return $this->childs;
+        return $this->children;
     }
 
     /**
@@ -447,7 +447,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function setChildren($children)
     {
-        $this->childs = $children;
+        $this->children = $children;
         $this->fieldDefinitionsCache = null;
 
         return $this;
@@ -458,7 +458,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function hasChildren()
     {
-        return is_array($this->childs) && count($this->childs) > 0;
+        return is_array($this->children) && count($this->children) > 0;
     }
 
     /**
@@ -466,7 +466,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function addChild($child)
     {
-        $this->childs[] = $child;
+        $this->children[] = $child;
         $this->fieldDefinitionsCache = null;
     }
 
@@ -1001,10 +1001,14 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         }
 
         if (count($validationExceptions) > 0) {
-            $aggregatedExceptions = new Model\Element\ValidationException();
-            $aggregatedExceptions->setSubItems($validationExceptions);
+            $errors = [];
+            /** @var Element\ValidationException $e */
+            foreach ($validationExceptions as $e) {
+                $errors[] = $e->getAggregatedMessage();
+            }
+            $message = implode(' / ', $errors);
 
-            throw $aggregatedExceptions;
+            throw new Model\Element\ValidationException($message);
         }
     }
 
@@ -1089,7 +1093,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return mixed
+     * @return DataObject\Localizedfield
      */
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
@@ -1147,16 +1151,25 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
     /**
      * @return array
      */
-    public function __sleep()
+    public function getBlockedVarsForExport(): array
     {
-        $vars = get_object_vars($this);
-        $blockedVars = [
+        return [
             'fieldDefinitionsCache',
             'referencedFields',
             'blockedVarsForExport',
             'permissionView',
             'permissionEdit',
+            'childs',
         ];
+    }
+
+    /**
+     * @return array
+     */
+    public function __sleep()
+    {
+        $vars = get_object_vars($this);
+        $blockedVars = $this->getBlockedVarsForExport();
 
         foreach ($blockedVars as $blockedVar) {
             unset($vars[$blockedVar]);
@@ -1314,11 +1327,11 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function getTabPosition(): string
     {
-        return $this->tabPosition;
+        return $this->tabPosition ?? 'top';
     }
 
     /**
-     * @param string $tabPosition
+     * @param string|null $tabPosition
      */
     public function setTabPosition($tabPosition): void
     {
@@ -1430,5 +1443,15 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         }
 
         return null;
+    }
+
+    public static function __set_state($data)
+    {
+        $obj = new static();
+        $obj->setValues($data);
+
+        $obj->childs = $obj->children;  // @phpstan-ignore-line
+
+        return $obj;
     }
 }

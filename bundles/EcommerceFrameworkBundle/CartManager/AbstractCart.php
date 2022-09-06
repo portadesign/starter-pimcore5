@@ -30,11 +30,6 @@ use Pimcore\Model\DataObject\Concrete;
 abstract class AbstractCart extends AbstractModel implements CartInterface
 {
     /**
-     * @var bool
-     */
-    private $ignoreReadonly = false;
-
-    /**
      * @var int
      */
     protected $userId;
@@ -75,7 +70,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
     protected $modificationDateTimestamp;
 
     /**
-     * @var mixed
+     * @var string|int|null
      */
     protected $id;
 
@@ -143,7 +138,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
      * @param AbstractSetProductEntry[] $subProducts
      * @param string|null $comment
      *
-     * @return mixed
+     * @return string
      */
     public function addItem(CheckoutableInterface $product, $count, $itemKey = null, $replace = false, $params = [], $subProducts = [], $comment = null)
     {
@@ -300,7 +295,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
         if (!empty($subProducts)) {
             $subItems = [];
             foreach ($subProducts as $subProduct) {
-                if ($subItems[$subProduct->getProduct()->getId()]) {
+                if (isset($subItems[$subProduct->getProduct()->getId()])) {
                     $subItem = $subItems[$subProduct->getProduct()->getId()];
                     $subItem->setCount($subItem->getCount() + $subProduct->getQuantity());
                 } else {
@@ -578,7 +573,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
     }
 
     /**
-     * @param int $id
+     * @param string|int $id
      */
     public function setId($id)
     {
@@ -586,7 +581,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
     }
 
     /**
-     * @return int
+     * @return string|int|null
      */
     public function getId()
     {
@@ -607,7 +602,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
     }
 
     /**
-     * @param \DateTime $creationDate
+     * @param \DateTime|null $creationDate
      */
     public function setCreationDate(\DateTime $creationDate = null)
     {
@@ -637,7 +632,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
     }
 
     /**
-     * @return \DateTime
+     * @return \DateTime|null
      */
     public function getModificationDate()
     {
@@ -650,7 +645,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
     }
 
     /**
-     * @param \DateTime $modificationDate
+     * @param \DateTime|null $modificationDate
      */
     public function setModificationDate(\DateTime $modificationDate = null)
     {
@@ -672,7 +667,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
     }
 
     /**
-     * @return mixed
+     * @return int|null
      */
     public function getModificationDateTimestamp()
     {
@@ -935,7 +930,7 @@ abstract class AbstractCart extends AbstractModel implements CartInterface
             //check for each voucher token if reservation is valid or it is already applied to order
             foreach ($this->getVoucherTokenCodes() as $code) {
                 $reservation = Reservation::get($code, $this);
-                if (!$reservation->check($this->getId()) && !array_key_exists($code, $appliedVoucherCodes)) {
+                if (!$reservation && !array_key_exists($code, $appliedVoucherCodes)) {
                     unset($this->checkoutData['voucher_'.$code]);
                 }
             }

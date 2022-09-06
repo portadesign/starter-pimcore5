@@ -39,7 +39,10 @@ class Document extends Model\Asset
         }
 
         parent::update($params);
-        $this->clearThumbnails();
+
+        if ($params['isUpdate']) {
+            $this->clearThumbnails();
+        }
     }
 
     /**
@@ -64,7 +67,7 @@ class Document extends Model\Asset
             $pageCount = $converter->getPageCount();
             $this->setCustomSetting('document_page_count', $pageCount);
         } catch (\Exception $e) {
-            Logger::error($e);
+            Logger::error((string) $e);
             $this->setCustomSetting('document_page_count', 'failed');
         }
     }

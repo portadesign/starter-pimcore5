@@ -217,7 +217,7 @@ abstract class AbstractModel implements ModelInterface
      */
     public function __sleep()
     {
-        $blockedVars = ['dao', 'o_dirtyFields'];
+        $blockedVars = ['dao', 'o_dirtyFields', 'activeDispatchingEvents'];
 
         $vars = get_object_vars($this);
 
@@ -247,7 +247,7 @@ abstract class AbstractModel implements ModelInterface
 
                 return $r;
             } catch (\Exception $e) {
-                Logger::emergency($e);
+                Logger::emergency((string) $e);
 
                 throw $e;
             }

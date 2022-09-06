@@ -19,6 +19,9 @@ pimcore.document.settings_abstract = Class.create({
     },
 
     setDocumentType: function (field, newValue, oldValue) {
+        if (!newValue.data.id) {
+            return;
+        }
         var allowedFields = ["controller", "template"];
         var form = this.getLayout().getForm();
         var element = null;
@@ -26,9 +29,7 @@ pimcore.document.settings_abstract = Class.create({
         for (var i = 0; i < allowedFields.length; i++) {
             element = form.findField(allowedFields[i]);
             if (element) {
-                if (newValue.data.id > 0) {
-                    element.setValue(newValue.data[allowedFields[i]]);
-                }
+                element.setValue(newValue.data[allowedFields[i]]);
             }
         }
     },
@@ -139,6 +140,7 @@ pimcore.document.settings_abstract = Class.create({
                                                     "contentMasterDocumentPath_" + this.document.id).getValue()
                                             },
                                             success:function () {
+                                                this.document.resetChanges();
                                                 this.document.reload();
                                             }.bind(this)
                                         });

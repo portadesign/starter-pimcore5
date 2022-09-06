@@ -36,7 +36,7 @@ class HeadlessChrome extends Processor
     protected function buildPdf(Document\PrintAbstract $document, $config)
     {
         $web2printConfig = Config::getWeb2PrintConfig();
-        $web2printConfig = $web2printConfig['headlessChromeSettings'];
+        $web2printConfig = $web2printConfig->get('headlessChromeSettings');
         $web2printConfig = json_decode($web2printConfig, true);
 
         $params = ['document' => $document];
@@ -61,7 +61,7 @@ class HeadlessChrome extends Processor
             $pdf = $this->getPdfFromString($html, $web2printConfig);
             $this->updateStatus($document->getId(), 100, 'saving_pdf_document');
         } catch (\Exception $e) {
-            Logger::error($e);
+            Logger::error((string) $e);
             $document->setLastGenerateMessage($e->getMessage());
 
             throw new \Exception('Error during PDF-Generation:' . $e->getMessage());
@@ -91,7 +91,6 @@ class HeadlessChrome extends Processor
     public function getPdfFromString($html, $params = [], $returnFilePath = false)
     {
         $params = $params ?: $this->getDefaultOptions();
-        $path = PIMCORE_SYSTEM_TEMP_DIRECTORY . DIRECTORY_SEPARATOR . uniqid('web2print_') . '.pdf';
         $input = new StringInput();
         $input->setHtml($html);
 
@@ -105,6 +104,7 @@ class HeadlessChrome extends Processor
         $output = $converter->convert();
 
         if ($returnFilePath) {
+            $path = PIMCORE_SYSTEM_TEMP_DIRECTORY . DIRECTORY_SEPARATOR . uniqid('web2print_') . '.pdf';
             /** @var FileOutput $output */
             $output->store($path);
 

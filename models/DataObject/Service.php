@@ -32,6 +32,7 @@ use Pimcore\Model\DataObject\ClassDefinition\Data\IdRewriterInterface;
 use Pimcore\Model\DataObject\ClassDefinition\Data\LayoutDefinitionEnrichmentInterface;
 use Pimcore\Model\Element;
 use Pimcore\Model\Element\DirtyIndicatorInterface;
+use Pimcore\Tool;
 use Pimcore\Tool\Admin as AdminTool;
 use Pimcore\Tool\Session;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
@@ -111,11 +112,8 @@ class Service extends Model\Element\Service
             $objects = $list->load();
             $userObjects[] = $objects;
         }
-        if ($userObjects) {
-            $userObjects = \array_merge(...$userObjects);
-        }
 
-        return $userObjects;
+        return \array_merge(...$userObjects);
     }
 
     /**
@@ -138,28 +136,14 @@ class Service extends Model\Element\Service
         //load all in case of lazy loading fields
         self::loadAllObjectFields($source);
 
-        /** @var Concrete $new */
-        $new = Element\Service::cloneMe($source);
-        $new->setId(null);
-        $new->setChildren(null);
-        $new->setKey(Element\Service::getSafeCopyName($new->getKey(), $target));
-        $new->setParentId($target->getId());
-        $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
-        $new->setUserModification($this->_user ? $this->_user->getId() : 0);
-        $new->setDao(null);
-        $new->setLocked(false);
-        $new->setCreationDate(time());
+        // triggers actions before object cloning
+        $event = new DataObjectEvent($source, [
+            'target_element' => $target,
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, DataObjectEvents::PRE_COPY);
+        $target = $event->getArgument('target_element');
 
-        if ($new instanceof Concrete) {
-            foreach ($new->getClass()->getFieldDefinitions() as $fieldDefinition) {
-                if ($fieldDefinition->getUnique()) {
-                    $new->set($fieldDefinition->getName(), null);
-                    $new->setPublished(false);
-                }
-            }
-        }
-
-        $new->save();
+        $new = $this->copy($source, $target);
 
         // add to store
         $this->_copyRecursiveIds[] = $new->getId();
@@ -202,29 +186,14 @@ class Service extends Model\Element\Service
         //load all in case of lazy loading fields
         self::loadAllObjectFields($source);
 
-        /** @var Concrete $new */
-        $new = Element\Service::cloneMe($source);
-        $new->setId(null);
+        // triggers actions before object cloning
+        $event = new DataObjectEvent($source, [
+            'target_element' => $target,
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, DataObjectEvents::PRE_COPY);
+        $target = $event->getArgument('target_element');
 
-        $new->setChildren(null);
-        $new->setKey(Element\Service::getSafeCopyName($new->getKey(), $target));
-        $new->setParentId($target->getId());
-        $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
-        $new->setUserModification($this->_user ? $this->_user->getId() : 0);
-        $new->setDao(null);
-        $new->setLocked(false);
-        $new->setCreationDate(time());
-
-        if ($new instanceof Concrete) {
-            foreach ($new->getClass()->getFieldDefinitions() as $fieldDefinition) {
-                if ($fieldDefinition->getUnique()) {
-                    $new->set($fieldDefinition->getName(), null);
-                    $new->setPublished(false);
-                }
-            }
-        }
-
-        $new->save();
+        $new = $this->copy($source, $target);
 
         DataObject::setDisableDirtyDetection($isDirtyDetectionDisabled);
 
@@ -235,6 +204,43 @@ class Service extends Model\Element\Service
             'base_element' => $source, // the element used to make a copy
         ]);
         \Pimcore::getEventDispatcher()->dispatch($event, DataObjectEvents::POST_COPY);
+
+        return $new;
+    }
+
+    private function copy(AbstractObject $source, AbstractObject $target): AbstractObject
+    {
+        /** @var AbstractObject $new */
+        $new = Element\Service::cloneMe($source);
+        $new->setId(null);
+        $new->setChildren(null);
+        $new->setKey(Element\Service::getSafeCopyName($new->getKey(), $target));
+        $new->setParentId($target->getId());
+        $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
+        $new->setUserModification($this->_user ? $this->_user->getId() : 0);
+        $new->setDao(null);
+        $new->setLocked(null);
+        $new->setCreationDate(time());
+
+        if ($new instanceof Concrete) {
+            foreach ($new->getClass()->getFieldDefinitions() as $fieldDefinition) {
+                if ($fieldDefinition instanceof DataObject\ClassDefinition\Data\Localizedfields) {
+                    foreach ($fieldDefinition->getFieldDefinitions() as $localizedFieldDefinition) {
+                        if ($localizedFieldDefinition->getUnique()) {
+                            foreach (Tool::getValidLanguages() as $language) {
+                                $new->set($localizedFieldDefinition->getName(), null, $language);
+                            }
+                            $new->setPublished(false);
+                        }
+                    }
+                } elseif ($fieldDefinition->getUnique()) {
+                    $new->set($fieldDefinition->getName(), null);
+                    $new->setPublished(false);
+                }
+            }
+        }
+
+        $new->save();
 
         return $new;
     }
@@ -267,7 +273,7 @@ class Service extends Model\Element\Service
         $new->setKey($target->getKey());
         $new->setParentId($target->getParentId());
         $new->setScheduledTasks($source->getScheduledTasks());
-        $new->setProperties($source->getProperties());
+        $new->setProperties(self::cloneProperties($source->getProperties()));
         $new->setUserModification($this->_user ? $this->_user->getId() : 0);
 
         $new->save();
@@ -307,16 +313,16 @@ class Service extends Model\Element\Service
         $csvMode = $params['csvMode'] ?? false;
 
         if ($object instanceof Concrete) {
+            $user = AdminTool::getCurrentUser();
+
             $context = ['object' => $object,
                 'purpose' => 'gridview',
                 'language' => $requestedLanguage, ];
             $data['classname'] = $object->getClassName();
             $data['idPath'] = Element\Service::getIdPath($object);
             $data['inheritedFields'] = [];
-            $data['permissions'] = $object->getUserPermissions();
+            $data['permissions'] = $object->getUserPermissions($user);
             $data['locked'] = $object->isLocked();
-
-            $user = AdminTool::getCurrentUser();
 
             if (is_null($fields)) {
                 $fields = array_keys($object->getclass()->getFieldDefinitions());
@@ -754,8 +760,8 @@ class Service extends Model\Element\Service
                 $field = $keyParts[2];
                 $groupKeyId = explode('-', $keyParts[3]);
 
-                $groupId = $groupKeyId[0];
-                $keyid = $groupKeyId[1];
+                $groupId = (int) $groupKeyId[0];
+                $keyid = (int) $groupKeyId[1];
                 $getter = 'get' . ucfirst($field);
 
                 if (method_exists($object, $getter)) {
@@ -792,7 +798,7 @@ class Service extends Model\Element\Service
     /**
      * @param Concrete $object
      *
-     * @return AbstractObject|null
+     * @return Concrete|null
      */
     public static function hasInheritableParentObject(Concrete $object)
     {
@@ -903,6 +909,10 @@ class Service extends Model\Element\Service
      */
     public static function pathExists($path, $type = null)
     {
+        if (!$path) {
+            return false;
+        }
+
         $path = Element\Service::correctPath($path);
 
         try {
@@ -996,14 +1006,14 @@ class Service extends Model\Element\Service
 
         if ($user->getAdmin()) {
             $superLayout = new ClassDefinition\CustomLayout();
-            $superLayout->setId(-1);
+            $superLayout->setId('-1');
             $superLayout->setName('Master (Admin Mode)');
             $resultList[-1] = $superLayout;
         }
 
         if ($isMasterAllowed) {
             $master = new ClassDefinition\CustomLayout();
-            $master->setId(0);
+            $master->setId('0');
             $master->setName('Master');
             $resultList[0] = $master;
         }
@@ -1290,7 +1300,7 @@ class Service extends Model\Element\Service
      */
     private static function mergeFieldDefinition(&$mergedFieldDefinition, &$customFieldDefinitions, $key)
     {
-        if (!$customFieldDefinitions[$key]) {
+        if (empty($customFieldDefinitions[$key])) {
             unset($mergedFieldDefinition[$key]);
         } elseif (isset($mergedFieldDefinition[$key])) {
             $def = $customFieldDefinitions[$key];
@@ -1435,7 +1445,7 @@ class Service extends Model\Element\Service
     /**
      * Enriches the layout definition before it is returned to the admin interface.
      *
-     * @param Model\DataObject\ClassDefinition\Data|Model\DataObject\ClassDefinition\Layout $layout
+     * @param Model\DataObject\ClassDefinition\Data|Model\DataObject\ClassDefinition\Layout|null $layout
      * @param Concrete|null $object
      * @param array $context additional contextual data
      *
@@ -1443,6 +1453,10 @@ class Service extends Model\Element\Service
      */
     public static function enrichLayoutDefinition(&$layout, $object = null, $context = [])
     {
+        if (is_null($layout)) {
+            return;
+        }
+
         $context['object'] = $object;
 
         //TODO Pimcore 11: remove method_exists BC layer
@@ -1867,7 +1881,7 @@ class Service extends Model\Element\Service
                     $data[] = $tmp;
                 }
 
-                $rowData = self::getCsvDataForObject($object, $requestedLanguage, $fields, $helperDefinitions, $localeService, $context);
+                $rowData = self::getCsvDataForObject($object, $requestedLanguage, $fields, $helperDefinitions, $localeService, false, $context);
                 $rowData = self::escapeCsvRecord($rowData);
                 $data[] = $rowData;
             }
@@ -1899,8 +1913,8 @@ class Service extends Model\Element\Service
             if ($type == 'classificationstore') {
                 $fieldname = $fieldParts[2];
                 $groupKeyId = explode('-', $fieldParts[3]);
-                $groupId = $groupKeyId[0];
-                $keyId = $groupKeyId[1];
+                $groupId = (int) $groupKeyId[0];
+                $keyId = (int) $groupKeyId[1];
 
                 $groupConfig = DataObject\Classificationstore\GroupConfig::getById($groupId);
                 $keyConfig = DataObject\Classificationstore\KeyConfig::getById($keyId);
@@ -1966,8 +1980,8 @@ class Service extends Model\Element\Service
                     if ($type == 'classificationstore') {
                         $fieldname = $fieldParts[2];
                         $groupKeyId = explode('-', $fieldParts[3]);
-                        $groupId = $groupKeyId[0];
-                        $keyId = $groupKeyId[1];
+                        $groupId = (int) $groupKeyId[0];
+                        $keyId = (int) $groupKeyId[1];
                         $getter = 'get' . ucfirst($fieldname);
                         if (method_exists($object, $getter)) {
                             $keyConfig = DataObject\Classificationstore\KeyConfig::getById($keyId);

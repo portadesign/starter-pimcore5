@@ -102,7 +102,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
 
     postSaveObject: function(object, task) {
 
-        if (object.id == this.object.id && task == "publish") {
+        if (object.id == this.object.id) {
             for (var itemIndex = 0; itemIndex < this.component.items.items.length; itemIndex++) {
                 var item = this.component.items.items[itemIndex];
                 item["pimcore_oIndex"] = itemIndex;
@@ -337,23 +337,27 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
 
     removeBlock: function (blockElement) {
 
-        this.closeOpenEditors();
+        Ext.Msg.confirm(t('delete'), t('delete_group_message'), function(btn){
+            if (btn == 'yes') {
+                this.closeOpenEditors();
 
-        var key = blockElement.key;
-        this.currentElements[key] = "deleted";
+                var key = blockElement.key;
+                this.currentElements[key] = "deleted";
 
-        this.component.remove(blockElement);
-        this.dirty = true;
+                this.component.remove(blockElement);
+                this.dirty = true;
 
-        // check for remaining elements
-        if(this.component.items.items.length < 1) {
-            this.component.removeAll();
-            this.component.add(this.getControls());
-            this.component.updateLayout();
-            this.currentElements = [];
-        }
+                // check for remaining elements
+                if (this.component.items.items.length < 1) {
+                    this.component.removeAll();
+                    this.component.add(this.getControls());
+                    this.component.updateLayout();
+                    this.currentElements = [];
+                }
 
-        this.updateBlockIndices();
+                this.updateBlockIndices();
+            }
+        }.bind(this));
     },
 
     moveBlockUp: function (blockElement) {

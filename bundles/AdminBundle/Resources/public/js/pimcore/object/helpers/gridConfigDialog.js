@@ -108,6 +108,7 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
                 this.settings.sharedRoleIds = this.settings.sharedRoleIds.join();
             }
             this.settings.shareGlobally = this.shareGlobally ? this.shareGlobally.getValue() : false;
+            this.settings.setAsFavourite = this.setAsFavourite ? this.setAsFavourite.getValue() : false;
         } else {
             delete this.settings.sharedUserIds;
             delete this.settings.sharedRoleIds;
@@ -570,7 +571,7 @@ pimcore.object.helpers.gridConfigDialog = Class.create(pimcore.element.helpers.g
     getOperatorTrees: function () {
         var operators = Object.keys(pimcore.object.gridcolumn.operator);
         var operatorGroups = [];
-        // var childs = [];
+
         for (let i = 0; i < operators.length; i++) {
             var operator = operators[i];
             if (!this.availableOperators || this.availableOperators.indexOf(operator) >= 0) {

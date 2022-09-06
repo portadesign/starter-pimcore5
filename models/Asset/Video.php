@@ -45,7 +45,10 @@ class Video extends Model\Asset
             }
         }
 
-        $this->clearThumbnails();
+        if ($params['isUpdate']) {
+            $this->clearThumbnails();
+        }
+
         parent::update($params);
     }
 
@@ -122,7 +125,7 @@ class Video extends Model\Asset
                 }
             } catch (\Exception $e) {
                 Logger::error("Couldn't create thumbnail of video " . $this->getRealFullPath());
-                Logger::error($e);
+                Logger::error((string) $e);
             }
         }
 
@@ -164,6 +167,13 @@ class Video extends Model\Asset
     {
         if (!\Pimcore\Video::isAvailable()) {
             Logger::error("Couldn't create image-thumbnail of video " . $this->getRealFullPath() . ' no video adapter is available');
+
+            return new Video\ImageThumbnail(null); // returns error image
+        }
+
+        if (!$this->getCustomSetting('videoWidth') || !$this->getCustomSetting('videoHeight')) {
+            Logger::info('Image thumbnail not yet available, processing is done asynchronously.');
+            $this->addToUpdateTaskQueue();
 
             return new Video\ImageThumbnail(null); // returns error image
         }

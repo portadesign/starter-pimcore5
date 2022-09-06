@@ -168,6 +168,13 @@ class FullPageCacheListener
         $requestUri = $request->getRequestUri();
         $excludePatterns = [];
 
+        // disable the output-cache if the client sends an authorization header
+        if ($request->headers->has('authorization')) {
+            $this->disable('authorization header in use');
+
+            return;
+        }
+
         // only enable GET method
         if (!$request->isMethodCacheable()) {
             $this->disable();
@@ -211,9 +218,7 @@ class FullPageCacheListener
 
                 if (!empty($conf['exclude_patterns'])) {
                     $confExcludePatterns = explode(',', $conf['exclude_patterns']);
-                    if (!empty($confExcludePatterns)) {
-                        $excludePatterns = $confExcludePatterns;
-                    }
+                    $excludePatterns = $confExcludePatterns;
                 }
 
                 if (!empty($conf['exclude_cookie'])) {
@@ -246,7 +251,7 @@ class FullPageCacheListener
                 return;
             }
         } catch (\Exception $e) {
-            Logger::error($e);
+            Logger::error((string) $e);
 
             $this->disable('ERROR: Exception (see log files in /var/log)');
 
@@ -300,7 +305,7 @@ class FullPageCacheListener
             $response = $cacheItem;
             $response->headers->set('X-Pimcore-Output-Cache-Tag', $cacheKey, true);
             $cacheItemDate = strtotime($response->headers->get('X-Pimcore-Cache-Date'));
-            $response->headers->set('Age', (time() - $cacheItemDate));
+            $response->headers->set('Age', (string) (time() - $cacheItemDate));
 
             $event->setResponse($response);
             $this->stopResponsePropagation = true;
@@ -393,7 +398,7 @@ class FullPageCacheListener
 
                 Cache::save($cacheItem, $cacheKey, $tags, $this->lifetime, 1000, true);
             } catch (\Exception $e) {
-                Logger::error($e);
+                Logger::error((string) $e);
 
                 return;
             }

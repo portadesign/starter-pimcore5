@@ -98,7 +98,7 @@ final class Config extends Model\AbstractModel
     /**
      * @internal
      *
-     * @var float
+     * @var float|null
      */
     protected $highResolution;
 
@@ -133,21 +133,21 @@ final class Config extends Model\AbstractModel
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     protected $modificationDate;
 
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     protected $creationDate;
 
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $filenameSuffix;
 
@@ -506,7 +506,7 @@ final class Config extends Model\AbstractModel
     }
 
     /**
-     * @return float
+     * @return float|null
      */
     public function getHighResolution()
     {
@@ -546,7 +546,7 @@ final class Config extends Model\AbstractModel
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getFilenameSuffix()
     {
@@ -769,7 +769,7 @@ final class Config extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getModificationDate()
     {
@@ -785,7 +785,7 @@ final class Config extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCreationDate()
     {
@@ -917,5 +917,51 @@ final class Config extends Model\AbstractModel
             $this->dao = clone $this->dao;
             $this->dao->setModel($this);
         }
+
+        //rebuild asset path for overlays
+        foreach ($this->items as &$item) {
+            if (in_array($item['method'], ['addOverlay', 'addOverlayFit'])) {
+                if (isset($item['arguments']['id'])) {
+                    $img = Model\Asset\Image::getById($item['arguments']['id']);
+                    if ($img) {
+                        $item['arguments']['path'] = $img->getFullPath();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @internal
+     *
+     * @return array
+     */
+    public static function getAutoFormats(): array
+    {
+        return \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['thumbnails']['auto_formats'];
+    }
+
+    /**
+     * @internal
+     *
+     * @return Config[]
+     */
+    public function getAutoFormatThumbnailConfigs(): array
+    {
+        $autoFormatThumbnails = [];
+
+        foreach ($this->getAutoFormats() as $autoFormat => $autoFormatConfig) {
+            if (Model\Asset\Image\Thumbnail::supportsFormat($autoFormat) && $autoFormatConfig['enabled']) {
+                $autoFormatThumbnail = clone $this;
+                $autoFormatThumbnail->setFormat($autoFormat);
+                if (!empty($autoFormatConfig['quality'])) {
+                    $autoFormatThumbnail->setQuality($autoFormatConfig['quality']);
+                }
+
+                $autoFormatThumbnails[$autoFormat] = $autoFormatThumbnail;
+            }
+        }
+
+        return $autoFormatThumbnails;
     }
 }

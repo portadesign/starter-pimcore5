@@ -58,7 +58,6 @@ pimcore.element.properties = Class.create({
                 displayField:'translatedName',
                 valueField: "id",
                 store: predefinedPropertiesStore,
-                editable: false,
                 triggerAction: 'all',
                 listWidth: 300,
                 width: 250,
@@ -117,6 +116,7 @@ pimcore.element.properties = Class.create({
                             inheritable: property.inheritable,
                             all: property,
                             config: property.config,
+                            predefinedName: property.predefinedName,
                             description: property.description
                         });
                     }
@@ -134,29 +134,55 @@ pimcore.element.properties = Class.create({
                         rootProperty: 'properties'
                     }
                 },
-                fields: ['name','description','type',{name: "data", type: "string", convert: function (v, rec) {
-                    if (rec.data.type == "document" || rec.data.type == "asset" || rec.data.type == "object") {
-                        var type = rec.data.type;
-                        if (type == "document") {
-                            if (v && typeof v == "object") {
-                                return v.path + v.key;
-                            }
+                fields: [
+                    'name',
+                    {
+                        name: "predefinedName",
+                        type: "string",
+                        convert: function (v, rec) {
+                            return t(rec.data.predefinedName ? rec.data.predefinedName : 'custom');
                         }
-                        else if (type == "asset") {
-                            if (v && typeof v == "object") {
-                                return v.path + v.filename;
-                            }
+                    },
+                    {
+                        name: "description",
+                        type: "string",
+                        convert: function (v, rec) {
+                            return t(rec.data.description);
                         }
-                        else if (type == "object") {
-                            if (v && typeof v == "object") {
-                                return v.o_path + v.o_key;
-                            }
-                        }
+                    },
+                    'type',
+                    {
+                        name: "data",
+                        type: "string",
+                        convert: function (v, rec) {
+                            if (rec.data.type == "document" || rec.data.type == "asset" || rec.data.type == "object") {
+                                var type = rec.data.type;
+                                if (type == "document") {
+                                    if (v && typeof v == "object") {
+                                        return v.path + v.key;
+                                    }
+                                }
+                                else if (type == "asset") {
+                                    if (v && typeof v == "object") {
+                                        return v.path + v.filename;
+                                    }
+                                }
+                                else if (type == "object") {
+                                    if (v && typeof v == "object") {
+                                        return v.o_path + v.o_key;
+                                    }
+                                }
 
-                    }
+                            }
 
-                    return v;
-                }},"inherited","all",{name: 'inheritable', type: 'bool', mapping: "inheritable"}, "config"],
+                            return v;
+                        }
+                    },
+                    "inherited",
+                    "all",
+                    {name: 'inheritable', type: 'bool', mapping: "inheritable"},
+                    "config"
+                ],
                 groupField: 'inherited',
                 filters: [
                     function(item) {
@@ -267,6 +293,14 @@ pimcore.element.properties = Class.create({
                                 allowBlank: false
                             });
                         },
+                        sortable: true,
+                        renderer: Ext.util.Format.htmlEncode,
+                        width: 230
+                    },
+                    {
+                        text: t('name'),
+                        dataIndex: 'predefinedName',
+                        editable: false,
                         sortable: true,
                         renderer: Ext.util.Format.htmlEncode,
                         width: 230
@@ -561,7 +595,7 @@ pimcore.element.properties = Class.create({
             }
 
             this.add(selectedData.key, selectedData.type, selectedData.data, selectedData.config, false,
-                selectedData.inheritable, selectedData.description);
+                selectedData.inheritable, selectedData.name, selectedData.description);
         } catch (e) {
             console.log(e);
         }
@@ -569,16 +603,17 @@ pimcore.element.properties = Class.create({
 
     addSetFromUserDefined: function (customKey, customType) {
         try {
-            if (in_array(customKey.getValue(), this.disallowedKeys)) {
+            let key = htmlspecialchars(customKey.getValue());
+            if (in_array(key, this.disallowedKeys)) {
                 Ext.MessageBox.alert(t("error"), t("name_is_not_allowed"));
             }
-            this.add(customKey.getValue(), customType.getValue(), false, false, false, true);
+            this.add(key, customType.getValue(), false, false, false, true);
         } catch (e) {
             console.log(e);
         }
     },
 
-    add: function (key, type, value, config, inherited, inheritable, description) {
+    add: function (key, type, value, config, inherited, inheritable, predefinedName, description) {
 
         if(in_array(key, this.disallowedKeys)) {
             return;
@@ -638,6 +673,7 @@ pimcore.element.properties = Class.create({
             inherited: false,
             inheritable: inheritable,
             config: config,
+            predefinedName: predefinedName,
             description: description
         });
 

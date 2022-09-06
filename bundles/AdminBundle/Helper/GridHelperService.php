@@ -102,8 +102,8 @@ class GridHelperService
                         $language = 'default';
                     }
 
-                    $groupId = $groupKeyId[0];
-                    $keyid = $groupKeyId[1];
+                    $groupId = (int) $groupKeyId[0];
+                    $keyid = (int) $groupKeyId[1];
 
                     $keyConfig = Model\DataObject\Classificationstore\KeyConfig::getById($keyid);
                     $type = $keyConfig->getType();
@@ -113,14 +113,16 @@ class GridHelperService
                     if ($field instanceof Model\DataObject\ClassDefinition\Data) {
                         $mappedKey = 'cskey_' . $fieldName . '_' . $groupId . '_' . $keyid;
                         $featureJoins[] = ['fieldname' => $fieldName, 'groupId' => $groupId, 'keyId' => $keyid, 'language' => $language];
-                        $featureCondition = $field->getFilterConditionExt(
-                            $filter['value'],
-                            $operator,
-                            [
-                                'name' => $mappedKey, ]
-                        );
+                        if (isset($filter['value'])) {
+                            $featureCondition = $field->getFilterConditionExt(
+                                $filter['value'],
+                                $operator,
+                                [
+                                    'name' => $mappedKey, ]
+                            );
 
-                        $featureConditions[$mappedKey] = $featureCondition;
+                            $featureConditions[$mappedKey] = $featureCondition;
+                        }
                     }
                 } elseif (count($keyParts) > 1) {
                     $brickType = $keyParts[0];
@@ -295,7 +297,7 @@ class GridHelperService
                             foreach ($filter['value'] as $filterValue) {
                                 $brickCondition = '(' . $brickField->getFilterCondition($filterValue, $operator,
                                         ['brickPrefix' => $brickPrefix]
-                                    ) . ' AND ' . $brickPrefix . 'fieldname = ' . $db->quote($brickFilterField) . ')';
+                                    ) . ' AND ' . $brickType . '.fieldname = ' . $db->quote($brickFilterField) . ')';
                                 $fieldConditions[] = $brickCondition;
                             }
 
@@ -304,7 +306,7 @@ class GridHelperService
                             }
                         } else {
                             $brickCondition = '(' . $brickField->getFilterCondition($filter['value'], $operator,
-                                    ['brickPrefix' => $brickPrefix]) . ' AND ' . $brickPrefix . 'fieldname = ' . $db->quote($brickFilterField) . ')';
+                                    ['brickPrefix' => $brickPrefix]) . ' AND ' . $brickType . '.fieldname = ' . $db->quote($brickFilterField) . ')';
                             $conditionPartsFilters[] = $brickCondition;
                         }
                     } elseif ($field instanceof ClassDefinition\Data\UrlSlug) {
@@ -332,12 +334,13 @@ class GridHelperService
                         } elseif ($filterField == 'id') {
                             $conditionPartsFilters[] = 'oo_id ' . $operator . ' ' . $db->quote($filter['value']);
                         } else {
+                            $filterField = $db->quoteIdentifier('o_' . $filterField);
                             if ($filter['type'] == 'date' && $operator == '=') {
                                 //if the equal operator is chosen with the date type, condition has to be changed
                                 $maxTime = $filter['value'] + (86400 - 1); //specifies the top point of the range used in the condition
-                                $conditionPartsFilters[] = '`o_' . $filterField . '` BETWEEN ' . $db->quote($filter['value']) . ' AND ' . $db->quote($maxTime);
+                                $conditionPartsFilters[] = $filterField . ' BETWEEN ' . $db->quote($filter['value']) . ' AND ' . $db->quote($maxTime);
                             } else {
-                                $conditionPartsFilters[] = '`o_' . $filterField . '` ' . $operator . ' ' . $db->quote($filter['value']);
+                                $conditionPartsFilters[] = $filterField . ' ' . $operator . ' ' . $db->quote($filter['value']);
                             }
                         }
                     }
@@ -418,7 +421,7 @@ class GridHelperService
                     $alreadyJoined[$mappedKey] = 1;
 
                     $table = $me->getDao()->getTableName();
-                    $select->addSelect('value AS ' . $mappedKey);
+                    $select->addSelect($mappedKey . '.value AS ' . $mappedKey);
                     $select->leftJoin(
                         $table,
                         'object_classificationstore_data_' . $class->getId(),
@@ -493,7 +496,7 @@ class GridHelperService
 
     public function prepareListingForGrid(array $requestParams, string $requestedLanguage, $adminUser): DataObject\Listing\Concrete
     {
-        $folder = Model\DataObject::getById($requestParams['folderId']);
+        $folder = Model\DataObject::getById((int) $requestParams['folderId']);
         $class = ClassDefinition::getById($requestParams['classId']);
         $className = $class->getName();
 
@@ -778,11 +781,12 @@ class GridHelperService
                     $value = $db->quote($value);
                 }
 
-                if ($filterField == 'fullpath') {
-                    $filterField = 'CONCAT(path,filename)';
-                }
-
                 if (isset($filterDef[1]) && $filterDef[1] == 'system') {
+                    if ($filterField == 'fullpath') {
+                        $filterField = 'CONCAT(path,filename)';
+                    } else {
+                        $filterField = $db->quoteIdentifier($filterField);
+                    }
                     $conditionFilters[] = $filterField . ' ' . $operator . ' ' . $value;
                 } else {
                     $language = $allParams['language'];

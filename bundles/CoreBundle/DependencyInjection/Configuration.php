@@ -22,7 +22,6 @@ use Pimcore\Workflow\EventSubscriber\ChangePublishedStateSubscriber;
 use Pimcore\Workflow\EventSubscriber\NotificationSubscriber;
 use Pimcore\Workflow\Notification\NotificationEmailService;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
-use Symfony\Component\Config\Definition\Builder\NodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
@@ -34,9 +33,12 @@ final class Configuration implements ConfigurationInterface
     /**
      * @var PlaceholderProcessor
      */
-    private $placeholderProcessor;
+    private PlaceholderProcessor $placeholderProcessor;
 
-    private $placeholders = [];
+    /**
+     * @var array
+     */
+    private array $placeholders = [];
 
     public function __construct()
     {
@@ -45,11 +47,9 @@ final class Configuration implements ConfigurationInterface
     }
 
     /**
-     * Generates the configuration tree builder.
-     *
-     * @return \Symfony\Component\Config\Definition\Builder\TreeBuilder The tree builder
+     * {@inheritdoc}
      */
-    public function getConfigTreeBuilder()
+    public function getConfigTreeBuilder(): TreeBuilder
     {
         $treeBuilder = new TreeBuilder('pimcore');
 
@@ -178,6 +178,7 @@ final class Configuration implements ConfigurationInterface
         $this->addStaticRoutesNode($rootNode);
         $this->addPerspectivesNode($rootNode);
         $this->addCustomViewsNode($rootNode);
+        $this->buildRedirectsStatusCodes($rootNode);
 
         return $treeBuilder;
     }
@@ -204,6 +205,24 @@ final class Configuration implements ConfigurationInterface
                         ->defaultValue(1800)
                     ->end()
         ;
+    }
+
+    /**
+     * @param ArrayNodeDefinition $rootNode
+     */
+    private function buildRedirectsStatusCodes(ArrayNodeDefinition $rootNode)
+    {
+        $rootNode
+            ->children()
+            ->arrayNode('redirects')
+                ->addDefaultsIfNotSet()
+                ->children()
+                    ->arrayNode('status_codes')
+                        ->info('List all redirect status codes.')
+                        ->prototype('scalar')
+                    ->end()
+                ->end()
+            ->end();
     }
 
     /**
@@ -517,6 +536,10 @@ final class Configuration implements ConfigurationInterface
                                         ->end()
                                         ->defaultTrue()
                                     ->end()
+                                    ->arrayNode('image_optimizers')
+                                        ->addDefaultsIfNotSet()
+                                        ->canBeDisabled()
+                                    ->end()
                                     ->arrayNode('auto_formats')
                                         ->prototype('array')
                                             ->canBeDisabled()
@@ -534,6 +557,9 @@ final class Configuration implements ConfigurationInterface
                                                 'quality' => null,
                                             ],
                                         ])
+                                    ->end()
+                                    ->booleanNode('status_cache')
+                                        ->defaultTrue()
                                     ->end()
                                     ->booleanNode('auto_clear_temp_files')
                                         ->beforeNormalization()
@@ -652,6 +678,7 @@ final class Configuration implements ConfigurationInterface
                 ->addDefaultsIfNotSet()
                     ->children()
                         ->arrayNode('predefined')
+                            ->addDefaultsIfNotSet()
                             ->children()
                                 ->arrayNode('definitions')
                                 ->normalizeKeys(false)
@@ -856,6 +883,9 @@ final class Configuration implements ConfigurationInterface
                     ->end()
                     ->defaultFalse()
                 ->end()
+                ->scalarNode('preview_url_prefix')
+                    ->defaultValue('')
+                ->end()
                 ->integerNode('tree_paging_limit')
                     ->defaultValue(50)
                 ->end()
@@ -913,8 +943,12 @@ final class Configuration implements ConfigurationInterface
                             ->scalarNode('default_controller_print_container')
                                 ->defaultValue('App\\Controller\\Web2printController::containerAction')
                             ->end()
-                            ->booleanNode('enableInDefaultView')->end()
-                            ->scalarNode('generalTool')->end()
+                            ->booleanNode('enableInDefaultView')
+                                ->defaultValue(false)
+                            ->end()
+                            ->scalarNode('generalTool')
+                                ->defaultValue('')
+                            ->end()
                             ->scalarNode('generalDocumentSaveMode')->end()
                             ->scalarNode('pdfreactorVersion')->end()
                             ->scalarNode('pdfreactorProtocol')->end()
@@ -1023,7 +1057,6 @@ final class Configuration implements ConfigurationInterface
             ->arrayNode('context')
             ->useAttributeAsKey('name');
 
-        /** @var ArrayNodeDefinition|NodeDefinition $prototype */
         $prototype = $contextNode->prototype('array');
 
         // define routes child on each context entry
@@ -2150,6 +2183,9 @@ final class Configuration implements ConfigurationInterface
                                     ->scalarNode('icon')->end()
                                     ->variableNode('toolbar')->end()
                                     ->arrayNode('dashboards')
+                                        ->children()
+                                            ->variableNode('disabledPortlets')->end()
+                                        ->end()
                                         ->children()
                                             ->variableNode('predefined')->end()
                                         ->end()

@@ -591,11 +591,21 @@ class CoreCacheHandler implements LoggerAwareInterface
         if ($result) {
             $this->logger->debug('Added entry {key} to cache', ['key' => $item->getKey()]);
         } else {
+            try {
+                $itemData = $item->get();
+                if (!is_scalar($itemData)) {
+                    $itemData = serialize($itemData);
+                }
+                $itemSizeText = formatBytes(mb_strlen((string) $itemData));
+            } catch (\Throwable $e) {
+                $itemSizeText = 'unknown';
+            }
+
             $this->logger->error(
                 'Failed to add entry {key} to cache. Item size was {itemSize}',
                 [
                     'key' => $item->getKey(),
-                    'itemSize' => formatBytes(strlen($item->get())),
+                    'itemSize' => $itemSizeText,
                 ]
             );
         }
@@ -839,6 +849,22 @@ class CoreCacheHandler implements LoggerAwareInterface
         $this->tagsIgnoredOnClear = array_filter($this->tagsIgnoredOnClear, function ($t) use ($tag) {
             return $t !== $tag;
         });
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     *
+     * @param array $tags
+     *
+     * @return $this
+     */
+    public function removeClearedTags(array $tags)
+    {
+        foreach ($tags as $tag) {
+            unset($this->clearedTags[$tag]);
+        }
 
         return $this;
     }

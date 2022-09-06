@@ -36,7 +36,7 @@ class Dao extends Model\Dao\AbstractDao
             $this->model->setId($id);
         }
 
-        $data = $this->db->fetchRow('SELECT * FROM website_settings WHERE id = ?', $this->model->getId());
+        $data = $this->db->fetchRow('SELECT * FROM website_settings WHERE id = ?', [$this->model->getId()]);
         $this->assignVariablesToModel($data);
 
         if (!empty($data['id'])) {
@@ -58,7 +58,23 @@ class Dao extends Model\Dao\AbstractDao
         if ($name != null) {
             $this->model->setName($name);
         }
-        $data = $this->db->fetchRow("SELECT * FROM website_settings WHERE name = ? AND (siteId IS NULL OR siteId = '' OR siteId = ?) AND  (language IS NULL OR language = '' OR language = ?) ORDER BY siteId,language DESC", [$this->model->getName(), $siteId, $language]);
+        $data = $this->db->fetchRow(
+            "SELECT *
+            FROM website_settings
+            WHERE name = ?
+                AND (
+                    siteId IS NULL
+                    OR siteId = 0
+                    OR siteId = ?
+                )
+                AND (
+                    language IS NULL
+                    OR language = ''
+                    OR language = ?
+                )
+            ORDER BY CONCAT(siteId, language) DESC, siteId DESC, language DESC",
+            [$this->model->getName(), $siteId, $language]
+        );
 
         if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
@@ -109,7 +125,7 @@ class Dao extends Model\Dao\AbstractDao
 
         $this->db->insert('website_settings', ['name' => $this->model->getName(), 'siteId' => $this->model->getSiteId()]);
 
-        $this->model->setId($this->db->lastInsertId());
+        $this->model->setId((int) $this->db->lastInsertId());
 
         $this->update();
     }

@@ -19,6 +19,7 @@ use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\User;
 
 /**
  * @internal
@@ -75,7 +76,7 @@ class Dao extends Model\Element\Dao
             'o_key' => $this->model->getKey(),
             'o_path' => $this->model->getRealPath(),
         ]);
-        $this->model->setId($this->db->lastInsertId());
+        $this->model->setId((int) $this->db->lastInsertId());
 
         if (!$this->model->getKey() && !is_numeric($this->model->getKey())) {
             $this->model->setKey($this->db->lastInsertId());
@@ -203,7 +204,7 @@ class Dao extends Model\Element\Dao
         $path = null;
 
         try {
-            $path = $this->db->fetchOne('SELECT CONCAT(o_path,`o_key`) as o_path FROM objects WHERE o_id = ?', $this->model->getId());
+            $path = $this->db->fetchOne('SELECT CONCAT(o_path,`o_key`) as o_path FROM objects WHERE o_id = ?', [$this->model->getId()]);
         } catch (\Exception $e) {
             Logger::error('could not get current object path from DB');
         }
@@ -216,10 +217,14 @@ class Dao extends Model\Element\Dao
      */
     public function getVersionCountForUpdate(): int
     {
-        $versionCount = (int) $this->db->fetchOne('SELECT o_versionCount FROM objects WHERE o_id = ? FOR UPDATE', $this->model->getId());
+        if (!$this->model->getId()) {
+            return 0;
+        }
+
+        $versionCount = (int) $this->db->fetchOne('SELECT o_versionCount FROM objects WHERE o_id = ? FOR UPDATE', [$this->model->getId()]);
 
         if ($this->model instanceof DataObject\Concrete) {
-            $versionCount2 = (int) $this->db->fetchOne("SELECT MAX(versionCount) FROM versions WHERE cid = ? AND ctype = 'object'", $this->model->getId());
+            $versionCount2 = (int) $this->db->fetchOne("SELECT MAX(versionCount) FROM versions WHERE cid = ? AND ctype = 'object'", [$this->model->getId()]);
             $versionCount = max($versionCount, $versionCount2);
         }
 
@@ -283,29 +288,54 @@ class Dao extends Model\Element\Dao
         return $properties;
     }
 
-    public function deleteAllPermissions()
-    {
-        $this->db->delete('users_workspaces_object', ['cid' => $this->model->getId()]);
-    }
-
     /**
      * Quick test if there are children
      *
      * @param array $objectTypes
      * @param bool|null $includingUnpublished
+     * @param Model\User $user
      *
      * @return bool
      */
-    public function hasChildren($objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER], $includingUnpublished = null)
+    public function hasChildren($objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER], $includingUnpublished = null, $user = null)
     {
-        $sql = 'SELECT 1 FROM objects WHERE o_parentId = ?';
+        if (!$this->model->getId()) {
+            return false;
+        }
+
+        $sql = 'SELECT 1 FROM objects o WHERE o_parentId = ? ';
+        if ($user && !$user->isAdmin()) {
+            $roleIds = $user->getRoles();
+            $currentUserId = $user->getId();
+            $permissionIds = array_merge($roleIds, [$currentUserId]);
+
+            //gets the permission of the ancestors, since it would be the same for each row with same o_parentId, it is done once outside the query to avoid extra subquery.
+            $inheritedPermission = $this->isInheritingPermission('list', $permissionIds);
+
+            // $anyAllowedRowOrChildren checks for nested elements that are `list`=1. This is to allow the folders in between from current parent to any nested elements and due the "additive" permission on the element itself, we can simply ignore list=0 children
+            // unless for the same rule found is list=0 on user specific level, in that case it nullifies that entry.
+            $anyAllowedRowOrChildren = 'EXISTS(SELECT list FROM users_workspaces_object uwo WHERE userId IN (' . implode(',', $permissionIds) . ') AND list=1 AND LOCATE(CONCAT(o.o_path,o.o_key),cpath)=1 AND
+            NOT EXISTS(SELECT list FROM users_workspaces_object WHERE userId =' . $currentUserId . '  AND list=0 AND cpath = uwo.cpath))';
+
+            // $allowedCurrentRow checks if the current row is blocked, if found a match it "removes/ignores" the entry from object table, doesn't need to check if is list=1 on user level, since it is done in $anyAllowedRowOrChildren (NB: equal or longer cpath) so we are safe to deduce that there are no valid list=1 rules
+            $isDisallowedCurrentRow = 'EXISTS(SELECT list FROM users_workspaces_object uworow WHERE userId IN (' . implode(',', $permissionIds) . ')  AND cid = o_id AND list=0)';
+
+            //If no children with list=1 (with no user-level list=0) is found, we consider the inherited permission rule
+            //if $inheritedPermission=0 then everything is disallowed (or doesn't specify any rule) for that row, we can skip $isDisallowedCurrentRow
+            //if $inheritedPermission=1, then we are allowed unless the current row is specifically disabled, already knowing from $anyAllowedRowOrChildren that there are no list=1(without user permission list=0),so this "blocker" is the highest cpath available for this row if found
+
+            $sql .= ' AND IF(' . $anyAllowedRowOrChildren . ',1,IF(' . $inheritedPermission . ', ' . $isDisallowedCurrentRow . ' = 0, 0)) = 1';
+        }
 
         if ((isset($includingUnpublished) && !$includingUnpublished) || (!isset($includingUnpublished) && Model\Document::doHideUnpublished())) {
             $sql .= ' AND o_published = 1';
         }
 
-        $sql .= " AND o_type IN ('" . implode("','", $objectTypes) . "') LIMIT 1";
+        if (!empty($objectTypes)) {
+            $sql .= " AND o_type IN ('" . implode("','", $objectTypes) . "')";
+        }
 
+        $sql .= ' LIMIT 1';
         $c = $this->db->fetchOne($sql, $this->model->getId());
 
         return (bool)$c;
@@ -321,7 +351,17 @@ class Dao extends Model\Element\Dao
      */
     public function hasSiblings($objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER], $includingUnpublished = null)
     {
-        $sql = 'SELECT 1 FROM objects WHERE o_parentId = ? and o_id != ?';
+        if (!$this->model->getParentId()) {
+            return false;
+        }
+
+        $sql = 'SELECT 1 FROM objects WHERE o_parentId = ?';
+        $params = [$this->model->getParentId()];
+
+        if ($this->model->getId()) {
+            $sql .= ' AND o_id != ?';
+            $params[] = $this->model->getId();
+        }
 
         if ((isset($includingUnpublished) && !$includingUnpublished) || (!isset($includingUnpublished) && Model\Document::doHideUnpublished())) {
             $sql .= ' AND o_published = 1';
@@ -329,7 +369,7 @@ class Dao extends Model\Element\Dao
 
         $sql .= " AND o_type IN ('" . implode("','", $objectTypes) . "') LIMIT 1";
 
-        $c = $this->db->fetchOne($sql, [$this->model->getParentId(), $this->model->getId()]);
+        $c = $this->db->fetchOne($sql, $params);
 
         return (bool)$c;
     }
@@ -344,6 +384,10 @@ class Dao extends Model\Element\Dao
      */
     public function getChildAmount($objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER], $user = null)
     {
+        if (!$this->model->getId()) {
+            return 0;
+        }
+
         $query = 'SELECT COUNT(*) AS count FROM objects o WHERE o_parentId = ?';
 
         if (!empty($objectTypes)) {
@@ -351,15 +395,20 @@ class Dao extends Model\Element\Dao
         }
 
         if ($user && !$user->isAdmin()) {
-            $userIds = $user->getRoles();
-            $userIds[] = $user->getId();
+            $roleIds = $user->getRoles();
+            $currentUserId = $user->getId();
+            $permissionIds = array_merge($roleIds, [$currentUserId]);
 
-            $query .= ' AND (select list as locate from users_workspaces_object where userId in (' . implode(',', $userIds) . ') and LOCATE(cpath,CONCAT(o.o_path,o.o_key))=1 ORDER BY LENGTH(cpath) DESC LIMIT 1)=1;';
+            $inheritedPermission = $this->isInheritingPermission('list', $permissionIds);
+
+            $anyAllowedRowOrChildren = 'EXISTS(SELECT list FROM users_workspaces_object uwo WHERE userId IN (' . implode(',', $permissionIds) . ') AND list=1 AND LOCATE(CONCAT(o.o_path,o.o_key),cpath)=1 AND
+            NOT EXISTS(SELECT list FROM users_workspaces_object WHERE userId ='.$currentUserId.'  AND list=0 AND cpath = uwo.cpath))';
+            $isDisallowedCurrentRow = 'EXISTS(SELECT list FROM users_workspaces_object uworow WHERE userId IN (' . implode(',', $permissionIds) . ')  AND cid = o_id AND list=0)';
+
+            $query .= ' AND IF(' . $anyAllowedRowOrChildren . ',1,IF(' . $inheritedPermission . ', ' . $isDisallowedCurrentRow . ' = 0, 0)) = 1';
         }
 
-        $c = $this->db->fetchOne($query, $this->model->getId());
-
-        return $c;
+        return (int) $this->db->fetchOne($query, [$this->model->getId()]);
     }
 
     /**
@@ -414,26 +463,33 @@ class Dao extends Model\Element\Dao
     }
 
     /**
-     * @return array
+     * @return DataObject\ClassDefinition[]
      */
     public function getClasses()
     {
-        if ($this->getChildAmount()) {
-            $path = $this->model->getRealFullPath();
-            if (!$this->model->getId() || $this->model->getId() == 1) {
-                $path = '';
-            }
-            $classIds = $this->db->fetchCol("SELECT o_classId FROM objects WHERE o_path LIKE ? AND o_type = 'object' GROUP BY o_classId", $this->db->escapeLike($path) . '/%');
-
-            $classes = [];
-            foreach ($classIds as $classId) {
-                $classes[] = DataObject\ClassDefinition::getById($classId);
-            }
-
-            return $classes;
+        $path = $this->model->getRealFullPath();
+        if (!$this->model->getId() || $this->model->getId() == 1) {
+            $path = '';
         }
 
-        return [];
+        $classIds = [];
+        do {
+            $classId = $this->db->fetchOne(
+                "SELECT o_classId FROM objects WHERE o_path LIKE ? AND o_type = 'object'".($classIds ? ' AND o_classId NOT IN ('.rtrim(str_repeat('?,', count($classIds)), ',').')' : '').' LIMIT 1',
+                array_merge([$this->db->escapeLike($path).'/%'], $classIds));
+            if ($classId) {
+                $classIds[] = $classId;
+            }
+        } while ($classId);
+
+        $classes = [];
+        foreach ($classIds as $classId) {
+            if ($class = DataObject\ClassDefinition::getById($classId)) {
+                $classes[] = $class;
+            }
+        }
+
+        return $classes;
     }
 
     /**
@@ -442,9 +498,24 @@ class Dao extends Model\Element\Dao
     protected function collectParentIds()
     {
         $parentIds = $this->getParentIds();
-        $parentIds[] = $this->model->getId();
+        if ($id = $this->model->getId()) {
+            $parentIds[] = $id;
+        }
 
         return $parentIds;
+    }
+
+    /**
+     * @param string $type
+     * @param array $userIds
+     *
+     * @return int
+     *
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function isInheritingPermission(string $type, array $userIds)
+    {
+        return $this->InheritingPermission($type, $userIds, 'object');
     }
 
     /**
@@ -488,7 +559,19 @@ class Dao extends Model\Element\Dao
     }
 
     /**
-     * @param string $type
+     * @param array $columns
+     * @param User $user
+     *
+     * @return array<string, int>
+     *
+     */
+    public function areAllowed(array $columns, User $user)
+    {
+        return $this->permissionByTypes($columns, $user, 'object');
+    }
+
+    /**
+     * @param string|null $type
      * @param Model\User $user
      * @param bool $quote
      *
@@ -560,7 +643,7 @@ class Dao extends Model\Element\Dao
     }
 
     /**
-     * @param string $type
+     * @param string|null $type
      * @param Model\User $user
      * @param bool $quote
      *
@@ -606,7 +689,7 @@ class Dao extends Model\Element\Dao
      */
     public function __isBasedOnLatestData()
     {
-        $data = $this->db->fetchRow('SELECT o_modificationDate, o_versionCount  from objects WHERE o_id = ?', $this->model->getId());
+        $data = $this->db->fetchRow('SELECT o_modificationDate, o_versionCount  from objects WHERE o_id = ?', [$this->model->getId()]);
 
         return $data
             && $data['o_modificationDate'] == $this->model->__getDataVersionTimestamp()

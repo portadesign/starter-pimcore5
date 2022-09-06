@@ -18,6 +18,7 @@ namespace Pimcore\Model\Search\Backend;
 use ForceUTF8\Encoding;
 use Pimcore\Event\Model\SearchBackendEvent;
 use Pimcore\Event\SearchBackendEvents;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Loader\ImplementationLoader\Exception\UnsupportedException;
 use Pimcore\Logger;
 use Pimcore\Model\Asset;
@@ -33,6 +34,8 @@ use Pimcore\Model\Search\Backend\Data\Dao;
  */
 class Data extends \Pimcore\Model\AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     // if a word occures more often than this number it will get stripped to keep the search_backend_data table from getting too big
     const MAX_WORD_OCCURENCES = 3;
 
@@ -77,14 +80,14 @@ class Data extends \Pimcore\Model\AbstractModel
     /**
      * timestamp of creation date
      *
-     * @var int
+     * @var int|null
      */
     protected $creationDate;
 
     /**
      * timestamp of modification date
      *
-     * @var int
+     * @var int|null
      */
     protected $modificationDate;
 
@@ -203,7 +206,7 @@ class Data extends \Pimcore\Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCreationDate()
     {
@@ -223,7 +226,7 @@ class Data extends \Pimcore\Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getModificationDate()
     {
@@ -445,7 +448,7 @@ class Data extends \Pimcore\Model\AbstractModel
                             $this->data .= ' ' . $contentText;
                         }
                     } catch (\Exception $e) {
-                        Logger::error($e);
+                        Logger::error((string) $e);
                     }
                 }
             } elseif ($element instanceof Asset\Text) {
@@ -457,7 +460,7 @@ class Data extends \Pimcore\Model\AbstractModel
                         $this->data .= ' ' . $contentText;
                     }
                 } catch (\Exception $e) {
-                    Logger::error($e);
+                    Logger::error((string) $e);
                 }
             } elseif ($element instanceof Asset\Image) {
                 try {
@@ -470,7 +473,7 @@ class Data extends \Pimcore\Model\AbstractModel
                         }
                     }
                 } catch (\Exception $e) {
-                    Logger::error($e);
+                    Logger::error((string) $e);
                 }
             }
 
@@ -568,7 +571,7 @@ class Data extends \Pimcore\Model\AbstractModel
     public function save()
     {
         if ($this->id instanceof Data\Id) {
-            \Pimcore::getEventDispatcher()->dispatch(new SearchBackendEvent($this), SearchBackendEvents::PRE_SAVE);
+            $this->dispatchEvent(new SearchBackendEvent($this), SearchBackendEvents::PRE_SAVE);
 
             $maxRetries = 5;
             for ($retries = 0; $retries < $maxRetries; $retries++) {
@@ -592,7 +595,7 @@ class Data extends \Pimcore\Model\AbstractModel
                 }
             }
 
-            \Pimcore::getEventDispatcher()->dispatch(new SearchBackendEvent($this), SearchBackendEvents::POST_SAVE);
+            $this->dispatchEvent(new SearchBackendEvent($this), SearchBackendEvents::POST_SAVE);
         } else {
             throw new \Exception('Search\\Backend\\Data cannot be saved - no id set!');
         }

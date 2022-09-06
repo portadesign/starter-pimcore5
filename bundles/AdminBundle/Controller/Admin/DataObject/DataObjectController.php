@@ -47,7 +47,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
- * @Route("/object")
+ * @Route("/object", name="pimcore_admin_dataobject_dataobject_")
  *
  * @internal
  */
@@ -56,49 +56,25 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     use AdminStyleTrait;
     use ElementEditLockHelperTrait;
     use ApplySchedulerDataTrait;
+    use DataObjectActionsTrait;
 
     /**
      * @var DataObject\Service
      */
-    protected $_objectService;
+    protected DataObject\Service $_objectService;
 
     /**
      * @var array
      */
-    private $objectData;
+    private array $objectData = [];
 
     /**
      * @var array
      */
-    private $metaData;
+    private array $metaData = [];
 
     /**
-     * @Route("/tree-get-root", name="pimcore_admin_dataobject_dataobject_treegetroot", methods={"GET"})
-     *
-     * @param Request $request
-     *
-     * @return JsonResponse
-     */
-    public function treeGetRootAction(Request $request)
-    {
-        return parent::treeGetRootAction($request);
-    }
-
-    /**
-     * @Route("/delete-info", name="pimcore_admin_dataobject_dataobject_deleteinfo", methods={"GET"})
-     *
-     * @param Request $request
-     * @param EventDispatcherInterface $eventDispatcher
-     *
-     * @return JsonResponse
-     */
-    public function deleteInfoAction(Request $request, EventDispatcherInterface $eventDispatcher)
-    {
-        return parent::deleteInfoAction($request, $eventDispatcher);
-    }
-
-    /**
-     * @Route("/tree-get-childs-by-id", name="pimcore_admin_dataobject_dataobject_treegetchildsbyid", methods={"GET"})
+     * @Route("/tree-get-childs-by-id", name="treegetchildsbyid", methods={"GET"})
      *
      * @param Request $request
      * @param EventDispatcherInterface $eventDispatcher
@@ -108,14 +84,13 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     public function treeGetChildsByIdAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
         $allParams = array_merge($request->request->all(), $request->query->all());
-
         $filter = $request->get('filter');
-        $object = DataObject::getById($request->get('node'));
-        $objectTypes = null;
+        $object = DataObject::getById((int) $request->get('node'));
+        $objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER];
         $objects = [];
         $cv = false;
-        $offset = 0;
-        $total = 0;
+        $offset = $total = $limit = $filteredTotalCount = 0;
+
         if ($object instanceof DataObject\Concrete) {
             $class = $object->getClass();
             if ($class->getShowVariants()) {
@@ -123,101 +98,61 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             }
         }
 
-        if (!$objectTypes) {
-            $objectTypes = [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER];
-        }
-
-        $filteredTotalCount = 0;
-        $limit = 0;
-
         if ($object->hasChildren($objectTypes)) {
-            $limit = (int)$request->get('limit');
+            $offset = (int)$request->get('start');
+            $limit = (int)$request->get('limit', 100000000);
+            if ($view = $request->get('view', false)) {
+                $cv = Element\Service::getCustomViewById($request->get('view'));
+            }
+
             if (!is_null($filter)) {
                 if (substr($filter, -1) != '*') {
                     $filter .= '*';
                 }
                 $filter = str_replace('*', '%', $filter);
-
                 $limit = 100;
-            } elseif (!$request->get('limit')) {
-                $limit = 100000000;
             }
 
-            $offset = (int)$request->get('start');
-
-            $childsList = new DataObject\Listing();
-            $condition = "objects.o_parentId = '" . $object->getId() . "'";
-
-            // custom views start
-            if ($request->get('view')) {
-                $cv = Element\Service::getCustomViewById($request->get('view'));
-
-                if ($cv['classes']) {
-                    $cvConditions = [];
-                    $cvClasses = $cv['classes'];
-                    foreach ($cvClasses as $key => $cvClass) {
-                        $cvConditions[] = "objects.o_classId = '" . $key . "'";
-                    }
-
-                    $cvConditions[] = "objects.o_type = 'folder'";
-                    $condition .= ' AND (' . implode(' OR ', $cvConditions) . ')';
-                }
-            }
-            // custom views end
-
-            if (!$this->getAdminUser()->isAdmin()) {
-                $userIds = $this->getAdminUser()->getRoles();
-                $userIds[] = $this->getAdminUser()->getId();
-                $condition .= ' AND
-                (
-                    (SELECT list FROM users_workspaces_object WHERE userId IN (' . implode(',', $userIds) . ') AND LOCATE(CONCAT(objects.o_path,objects.o_key),cpath)=1 ORDER BY LENGTH(cpath) DESC, FIELD(userId, '. $this->getAdminUser()->getId() .') DESC, list DESC LIMIT 1)=1
-                    OR
-                    (SELECT list FROM users_workspaces_object WHERE userId IN (' . implode(',', $userIds) . ') AND LOCATE(cpath,CONCAT(objects.o_path,objects.o_key))=1 ORDER BY LENGTH(cpath) DESC, FIELD(userId, '. $this->getAdminUser()->getId() .') DESC, list DESC LIMIT 1)=1
-                )';
-            }
-
-            if (!is_null($filter)) {
-                $db = Db::get();
-                $condition .= ' AND CAST(objects.o_key AS CHAR CHARACTER SET utf8) COLLATE utf8_general_ci LIKE ' . $db->quote($filter);
-            }
-
-            $childsList->setCondition($condition);
-            $childsList->setLimit($limit);
-            $childsList->setOffset($offset);
+            $childrenList = new DataObject\Listing();
+            $childrenList->setCondition($this->buildChildrenCondition($object, $filter, $view));
+            $childrenList->setLimit($limit);
+            $childrenList->setOffset($offset);
 
             if ($object->getChildrenSortBy() === 'index') {
-                $childsList->setOrderKey('objects.o_index ASC', false);
+                $childrenList->setOrderKey('objects.o_index ASC', false);
             } else {
-                $childsList->setOrderKey(
+                $childrenList->setOrderKey(
                     sprintf(
                         'CAST(objects.o_%s AS CHAR CHARACTER SET utf8) COLLATE utf8_general_ci %s',
-                        $object->getChildrenSortBy(), $object->getChildrenSortOrder() ?? 'ASC'
+                        $object->getChildrenSortBy(), $object->getChildrenSortOrder()
                     ),
                     false
                 );
             }
-            $childsList->setObjectTypes($objectTypes);
+            $childrenList->setObjectTypes($objectTypes);
 
-            Element\Service::addTreeFilterJoins($cv, $childsList);
+            Element\Service::addTreeFilterJoins($cv, $childrenList);
 
             $beforeListLoadEvent = new GenericEvent($this, [
-                'list' => $childsList,
+                'list' => $childrenList,
                 'context' => $allParams,
             ]);
             $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::OBJECT_LIST_BEFORE_LIST_LOAD);
-            /** @var DataObject\Listing $childsList */
-            $childsList = $beforeListLoadEvent->getArgument('list');
 
-            $childs = $childsList->load();
-            $filteredTotalCount = $childsList->getTotalCount();
+            /** @var DataObject\Listing $childrenList */
+            $childrenList = $beforeListLoadEvent->getArgument('list');
 
-            foreach ($childs as $child) {
-                $tmpObject = $this->getTreeNodeConfig($child);
+            $children = $childrenList->load();
+            $filteredTotalCount = $childrenList->getTotalCount();
 
-                if ($child->isAllowed('list')) {
-                    $objects[] = $tmpObject;
+            foreach ($children as $child) {
+                $objectTreeNode = $this->getTreeNodeConfig($child);
+                // this if is obsolete since as long as the change with #11714 about list on line 175-179 are working fine, we already filter the list=1 there
+                if ($objectTreeNode['permissions']['list'] == 1) {
+                    $objects[] = $objectTreeNode;
                 }
             }
+
             //pagination for custom view
             $total = $cv
                 ? $filteredTotalCount
@@ -250,9 +185,61 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
+     * @param DataObject\AbstractObject $object
+     * @param string|null $filter
+     * @param string|null $view
+     *
+     * @return string
+     */
+    private function buildChildrenCondition(DataObject\AbstractObject $object, ?string $filter, ?string $view): string
+    {
+        $condition = "objects.o_parentId = '" . $object->getId() . "'";
+
+        // custom views start
+        if ($view) {
+            $cv = Element\Service::getCustomViewById($view);
+
+            if (!empty($cv['classes'])) {
+                $cvConditions = [];
+                $cvClasses = $cv['classes'];
+                foreach ($cvClasses as $key => $cvClass) {
+                    $cvConditions[] = "objects.o_classId = '" . $key . "'";
+                }
+
+                $cvConditions[] = "objects.o_type = 'folder'";
+                $condition .= ' AND (' . implode(' OR ', $cvConditions) . ')';
+            }
+        }
+        // custom views end
+
+        if (!$this->getAdminUser()->isAdmin()) {
+            $userIds = $this->getAdminUser()->getRoles();
+            $currentUserId = $this->getAdminUser()->getId();
+            $userIds[] = $currentUserId;
+
+            $inheritedPermission = $object->getDao()->isInheritingPermission('list', $userIds);
+
+            $anyAllowedRowOrChildren = 'EXISTS(SELECT list FROM users_workspaces_object uwo WHERE userId IN (' . implode(',', $userIds) . ') AND list=1 AND LOCATE(CONCAT(objects.o_path,objects.o_key),cpath)=1 AND
+                NOT EXISTS(SELECT list FROM users_workspaces_object WHERE userId =' . $currentUserId . '  AND list=0 AND cpath = uwo.cpath))';
+            $isDisallowedCurrentRow = 'EXISTS(SELECT list FROM users_workspaces_object WHERE userId IN (' . implode(',', $userIds) . ')  AND cid = objects.o_id AND list=0)';
+
+            $condition .= ' AND IF(' . $anyAllowedRowOrChildren . ',1,IF(' . $inheritedPermission . ', ' . $isDisallowedCurrentRow . ' = 0, 0)) = 1';
+        }
+
+        if (!is_null($filter)) {
+            $db = Db::get();
+            $condition .= ' AND CAST(objects.o_key AS CHAR CHARACTER SET utf8) COLLATE utf8_general_ci LIKE ' . $db->quote($filter);
+        }
+
+        return $condition;
+    }
+
+    /**
      * @param DataObject\AbstractObject $element
      *
      * @return array
+     *
+     * @throws \Exception
      */
     protected function getTreeNodeConfig($element): array
     {
@@ -278,13 +265,9 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             $allowedTypes[] = DataObject::OBJECT_TYPE_VARIANT;
         }
 
-        $hasChildren = $child->hasChildren($allowedTypes);
+        $hasChildren = $child->getDao()->hasChildren($allowedTypes, null, $this->getAdminUser());
 
-        $tmpObject['isTarget'] = false;
         $tmpObject['allowDrop'] = false;
-        $tmpObject['allowChildren'] = false;
-
-        $tmpObject['leaf'] = !$hasChildren;
 
         $tmpObject['isTarget'] = true;
         if ($tmpObject['type'] != DataObject::OBJECT_TYPE_VARIANT) {
@@ -309,7 +292,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
         $this->addAdminStyle($child, ElementAdminStyleEvent::CONTEXT_TREE, $tmpObject);
 
         $tmpObject['expanded'] = !$hasChildren;
-        $tmpObject['permissions'] = $child->getUserPermissions();
+        $tmpObject['permissions'] = $child->getUserPermissions($this->getAdminUser());
 
         if ($child->isLocked()) {
             $tmpObject['cls'] .= 'pimcore_treenode_locked ';
@@ -320,8 +303,8 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
         if ($tmpObject['leaf']) {
             $tmpObject['expandable'] = false;
+            $tmpObject['leaf'] = false; //this is required to allow drag&drop
             $tmpObject['expanded'] = true;
-            $tmpObject['leaf'] = false;
             $tmpObject['loaded'] = true;
         }
 
@@ -329,17 +312,17 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/get-id-path-paging-info", name="pimcore_admin_dataobject_dataobject_getidpathpaginginfo", methods={"GET"})
+     * @Route("/get-id-path-paging-info", name="getidpathpaginginfo", methods={"GET"})
      *
      * @param Request $request
      *
      * @return JsonResponse
      */
-    public function getIdPathPagingInfoAction(Request $request)
+    public function getIdPathPagingInfoAction(Request $request): JsonResponse
     {
         $path = $request->get('path');
         $pathParts = explode('/', $path);
-        $id = array_pop($pathParts);
+        $id = (int) array_pop($pathParts);
 
         $limit = $request->get('limit');
 
@@ -366,9 +349,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                 $idList = $list->loadIdList();
                 $position = array_search($object->getId(), $idList);
                 $info['position'] = $position + 1;
-
                 $info['page'] = ceil($info['position'] / $limit);
-                $containsPaging = true;
             }
 
             $data[$parent->getId()] = $info;
@@ -380,7 +361,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/get", name="pimcore_admin_dataobject_dataobject_get", methods={"GET"})
+     * @Route("/get", name="get", methods={"GET"})
      *
      * @param Request $request
      * @param EventDispatcherInterface $eventDispatcher
@@ -389,9 +370,10 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      *
      * @throws \Exception
      */
-    public function getAction(Request $request, EventDispatcherInterface $eventDispatcher)
+    public function getAction(Request $request, EventDispatcherInterface $eventDispatcher): JsonResponse
     {
-        $objectFromDatabase = DataObject\Concrete::getById((int)$request->get('id'));
+        $objectId = (int)$request->get('id');
+        $objectFromDatabase = DataObject\Concrete::getById($objectId);
         if ($objectFromDatabase === null) {
             return $this->adminJson(['success' => false, 'message' => 'element_not_found'], JsonResponse::HTTP_NOT_FOUND);
         }
@@ -403,8 +385,8 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
         // check for lock
         if ($object->isAllowed('save') || $object->isAllowed('publish') || $object->isAllowed('unpublish') || $object->isAllowed('delete')) {
-            if (Element\Editlock::isLocked($request->get('id'), 'object')) {
-                return $this->getEditLockResponse($request->get('id'), 'object');
+            if (Element\Editlock::isLocked($objectId, 'object')) {
+                return $this->getEditLockResponse($objectId, 'object');
             }
 
             Element\Editlock::lock($request->get('id'), 'object');
@@ -433,6 +415,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                 $objectData['draft'] = [
                     'id' => $draftVersion->getId(),
                     'modificationDate' => $draftVersion->getDate(),
+                    'isAutoSave' => $draftVersion->isAutoSave(),
                 ];
             }
 
@@ -463,7 +446,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             }
 
             $objectData['layout'] = $objectFromDatabase->getClass()->getLayoutDefinitions();
-            $objectData['userPermissions'] = $objectFromDatabase->getUserPermissions();
+            $objectData['userPermissions'] = $objectFromDatabase->getUserPermissions($this->getAdminUser());
             $objectVersions = Element\Service::getSafeVersionInfo($objectFromDatabase->getVersions());
             $objectData['versions'] = array_splice($objectVersions, -1, 1);
             $objectData['scheduledTasks'] = array_map(
@@ -619,7 +602,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
             $relations = $object->getRelationData($refKey, !$fielddefinition instanceof ReverseObjectRelation, $refId);
 
-            if (empty($relations) && !empty($parent)) {
+            if ($fielddefinition->supportsInheritance() && empty($relations) && !empty($parent)) {
                 $this->getDataForField($parent, $key, $fielddefinition, $objectFromVersion, $level + 1);
             } else {
                 $data = [];
@@ -703,7 +686,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/get-folder", name="pimcore_admin_dataobject_dataobject_getfolder", methods={"GET"})
+     * @Route("/get-folder", name="getfolder", methods={"GET"})
      *
      * @param Request $request
      * @param EventDispatcherInterface $eventDispatcher
@@ -712,13 +695,19 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     public function getFolderAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
+        $objectId = (int)$request->get('id');
         // check for lock
-        if (Element\Editlock::isLocked($request->get('id'), 'object')) {
-            return $this->getEditLockResponse($request->get('id'), 'object');
+        if (Element\Editlock::isLocked($objectId, 'object')) {
+            return $this->getEditLockResponse($objectId, 'object');
         }
-        Element\Editlock::lock($request->get('id'), 'object');
+        Element\Editlock::lock($objectId, 'object');
 
-        $object = DataObject::getById((int)$request->get('id'));
+        $object = DataObject::getById($objectId);
+
+        if (!$object) {
+            throw $this->createNotFoundException();
+        }
+
         if ($object->isAllowed('view')) {
             $objectData = [];
 
@@ -736,7 +725,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             $objectData['general']['o_locked'] = $object->isLocked();
 
             $objectData['properties'] = Element\Service::minimizePropertiesForEditmode($object->getProperties());
-            $objectData['userPermissions'] = $object->getUserPermissions();
+            $objectData['userPermissions'] = $object->getUserPermissions($this->getAdminUser());
             $objectData['classes'] = $this->prepareChildClasses($object->getDao()->getClasses());
 
             // grid-config
@@ -776,7 +765,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      *
      * @return array
      */
-    protected function prepareChildClasses($classes)
+    protected function prepareChildClasses(array $classes): array
     {
         $reduced = [];
         foreach ($classes as $class) {
@@ -791,83 +780,82 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/add", name="pimcore_admin_dataobject_dataobject_add", methods={"POST"})
+     * @Route("/add", name="add", methods={"POST"})
      *
      * @param Request $request
      * @param Model\FactoryInterface $modelFactory
      *
      * @return JsonResponse
      */
-    public function addAction(Request $request, Model\FactoryInterface $modelFactory)
+    public function addAction(Request $request, Model\FactoryInterface $modelFactory): JsonResponse
     {
-        $success = false;
-
-        $className = 'Pimcore\\Model\\DataObject\\' . ucfirst($request->get('className'));
-        $parent = DataObject::getById($request->get('parentId'));
-
         $message = '';
-        $object = null;
-        if ($parent->isAllowed('create')) {
-            $intendedPath = $parent->getRealFullPath() . '/' . $request->get('key');
+        $parent = DataObject::getById((int) $request->get('parentId'));
 
-            if (!DataObject\Service::pathExists($intendedPath)) {
-                /** @var DataObject\Concrete $object */
-                $object = $modelFactory->build($className);
-                $object->setOmitMandatoryCheck(true); // allow to save the object although there are mandatory fields
-
-                if ($request->get('variantViaTree')) {
-                    $parentId = $request->get('parentId');
-                    $parent = DataObject\Concrete::getById($parentId);
-                    $object->setClassId($parent->getClass()->getId());
-                } else {
-                    $object->setClassId($request->get('classId'));
-                }
-
-                $object->setClassName($request->get('className'));
-                $object->setParentId($request->get('parentId'));
-                $object->setKey($request->get('key'));
-                $object->setCreationDate(time());
-                $object->setUserOwner($this->getAdminUser()->getId());
-                $object->setUserModification($this->getAdminUser()->getId());
-                $object->setPublished(false);
-
-                if ($request->get('objecttype') == DataObject::OBJECT_TYPE_OBJECT
-                    || $request->get('objecttype') == DataObject::OBJECT_TYPE_VARIANT) {
-                    $object->setType($request->get('objecttype'));
-                }
-
-                try {
-                    $object->save();
-                    $success = true;
-                } catch (\Exception $e) {
-                    return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
-                }
-            } else {
-                $message = 'prevented creating object because object with same path+key already exists';
-                Logger::debug($message);
-            }
-        } else {
+        if (!$parent->isAllowed('create')) {
             $message = 'prevented adding object because of missing permissions';
             Logger::debug($message);
         }
 
-        if ($success && $object instanceof DataObject\AbstractObject) {
+        $intendedPath = $parent->getRealFullPath() . '/' . $request->get('key');
+        if (DataObject\Service::pathExists($intendedPath)) {
+            $message = 'prevented creating object because object with same path+key already exists';
+            Logger::debug($message);
+        }
+
+        //return false if missing permissions or path+key already exists
+        if (!empty($message)) {
             return $this->adminJson([
-                'success' => $success,
-                'id' => $object->getId(),
-                'type' => $object->getType(),
-                'message' => $message,
-            ]);
-        } else {
-            return $this->adminJson([
-                'success' => $success,
+                'success' => false,
                 'message' => $message,
             ]);
         }
+
+        $className = 'Pimcore\\Model\\DataObject\\' . ucfirst($request->get('className'));
+        /** @var DataObject\Concrete $object */
+        $object = $modelFactory->build($className);
+        $object->setOmitMandatoryCheck(true); // allow to save the object although there are mandatory fields
+        $object->setClassId($request->get('classId'));
+
+        if ($request->get('variantViaTree')) {
+            $parentId = $request->get('parentId');
+            $parent = DataObject\Concrete::getById($parentId);
+            $object->setClassId($parent->getClass()->getId());
+        }
+
+        $object->setClassName($request->get('className'));
+        $object->setParentId($request->get('parentId'));
+        $object->setKey($request->get('key'));
+        $object->setCreationDate(time());
+        $object->setUserOwner($this->getAdminUser()->getId());
+        $object->setUserModification($this->getAdminUser()->getId());
+        $object->setPublished(false);
+
+        $objectType = $request->get('objecttype');
+        if (in_array($objectType, [DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_VARIANT])) {
+            $object->setType($objectType);
+        }
+
+        try {
+            $object->save();
+            $return = [
+                'success' => true,
+                'id' => $object->getId(),
+                'type' => $object->getType(),
+                'message' => $message,
+            ];
+        } catch (\Exception $e) {
+            $return = [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+
+        return $this->adminJson($return);
     }
 
     /**
-     * @Route("/add-folder", name="pimcore_admin_dataobject_dataobject_addfolder", methods={"POST"})
+     * @Route("/add-folder", name="addfolder", methods={"POST"})
      *
      * @param Request $request
      *
@@ -877,7 +865,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     {
         $success = false;
 
-        $parent = DataObject::getById($request->get('parentId'));
+        $parent = DataObject::getById((int) $request->get('parentId'));
         if ($parent->isAllowed('create')) {
             if (!DataObject\Service::pathExists($parent->getRealFullPath() . '/' . $request->get('key'))) {
                 $folder = DataObject\Folder::create([
@@ -888,10 +876,6 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                     'o_key' => $request->get('key'),
                     'o_published' => true,
                 ]);
-
-                $folder->setCreationDate(time());
-                $folder->setUserOwner($this->getAdminUser()->getId());
-                $folder->setUserModification($this->getAdminUser()->getId());
 
                 try {
                     $folder->save();
@@ -908,7 +892,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/delete", name="pimcore_admin_dataobject_dataobject_delete", methods={"DELETE"})
+     * @Route("/delete", name="delete", methods={"DELETE"})
      *
      * @param Request $request
      *
@@ -918,8 +902,18 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     public function deleteAction(Request $request)
     {
-        if ($request->get('type') == 'childs') {
-            $parentObject = DataObject::getById($request->get('id'));
+        $type = $request->get('type');
+
+        if ($type === 'childs') {
+            trigger_deprecation(
+                'pimcore/pimcore',
+                '10.4',
+                'Type childs is deprecated. Use children instead'
+            );
+            $type = 'children';
+        }
+        if ($type === 'children') {
+            $parentObject = DataObject::getById((int) $request->get('id'));
 
             $list = new DataObject\Listing();
             $list->setCondition('o_path LIKE ' . $list->quote($list->escapeLike($parentObject->getRealFullPath()) . '/%'));
@@ -936,16 +930,17 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             }
 
             return $this->adminJson(['success' => true, 'deleted' => $deletedItems]);
-        } elseif ($request->get('id')) {
-            $object = DataObject::getById($request->get('id'));
+        }
+        if ($id = $request->get('id')) {
+            $object = DataObject::getById((int) $id);
             if ($object) {
                 if (!$object->isAllowed('delete')) {
                     throw $this->createAccessDeniedHttpException();
-                } elseif ($object->isLocked()) {
-                    return $this->adminJson(['success' => false, 'message' => 'prevented deleting object, because it is locked: ID: ' . $object->getId()]);
-                } else {
-                    $object->delete();
                 }
+                if ($object->isLocked()) {
+                    return $this->adminJson(['success' => false, 'message' => 'prevented deleting object, because it is locked: ID: ' . $object->getId()]);
+                }
+                $object->delete();
             }
 
             // return true, even when the object doesn't exist, this can be the case when using batch delete incl. children
@@ -956,7 +951,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/change-children-sort-by", name="pimcore_admin_dataobject_dataobject_changechildrensortby", methods={"PUT"})
+     * @Route("/change-children-sort-by", name="changechildrensortby", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -966,10 +961,13 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     public function changeChildrenSortByAction(Request $request)
     {
-        $object = DataObject::getById($request->get('id'));
+        $object = DataObject::getById((int) $request->get('id'));
         if ($object) {
             $sortBy = $request->get('sortBy');
             $sortOrder = $request->get('childrenSortOrder');
+            if (!\in_array($sortOrder, ['ASC', 'DESC'])) {
+                $sortOrder = 'ASC';
+            }
 
             $currentSortBy = $object->getChildrenSortBy();
 
@@ -979,7 +977,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             if ($currentSortBy != $sortBy) {
                 $user = Tool\Admin::getCurrentUser();
 
-                if (!$user->isAdmin()) {
+                if (!$user->isAdmin() && !$user->isAllowed('objects_sort_method')) {
                     return $this->json(['success' => false, 'message' => 'Changing the sort method is only allowed for admin users']);
                 }
 
@@ -997,7 +995,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/update", name="pimcore_admin_dataobject_dataobject_update", methods={"PUT"})
+     * @Route("/update", name="update", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -1009,7 +1007,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     {
         $success = false;
 
-        $object = DataObject::getById($request->get('id'));
+        $object = DataObject::getById((int) $request->get('id'));
         if ($object instanceof DataObject\Concrete) {
             $object->setOmitMandatoryCheck(true);
         }
@@ -1024,12 +1022,15 @@ class DataObjectController extends ElementControllerBase implements KernelContro
         }
 
         $values = $this->decodeJson($request->get('values'));
+        $key = $values['key'] ?? null;
 
         if ($object->isAllowed('settings')) {
-            if (isset($values['key']) && $values['key'] && $object->isAllowed('rename')) {
-                $object->setKey($values['key']);
-            } elseif (!isset($values['key']) || $values['key'] != $object->getKey()) {
-                Logger::debug('prevented renaming object because of missing permissions ');
+            if ($key) {
+                if ($object->isAllowed('rename')) {
+                    $object->setKey($key);
+                } elseif ($key !== $object->getKey()) {
+                    Logger::debug('prevented renaming object because of missing permissions ');
+                }
             }
 
             if (!empty($values['parentId'])) {
@@ -1078,21 +1079,12 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
                 $success = true;
             } catch (\Exception $e) {
-                Logger::error($e);
+                Logger::error((string) $e);
 
                 return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
             }
-        } elseif ($object->isAllowed('rename') && $values['key']) {
-            //just rename
-            try {
-                $object->setKey($values['key']);
-                $object->save();
-                $success = true;
-            } catch (\Exception $e) {
-                Logger::error($e);
-
-                return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
-            }
+        } elseif ($key && $object->isAllowed('rename')) {
+            $this->adminJson($this->renameObject($object, $key));
         } else {
             Logger::debug('prevented update object because of missing permissions.');
         }
@@ -1256,7 +1248,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/save", name="pimcore_admin_dataobject_dataobject_save", methods={"POST", "PUT"})
+     * @Route("/save", name="save", methods={"POST", "PUT"})
      *
      * @param Request $request
      *
@@ -1266,7 +1258,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     public function saveAction(Request $request)
     {
-        $objectFromDatabase = DataObject\Concrete::getById($request->get('id'));
+        $objectFromDatabase = DataObject\Concrete::getById((int) $request->get('id'));
 
         // set the latest available version for editmode
         $object = $this->getLatestVersion($objectFromDatabase);
@@ -1392,7 +1384,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
                 return $this->adminJson(['success' => true]);
             }
-        } elseif ($object->isAllowed('save')) {
+        } elseif ($object->isAllowed('save') || $object->isAllowed('publish')) {
             $isAutoSave = $request->get('task') == 'autoSave';
             $draftData = [];
 
@@ -1401,6 +1393,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                 $draftData = [
                     'id' => $version->getId(),
                     'modificationDate' => $version->getDate(),
+                    'isAutoSave' => $version->isAutoSave(),
                 ];
             } else {
                 $object->save();
@@ -1466,7 +1459,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/save-folder", name="pimcore_admin_dataobject_dataobject_savefolder", methods={"PUT"})
+     * @Route("/save-folder", name="savefolder", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -1474,7 +1467,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     public function saveFolderAction(Request $request)
     {
-        $object = DataObject::getById($request->get('id'));
+        $object = DataObject::getById((int) $request->get('id'));
 
         if (!$object) {
             throw $this->createNotFoundException('Object not found');
@@ -1540,7 +1533,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/publish-version", name="pimcore_admin_dataobject_dataobject_publishversion", methods={"POST"})
+     * @Route("/publish-version", name="publishversion", methods={"POST"})
      *
      * @param Request $request
      *
@@ -1548,7 +1541,10 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     public function publishVersionAction(Request $request)
     {
-        $version = Model\Version::getById($request->get('id'));
+        $version = Model\Version::getById((int) $request->get('id'));
+        if (!$version) {
+            throw $this->createNotFoundException();
+        }
         $object = $version->loadData();
 
         $currentObject = DataObject::getById($object->getId());
@@ -1576,7 +1572,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/preview-version", name="pimcore_admin_dataobject_dataobject_previewversion", methods={"GET"})
+     * @Route("/preview-version", name="previewversion", methods={"GET"})
      *
      * @param Request $request
      *
@@ -1617,7 +1613,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/diff-versions/from/{from}/to/{to}", name="pimcore_admin_dataobject_dataobject_diffversions", methods={"GET"})
+     * @Route("/diff-versions/from/{from}/to/{to}", name="diffversions", methods={"GET"})
      *
      * @param Request $request
      * @param int $from
@@ -1673,7 +1669,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/grid-proxy", name="pimcore_admin_dataobject_dataobject_gridproxy", methods={"GET", "POST", "PUT"})
+     * @Route("/grid-proxy", name="gridproxy", methods={"GET", "POST", "PUT"})
      *
      * @param Request $request
      * @param EventDispatcherInterface $eventDispatcher
@@ -1689,10 +1685,8 @@ class DataObjectController extends ElementControllerBase implements KernelContro
         GridHelperService $gridHelperService,
         LocaleServiceInterface $localeService,
         CsrfProtectionHandler $csrfProtection
-    ) {
+    ): JsonResponse {
         $allParams = array_merge($request->request->all(), $request->query->all());
-        $csvMode = $allParams['csvMode'] ?? false;
-
         if (isset($allParams['context']) && $allParams['context']) {
             $allParams['context'] = json_decode($allParams['context'], true);
         } else {
@@ -1706,256 +1700,22 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
         $allParams = $filterPrepareEvent->getArgument('requestParams');
 
-        $requestedLanguage = $allParams['language'] ?? null;
-        if ($requestedLanguage) {
-            if ($requestedLanguage != 'default') {
-                $request->setLocale($requestedLanguage);
-            }
-        } else {
-            $requestedLanguage = $request->getLocale();
-        }
+        $csrfProtection->checkCsrfToken($request);
 
-        if (isset($allParams['data']) && $allParams['data']) {
-            $csrfProtection->checkCsrfToken($request);
-            if ($allParams['xaction'] == 'update') {
-                try {
-                    $data = $this->decodeJson($allParams['data']);
+        $result = $this->gridProxy(
+            $allParams,
+            DataObject::OBJECT_TYPE_OBJECT,
+            $request,
+            $eventDispatcher,
+            $gridHelperService,
+            $localeService
+        );
 
-                    // save
-                    $object = DataObject::getById($data['id']);
-
-                    if (!$object instanceof DataObject\Concrete) {
-                        throw $this->createNotFoundException('Object not found');
-                    }
-
-                    $class = $object->getClass();
-
-                    if (!$object->isAllowed('publish')) {
-                        throw $this->createAccessDeniedException("Permission denied. You don't have the rights to save this object.");
-                    }
-
-                    $user = Tool\Admin::getCurrentUser();
-                    $allLanguagesAllowed = false;
-                    $languagePermissions = [];
-                    if (!$user->isAdmin()) {
-                        $languagePermissions = $object->getPermissions('lEdit', $user);
-
-                        //sets allowed all languages modification when the lEdit column is empty
-                        $allLanguagesAllowed = $languagePermissions['lEdit'] == '';
-
-                        $languagePermissions = explode(',', $languagePermissions['lEdit']);
-                    }
-
-                    $objectData = [];
-                    foreach ($data as $key => $value) {
-                        $parts = explode('~', $key);
-                        if (substr($key, 0, 1) == '~') {
-                            $type = $parts[1];
-                            $field = $parts[2];
-                            $keyid = $parts[3];
-
-                            if ($type == 'classificationstore') {
-                                $groupKeyId = explode('-', $keyid);
-                                $groupId = $groupKeyId[0];
-                                $keyid = $groupKeyId[1];
-
-                                $getter = 'get' . ucfirst($field);
-                                if (method_exists($object, $getter)) {
-
-                                    /** @var Model\DataObject\ClassDefinition\Data\Classificationstore $csFieldDefinition */
-                                    $csFieldDefinition = $object->getClass()->getFieldDefinition($field);
-                                    $csLanguage = $requestedLanguage;
-                                    if (!$csFieldDefinition->isLocalized()) {
-                                        $csLanguage = 'default';
-                                    }
-
-                                    /** @var DataObject\Classificationstore $classificationStoreData */
-                                    $classificationStoreData = $object->$getter();
-
-                                    $keyConfig = DataObject\Classificationstore\KeyConfig::getById($keyid);
-                                    if ($keyConfig) {
-                                        $fieldDefinition = $keyDef = DataObject\Classificationstore\Service::getFieldDefinitionFromJson(
-                                            json_decode($keyConfig->getDefinition()),
-                                            $keyConfig->getType()
-                                        );
-                                        if ($fieldDefinition && method_exists($fieldDefinition, 'getDataFromGridEditor')) {
-                                            $value = $fieldDefinition->getDataFromGridEditor($value, $object, []);
-                                        }
-                                    }
-
-                                    $activeGroups = $classificationStoreData->getActiveGroups() ? $classificationStoreData->getActiveGroups() : [];
-                                    $activeGroups[$groupId] = true;
-                                    $classificationStoreData->setActiveGroups($activeGroups);
-                                    $classificationStoreData->setLocalizedKeyValue($groupId, $keyid, $value, $csLanguage);
-                                }
-                            }
-                        } elseif (count($parts) > 1) {
-                            $brickType = $parts[0];
-                            $brickDescriptor = null;
-
-                            if (strpos($brickType, '?') !== false) {
-                                $brickDescriptor = substr($brickType, 1);
-                                $brickDescriptor = json_decode($brickDescriptor, true);
-                                $brickType = $brickDescriptor['containerKey'];
-                            }
-                            $brickKey = $parts[1];
-                            $brickField = DataObject\Service::getFieldForBrickType($object->getClass(), $brickType);
-
-                            $fieldGetter = 'get' . ucfirst($brickField);
-                            $brickGetter = 'get' . ucfirst($brickType);
-                            $valueSetter = 'set' . ucfirst($brickKey);
-
-                            $brick = $object->$fieldGetter()->$brickGetter();
-                            if (empty($brick)) {
-                                $classname = '\\Pimcore\\Model\\DataObject\\Objectbrick\\Data\\' . ucfirst($brickType);
-                                $brickSetter = 'set' . ucfirst($brickType);
-                                $brick = new $classname($object);
-                                $object->$fieldGetter()->$brickSetter($brick);
-                            }
-
-                            if ($brickDescriptor) {
-                                $brickDefinition = Model\DataObject\Objectbrick\Definition::getByKey($brickType);
-                                /** @var DataObject\ClassDefinition\Data\Localizedfields $fieldDefinitionLocalizedFields */
-                                $fieldDefinitionLocalizedFields = $brickDefinition->getFieldDefinition('localizedfields');
-                                $fieldDefinition = $fieldDefinitionLocalizedFields->getFieldDefinition($brickKey);
-                            } else {
-                                $fieldDefinition = $this->getFieldDefinitionFromBrick($brickType, $brickKey);
-                            }
-
-                            if ($fieldDefinition && method_exists($fieldDefinition, 'getDataFromGridEditor')) {
-                                $value = $fieldDefinition->getDataFromGridEditor($value, $object, []);
-                            }
-
-                            if ($brickDescriptor) {
-                                /** @var DataObject\Localizedfield $localizedFields */
-                                $localizedFields = $brick->getLocalizedfields();
-                                $localizedFields->setLocalizedValue($brickKey, $value);
-                            } else {
-                                $brick->$valueSetter($value);
-                            }
-                        } else {
-                            if (!$user->isAdmin() && $languagePermissions) {
-                                $fd = $class->getFieldDefinition($key);
-                                if (!$fd) {
-                                    // try to get via localized fields
-                                    $localized = $class->getFieldDefinition('localizedfields');
-                                    if ($localized instanceof DataObject\ClassDefinition\Data\Localizedfields) {
-                                        $field = $localized->getFieldDefinition($key);
-                                        if ($field) {
-                                            $currentLocale = $localeService->findLocale();
-                                            if (!$allLanguagesAllowed && !in_array($currentLocale, $languagePermissions)) {
-                                                continue;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            $fieldDefinition = $this->getFieldDefinition($class, $key);
-                            if ($fieldDefinition && method_exists($fieldDefinition, 'getDataFromGridEditor')) {
-                                $value = $fieldDefinition->getDataFromGridEditor($value, $object, []);
-                            }
-
-                            $objectData[$key] = $value;
-                        }
-                    }
-
-                    $object->setValues($objectData);
-                    if ($object->getPublished() == false) {
-                        $object->setOmitMandatoryCheck(true);
-                    }
-
-                    $object->save();
-
-                    return $this->adminJson(['data' => DataObject\Service::gridObjectData($object, $allParams['fields'], $requestedLanguage), 'success' => true]);
-                } catch (\Exception $e) {
-                    return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
-                }
-            }
-        } else {
-            // get list of objects
-            $list = $gridHelperService->prepareListingForGrid($allParams, $requestedLanguage, $this->getAdminUser());
-
-            $beforeListLoadEvent = new GenericEvent($this, [
-                'list' => $list,
-                'context' => $allParams,
-            ]);
-            $eventDispatcher->dispatch($beforeListLoadEvent, AdminEvents::OBJECT_LIST_BEFORE_LIST_LOAD);
-            /** @var DataObject\Listing\Concrete $list */
-            $list = $beforeListLoadEvent->getArgument('list');
-
-            $list->load();
-
-            $objects = [];
-            foreach ($list->getObjects() as $object) {
-                if ($csvMode) {
-                    $o = DataObject\Service::getCsvDataForObject($object, $requestedLanguage, $request->get('fields'), DataObject\Service::getHelperDefinitions(), $localeService, false, $allParams['context']);
-                } else {
-                    $o = DataObject\Service::gridObjectData($object, $allParams['fields'] ?? null, $requestedLanguage,
-                        ['csvMode' => $csvMode]);
-                }
-
-                // Like for treeGetChildsByIdAction, so we respect isAllowed method which can be extended (object DI) for custom permissions, so relying only users_workspaces_object is insufficient and could lead security breach
-                if ($object->isAllowed('list')) {
-                    $objects[] = $o;
-                }
-            }
-
-            $result = ['data' => $objects, 'success' => true, 'total' => $list->getTotalCount()];
-
-            $afterListLoadEvent = new GenericEvent($this, [
-                'list' => $result,
-                'context' => $allParams,
-            ]);
-            $eventDispatcher->dispatch($afterListLoadEvent, AdminEvents::OBJECT_LIST_AFTER_LIST_LOAD);
-            $result = $afterListLoadEvent->getArgument('list');
-
-            return $this->adminJson($result);
-        }
-
-        return $this->adminJson(['success' => false]);
+        return $this->adminJson($result);
     }
 
     /**
-     * @param DataObject\ClassDefinition $class
-     * @param string $key
-     *
-     * @return DataObject\ClassDefinition\Data|null
-     */
-    protected function getFieldDefinition($class, $key)
-    {
-        $fieldDefinition = $class->getFieldDefinition($key);
-        if ($fieldDefinition) {
-            return $fieldDefinition;
-        }
-
-        $localized = $class->getFieldDefinition('localizedfields');
-        if ($localized instanceof DataObject\ClassDefinition\Data\Localizedfields) {
-            $fieldDefinition = $localized->getFieldDefinition($key);
-        }
-
-        return $fieldDefinition;
-    }
-
-    /**
-     * @param string $brickType
-     * @param string $key
-     *
-     * @return DataObject\ClassDefinition\Data|null
-     */
-    protected function getFieldDefinitionFromBrick($brickType, $key)
-    {
-        $brickDefinition = DataObject\Objectbrick\Definition::getByKey($brickType);
-        $fieldDefinition = null;
-        if ($brickDefinition) {
-            $fieldDefinition = $brickDefinition->getFieldDefinition($key);
-        }
-
-        return $fieldDefinition;
-    }
-
-    /**
-     * @Route("/copy-info", name="pimcore_admin_dataobject_dataobject_copyinfo", methods={"GET"})
+     * @Route("/copy-info", name="copyinfo", methods={"GET"})
      *
      * @param Request $request
      *
@@ -1967,11 +1727,11 @@ class DataObjectController extends ElementControllerBase implements KernelContro
         $pasteJobs = [];
 
         Tool\Session::useSession(function (AttributeBagInterface $session) use ($transactionId) {
-            $session->set($transactionId, ['idMapping' => []]);
+            $session->set((string) $transactionId, ['idMapping' => []]);
         }, 'pimcore_copy');
 
         if ($request->get('type') == 'recursive' || $request->get('type') == 'recursive-update-references') {
-            $object = DataObject::getById($request->get('sourceId'));
+            $object = DataObject::getById((int) $request->get('sourceId'));
 
             // first of all the new parent
             $pasteJobs[] = [[
@@ -2045,7 +1805,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/copy-rewrite-ids", name="pimcore_admin_dataobject_dataobject_copyrewriteids", methods={"PUT"})
+     * @Route("/copy-rewrite-ids", name="copyrewriteids", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -2088,7 +1848,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/copy", name="pimcore_admin_dataobject_dataobject_copy", methods={"POST"})
+     * @Route("/copy", name="copy", methods={"POST"})
      *
      * @param Request $request
      *
@@ -2105,13 +1865,13 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
         $targetId = (int)$request->get('targetId');
         if ($request->get('targetParentId')) {
-            $sourceParent = DataObject::getById($request->get('sourceParentId'));
+            $sourceParent = DataObject::getById((int) $request->get('sourceParentId'));
 
             // this is because the key can get the prefix "_copy" if the target does already exists
             if ($sessionBag['parentId']) {
                 $targetParent = DataObject::getById($sessionBag['parentId']);
             } else {
-                $targetParent = DataObject::getById($request->get('targetParentId'));
+                $targetParent = DataObject::getById((int) $request->get('targetParentId'));
             }
 
             $targetPath = preg_replace('@^' . preg_quote($sourceParent->getRealFullPath(), '@') . '@', $targetParent . '/', $source->getRealPath());
@@ -2156,7 +1916,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @Route("/preview", name="pimcore_admin_dataobject_dataobject_preview", methods={"GET"})
+     * @Route("/preview", name="preview", methods={"GET"})
      *
      * @param Request $request
      *
@@ -2304,12 +2064,14 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @param DataObject\Concrete $object
+     * @template T of DataObject\Concrete
+     *
+     * @param T $object
      * @param null|Version $draftVersion
      *
-     * @return DataObject\Concrete|null
+     * @return T
      */
-    protected function getLatestVersion(DataObject\Concrete $object, &$draftVersion = null)
+    protected function getLatestVersion(DataObject\Concrete $object, &$draftVersion = null): ?DataObject\Concrete
     {
         $latestVersion = $object->getLatestVersion($this->getAdminUser()->getId());
         if ($latestVersion) {

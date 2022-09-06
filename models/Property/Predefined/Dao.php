@@ -30,9 +30,9 @@ class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
         $config = \Pimcore::getContainer()->getParameter('pimcore.config');
 
         parent::configure([
-            'containerConfig' => $config['properties']['predefined']['definitions'] ?? [],
+            'containerConfig' => $config['properties']['predefined']['definitions'],
             'settingsStoreScope' => 'pimcore_predefined_properties',
-            'storageDirectory' => PIMCORE_CONFIGURATION_DIRECTORY . '/predefined-properties',
+            'storageDirectory' => $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_PREDEFINED_PROPERTIES'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/predefined-properties',
             'legacyConfigFile' => 'predefined-properties.php',
             'writeTargetEnvVariableName' => 'PIMCORE_WRITE_TARGET_PREDEFINED_PROPERTIES',
         ]);

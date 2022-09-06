@@ -15,8 +15,8 @@
 
 namespace Pimcore\Model\Document;
 
+use Pimcore\Messenger\GeneratePagePreviewMessage;
 use Pimcore\Model\Redirect;
-use Pimcore\Model\Site;
 use Pimcore\Model\Tool\Targeting\TargetGroup;
 
 /**
@@ -82,10 +82,6 @@ class Page extends TargetingDocument
 
         foreach ($redirects->getRedirects() as $redirect) {
             $redirect->delete();
-        }
-
-        if ($site = Site::getByRootId($this->getId())) {
-            $site->delete();
         }
 
         parent::doDelete();
@@ -171,15 +167,19 @@ class Page extends TargetingDocument
     }
 
     /**
-     * @param string $prettyUrl
+     * @param string|null $prettyUrl
      *
      * @return $this
      */
     public function setPrettyUrl($prettyUrl)
     {
-        $this->prettyUrl = '/' . trim($prettyUrl, ' /');
-        if (strlen($this->prettyUrl) < 2) {
+        if (!$prettyUrl) {
             $this->prettyUrl = null;
+        } else {
+            $this->prettyUrl = '/' . trim($prettyUrl, ' /');
+            if (strlen($this->prettyUrl) < 2) {
+                $this->prettyUrl = null;
+            }
         }
 
         return $this;
@@ -259,7 +259,7 @@ class Page extends TargetingDocument
         $targetGroups = array_map(function ($id) {
             $id = trim($id);
             if (!empty($id)) {
-                $targetGroup = TargetGroup::getById($id);
+                $targetGroup = TargetGroup::getById((int) $id);
                 if ($targetGroup) {
                     return $targetGroup;
                 }
@@ -277,5 +277,20 @@ class Page extends TargetingDocument
     public function getPreviewImageFilesystemPath()
     {
         return PIMCORE_SYSTEM_TEMP_DIRECTORY . '/document-page-previews/document-page-screenshot-' . $this->getId() . '@2x.jpg';
+    }
+
+    public function save()
+    {
+        $response = parent::save(...func_get_args());
+
+        // Dispatch page preview message, if preview is enabled.
+        $documentsConfig = \Pimcore\Config::getSystemConfiguration('documents');
+        if ($documentsConfig['generate_preview'] ?? false) {
+            \Pimcore::getContainer()->get('messenger.bus.pimcore-core')->dispatch(
+                new GeneratePagePreviewMessage($this->getId(), \Pimcore\Tool::getHostUrl())
+            );
+        }
+
+        return $response;
     }
 }

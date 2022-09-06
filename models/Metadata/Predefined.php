@@ -86,12 +86,12 @@ final class Predefined extends Model\AbstractModel
     protected $group;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $creationDate;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $modificationDate;
 
@@ -257,7 +257,7 @@ final class Predefined extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCreationDate()
     {
@@ -277,7 +277,7 @@ final class Predefined extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getModificationDate()
     {
@@ -354,7 +354,7 @@ final class Predefined extends Model\AbstractModel
             $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
             /** @var Model\Asset\MetaData\ClassDefinition\Data\Data $instance */
             $instance = $loader->build($this->type);
-            $this->data = $instance->marshal($this->data);
+            $this->data = $instance->getDataFromEditMode($this->data);
         } catch (UnsupportedException $e) {
             Logger::error('could not resolve asset metadata implementation for ' . $this->type);
         }
@@ -366,7 +366,7 @@ final class Predefined extends Model\AbstractModel
             $loader = \Pimcore::getContainer()->get('pimcore.implementation_loader.asset.metadata.data');
             /** @var Model\Asset\MetaData\ClassDefinition\Data\Data $instance */
             $instance = $loader->build($this->type);
-            $this->data = $instance->unmarshal($this->data);
+            $this->data = $instance->getDataForEditmode($this->data);
         } catch (UnsupportedException $e) {
             Logger::error('could not resolve asset metadata implementation for ' . $this->type);
         }

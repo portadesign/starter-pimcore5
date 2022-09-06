@@ -15,11 +15,11 @@
 
 namespace Pimcore\Model\Asset;
 
-use Pimcore\Db;
 use Pimcore\Loader\ImplementationLoader\Exception\UnsupportedException;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Asset\MetaData\ClassDefinition\Data\Data;
+use Pimcore\Model\User;
 use Pimcore\Tool\Serialize;
 
 /**
@@ -31,6 +31,13 @@ class Dao extends Model\Element\Dao
 {
     use Model\Element\Traits\ScheduledTasksDaoTrait;
     use Model\Element\Traits\VersionDaoTrait;
+
+    /**
+     * @internal
+     *
+     * @var array
+     */
+    public static array $thumbnailStatusCache = [];
 
     /**
      * Get the data for the object by id from database and assign it to the object (model)
@@ -103,7 +110,7 @@ class Dao extends Model\Element\Dao
             'parentId' => $this->model->getParentId(),
         ]);
 
-        $this->model->setId($this->db->lastInsertId());
+        $this->model->setId((int) $this->db->lastInsertId());
     }
 
     public function update()
@@ -121,9 +128,11 @@ class Dao extends Model\Element\Dao
 
         // metadata
         $this->db->delete('assets_metadata', ['cid' => $this->model->getId()]);
+        /** @var array $metadata */
         $metadata = $this->model->getMetadata(null, null, false, true);
 
         $data['hasMetaData'] = 0;
+        $metadataItems = [];
         if (!empty($metadata)) {
             foreach ($metadata as $metadataItem) {
                 $metadataItem['cid'] = $this->model->getId();
@@ -145,13 +154,18 @@ class Dao extends Model\Element\Dao
                 $metadataItem['language'] = (string) $metadataItem['language']; // language column cannot be NULL -> see SQL schema
 
                 if (is_scalar($metadataItem['data'])) {
-                    $this->db->insert('assets_metadata', $metadataItem);
                     $data['hasMetaData'] = 1;
+                    $metadataItems[] = $metadataItem;
                 }
             }
         }
 
         $this->db->insertOrUpdate('assets', $data);
+        if ($data['hasMetaData'] && count($metadataItems)) {
+            foreach ($metadataItems as $metadataItem) {
+                $this->db->insert('assets_metadata', $metadataItem);
+            }
+        }
 
         // tree_locks
         $this->db->delete('tree_locks', ['id' => $this->model->getId(), 'type' => 'asset']);
@@ -274,19 +288,6 @@ class Dao extends Model\Element\Dao
     }
 
     /**
-     * deletes all metadata for the object from database
-     */
-    public function deleteAllMetadata()
-    {
-        $this->db->delete('assets_metadata', ['cid' => $this->model->getId()]);
-    }
-
-    public function deleteAllPermissions()
-    {
-        $this->db->delete('users_workspaces_asset', ['cid' => $this->model->getId()]);
-    }
-
-    /**
      * @return string|null retrieves the current full set path from DB
      */
     public function getCurrentFullPath()
@@ -294,7 +295,7 @@ class Dao extends Model\Element\Dao
         $path = null;
 
         try {
-            $path = $this->db->fetchOne('SELECT CONCAT(path,filename) as path FROM assets WHERE id = ?', $this->model->getId());
+            $path = $this->db->fetchOne('SELECT CONCAT(path,filename) as path FROM assets WHERE id = ?', [$this->model->getId()]);
         } catch (\Exception $e) {
             Logger::error('could not get  current asset path from DB');
         }
@@ -307,10 +308,14 @@ class Dao extends Model\Element\Dao
      */
     public function getVersionCountForUpdate(): int
     {
-        $versionCount = (int) $this->db->fetchOne('SELECT versionCount FROM assets WHERE id = ? FOR UPDATE', $this->model->getId());
+        if (!$this->model->getId()) {
+            return 0;
+        }
+
+        $versionCount = (int) $this->db->fetchOne('SELECT versionCount FROM assets WHERE id = ? FOR UPDATE', [$this->model->getId()]);
 
         if (!$this->model instanceof Folder) {
-            $versionCount2 = (int) $this->db->fetchOne("SELECT MAX(versionCount) FROM versions WHERE cid = ? AND ctype = 'asset'", $this->model->getId());
+            $versionCount2 = (int) $this->db->fetchOne("SELECT MAX(versionCount) FROM versions WHERE cid = ? AND ctype = 'asset'", [$this->model->getId()]);
             $versionCount = max($versionCount, $versionCount2);
         }
 
@@ -320,11 +325,34 @@ class Dao extends Model\Element\Dao
     /**
      * quick test if there are children
      *
+     * @param Model\User $user
+     *
      * @return bool
      */
-    public function hasChildren()
+    public function hasChildren($user = null)
     {
-        $c = $this->db->fetchOne('SELECT id FROM assets WHERE parentId = ? LIMIT 1', $this->model->getId());
+        if (!$this->model->getId()) {
+            return false;
+        }
+
+        $query = 'SELECT `a`.`id` FROM `assets` a  WHERE parentId = ? ';
+
+        if ($user && !$user->isAdmin()) {
+            $userIds = $user->getRoles();
+            $currentUserId = $user->getId();
+            $userIds[] = $currentUserId;
+
+            $inheritedPermission = $this->isInheritingPermission('list', $userIds);
+
+            $anyAllowedRowOrChildren = 'EXISTS(SELECT list FROM users_workspaces_asset uwa WHERE userId IN (' . implode(',', $userIds) . ') AND list=1 AND LOCATE(CONCAT(path,filename),cpath)=1 AND
+                NOT EXISTS(SELECT list FROM users_workspaces_asset WHERE userId =' . $currentUserId . '  AND list=0 AND cpath = uwa.cpath))';
+            $isDisallowedCurrentRow = 'EXISTS(SELECT list FROM users_workspaces_asset WHERE userId IN (' . implode(',', $userIds) . ')  AND cid = id AND list=0)';
+
+            $query .= ' AND IF(' . $anyAllowedRowOrChildren . ',1,IF(' . $inheritedPermission . ', ' . $isDisallowedCurrentRow . ' = 0, 0)) = 1';
+        }
+
+        $query .= ' LIMIT 1;';
+        $c = $this->db->fetchOne($query, $this->model->getId());
 
         return (bool)$c;
     }
@@ -336,7 +364,21 @@ class Dao extends Model\Element\Dao
      */
     public function hasSiblings()
     {
-        $c = $this->db->fetchOne('SELECT id FROM assets WHERE parentId = ? and id != ? LIMIT 1', [$this->model->getParentId(), $this->model->getId()]);
+        if (!$this->model->getParentId()) {
+            return false;
+        }
+
+        $sql = 'SELECT 1 FROM assets WHERE parentId = ?';
+        $params = [$this->model->getParentId()];
+
+        if ($this->model->getId()) {
+            $sql .= ' AND id != ?';
+            $params[] = $this->model->getId();
+        }
+
+        $sql .= ' LIMIT 1';
+
+        $c = $this->db->fetchOne($sql, $params);
 
         return (bool)$c;
     }
@@ -350,19 +392,27 @@ class Dao extends Model\Element\Dao
      */
     public function getChildAmount($user = null)
     {
-        if ($user && !$user->isAdmin()) {
-            $userIds = $user->getRoles();
-            $userIds[] = $user->getId();
-
-            $query = 'select count(*) from assets a where parentId = ?
-                            and (select list as locate from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(cpath,CONCAT(a.path,a.filename))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1;';
-        } else {
-            $query = 'SELECT COUNT(*) AS count FROM assets WHERE parentId = ?';
+        if (!$this->model->getId()) {
+            return 0;
         }
 
-        $c = $this->db->fetchOne($query, $this->model->getId());
+        $query = 'SELECT COUNT(*) AS count FROM assets WHERE parentId = ?';
 
-        return $c;
+        if ($user && !$user->isAdmin()) {
+            $userIds = $user->getRoles();
+            $currentUserId = $user->getId();
+            $userIds[] = $currentUserId;
+
+            $inheritedPermission = $this->isInheritingPermission('list', $userIds);
+
+            $anyAllowedRowOrChildren = 'EXISTS(SELECT list FROM users_workspaces_asset uwa WHERE userId IN (' . implode(',', $userIds) . ') AND list=1 AND LOCATE(CONCAT(path,filename),cpath)=1 AND
+                NOT EXISTS(SELECT list FROM users_workspaces_asset WHERE userId =' . $currentUserId . '  AND list=0 AND cpath = uwa.cpath))';
+            $isDisallowedCurrentRow = 'EXISTS(SELECT list FROM users_workspaces_asset WHERE userId IN (' . implode(',', $userIds) . ')  AND cid = id AND list=0)';
+
+            $query .= ' AND IF(' . $anyAllowedRowOrChildren . ',1,IF(' . $inheritedPermission . ', ' . $isDisallowedCurrentRow . ' = 0, 0)) = 1';
+        }
+
+        return (int) $this->db->fetchOne($query, [$this->model->getId()]);
     }
 
     /**
@@ -400,6 +450,19 @@ class Dao extends Model\Element\Dao
 
     /**
      * @param string $type
+     * @param array $userIds
+     *
+     * @return int
+     *
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function isInheritingPermission(string $type, array $userIds): int
+    {
+        return $this->InheritingPermission($type, $userIds, 'asset');
+    }
+
+    /**
+     * @param string $type
      * @param Model\User $user
      *
      * @return bool
@@ -417,7 +480,9 @@ class Dao extends Model\Element\Dao
                 $obj = $obj->getParent();
             }
         }
-        $parentIds[] = $this->model->getId();
+        if ($id = $this->model->getId()) {
+            $parentIds[] = $id;
+        }
 
         $userIds = $user->getRoles();
         $userIds[] = $user->getId();
@@ -449,6 +514,18 @@ class Dao extends Model\Element\Dao
         return false;
     }
 
+    /**
+     * @param array $columns
+     * @param User $user
+     *
+     * @return array<string, int>
+     *
+     */
+    public function areAllowed(array $columns, User $user)
+    {
+        return $this->permissionByTypes($columns, $user, 'asset');
+    }
+
     public function updateCustomSettings()
     {
         $customSettingsData = Serialize::serialize($this->model->getCustomSettings());
@@ -460,11 +537,66 @@ class Dao extends Model\Element\Dao
      */
     public function __isBasedOnLatestData()
     {
-        $data = $this->db->fetchRow('SELECT modificationDate, versionCount from assets WHERE id = ?', $this->model->getId());
+        $data = $this->db->fetchRow('SELECT modificationDate, versionCount from assets WHERE id = ?', [$this->model->getId()]);
         if ($data['modificationDate'] == $this->model->__getDataVersionTimestamp() && $data['versionCount'] == $this->model->getVersionCount()) {
             return true;
         }
 
         return false;
+    }
+
+    public function addToThumbnailCache(string $name, string $filename): void
+    {
+        $assetId = $this->model->getId();
+        $time = time();
+        $this->db->insertOrUpdate('assets_image_thumbnail_cache', [
+            'cid' => $assetId,
+            'name' => $name,
+            'filename' => $filename,
+            'modificationDate' => $time,
+        ]);
+
+        if (isset(self::$thumbnailStatusCache[$assetId])) {
+            $hash = $name . $filename;
+            self::$thumbnailStatusCache[$assetId][$hash] = $time;
+        }
+    }
+
+    public function getCachedThumbnailModificationDate(string $name, string $filename): ?int
+    {
+        $assetId = $this->model->getId();
+
+        // we use a static var here, because it could be that an asset is serialized in the cache,
+        // so this runtime cache wouldn't be as efficient
+        if (!isset(self::$thumbnailStatusCache[$assetId])) {
+            self::$thumbnailStatusCache[$assetId] = [];
+            $thumbs = $this->db->fetchAll('SELECT * FROM assets_image_thumbnail_cache WHERE cid = :cid', [
+                'cid' => $this->model->getId(),
+            ]);
+
+            foreach ($thumbs as $thumb) {
+                $hash = $thumb['name'] . $thumb['filename'];
+                self::$thumbnailStatusCache[$assetId][$hash] = $thumb['modificationDate'];
+            }
+        }
+
+        $hash = $name . $filename;
+
+        return self::$thumbnailStatusCache[$assetId][$hash] ?? null;
+    }
+
+    public function deleteFromThumbnailCache(?string $name = null): void
+    {
+        $assetId = $this->model->getId();
+        $where = [
+            'cid' => $assetId,
+        ];
+
+        if ($name) {
+            $where['name'] = $name;
+        }
+
+        $this->db->delete('assets_image_thumbnail_cache', $where);
+        unset(self::$thumbnailStatusCache[$assetId]);
     }
 }

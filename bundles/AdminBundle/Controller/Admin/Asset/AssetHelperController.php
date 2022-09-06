@@ -15,6 +15,8 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\Asset;
 
+use League\Flysystem\FilesystemException;
+use League\Flysystem\UnableToReadFile;
 use PhpOffice\PhpSpreadsheet\Reader\Csv;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Pimcore\Bundle\AdminBundle\Controller\AdminController;
@@ -32,11 +34,14 @@ use Pimcore\Model\GridConfigShare;
 use Pimcore\Model\Metadata;
 use Pimcore\Model\User;
 use Pimcore\Tool;
+use Pimcore\Tool\Storage;
 use Pimcore\Version;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
 use Symfony\Component\Routing\Annotation\Route;
@@ -207,7 +212,7 @@ class AssetHelperController extends AdminController
 
         if (is_numeric($requestedGridConfigId) && $requestedGridConfigId > 0) {
             $db = Db::get();
-            $savedGridConfig = GridConfig::getById($requestedGridConfigId);
+            $savedGridConfig = GridConfig::getById((int) $requestedGridConfigId);
 
             if ($savedGridConfig) {
                 $shared = null;
@@ -231,6 +236,7 @@ class AssetHelperController extends AdminController
                 $gridConfigName = $savedGridConfig->getName();
                 $gridConfigDescription = $savedGridConfig->getDescription();
                 $sharedGlobally = $savedGridConfig->isShareGlobally();
+                $setAsFavourite = $savedGridConfig->isSetAsFavourite();
             }
         }
 
@@ -240,7 +246,7 @@ class AssetHelperController extends AdminController
         if (empty($gridConfig)) {
             $availableFields = $this->getDefaultGridFields(
                 $request->get('no_system_columns'),
-                null, //maybe required for types other than metadata
+                [], //maybe required for types other than metadata
                 $context,
                 $types);
         } else {
@@ -270,6 +276,7 @@ class AssetHelperController extends AdminController
         $settings['gridConfigName'] = $gridConfigName ?? null;
         $settings['gridConfigDescription'] = $gridConfigDescription ?? null;
         $settings['shareGlobally'] = $sharedGlobally ?? null;
+        $settings['setAsFavourite'] = $setAsFavourite ?? null;
         $settings['isShared'] = !$gridConfigId || ($shared ?? null);
 
         $context = $gridConfig['context'] ?? null;
@@ -498,7 +505,11 @@ class AssetHelperController extends AdminController
      */
     public function gridSaveColumnConfigAction(Request $request)
     {
-        $asset = Asset::getById($request->get('id'));
+        $asset = Asset::getById((int) $request->get('id'));
+
+        if (!$asset) {
+            throw $this->createNotFoundException();
+        }
 
         if ($asset->isAllowed('list')) {
             try {
@@ -527,6 +538,10 @@ class AssetHelperController extends AdminController
 
                 $this->updateGridConfigShares($gridConfig, $metadata);
 
+                if ($metadata['setAsFavourite'] && $this->getAdminUser()->isAdmin()) {
+                    $this->updateGridConfigFavourites($gridConfig, $metadata);
+                }
+
                 if (!$gridConfig) {
                     $gridConfig = new GridConfig();
                     $gridConfig->setName(date('c'));
@@ -541,6 +556,7 @@ class AssetHelperController extends AdminController
                     $gridConfig->setName($metadata['gridConfigName']);
                     $gridConfig->setDescription($metadata['gridConfigDescription']);
                     $gridConfig->setShareGlobally($metadata['shareGlobally'] && $this->getAdminUser()->isAdmin());
+                    $gridConfig->setSetAsFavourite($metadata['setAsFavourite'] && $this->getAdminUser()->isAdmin());
                 }
 
                 $gridConfigData = json_encode($gridConfigData);
@@ -557,6 +573,7 @@ class AssetHelperController extends AdminController
                 $settings['gridConfigName'] = $gridConfig->getName();
                 $settings['gridConfigDescription'] = $gridConfig->getDescription();
                 $settings['shareGlobally'] = $gridConfig->isShareGlobally();
+                $settings['setAsFavourite'] = $gridConfig->isSetAsFavourite();
                 $settings['isShared'] = $gridConfig->getOwnerId() != $this->getAdminUser()->getId();
 
                 return $this->adminJson([
@@ -609,8 +626,82 @@ class AssetHelperController extends AdminController
         foreach ($combinedShares as $id) {
             $share = new GridConfigShare();
             $share->setGridConfigId($gridConfig->getId());
-            $share->setSharedWithUserId($id);
+            $share->setSharedWithUserId((int) $id);
             $share->save();
+        }
+    }
+
+    /**
+     * @param GridConfig|null $gridConfig
+     * @param array $metadata
+     *
+     * @throws \Exception
+     */
+    protected function updateGridConfigFavourites($gridConfig, $metadata)
+    {
+        $currentUser = $this->getAdminUser();
+
+        if (!$gridConfig || $currentUser === null || !$currentUser->isAllowed('share_configurations')) {
+            // nothing to do
+            return;
+        }
+
+        if (!$currentUser->isAdmin() && (int) $gridConfig->getOwnerId() !== $currentUser->getId()) {
+            throw new \Exception("don't mess with someone elses grid config");
+        }
+
+        $sharedUsers = [];
+
+        if ($metadata['shareGlobally'] === false) {
+            $sharedUserIds = $metadata['sharedUserIds'];
+
+            if ($sharedUserIds) {
+                $sharedUsers = explode(',', $sharedUserIds);
+            }
+        }
+
+        if ($metadata['shareGlobally'] === true) {
+            $users = new User\Listing();
+            $users->setCondition('id = ?', $currentUser->getId());
+
+            foreach ($users as $user) {
+                $sharedUsers[] = $user->getId();
+            }
+        }
+
+        foreach ($sharedUsers as $id) {
+            // Check if the user has already a favourite
+            $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId(
+                (int) $id,
+                $gridConfig->getClassId(),
+                0,
+                $gridConfig->getSearchType()
+            );
+
+            if ($favourite instanceof GridConfigFavourite) {
+                $favouriteGridConfig = GridConfig::getById($favourite->getGridConfigId());
+
+                if ($favouriteGridConfig instanceof GridConfig) {
+                    // Check if the grid config was shared globally if that is *not* the case we also not update
+                    if ((bool) $favouriteGridConfig->isShareGlobally() === false) {
+                        continue;
+                    }
+
+                    // Check if the user is the owner. If that is the case we do not update the favourite
+                    if ((int) $favouriteGridConfig->getOwnerId() === (int) $id) {
+                        continue;
+                    }
+                }
+            }
+
+            $favourite = new GridConfigFavourite();
+            $favourite->setGridConfigId($gridConfig->getId());
+            $favourite->setClassId($gridConfig->getClassId());
+            $favourite->setObjectId(0);
+            $favourite->setOwnerId($id);
+            $favourite->setType($gridConfig->getType());
+            $favourite->setSearchType($gridConfig->getSearchType());
+            $favourite->save();
         }
     }
 
@@ -634,7 +725,8 @@ class AssetHelperController extends AdminController
         $jobs = array_chunk($ids, 20);
 
         $fileHandle = uniqid('asset-export-');
-        file_put_contents($this->getCsvFile($fileHandle), '');
+        $storage = Storage::get('temp');
+        $storage->write($this->getCsvFile($fileHandle), '');
 
         return $this->adminJson(['success' => true, 'jobs' => $jobs, 'fileHandle' => $fileHandle]);
     }
@@ -672,20 +764,26 @@ class AssetHelperController extends AdminController
 
         $csv = $this->getCsvData($request, $language, $list, $fields, $addTitles);
 
-        $fp = fopen($this->getCsvFile($fileHandle), 'a');
+        $storage = Storage::get('temp');
+        $csvFile = $this->getCsvFile($fileHandle);
+
+        $fileStream = $storage->readStream($csvFile);
+
+        $temp = tmpfile();
+        stream_copy_to_stream($fileStream, $temp, null, 0);
 
         $firstLine = true;
         foreach ($csv as $line) {
             if ($addTitles && $firstLine) {
                 $firstLine = false;
                 $line = implode($delimiter, $line) . "\r\n";
-                fwrite($fp, $line);
+                fwrite($temp, $line);
             } else {
-                fwrite($fp, implode($delimiter, array_map([$this, 'encodeFunc'], $line)) . "\r\n");
+                fwrite($temp, implode($delimiter, array_map([$this, 'encodeFunc'], $line)) . "\r\n");
             }
         }
 
-        fclose($fp);
+        $storage->writeStream($csvFile, $temp);
 
         return $this->adminJson(['success' => true]);
     }
@@ -779,7 +877,7 @@ class AssetHelperController extends AdminController
      */
     protected function getCsvFile($fileHandle)
     {
-        return PIMCORE_SYSTEM_TEMP_DIRECTORY . '/' . $fileHandle . '.csv';
+        return $fileHandle . '.csv';
     }
 
     /**
@@ -787,22 +885,31 @@ class AssetHelperController extends AdminController
      *
      * @param Request $request
      *
-     * @return BinaryFileResponse
+     * @return Response
      */
     public function downloadCsvFileAction(Request $request)
     {
+        $storage = Storage::get('temp');
         $fileHandle = \Pimcore\File::getValidFilename($request->get('fileHandle'));
         $csvFile = $this->getCsvFile($fileHandle);
-        if (file_exists($csvFile)) {
-            $response = new BinaryFileResponse($csvFile);
+
+        try {
+            $csvData = $storage->read($csvFile);
+            $response = new Response($csvData);
             $response->headers->set('Content-Type', 'application/csv');
-            $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, 'export.csv');
-            $response->deleteFileAfterSend(true);
+            $disposition = HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_ATTACHMENT,
+                'export.csv'
+            );
+
+            $response->headers->set('Content-Disposition', $disposition);
+            $storage->delete($csvFile);
 
             return $response;
+        } catch (FilesystemException | UnableToReadFile $exception) {
+            // handle the error
+            throw $this->createNotFoundException('CSV file not found');
         }
-
-        throw $this->createNotFoundException('CSV file not found');
     }
 
     /**
@@ -814,14 +921,23 @@ class AssetHelperController extends AdminController
      */
     public function downloadXlsxFileAction(Request $request)
     {
+        $storage = Storage::get('temp');
         $fileHandle = \Pimcore\File::getValidFilename($request->get('fileHandle'));
         $csvFile = $this->getCsvFile($fileHandle);
-        if (file_exists($csvFile)) {
+
+        try {
+            $csvStream= $storage->readStream($csvFile);
+
             $csvReader = new Csv();
             $csvReader->setDelimiter(';');
             $csvReader->setSheetIndex(0);
 
-            $spreadsheet = $csvReader->load($csvFile);
+            $temp = tmpfile();
+            stream_copy_to_stream($csvStream, $temp, null, 0);
+            $tempMetaData = stream_get_meta_data($temp);
+            //TODO: use this method and storage->read() to avoid the extra temp file, is not available in the current version. See: https://github.com/PHPOffice/PhpSpreadsheet/pull/2792
+            //$spreadsheet = $csvReader->loadSpreadsheetFromString($csvData);
+            $spreadsheet = $csvReader->load($tempMetaData['uri']);
             $writer = new Xlsx($spreadsheet);
             $xlsxFilename = PIMCORE_SYSTEM_TEMP_DIRECTORY. '/' .$fileHandle. '.xlsx';
             $writer->save($xlsxFilename);
@@ -831,10 +947,13 @@ class AssetHelperController extends AdminController
             $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, 'export.xlsx');
             $response->deleteFileAfterSend(true);
 
-            return $response;
-        }
+            $storage->delete($csvFile);
 
-        throw $this->createNotFoundException('XLSX file not found');
+            return $response;
+        } catch (FilesystemException | UnableToReadFile $exception) {
+            // handle the error
+            throw $this->createNotFoundException('XLSX file not found');
+        }
     }
 
     /**
@@ -855,10 +974,10 @@ class AssetHelperController extends AdminController
         }
         $result['defaultColumns']['nodeLabel'] = 'default_metadata';
         $result['defaultColumns']['nodeType'] = 'image';
-        $result['defaultColumns']['childs'] = $defaultColumns;
+        $result['defaultColumns']['children'] = $defaultColumns;
 
         //predefined metadata
-        $list = Metadata\Predefined\Listing::getByTargetType('asset', null);
+        $list = Metadata\Predefined\Listing::getByTargetType('asset');
         $metadataItems = [];
         $tmp = [];
         foreach ($list as $item) {
@@ -878,7 +997,7 @@ class AssetHelperController extends AdminController
             }
         }
 
-        $result['metadataColumns']['childs'] = $metadataItems;
+        $result['metadataColumns']['children'] = $metadataItems;
         $result['metadataColumns']['nodeLabel'] = 'predefined_metadata';
         $result['metadataColumns']['nodeType'] = 'metadata';
 
@@ -890,7 +1009,7 @@ class AssetHelperController extends AdminController
         }
         $result['systemColumns']['nodeLabel'] = 'system_columns';
         $result['systemColumns']['nodeType'] = 'system';
-        $result['systemColumns']['childs'] = $systemColumns;
+        $result['systemColumns']['children'] = $systemColumns;
 
         return $this->adminJson($result);
     }

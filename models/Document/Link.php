@@ -315,7 +315,7 @@ class Link extends Model\Document
     }
 
     /**
-     * @param Model\Element\ElementInterface $element
+     * @param Model\Element\ElementInterface|null $element
      *
      * @return $this
      */
@@ -368,6 +368,9 @@ class Link extends Model\Document
         try {
             if ($this->internal) {
                 if ($this->internalType == 'document') {
+                    if ($this->getId() == $this->internal) {
+                        throw new \Exception('Prevented infinite redirection loop: attempted to linking "' . $this->getKey() . '" to itself. ');
+                    }
                     $this->object = Document::getById($this->internal);
                 } elseif ($this->internalType == 'asset') {
                     $this->object = Asset::getById($this->internal);
@@ -376,7 +379,7 @@ class Link extends Model\Document
                 }
             }
         } catch (\Exception $e) {
-            Logger::warn($e);
+            Logger::warn((string) $e);
             $this->internalType = '';
             $this->internal = null;
             $this->object = null;

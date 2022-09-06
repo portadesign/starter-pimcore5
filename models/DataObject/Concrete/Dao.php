@@ -148,7 +148,7 @@ class Dao extends Model\DataObject\AbstractObject\Dao
             return;
         }
 
-        if (!$data = $this->db->fetchRow('SELECT * FROM object_store_' . $this->model->getClassId() . ' WHERE oo_id = ?', $this->model->getId())) {
+        if (!$data = $this->db->fetchRow('SELECT * FROM object_store_' . $this->model->getClassId() . ' WHERE oo_id = ?', [$this->model->getId()])) {
             return;
         }
 
@@ -202,18 +202,18 @@ class Dao extends Model\DataObject\AbstractObject\Dao
         $untouchable = [];
         $db = Db::get();
 
-        foreach ($fieldDefinitions as $key => $fd) {
+        foreach ($fieldDefinitions as $fieldName => $fd) {
             if ($fd instanceof LazyLoadingSupportInterface && $fd->getLazyLoading()) {
-                if (!$this->model->isLazyKeyLoaded($key) || $fd instanceof DataObject\ClassDefinition\Data\ReverseObjectRelation) {
+                if (!$this->model->isLazyKeyLoaded($fieldName) || $fd instanceof DataObject\ClassDefinition\Data\ReverseObjectRelation) {
                     //this is a relation subject to lazy loading - it has not been loaded
-                    $untouchable[] = $key;
+                    $untouchable[] = $fieldName;
                 }
             }
 
             if (!DataObject::isDirtyDetectionDisabled() && $fd->supportsDirtyDetection()) {
-                if ($this->model instanceof Model\Element\DirtyIndicatorInterface && !$this->model->isFieldDirty($key)) {
-                    if (!in_array($key, $untouchable)) {
-                        $untouchable[] = $key;
+                if ($this->model instanceof Model\Element\DirtyIndicatorInterface && !$this->model->isFieldDirty($fieldName)) {
+                    if (!in_array($fieldName, $untouchable)) {
+                        $untouchable[] = $fieldName;
                     }
                 }
             }
@@ -231,15 +231,19 @@ class Dao extends Model\DataObject\AbstractObject\Dao
             $condition = '(' . $condition . ' AND ownerType != "localizedfield" AND ownerType != "fieldcollection")';
         }
 
-        $this->db->deleteWhere('object_relations_' . $this->model->getClassId(), $condition);
+        $dataExists = $this->db->fetchOne('SELECT `src_id` FROM `object_relations_'. $this->model->getClassId().'`
+        WHERE '.$condition .' LIMIT 1');
+        if ($dataExists) {
+            $this->db->deleteWhere('object_relations_' . $this->model->getClassId(), $condition);
+        }
 
         $inheritedValues = DataObject::doGetInheritedValues();
         DataObject::setGetInheritedValues(false);
 
         $data = [];
         $data['oo_id'] = $this->model->getId();
-        foreach ($fieldDefinitions as $key => $fd) {
-            $getter = 'get' . ucfirst($key);
+        foreach ($fieldDefinitions as $fieldName => $fd) {
+            $getter = 'get' . ucfirst($fieldName);
 
             if ($fd instanceof CustomResourcePersistingInterface) {
                 // for fieldtypes which have their own save algorithm eg. fieldcollections, relational data-types, ...
@@ -249,7 +253,7 @@ class Dao extends Model\DataObject\AbstractObject\Dao
                         'containerType' => 'object',
                     ],
                     'owner' => $this->model,
-                    'fieldname' => $key,
+                    'fieldname' => $fieldName,
                 ]
                 ;
                 if ($this->model instanceof Model\Element\DirtyIndicatorInterface) {
@@ -259,24 +263,26 @@ class Dao extends Model\DataObject\AbstractObject\Dao
             }
             if ($fd instanceof ResourcePersistenceAwareInterface) {
                 // pimcore saves the values with getDataForResource
+
+                $fieldDefinitionParams = [
+                    'isUpdate' => $isUpdate,
+                    'owner' => $this->model,
+                    'fieldname' => $fieldName,
+                ];
                 if (is_array($fd->getColumnType())) {
-                    $insertDataArray = $fd->getDataForResource($this->model->$getter(), $this->model,
-                        [
-                            'isUpdate' => $isUpdate,
-                            'owner' => $this->model,
-                            'fieldname' => $key,
-                        ]);
+                    $insertDataArray = $fd->getDataForResource($this->model->$getter(), $this->model, $fieldDefinitionParams);
                     if (is_array($insertDataArray)) {
                         $data = array_merge($data, $insertDataArray);
+                        $this->model->set($fieldName, $fd->getDataFromResource($insertDataArray, $this->model, $fieldDefinitionParams));
                     }
                 } else {
-                    $insertData = $fd->getDataForResource($this->model->$getter(), $this->model,
-                        [
-                            'isUpdate' => $isUpdate,
-                            'owner' => $this->model,
-                            'fieldname' => $key,
-                        ]);
-                    $data[$key] = $insertData;
+                    $insertData = $fd->getDataForResource($this->model->$getter(), $this->model, $fieldDefinitionParams);
+                    $data[$fieldName] = $insertData;
+                    $this->model->set($fieldName, $fd->getDataFromResource($insertData, $this->model, $fieldDefinitionParams));
+                }
+
+                if ($this->model instanceof Model\Element\DirtyIndicatorInterface) {
+                    $this->model->markFieldDirty($fieldName, false);
                 }
             }
         }
@@ -287,7 +293,7 @@ class Dao extends Model\DataObject\AbstractObject\Dao
         // get data for query table
         $data = [];
         $this->inheritanceHelper->resetFieldsToCheck();
-        $oldData = $this->db->fetchRow('SELECT * FROM object_query_' . $this->model->getClassId() . ' WHERE oo_id = ?', $this->model->getId());
+        $oldData = $this->db->fetchRow('SELECT * FROM object_query_' . $this->model->getClassId() . ' WHERE oo_id = ?', [$this->model->getId()]);
 
         $inheritanceEnabled = $this->model->getClass()->getAllowInherit();
         $parentData = null;
@@ -418,10 +424,6 @@ class Dao extends Model\DataObject\AbstractObject\Dao
      */
     public function delete()
     {
-        $this->db->delete('object_query_' . $this->model->getClassId(), ['oo_id' => $this->model->getId()]);
-        $this->db->delete('object_store_' . $this->model->getClassId(), ['oo_id' => $this->model->getId()]);
-        $this->db->delete('object_relations_' . $this->model->getClassId(), ['src_id' => $this->model->getId()]);
-
         // delete fields which have their own delete algorithm
         if ($this->model->getClass()) {
             foreach ($this->model->getClass()->getFieldDefinitions() as $fd) {

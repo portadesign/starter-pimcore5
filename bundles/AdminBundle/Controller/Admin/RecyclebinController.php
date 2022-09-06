@@ -40,7 +40,10 @@ class RecyclebinController extends AdminController implements KernelControllerEv
     {
         if ($request->get('xaction') == 'destroy') {
             $item = Recyclebin\Item::getById(\Pimcore\Bundle\AdminBundle\Helper\QueryParams::getRecordIdForGridRequest($request->get('data')));
-            $item->delete();
+
+            if ($item) {
+                $item->delete();
+            }
 
             return $this->adminJson(['success' => true, 'data' => []]);
         } else {
@@ -101,13 +104,13 @@ class RecyclebinController extends AdminController implements KernelControllerEv
                         $filter['value'] = (int) $filter['value'];
                     }
                     // system field
-                    $value = $filter['value'];
+                    $value = ($filter['value'] ?? '');
                     if ($operator == 'LIKE') {
                         $value = '%' . $value . '%';
                     }
 
-                    $field = '`' . $filterField . '` ';
-                    if ($filter['field'] == 'fullpath') {
+                    $field = $db->quoteIdentifier($filterField);
+                    if (($filter['field'] ?? false) == 'fullpath') {
                         $field = 'CONCAT(path,filename)';
                     }
 
@@ -116,7 +119,7 @@ class RecyclebinController extends AdminController implements KernelControllerEv
                         $condition = $field . ' BETWEEN ' . $db->quote($value) . ' AND ' . $db->quote($maxTime);
                         $conditionFilters[] = $condition;
                     } else {
-                        $conditionFilters[] = $field . $operator . " '" . $value . "' ";
+                        $conditionFilters[] = $field . $operator . ' ' . $db->quote($value);
                     }
                 }
             }
@@ -148,7 +151,10 @@ class RecyclebinController extends AdminController implements KernelControllerEv
      */
     public function restoreAction(Request $request)
     {
-        $item = Recyclebin\Item::getById($request->get('id'));
+        $item = Recyclebin\Item::getById((int) $request->get('id'));
+        if (!$item) {
+            throw $this->createNotFoundException();
+        }
         $item->restore();
 
         return $this->adminJson(['success' => true]);
@@ -206,7 +212,7 @@ class RecyclebinController extends AdminController implements KernelControllerEv
 
         // recyclebin actions might take some time (save & restore)
         $timeout = 600; // 10 minutes
-        @ini_set('max_execution_time', $timeout);
+        @ini_set('max_execution_time', (string) $timeout);
         set_time_limit($timeout);
 
         // check permissions

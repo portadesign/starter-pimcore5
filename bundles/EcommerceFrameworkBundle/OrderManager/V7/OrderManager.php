@@ -79,7 +79,7 @@ class OrderManager implements OrderManagerInterface
     protected $options;
 
     /**
-     * @var Folder
+     * @var Folder|null
      */
     protected $orderParentFolder;
 
@@ -848,7 +848,7 @@ class OrderManager implements OrderManagerInterface
      * @param RecurringPaymentInterface $paymentProvider
      * @param string|null $paymentMethod
      *
-     * @return mixed
+     * @return \Pimcore\Model\DataObject\Concrete|null|false
      *
      * @throws \Exception
      */

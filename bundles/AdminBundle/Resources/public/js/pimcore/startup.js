@@ -135,8 +135,7 @@ Ext.onReady(function () {
     Ext.state.Manager.setProvider(provider);
 
     // confirmation to close pimcore
-    window.onbeforeunload = function () {
-
+    window.addEventListener('beforeunload', function () {
         // set this here as a global so that eg. the editmode can access this (edit::iframeOnbeforeunload()),
         // to prevent multiple warning messages to be shown
         pimcore.globalmanager.add("pimcore_reload_in_progress", true);
@@ -149,7 +148,22 @@ Ext.onReady(function () {
                 return t("do_you_really_want_to_close_pimcore");
             }
         }
-    };
+
+        var openTabs = pimcore.helpers.getOpenTab();
+        if(openTabs.length > 0) {
+            var elementsToBeUnlocked = [];
+            for (var i = 0; i < openTabs.length; i++) {
+                var elementIdentifier = openTabs[i].split("_");
+                if(['object', 'asset', 'document'].indexOf(elementIdentifier[0]) > -1) {
+                    elementsToBeUnlocked.push({ id: elementIdentifier[1], type: elementIdentifier[0] });
+                }
+            }
+
+            if(elementsToBeUnlocked.length > 0) {
+                navigator.sendBeacon(Routing.generate('pimcore_admin_element_unlockelements')+'?csrfToken='+ pimcore.settings['csrfToken'], JSON.stringify({ elements: elementsToBeUnlocked }));
+            }
+        }
+    });
 
     Ext.QuickTips.init();
     Ext.MessageBox.minPromptWidth = 500;
@@ -163,12 +177,16 @@ Ext.onReady(function () {
         'X-pimcore-extjs-version-minor': Ext.getVersion().getMinor()
     });
     Ext.Ajax.on('requestexception', function (conn, response, options) {
-        console.error("xhr request to " + options.url + " failed");
+        if(response.aborted){
+            console.log("xhr request to " + options.url + " aborted");
+        }else{
+            console.error("xhr request to " + options.url + " failed");
+        }
 
         var jsonData = response.responseJson;
         if (!jsonData) {
             try {
-                jsonData = Ext.decode(response.responseText);
+                jsonData = JSON.parse(response.responseText);
             } catch (e) {
 
             }
@@ -219,7 +237,26 @@ Ext.onReady(function () {
                         bodyStyle: "padding: 20px;",
                         html: t("the_system_is_in_maintenance_mode_please_wait"),
                         closeAction: "close",
-                        modal: true
+                        modal: true,
+                        listeners: {
+                            show: function () {
+                                window.setInterval(function () {
+                                    Ext.Ajax.request({
+                                        url: Routing.generate('pimcore_admin_misc_ping'),
+                                        success: function (response) {
+                                            if (pimcore.maintenanceWindow) {
+                                                pimcore.maintenanceWindow.close();
+                                                window.setTimeout(function () {
+                                                    delete pimcore.maintenanceWindow;
+                                                }, 2000);
+                                                pimcore.viewport.updateLayout();
+                                            }
+                                        }
+                                    });
+                                }, 30000);
+                            }
+                        }
+
                     });
                     pimcore.viewport.add(pimcore.maintenanceWindow);
                     pimcore.maintenanceWindow.show();
@@ -328,6 +365,11 @@ Ext.onReady(function () {
         pimcore.globalmanager.add("document_types_store", store);
         pimcore.globalmanager.add("document_valid_types", ["page","snippet","email","newsletter","link","hardlink","printpage","printcontainer"]);
     }
+
+    //search element types
+    pimcore.globalmanager.add("document_search_types", ["page", "snippet", "folder", "link", "hardlink", "email", "newsletter"]);
+    pimcore.globalmanager.add("asset_search_types", ["folder", "image", "text", "audio", "video", "document", "archive", "unknown"]);
+    pimcore.globalmanager.add("object_search_types", ["object", "folder", "variant"]);
 
     //translation admin keys
     pimcore.globalmanager.add("translations_admin_missing", []);
@@ -562,6 +604,10 @@ Ext.onReady(function () {
 
     }, 5000);
 
+
+    Ext.get("pimcore_logout").on('click', function () {
+        document.getElementById('pimcore_logout_form').submit();
+    })
 
     // remove loading
     Ext.get("pimcore_loading").addCls("loaded");
@@ -912,12 +958,34 @@ Ext.onReady(function () {
             listeners: {
                 "highlightitem": function (view, node, opts) {
                     var record = quicksearchStore.getAt(node.dataset.recordindex);
-                    var previewHtml = record.get('preview');
-                    if(!previewHtml) {
-                        previewHtml = '<div class="no_preview">' + t('preview_not_available') + '</div>';
-                    }
+                    if (!record.get('preview')) {
+                        Ext.Ajax.request({
+                            url: Routing.generate('pimcore_admin_searchadmin_search_quicksearch_by_id'),
+                            method: 'GET',
+                            params: {
+                                "id": record.get('id'),
+                                "type": record.get('type')
+                            },
+                            success: function (response) {
+                                var result = Ext.decode(response.responseText);
 
-                    Ext.get('pimcore_quicksearch_preview').setHtml(previewHtml);
+                                record.preview = result.preview;
+                                Ext.get('pimcore_quicksearch_preview').setHtml(result.preview);
+                            },
+                            failure: function () {
+                                var previewHtml = '<div class="no_preview">' + t('preview_not_available') + '</div>';
+
+                                Ext.get('pimcore_quicksearch_preview').setHtml(previewHtml);
+                            }
+                        });
+                    } else {
+                        var previewHtml = record.get('preview');
+                        if(!previewHtml) {
+                            previewHtml = '<div class="no_preview">' + t('preview_not_available') + '</div>';
+                        }
+
+                        Ext.get('pimcore_quicksearch_preview').setHtml(previewHtml);
+                    }
                 }
             }
         },

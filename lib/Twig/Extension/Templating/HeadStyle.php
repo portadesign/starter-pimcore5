@@ -80,7 +80,7 @@ class HeadStyle extends AbstractExtension implements RuntimeExtensionInterface
     /**
      * Capture type and/or attributes (used for hinting during capture)
      *
-     * @var string|null
+     * @var array|null
      */
     protected $_captureAttrs = null;
 
@@ -242,7 +242,8 @@ class HeadStyle extends AbstractExtension implements RuntimeExtensionInterface
      *
      * @return void
      */
-    public function offsetSet($index, $value)
+    #[\ReturnTypeWillChange]
+    public function offsetSet($index, $value)// : void
     {
         if (!$this->_isValid($value)) {
             throw new Exception('Invalid value passed to offsetSet; please use offsetSetStyle()');
@@ -287,7 +288,7 @@ class HeadStyle extends AbstractExtension implements RuntimeExtensionInterface
      * Start capture action
      *
      * @param string $type
-     * @param string|null $attrs
+     * @param array|null $attrs
      *
      * @return void
      */

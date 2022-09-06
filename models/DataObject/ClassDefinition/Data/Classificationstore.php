@@ -24,7 +24,7 @@ use Pimcore\Model\Element;
 use Pimcore\Normalizer\NormalizerInterface;
 use Pimcore\Tool;
 
-class Classificationstore extends Data implements CustomResourcePersistingInterface, TypeDeclarationSupportInterface, NormalizerInterface, PreGetDataInterface, LayoutDefinitionEnrichmentInterface
+class Classificationstore extends Data implements CustomResourcePersistingInterface, TypeDeclarationSupportInterface, NormalizerInterface, PreGetDataInterface, LayoutDefinitionEnrichmentInterface, VarExporterInterface
 {
     use Element\ChildsCompatibilityTrait;
 
@@ -42,7 +42,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
      *
      * @var array
      */
-    public $childs = [];
+    public $children = [];
 
     /**
      * @internal
@@ -161,7 +161,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $maxItems;
 
@@ -495,7 +495,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
      */
     public function getChildren()
     {
-        return $this->childs;
+        return $this->children;
     }
 
     /**
@@ -505,7 +505,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
      */
     public function setChildren($children)
     {
-        $this->childs = $children;
+        $this->children = $children;
         $this->fieldDefinitionsCache = null;
 
         return $this;
@@ -516,7 +516,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
      */
     public function hasChildren()
     {
-        if (is_array($this->childs) && count($this->childs) > 0) {
+        if (is_array($this->children) && count($this->children) > 0) {
             return true;
         }
 
@@ -528,7 +528,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
      */
     public function addChild($child)
     {
-        $this->childs[] = $child;
+        $this->children[] = $child;
         $this->fieldDefinitionsCache = null;
     }
 
@@ -633,7 +633,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
     /**
      * @param int $keyId
      *
-     * @return mixed
+     * @return DataObject\Classificationstore\KeyConfig
      */
     public function getKeyConfiguration($keyId)
     {
@@ -729,7 +729,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
     /**
      * @param string $title
      *
-     * @return $this|void
+     * @return $this
      */
     public function setTitle($title)
     {
@@ -784,7 +784,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
         $getInheritedValues = DataObject::doGetInheritedValues();
 
         if (!$omitMandatoryCheck) {
-            if ($this->maxItems > 0 && count($activeGroups) > $this->maxItems) {
+            if ($this->maxItems && count($activeGroups) > $this->maxItems) {
                 throw new Model\Element\ValidationException(
                     'Groups in field [' . $this->getName() . '] is bigger than ' . $this->getMaxItems()
                 );
@@ -882,14 +882,23 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
     /**
      * @return array
      */
-    public function __sleep()
+    public function getBlockedVarsForExport(): array
     {
-        $vars = get_object_vars($this);
-        $blockedVars = [
+        return [
             'fieldDefinitionsCache',
             'referencedFields',
             'blockedVarsForExport',
+            'childs',
         ];
+    }
+
+    /**
+     * @return array
+     */
+    public function __sleep()
+    {
+        $vars = get_object_vars($this);
+        $blockedVars = $this->getBlockedVarsForExport();
 
         foreach ($blockedVars as $blockedVar) {
             unset($vars[$blockedVar]);
@@ -931,15 +940,15 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
     }
 
     /**
-     * @param int $maxItems
+     * @param int|null $maxItems
      */
     public function setMaxItems($maxItems)
     {
-        $this->maxItems = (int) $maxItems;
+        $this->maxItems = $this->getAsIntegerCast($maxItems);
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getMaxItems()
     {
@@ -963,7 +972,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
     }
 
     /**
-     * @return array
+     * @return array|null
      */
     public function getPermissionView(): ?array
     {
@@ -979,7 +988,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
     }
 
     /**
-     * @return array
+     * @return array|null
      */
     public function getPermissionEdit(): ?array
     {
@@ -1073,7 +1082,7 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
     /**
      * {@inheritdoc}
      */
-    public function enrichLayoutDefinition(/*?Concrete */ $object, /**  array */ $context = []) // : self
+    public function enrichLayoutDefinition(/* ?Concrete */ $object, /* array */ $context = []) // : static
     {
         $this->activeGroupDefinitions = [];
         $activeGroupIds = $this->recursiveGetActiveGroupsIds($object);
@@ -1165,8 +1174,8 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
             }
 
             usort($this->activeGroupDefinitions, static function ($a, $b) use ($sorting) {
-                $s1 = $sorting[$a['id']] ?: 0;
-                $s2 = $sorting[$b['id']] ?: 0;
+                $s1 = $sorting[$a['id']] ?? 0;
+                $s2 = $sorting[$b['id']] ?? 0;
 
                 return $s1 <=> $s2;
             });
@@ -1385,5 +1394,47 @@ class Classificationstore extends Data implements CustomResourcePersistingInterf
         }
 
         return null;
+    }
+
+    /**
+     * Creates getter code which is used for generation of php file for object classes using this data type
+     *
+     * @param DataObject\ClassDefinition|DataObject\Objectbrick\Definition|DataObject\Fieldcollection\Definition $class
+     *
+     * @return string
+     */
+    public function getGetterCode($class)
+    {
+        $key = $this->getName();
+
+        $typeDeclaration = '';
+        if ($class->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+            $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
+        }
+
+        $code = '/**' . "\n";
+        $code .= '* Get ' . str_replace(['/**', '*/', '//'], '', $this->getName()) . ' - ' . str_replace(['/**', '*/', '//'], '', $this->getTitle()) . "\n";
+        $code .= '* @return ' . $this->getPhpdocReturnType() . "\n";
+        $code .= '*/' . "\n";
+        $code .= 'public function get' . ucfirst($key) . '()' . $typeDeclaration . "\n";
+        $code .= '{' . "\n";
+
+        $code .= $this->getPreGetValueHookCode($key);
+
+        $code .= "\t" . '$data = $this->getClass()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n\n";
+        $code .= "\t" . 'return $data;' . "\n";
+        $code .= "}\n\n";
+
+        return $code;
+    }
+
+    public static function __set_state($data)
+    {
+        $obj = new static();
+        $obj->setValues($data);
+
+        $obj->childs = $obj->children;  // @phpstan-ignore-line
+
+        return $obj;
     }
 }

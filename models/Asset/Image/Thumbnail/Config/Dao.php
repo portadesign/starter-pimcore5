@@ -17,7 +17,6 @@ namespace Pimcore\Model\Asset\Image\Thumbnail\Config;
 
 use Pimcore\Messenger\CleanupThumbnailsMessage;
 use Pimcore\Model;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * @internal
@@ -34,9 +33,9 @@ class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
         $config = \Pimcore::getContainer()->getParameter('pimcore.config');
 
         parent::configure([
-            'containerConfig' => $config['assets']['image']['thumbnails']['definitions'] ?? [],
+            'containerConfig' => $config['assets']['image']['thumbnails']['definitions'],
             'settingsStoreScope' => 'pimcore_image_thumbnails',
-            'storageDirectory' => PIMCORE_CONFIGURATION_DIRECTORY . '/image-thumbnails',
+            'storageDirectory' => $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_IMAGE_THUMBNAILS'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/image-thumbnails',
             'legacyConfigFile' => 'image-thumbnails.php',
             'writeTargetEnvVariableName' => 'PIMCORE_WRITE_TARGET_IMAGE_THUMBNAILS',
         ]);
@@ -113,6 +112,8 @@ class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
             // thumbnail already existed
             $this->autoClearTempFiles();
         }
+
+        $this->clearDatabaseCache();
     }
 
     /**
@@ -149,13 +150,24 @@ class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
         } else {
             $this->autoClearTempFiles();
         }
+
+        $this->clearDatabaseCache();
+    }
+
+    private function clearDatabaseCache(): void
+    {
+        \Pimcore\Db::get()->delete('assets_image_thumbnail_cache', [
+            'name' => $this->model->getName(),
+        ]);
+
+        Model\Asset\Dao::$thumbnailStatusCache = [];
     }
 
     protected function autoClearTempFiles()
     {
         $enabled = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['thumbnails']['auto_clear_temp_files'];
         if ($enabled) {
-            \Pimcore::getContainer()->get(MessageBusInterface::class)->dispatch(
+            \Pimcore::getContainer()->get('messenger.bus.pimcore-core')->dispatch(
                 new CleanupThumbnailsMessage('image', $this->model->getName())
             );
         }
