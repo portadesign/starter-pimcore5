@@ -26,6 +26,7 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\Statistic;
 use Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\Token;
 use Pimcore\Bundle\EcommerceFrameworkBundle\VoucherService\Token\Listing;
 use Pimcore\File;
+use Pimcore\Logger;
 use Pimcore\Model\DataObject\Fieldcollection\Data\VoucherTokenTypePattern;
 use Pimcore\Model\DataObject\OnlineShopVoucherSeries;
 use Pimcore\Model\DataObject\OnlineShopVoucherToken;
@@ -241,12 +242,13 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
 
             if (is_array($codeSets)) {
                 foreach ($codeSets as $query) {
-                    $db->query($this->buildInsertQuery($query));
+                    $db->executeQuery($this->buildInsertQuery($query));
                 }
             }
 
             return $codeSets;
         } catch (\Exception $e) {
+            Logger::error((string) $e);
         }
 
         return false;
@@ -459,7 +461,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
                     $checkTokenCount--;
                     unset($checkTokens[$token]);
                 // Check if the length of the checkTokens Array matches the defined step range
-                    // so the the checkTokens get matched against the database.
+                // so the the checkTokens get matched against the database.
                 } elseif ($checkTokenCount == $tokenCheckStep) {
                     // Check if any of the tokens in the temporary array checkTokens already exists,
                     // if not so, merge the checkTokens array with the array of tokens to insert and

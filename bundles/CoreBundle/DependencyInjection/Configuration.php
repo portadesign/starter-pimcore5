@@ -178,7 +178,9 @@ final class Configuration implements ConfigurationInterface
         $this->addStaticRoutesNode($rootNode);
         $this->addPerspectivesNode($rootNode);
         $this->addCustomViewsNode($rootNode);
+        $this->addGlossaryNode($rootNode);
         $this->buildRedirectsStatusCodes($rootNode);
+        $this->addTemplatingEngineNode($rootNode);
 
         return $treeBuilder;
     }
@@ -2259,5 +2261,50 @@ final class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
             ->end();
+    }
+
+    /**
+     * @param ArrayNodeDefinition $rootNode
+     */
+    private function addGlossaryNode(ArrayNodeDefinition $rootNode): void
+    {
+        $rootNode
+            ->children()
+                ->arrayNode('glossary')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->arrayNode('blocked_tags')
+                            ->useAttributeAsKey('name')
+                            ->prototype('scalar');
+    }
+
+    private function addTemplatingEngineNode(ArrayNodeDefinition $rootNode): void
+    {
+        $rootNode
+            ->children()
+            ->arrayNode('templating_engine')
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->arrayNode('twig')
+                ->addDefaultsIfNotSet()
+                ->children()
+                    ->arrayNode('sandbox_security_policy')
+                        ->info('Whitelist tags, filters & functions for evaluating twig 
+                        templates in a sandbox environment e.g. used by Mailer & Text layout component.')
+                        ->children()
+                            ->arrayNode('tags')
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode('filters')
+                                ->scalarPrototype()->end()
+                            ->end()
+                            ->arrayNode('functions')
+                                ->scalarPrototype()->end()
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
+            ->end()
+        ->end();
     }
 }

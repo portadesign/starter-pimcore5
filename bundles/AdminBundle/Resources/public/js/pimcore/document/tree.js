@@ -930,8 +930,16 @@ pimcore.document.tree = Class.create({
         }
 
         pimcore.helpers.hideRedundantSeparators(menu);
+        
+        const prepareDocumentTreeContextMenu = new CustomEvent(pimcore.events.prepareDocumentTreeContextMenu, {
+            detail: {
+                menu: menu,
+                tree: this,
+                document: record
+            }
+        });
 
-        pimcore.plugin.broker.fireEvent("prepareDocumentTreeContextMenu", menu, this, record);
+        document.dispatchEvent(prepareDocumentTreeContextMenu);
 
         menu.showAt(e.pageX+1, e.pageY+1);
     },

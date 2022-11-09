@@ -121,7 +121,9 @@ class GridHelperService
                                     'name' => $mappedKey, ]
                             );
 
-                            $featureConditions[$mappedKey] = $featureCondition;
+                            if (!empty($featureCondition)) {
+                                $featureConditions[$mappedKey] = $featureCondition;
+                            }
                         }
                     }
                 } elseif (count($keyParts) > 1) {
@@ -227,7 +229,6 @@ class GridHelperService
                     $brickDescriptor = null;
                     $isLocalized = false;
                     if (!$field) {
-
                         // if the definition doesn't exist check for a localized field
                         $localized = $class->getFieldDefinition('localizedfields');
                         if ($localized instanceof ClassDefinition\Data\Localizedfields) {
@@ -296,8 +297,8 @@ class GridHelperService
                             $fieldConditions = [];
                             foreach ($filter['value'] as $filterValue) {
                                 $brickCondition = '(' . $brickField->getFilterCondition($filterValue, $operator,
-                                        ['brickPrefix' => $brickPrefix]
-                                    ) . ' AND ' . $brickType . '.fieldname = ' . $db->quote($brickFilterField) . ')';
+                                    ['brickPrefix' => $brickPrefix]
+                                ) . ' AND ' . $brickType . '.fieldname = ' . $db->quote($brickFilterField) . ')';
                                 $fieldConditions[] = $brickCondition;
                             }
 
@@ -306,7 +307,7 @@ class GridHelperService
                             }
                         } else {
                             $brickCondition = '(' . $brickField->getFilterCondition($filter['value'], $operator,
-                                    ['brickPrefix' => $brickPrefix]) . ' AND ' . $brickType . '.fieldname = ' . $db->quote($brickFilterField) . ')';
+                                ['brickPrefix' => $brickPrefix]) . ' AND ' . $brickType . '.fieldname = ' . $db->quote($brickFilterField) . ')';
                             $conditionPartsFilters[] = $brickCondition;
                         }
                     } elseif ($field instanceof ClassDefinition\Data\UrlSlug) {
@@ -340,6 +341,10 @@ class GridHelperService
                                 $maxTime = $filter['value'] + (86400 - 1); //specifies the top point of the range used in the condition
                                 $conditionPartsFilters[] = $filterField . ' BETWEEN ' . $db->quote($filter['value']) . ' AND ' . $db->quote($maxTime);
                             } else {
+                                // @see \Pimcore\Model\DataObject\ClassDefinition\Data\Checkbox::getFilterConditionExt()
+                                if ($filter['type'] === 'boolean') {
+                                    $filterField = 'IFNULL(' . $filterField . ', 0)';
+                                }
                                 $conditionPartsFilters[] = $filterField . ' ' . $operator . ' ' . $db->quote($filter['value']);
                             }
                         }

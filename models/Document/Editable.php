@@ -366,7 +366,7 @@ abstract class Editable extends Model\AbstractModel implements Model\Document\Ed
     }
 
     /**
-     * {@inheritdoc}
+     * @return array
      */
     public function getConfig()
     {
@@ -374,7 +374,9 @@ abstract class Editable extends Model\AbstractModel implements Model\Document\Ed
     }
 
     /**
-     * {@inheritdoc}
+     * @param array $config
+     *
+     * @return $this
      */
     public function setConfig($config)
     {
@@ -387,7 +389,7 @@ abstract class Editable extends Model\AbstractModel implements Model\Document\Ed
      * @param string $name
      * @param mixed $value
      *
-     * @return self
+     * @return $this
      */
     public function addConfig(string $name, $value): self
     {

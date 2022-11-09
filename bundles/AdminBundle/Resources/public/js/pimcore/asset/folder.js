@@ -21,7 +21,14 @@ pimcore.asset.folder = Class.create(pimcore.asset.asset, {
         this.setType("folder");
         this.addLoadingPanel();
 
-        pimcore.plugin.broker.fireEvent("preOpenAsset", this, "folder");
+        const preOpenAssetFolder = new CustomEvent(pimcore.events.preOpenAsset, {
+            detail: {
+                object: this,
+                type: "folder"
+            }
+        });
+
+        document.dispatchEvent(preOpenAssetFolder);
 
         var user = pimcore.globalmanager.get("user");
 
@@ -284,17 +291,14 @@ pimcore.asset.folder = Class.create(pimcore.asset.asset, {
                 });
             }
 
-            var user = pimcore.globalmanager.get("user");
-            if (user.admin) {
-                buttons.push({
-                    xtype: "splitbutton",
-                    tooltip: t("show_metainfo"),
-                    iconCls: "pimcore_material_icon_info pimcore_material_icon",
-                    scale: "medium",
-                    handler: this.showMetaInfo.bind(this),
-                    menu: this.getMetaInfoMenuItems()
-                });
-            }
+            buttons.push({
+                xtype: "splitbutton",
+                tooltip: t("show_metainfo"),
+                iconCls: "pimcore_material_icon_info pimcore_material_icon",
+                scale: "medium",
+                handler: this.showMetaInfo.bind(this),
+                menu: this.getMetaInfoMenuItems()
+            });
 
             buttons.push("-");
             buttons.push({

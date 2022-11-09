@@ -15,6 +15,7 @@
 
 namespace Pimcore\Model\Asset\Image\Thumbnail;
 
+use Pimcore\Cache\RuntimeCache;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Tool\Serialize;
@@ -207,7 +208,7 @@ final class Config extends Model\AbstractModel
         }
 
         try {
-            $thumbnail = \Pimcore\Cache\Runtime::get($cacheKey);
+            $thumbnail = RuntimeCache::get($cacheKey);
             if (!$thumbnail) {
                 throw new \Exception('Thumbnail in registry is null');
             }
@@ -219,7 +220,7 @@ final class Config extends Model\AbstractModel
                 /** @var Model\Asset\Image\Thumbnail\Config\Dao $dao */
                 $dao = $thumbnail->getDao();
                 $dao->getByName($name);
-                \Pimcore\Cache\Runtime::set($cacheKey, $thumbnail);
+                RuntimeCache::set($cacheKey, $thumbnail);
             } catch (Model\Exception\NotFoundException $e) {
                 return null;
             }
@@ -252,7 +253,7 @@ final class Config extends Model\AbstractModel
     public static function exists(string $name): bool
     {
         $cacheKey = self::getCacheKey($name);
-        if (\Pimcore\Cache\Runtime::isRegistered($cacheKey)) {
+        if (RuntimeCache::isRegistered($cacheKey)) {
             return true;
         }
 
@@ -398,7 +399,7 @@ final class Config extends Model\AbstractModel
     /**
      * @param string $description
      *
-     * @return self
+     * @return $this
      */
     public function setDescription($description)
     {
@@ -418,7 +419,7 @@ final class Config extends Model\AbstractModel
     /**
      * @param array $items
      *
-     * @return self
+     * @return $this
      */
     public function setItems($items)
     {
@@ -438,7 +439,7 @@ final class Config extends Model\AbstractModel
     /**
      * @param string $name
      *
-     * @return self
+     * @return $this
      */
     public function setName($name)
     {
@@ -458,7 +459,7 @@ final class Config extends Model\AbstractModel
     /**
      * @param string $format
      *
-     * @return self
+     * @return $this
      */
     public function setFormat($format)
     {
@@ -478,7 +479,7 @@ final class Config extends Model\AbstractModel
     /**
      * @param int $quality
      *
-     * @return self
+     * @return $this
      */
     public function setQuality($quality)
     {

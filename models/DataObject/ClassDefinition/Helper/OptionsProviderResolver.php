@@ -29,6 +29,12 @@ class OptionsProviderResolver extends ClassResolver
 
     public static $providerCache = [];
 
+    /**
+     * @param string|null $providerClass
+     * @param int $mode
+     *
+     * @return SelectOptionsProviderInterface|MultiSelectOptionsProviderInterface|null
+     */
     public static function resolveProvider($providerClass, $mode)
     {
         return self::resolve($providerClass, function ($provider) use ($mode) {

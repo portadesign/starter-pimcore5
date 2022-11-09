@@ -53,6 +53,7 @@ class CustomLayoutRebuildCommand extends AbstractCommand
 
     /**
      * @param ClassLayoutDefinitionManager $classLayoutDefinitionManager
+     *
      * @required
      */
     public function setClassLayoutDefinitionManager(ClassLayoutDefinitionManager $classLayoutDefinitionManager)
@@ -63,7 +64,7 @@ class CustomLayoutRebuildCommand extends AbstractCommand
     /**
      * {@inheritdoc}
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         if ($input->getOption('delete-custom-layouts')) {
             $questionResult = true;

@@ -22,6 +22,9 @@ use Pimcore\Model\Document;
 use Pimcore\Tool\Console;
 use Pimcore\Web2Print\Processor;
 
+/**
+ * @deprecated and will be removed in Pimcore 11. Use either PdfReactor or HeadlessChrome instead.
+ */
 class WkHtmlToPdf extends Processor
 {
     /**
@@ -45,6 +48,13 @@ class WkHtmlToPdf extends Processor
      */
     public function __construct($wkhtmltopdfBin = null, $options = null)
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.5',
+            sprintf('%s has been deprecated and will be removed in Pimcore 11. Use %s or %s instead.',
+                __CLASS__, PdfReactor::class, HeadlessChrome::class)
+        );
+
         $web2printConfig = Config::getWeb2PrintConfig();
 
         if (!empty($wkhtmltopdfBin)) {
@@ -74,7 +84,7 @@ class WkHtmlToPdf extends Processor
     }
 
     /**
-     * {@internal}
+     * @internal
      */
     protected function buildPdf(Document\PrintAbstract $document, $config)
     {
@@ -103,7 +113,7 @@ class WkHtmlToPdf extends Processor
     }
 
     /**
-     * {@internal}
+     * @internal
      */
     public function getProcessingOptions()
     {
@@ -133,7 +143,7 @@ class WkHtmlToPdf extends Processor
     }
 
     /**
-     * {@internal}
+     * @internal
      */
     public function getPdfFromString($html, $params = [], $returnFilePath = false)
     {

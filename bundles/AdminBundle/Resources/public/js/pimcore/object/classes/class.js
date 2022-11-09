@@ -82,7 +82,7 @@ pimcore.object.classes.klass = Class.create({
         panelButtons.push({
             text: t("configure_custom_layouts"),
             iconCls: "pimcore_icon_class pimcore_icon_overlay_add",
-            hidden: (this instanceof pimcore.object.fieldcollections.field) || (this instanceof pimcore.object.objectbricks.field),
+            hidden: this instanceof pimcore.object.fieldcollections.field,
             handler: this.configureCustomLayouts.bind(this)
         });
 
@@ -150,7 +150,7 @@ pimcore.object.classes.klass = Class.create({
 
     configureCustomLayouts: function() {
         try {
-            var dialog = new pimcore.object.helpers.customLayoutEditor(this.data);
+            new pimcore.object.helpers.customLayoutEditor(this.data);
         } catch (e) {
             console.log(e);
         }
@@ -910,10 +910,16 @@ pimcore.object.classes.klass = Class.create({
                 this.allowVariants,
                 this.showVariants,
                 {
+                    xtype: "label",
+                    text: t("generate_type_declarations"),
+                    cls: 'pimcore_deprecated'
+                },
+                {
                     xtype: "checkbox",
-                    fieldLabel: t("generate_type_declarations"),
+                    fieldLabel: `(${t("deprecated")})`,
                     name: "generateTypeDeclarations",
-                    checked: this.data.generateTypeDeclarations
+                    checked: this.data.generateTypeDeclarations,
+                    cls: 'pimcore_cb_middle_two_lines'
                 },
                 {
                     xtype: "checkbox",

@@ -29,17 +29,17 @@ class AbstractUser extends Model\AbstractModel
     use RecursionBlockingEventDispatchHelperTrait;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $id;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $parentId;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $name;
 
@@ -58,8 +58,8 @@ class AbstractUser extends Model\AbstractModel
         $cacheKey = 'user_' . $id;
 
         try {
-            if (\Pimcore\Cache\Runtime::isRegistered($cacheKey)) {
-                $user = \Pimcore\Cache\Runtime::get($cacheKey);
+            if (\Pimcore\Cache\RuntimeCache::isRegistered($cacheKey)) {
+                $user = \Pimcore\Cache\RuntimeCache::get($cacheKey);
             } else {
                 $user = new static();
                 $user->getDao()->getById($id);
@@ -70,7 +70,7 @@ class AbstractUser extends Model\AbstractModel
                     $user = $className::getById($user->getId());
                 }
 
-                \Pimcore\Cache\Runtime::set($cacheKey, $user);
+                \Pimcore\Cache\RuntimeCache::set($cacheKey, $user);
             }
         } catch (Model\Exception\NotFoundException $e) {
             return null;
@@ -116,7 +116,7 @@ class AbstractUser extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getId()
     {
@@ -136,7 +136,7 @@ class AbstractUser extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getParentId()
     {
@@ -156,7 +156,7 @@ class AbstractUser extends Model\AbstractModel
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getName()
     {

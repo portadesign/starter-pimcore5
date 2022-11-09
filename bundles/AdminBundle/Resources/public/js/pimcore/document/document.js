@@ -95,20 +95,20 @@ pimcore.document.document = Class.create(pimcore.element.abstract, {
                 saveData.missingRequiredEditable = this.data.missingRequiredEditable;
             }
 
-            try {
-                pimcore.plugin.broker.fireEvent("preSaveDocument", this, this.getType(), task, only);
-            } catch (e) {
-                if (e instanceof pimcore.error.ValidationException) {
-                    this.tab.unmask();
-                    pimcore.helpers.showPrettyError('document', t("error"), t("saving_failed"), e.message);
-                    return false;
-                }
+            const preSaveDocument = new CustomEvent(pimcore.events.preSaveDocument, {
+                detail: {
+                    document: this,
+                    type: this.getType(),
+                    task: task,
+                    onlySaveVersion: only
+                },
+                cancelable: true
+            });
 
-                if (e instanceof pimcore.error.ActionCancelledException) {
-                    this.tab.unmask();
-                    pimcore.helpers.showNotification(t("Info"), 'Document not saved: ' + e.message, 'info');
-                    return false;
-                }
+            const isAllowed = document.dispatchEvent(preSaveDocument);
+            if (!isAllowed) {
+                this.tab.unmask();
+                return false;
             }
 
             Ext.Ajax.request({
@@ -143,7 +143,17 @@ pimcore.document.document = Class.create(pimcore.element.abstract, {
                                 this.data['draft'] = rdata['draft'];
                             }
 
-                            pimcore.plugin.broker.fireEvent("postSaveDocument", this, this.getType(), task, only);
+                            const postSaveDocument = new CustomEvent(pimcore.events.postSaveDocument, {
+                                detail: {
+                                    document: this,
+                                    type: this.getType(),
+                                    task: task,
+                                    onlySaveVersion: only
+                                }
+                            });
+
+                            document.dispatchEvent(postSaveDocument);
+
                             pimcore.helpers.updateTreeElementStyle('document', this.id, rdata.treeData);
                         }
                     } catch (e) {

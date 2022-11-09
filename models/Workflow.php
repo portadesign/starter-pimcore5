@@ -18,6 +18,8 @@ namespace Pimcore\Model;
 use Pimcore\Model\Exception\NotFoundException;
 
 /**
+ * @deprecated
+ *
  * @method Workflow\Dao getDao()
  * @method void save()
  */
@@ -115,14 +117,14 @@ class Workflow extends AbstractModel
         $cacheKey = 'workflow_' . $id;
 
         try {
-            $workflow = \Pimcore\Cache\Runtime::get($cacheKey);
+            $workflow = \Pimcore\Cache\RuntimeCache::get($cacheKey);
             if (!$workflow) {
                 throw new \Exception('Workflow in registry is null');
             }
         } catch (\Exception $e) {
             try {
                 $workflow = new self();
-                \Pimcore\Cache\Runtime::set($cacheKey, $workflow);
+                \Pimcore\Cache\RuntimeCache::set($cacheKey, $workflow);
                 $workflow->getDao()->getById((int)$id);
             } catch (NotFoundException $e) {
                 return null;
@@ -254,7 +256,7 @@ class Workflow extends AbstractModel
     }
 
     /**
-     * Returns whether or not a state name is valid within the workflow
+     * Returns whether a state name is valid within the workflow
      *
      * @param string $stateName
      *
@@ -349,7 +351,7 @@ class Workflow extends AbstractModel
     /**
      * @param string $stateName
      *
-     * @return bool|mixed
+     * @return mixed
      */
     public function getStateConfig($stateName)
     {
@@ -365,7 +367,7 @@ class Workflow extends AbstractModel
     /**
      * @param string $statusName
      *
-     * @return bool|mixed
+     * @return mixed
      */
     public function getStatusConfig($statusName)
     {
@@ -480,7 +482,6 @@ class Workflow extends AbstractModel
         }
 
         if ($statusName && !$this->isGlobalAction($actionName)) {
-
             //check the status has this action
             if (!array_key_exists($actionName, $this->transitionDefinitions[$statusName]['validActions'])) {
                 throw new \Exception("Cannot merge action configuration [{$actionName}] for status [{$statusName}], action name is not valid in status");

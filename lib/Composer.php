@@ -22,7 +22,7 @@ use Symfony\Component\Process\PhpExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
- * {@internal}
+ * @internal
  */
 class Composer
 {
@@ -136,7 +136,7 @@ class Composer
 
         // ensure that there's a random secret defined
         if (strpos($parameters, 'ThisTokenIsNotSoSecretChangeIt')) {
-            $parameters = preg_replace_callback('/ThisTokenIsNotSoSecretChangeIt/', function ($match) {
+            $parameters = preg_replace_callback('/ThisTokenIsNotSoSecretChangeIt(Immediately)?/', function ($match) {
                 // generate a unique token for each occurrence
                 return base64_encode(random_bytes(32));
             }, $parameters);
@@ -302,6 +302,8 @@ class Composer
             array_push($command, '--symlink', '--relative');
         }
 
+        $command[] = '--ignore-maintenance-mode';
+
         if (!static::hasDirectory($event, 'public-dir', $webDir, 'install assets')) {
             return;
         }
@@ -330,6 +332,7 @@ class Composer
         $command = ['cache:clear'];
         if (!$options['symfony-cache-warmup']) {
             $command[] = '--no-warmup';
+            $command[] = '--ignore-maintenance-mode';
         }
 
         static::executeCommand($event, $consoleDir, $command, $options['process-timeout']);

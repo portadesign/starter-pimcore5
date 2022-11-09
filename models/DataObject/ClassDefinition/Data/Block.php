@@ -842,7 +842,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function setCollapsed($collapsed)
     {
-        $this->collapsed = $collapsed;
+        $this->collapsed = (bool) $collapsed;
     }
 
     /**
@@ -858,7 +858,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function setCollapsible($collapsible)
     {
-        $this->collapsible = $collapsible;
+        $this->collapsible = (bool) $collapsible;
     }
 
     /**
@@ -890,13 +890,13 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     }
 
     /**
-     * @param int|bool|null $lazyLoading
+     * @param bool $lazyLoading
      *
      * @return $this
      */
     public function setLazyLoading($lazyLoading)
     {
-        $this->lazyLoading = $lazyLoading;
+        $this->lazyLoading = (bool) $lazyLoading;
 
         return $this;
     }
@@ -966,7 +966,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
                 $query = 'select ' . $db->quoteIdentifier($field) . ' from object_localized_data_' . $object->getClassId() . ' where language = ' . $db->quote($params['language']) . ' and  ooo_id  = ' . $object->getId();
             }
             $data = $db->fetchOne($query);
-            $data = $this->getDataFromResource($data, $container, $params);
+            $data = $this->getDataFromResource($data, $object, $params);
         } elseif ($container instanceof DataObject\Objectbrick\Data\AbstractData) {
             $context = $params['context'];
 
@@ -977,7 +977,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
             $query = 'select ' . $db->quoteIdentifier($brickField) . ' from object_brick_store_' . $brickType . '_' . $object->getClassId()
                 . ' where  o_id  = ' . $object->getId() . ' and fieldname = ' . $db->quote($fieldname);
             $data = $db->fetchOne($query);
-            $data = $this->getDataFromResource($data, $container, $params);
+            $data = $this->getDataFromResource($data, $object, $params);
         } elseif ($container instanceof DataObject\Fieldcollection\Data\AbstractData) {
             $context = $params['context'];
             $collectionType = $context['containerKey'];
@@ -989,7 +989,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
             $query = 'select ' . $db->quoteIdentifier($field) . ' from object_collection_' . $collectionType . '_' . $object->getClassId()
                 . ' where  o_id  = ' . $object->getId() . ' and fieldname = ' . $db->quote($fcField) . ' and `index` = ' . $context['index'];
             $data = $db->fetchOne($query);
-            $data = $this->getDataFromResource($data, $container, $params);
+            $data = $this->getDataFromResource($data, $object, $params);
         }
 
         return $data;
@@ -1061,7 +1061,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function setDisallowAddRemove($disallowAddRemove)
     {
-        $this->disallowAddRemove = $disallowAddRemove;
+        $this->disallowAddRemove = (bool) $disallowAddRemove;
     }
 
     /**
@@ -1077,7 +1077,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function setDisallowReorder($disallowReorder)
     {
-        $this->disallowReorder = $disallowReorder;
+        $this->disallowReorder = (bool) $disallowReorder;
     }
 
     /**
@@ -1161,7 +1161,6 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
         if (is_array($blockDefinitions)) {
             foreach ($blockDefinitions as $field) {
                 if ($field instanceof LazyLoadingSupportInterface && $field->getLazyLoading()) {
-
                     // Lazy loading inside blocks isn't supported, turn it off if possible
                     if (method_exists($field, 'setLazyLoading')) {
                         $field->setLazyLoading(false);

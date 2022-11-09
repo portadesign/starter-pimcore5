@@ -176,6 +176,14 @@ final class Localizedfield extends Model\AbstractModel implements
     }
 
     /**
+     * @return array
+     */
+    public function getItems(): array
+    {
+        return $this->items;
+    }
+
+    /**
      * @param array $items
      *
      * @return $this
@@ -462,7 +470,7 @@ final class Localizedfield extends Model\AbstractModel implements
      * @param string|null $language
      * @param bool $ignoreFallbackLanguage
      *
-     * @return mixed|null
+     * @return mixed
      *
      * @throws \Exception
      * @throws Model\Exception\NotFoundException

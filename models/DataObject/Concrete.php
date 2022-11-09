@@ -389,7 +389,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
     /**
      * @param ClassDefinition|null $o_class
      *
-     * @return self
+     * @return $this
      */
     public function setClass(?ClassDefinition $o_class)
     {
@@ -481,7 +481,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
     /**
      * @param bool $omitMandatoryCheck
      *
-     * @return self
+     * @return $this
      */
     public function setOmitMandatoryCheck($omitMandatoryCheck)
     {
@@ -540,7 +540,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
      *
      * @return self|null
      */
-    private function getClosestParentOfClass(string $classId): ?self
+    public function getClosestParentOfClass(string $classId): ?self
     {
         $parent = $this->getParent();
         if ($parent instanceof AbstractObject) {
@@ -831,7 +831,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
         $conditionParts = Service::buildConditionPartsFromDescriptor($descriptor);
 
         $query = 'SELECT * FROM ' . $table . ' WHERE ' . implode(' AND ', $conditionParts);
-        $result = $db->fetchAll($query);
+        $result = $db->fetchAllAssociative($query);
 
         return $result;
     }
@@ -903,8 +903,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
     {
         if ($this->__rawRelationData === null) {
             $db = Db::get();
-            $relations = $db->fetchAll('SELECT * FROM object_relations_' . $this->getClassId() . ' WHERE src_id = ?', [$this->getId()]);
-            $this->__rawRelationData = $relations ?? [];
+            $this->__rawRelationData = $db->fetchAllAssociative('SELECT * FROM object_relations_' . $this->getClassId() . ' WHERE src_id = ?', [$this->getId()]);
         }
 
         return $this->__rawRelationData;

@@ -15,7 +15,6 @@
 
 namespace Pimcore\Model;
 
-use Pimcore\Cache\Runtime;
 use Pimcore\Event\Model\VersionEvent;
 use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Event\VersionEvents;
@@ -41,7 +40,7 @@ final class Version extends AbstractModel
     use RecursionBlockingEventDispatchHelperTrait;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $id;
 
@@ -217,7 +216,6 @@ final class Version extends AbstractModel
 
         // if necessary convert the data to save it to filesystem
         if (is_object($data) || is_array($data)) {
-
             // this is because of lazy loaded element inside documents and objects (eg: relational data-types, fieldcollections, ...)
             $fromRuntime = null;
             $cacheKey = null;
@@ -248,7 +246,7 @@ final class Version extends AbstractModel
         }
 
         $this->setStorageType($this->storageAdapter->getStorageType(strlen($dataString),
-                                                        $isAsset ? $data->getfileSize() : null));
+            $isAsset ? $data->getfileSize() : null));
 
         if ($isAsset) {
             $this->setBinaryFileId($this->getDao()->getBinaryFileIdForHash($this->getBinaryFileHash()));
@@ -338,7 +336,7 @@ final class Version extends AbstractModel
         $this->dispatchEvent(new VersionEvent($this), VersionEvents::PRE_DELETE);
 
         $this->storageAdapter->delete($this,
-                                $this->getDao()->isBinaryHashInUse($this->getBinaryFileHash()));
+            $this->getDao()->isBinaryHashInUse($this->getBinaryFileHash()));
 
         $this->getDao()->delete();
         $this->dispatchEvent(new VersionEvent($this), VersionEvents::POST_DELETE);
@@ -368,7 +366,7 @@ final class Version extends AbstractModel
 
             $data = Serialize::unserialize($data);
             //clear runtime cache to avoid dealing with marshalled data
-            Runtime::clear();
+            \Pimcore::collectGarbage();
             if ($data instanceof \__PHP_Incomplete_Class) {
                 Logger::err('Version: cannot read version data from file system because of incompatible class.');
 
@@ -398,11 +396,17 @@ final class Version extends AbstractModel
         return $data;
     }
 
+    /**
+     * @return mixed
+     */
     public function getFileStream()
     {
         return $this->storageAdapter->getFileStream($this);
     }
 
+    /**
+     * @return mixed
+     */
     public function getBinaryFileStream()
     {
         return $this->storageAdapter->getBinaryFileStream($this);
@@ -425,7 +429,7 @@ final class Version extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getId()
     {

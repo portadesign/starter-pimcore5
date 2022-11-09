@@ -696,12 +696,6 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     public function getFolderAction(Request $request, EventDispatcherInterface $eventDispatcher)
     {
         $objectId = (int)$request->get('id');
-        // check for lock
-        if (Element\Editlock::isLocked($objectId, 'object')) {
-            return $this->getEditLockResponse($objectId, 'object');
-        }
-        Element\Editlock::lock($objectId, 'object');
-
         $object = DataObject::getById($objectId);
 
         if (!$object) {
@@ -1005,9 +999,36 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     public function updateAction(Request $request)
     {
+        $values = $this->decodeJson($request->get('values'));
+
+        $ids = $this->decodeJson($request->get('id'));
+
+        if (is_array($ids)) {
+            $return = ['success' => true];
+            foreach ($ids as $id) {
+                $object = DataObject::getById((int)$id);
+                $return = $this->executeUpdateAction($object, $values);
+                if (!$return['success']) {
+                    return $this->adminJson($return);
+                }
+            }
+        } else {
+            $object = DataObject::getById((int)$ids);
+            $return = $this->executeUpdateAction($object, $values);
+        }
+
+        return $this->adminJson($return);
+    }
+
+    /**
+     * @return array{success: bool, message?: string}
+     *
+     * @throws \Exception
+     */
+    private function executeUpdateAction(DataObject $object, mixed $values): array
+    {
         $success = false;
 
-        $object = DataObject::getById((int) $request->get('id'));
         if ($object instanceof DataObject\Concrete) {
             $object->setOmitMandatoryCheck(true);
         }
@@ -1017,11 +1038,10 @@ class DataObjectController extends ElementControllerBase implements KernelContro
         if ($object instanceof DataObject\Concrete) {
             $latestVersion = $object->getLatestVersion();
             if ($latestVersion && $latestVersion->getData()->getModificationDate() != $object->getModificationDate()) {
-                return $this->adminJson(['success' => false, 'message' => "You can't rename or relocate if there's a newer not published version"]);
+                return ['success' => false, 'message' => "You can't rename or relocate if there's a newer not published version"];
             }
         }
 
-        $values = $this->decodeJson($request->get('values'));
         $key = $values['key'] ?? null;
 
         if ($object->isAllowed('settings')) {
@@ -1045,11 +1065,11 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                     $objectWithSamePath = DataObject::getByPath($parent->getRealFullPath() . '/' . $object->getKey());
 
                     if ($objectWithSamePath != null) {
-                        return $this->adminJson(['success' => false, 'message' => 'prevented creating object because object with same path+key already exists']);
+                        return ['success' => false, 'message' => 'prevented creating object because object with same path+key already exists'];
                     }
 
                     if ($object->isLocked()) {
-                        return $this->adminJson(['success' => false, 'message' => 'prevented moving object, because it is locked: ID: ' . $object->getId()]);
+                        return ['success' => false, 'message' => 'prevented moving object, because it is locked: ID: ' . $object->getId()];
                     }
 
                     $object->setParentId($values['parentId']);
@@ -1064,32 +1084,33 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             $object->setUserModification($this->getAdminUser()->getId());
 
             try {
-                $isIndexUpdate = isset($values['index']) && is_int($values['index']);
+                $isIndexUpdate = isset($values['indices']);
 
                 if ($isIndexUpdate) {
                     // Ensure the update sort index is already available in the postUpdate eventListener
-                    $object->setIndex($values['index']);
+                    $indexUpdate = is_int($values['indices']) ? $values['indices'] : $values['indices'][$object->getId()];
+                    $object->setIndex($indexUpdate);
                 }
 
                 $object->save();
 
                 if ($isIndexUpdate) {
-                    $this->updateIndexesOfObjectSiblings($object, $values['index']);
+                    $this->updateIndexesOfObjectSiblings($object, $indexUpdate);
                 }
 
                 $success = true;
             } catch (\Exception $e) {
                 Logger::error((string) $e);
 
-                return $this->adminJson(['success' => false, 'message' => $e->getMessage()]);
+                return ['success' => false, 'message' => $e->getMessage()];
             }
         } elseif ($key && $object->isAllowed('rename')) {
-            $this->adminJson($this->renameObject($object, $key));
+            return $this->renameObject($object, $key);
         } else {
             Logger::debug('prevented update object because of missing permissions.');
         }
 
-        return $this->adminJson(['success' => $success]);
+        return ['success' => $success];
     }
 
     private function executeInsideTransaction(callable $fn)
@@ -1133,7 +1154,8 @@ class DataObjectController extends ElementControllerBase implements KernelContro
         $fn = function () use ($parentObject, $currentSortOrder) {
             $list = new DataObject\Listing();
 
-            Db::get()->executeUpdate(
+            $db = Db::get();
+            $result = $db->executeStatement(
                 'UPDATE '.$list->getDao()->getTableName().' o,
                     (
                     SELECT newIndex, o_id FROM (
@@ -1151,7 +1173,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             );
 
             $db = Db::get();
-            $children = $db->fetchAll(
+            $children = $db->fetchAllAssociative(
                 'SELECT o_id, o_modificationDate, o_versionCount FROM objects'
                 .' WHERE o_parentId = ? ORDER BY o_index ASC',
                 [$parentObject->getId()]
@@ -1198,35 +1220,36 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             $list = new DataObject\Listing();
             $updatedObject->saveIndex($newIndex);
 
-            Db::get()->executeUpdate(
+            // The cte and the limit are needed to order the data before the newIndex is set
+            $db = Db::get();
+            $db->executeStatement(
                 'UPDATE '.$list->getDao()->getTableName().' o,
                     (
-                        SELECT newIndex, o_id FROM (SELECT @n := IF(@n = ? - 1,@n + 2,@n + 1) AS newIndex, o_id
-                        FROM '.$list->getDao()->getTableName().',
-                        (SELECT @n := -1) variable
-                        WHERE o_id != ? AND o_parentId = ? AND o_type IN (\''.implode(
+                        SELECT newIndex, o_id
+                        FROM (
+                            With cte As (SELECT o_index, o_id FROM ' . $list->getDao()->getTableName() . ' WHERE o_parentId = ? AND o_id != ? AND o_type IN (\''.implode(
                     "','", [
                         DataObject::OBJECT_TYPE_OBJECT,
                         DataObject::OBJECT_TYPE_VARIANT,
                         DataObject::OBJECT_TYPE_FOLDER,
                     ]
-                ).'\')
-                            ORDER BY o_index, o_id=?
+                ).'\') ORDER BY o_index LIMIT '. $updatedObject->getParent()->getChildAmount() .')
+                            SELECT @n := IF(@n = ? - 1,@n + 2,@n + 1) AS newIndex, o_id
+                            FROM cte,
+                            (SELECT @n := -1) variable
                         ) tmp
                     ) order_table
                     SET o.o_index = order_table.newIndex
                     WHERE o.o_id=order_table.o_id',
                 [
-                    $newIndex,
-                    $updatedObject->getId(),
                     $updatedObject->getParentId(),
                     $updatedObject->getId(),
+                    $newIndex,
                 ]
             );
 
-            $db = Db::get();
-            $siblings = $db->fetchAll(
-                'SELECT o_id, o_modificationDate, o_versionCount FROM objects'
+            $siblings = $db->fetchAllAssociative(
+                'SELECT o_id, o_modificationDate, o_versionCount, o_key, o_index FROM objects'
                 ." WHERE o_parentId = ? AND o_id != ? AND o_type IN ('object', 'variant','folder') ORDER BY o_index ASC",
                 [$updatedObject->getParentId(), $updatedObject->getId()]
             );
@@ -1359,7 +1382,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             $object->save();
             $treeData = $this->getTreeNodeConfig($object);
 
-            $newObject = DataObject::getById($object->getId(), true);
+            $newObject = DataObject::getById($object->getId(), ['force' => true]);
 
             if ($request->get('task') == 'publish') {
                 $object->deleteAutoSaveVersions($this->getAdminUser()->getId());
@@ -1405,7 +1428,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
             $treeData = $this->getTreeNodeConfig($object);
 
-            $newObject = DataObject::getById($object->getId(), true);
+            $newObject = DataObject::getById($object->getId(), ['force' => true]);
 
             return $this->adminJson([
                 'success' => true,

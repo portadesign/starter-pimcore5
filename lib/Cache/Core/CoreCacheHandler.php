@@ -291,7 +291,7 @@ class CoreCacheHandler implements LoggerAwareInterface
      *
      * @param string $key
      *
-     * @return bool|mixed
+     * @return mixed
      */
     public function load($key)
     {
@@ -541,7 +541,7 @@ class CoreCacheHandler implements LoggerAwareInterface
         if ($data instanceof ElementInterface) {
             // fetch a fresh copy
             $type = Service::getElementType($data);
-            $data = Service::getElementById($type, $data->getId(), true);
+            $data = Service::getElementById($type, $data->getId(), ['force' => true]);
 
             if (!$data->__isBasedOnLatestData()) {
                 $this->logger->warning('Not saving {key} to cache as element is not based on latest data', [

@@ -107,7 +107,15 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
 
         this.tab.on("afterrender", function (tabId) {
             this.tabPanel.setActiveItem(tabId);
-            pimcore.plugin.broker.fireEvent("postOpenAsset", this, this.getType());
+
+            const postOpenAsset = new CustomEvent(pimcore.events.postOpenAsset, {
+                detail: {
+                    asset: this,
+                    type: this.getType()
+                }
+            });
+
+            document.dispatchEvent(postOpenAsset);
         }.bind(this, tabId));
 
         this.removeLoadingPanel();
@@ -355,21 +363,20 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
 
         this.tab.mask();
 
-        try {
-            pimcore.plugin.broker.fireEvent("preSaveAsset", this.id);
-        } catch (e) {
-            if (e instanceof pimcore.error.ValidationException) {
-                this.tab.unmask();
-                pimcore.helpers.showPrettyError('asset', t("error"), t("saving_failed"), e.message);
-                return false;
-            }
+        const preSaveAsset = new CustomEvent(pimcore.events.preSaveAsset, {
+            detail: {
+                id: this.id,
+                task: task
+            },
+            cancelable: true
+        });
 
-            if (e instanceof pimcore.error.ActionCancelledException) {
-                this.tab.unmask();
-                pimcore.helpers.showNotification(t("Info"), 'Asset not saved: ' + e.message, 'info');
-                return false;
-            }
+        const isAllowed = document.dispatchEvent(preSaveAsset);
+        if (!isAllowed) {
+            this.tab.unmask();
+            return false;
         }
+
 
         let params = this.getSaveData(only);
         if (task) {
@@ -387,7 +394,14 @@ pimcore.asset.asset = Class.create(pimcore.element.abstract, {
                         this.resetChanges();
                         Ext.apply(this.data, rdata.data);
 
-                        pimcore.plugin.broker.fireEvent("postSaveAsset", this.id);
+                        const postSaveAsset = new CustomEvent(pimcore.events.postSaveAsset, {
+                            detail: {
+                                id: this.id
+                            }
+                        });
+
+                        document.dispatchEvent(postSaveAsset);
+
                         pimcore.helpers.updateTreeElementStyle('asset', this.id, rdata.treeData);
 
                     }

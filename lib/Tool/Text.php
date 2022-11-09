@@ -16,6 +16,7 @@
 namespace Pimcore\Tool;
 
 use Onnov\DetectEncoding\EncodingDetector;
+use Pimcore\Cache\RuntimeCache;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\Document;
@@ -37,10 +38,10 @@ class Text
     }
 
     /**
-     * @param string $text
+     * @param string|null $text
      * @param array $params
      *
-     * @return string
+     * @return string|null
      */
     public static function wysiwygText($text, $params = [])
     {
@@ -196,14 +197,14 @@ class Text
         }
 
         $hash = 'elements_raw_wysiwyg_text_' . md5($text);
-        if (\Pimcore\Cache\Runtime::isRegistered($hash)) {
-            return \Pimcore\Cache\Runtime::get($hash);
+        if (RuntimeCache::isRegistered($hash)) {
+            return RuntimeCache::get($hash);
         }
 
         //$text = Pimcore_Tool_Text::removeLineBreaks($text);
         preg_match_all("@\<(a|img)[^>]*(pimcore_id=\"[0-9]+\")[^>]*(pimcore_type=\"[asset|document|object]+\")[^>]*\>@msUi", $text, $matches);
 
-        \Pimcore\Cache\Runtime::set($hash, $matches);
+        RuntimeCache::set($hash, $matches);
 
         return $matches;
     }
@@ -216,8 +217,8 @@ class Text
     private static function getElementsInWysiwyg($text)
     {
         $hash = 'elements_wysiwyg_text_' . md5($text);
-        if (\Pimcore\Cache\Runtime::isRegistered($hash)) {
-            return \Pimcore\Cache\Runtime::get($hash);
+        if (RuntimeCache::isRegistered($hash)) {
+            return RuntimeCache::get($hash);
         }
 
         $elements = [];
@@ -240,7 +241,7 @@ class Text
             }
         }
 
-        \Pimcore\Cache\Runtime::set($hash, $elements);
+        RuntimeCache::set($hash, $elements);
 
         return $elements;
     }

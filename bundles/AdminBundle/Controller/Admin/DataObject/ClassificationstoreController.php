@@ -21,6 +21,10 @@ use Pimcore\Db;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data\LayoutDefinitionEnrichmentInterface;
 use Pimcore\Model\DataObject\Classificationstore;
+use Pimcore\Model\Translation;
+use Pimcore\Model\Translation\Listing;
+use Pimcore\Model\User;
+use Pimcore\Tool\Admin;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
@@ -248,7 +252,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
             if ($allowedGroupIds) {
                 $db = \Pimcore\Db::get();
                 $query = 'select * from classificationstore_collectionrelations where groupId in (' . implode(',', $allowedGroupIds) .')';
-                $relationList = $db->fetchAll($query);
+                $relationList = $db->fetchAllAssociative($query);
 
                 if (is_array($relationList)) {
                     foreach ($relationList as $item) {
@@ -272,7 +276,14 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
         $searchfilter = $request->get('searchfilter');
         if ($searchfilter) {
-            $conditionParts[] = '(name LIKE ' . $db->quote('%' . $searchfilter . '%') . ' OR description LIKE ' . $db->quote('%'. $searchfilter . '%') . ')';
+            $searchFilterConditions = [];
+
+            $searchTerms = array_merge([$searchfilter], $this->getTranslatedSearchFilterTerms($searchfilter));
+            foreach ($searchTerms as $searchFilterTerm) {
+                $searchFilterConditions[] = 'name LIKE '.$db->quote('%'.$searchFilterTerm.'%').' OR description LIKE '.$db->quote('%'.$searchFilterTerm.'%');
+            }
+
+            $conditionParts[] = '('.implode(' OR ', $searchFilterConditions).')';
         }
 
         $storeId = $request->get('storeId');
@@ -421,7 +432,14 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
         $searchfilter = $request->get('searchfilter');
         if ($searchfilter) {
-            $conditionParts[] = '(name LIKE ' . $db->quote('%' . $searchfilter . '%') . ' OR description LIKE ' . $db->quote('%'. $searchfilter . '%') . ')';
+            $searchFilterConditions = [];
+
+            $searchTerms = array_merge([$searchfilter], $this->getTranslatedSearchFilterTerms($searchfilter));
+            foreach ($searchTerms as $searchFilterTerm) {
+                $searchFilterConditions[] = 'name LIKE '.$db->quote('%'.$searchFilterTerm.'%').' OR description LIKE '.$db->quote('%'.$searchFilterTerm.'%');
+            }
+
+            $conditionParts[] = '('.implode(' OR ', $searchFilterConditions).')';
         }
 
         if ($request->get('storeId')) {
@@ -758,11 +776,18 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
         $searchfilter = $request->get('searchfilter');
         if ($searchfilter) {
-            $conditionParts[] = '('
-                . Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS . '.name LIKE ' . $db->quote('%' . $searchfilter . '%')
-                . ' OR ' . Classificationstore\GroupConfig\Dao::TABLE_NAME_GROUPS . '.name LIKE ' . $db->quote('%' . $searchfilter . '%')
-                . ' OR ' . Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS . '.description LIKE ' . $db->quote('%' . $searchfilter . '%') . ')';
+            $searchFilterConditions = [];
+
+            $searchTerms = array_merge([$searchfilter], $this->getTranslatedSearchFilterTerms($searchfilter));
+            foreach ($searchTerms as $searchFilterTerm) {
+                $searchFilterConditions[] = Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS.'.name LIKE '.$db->quote('%'.$searchFilterTerm.'%')
+                    .' OR '.Classificationstore\GroupConfig\Dao::TABLE_NAME_GROUPS.'.name LIKE '.$db->quote('%'.$searchFilterTerm.'%')
+                    .' OR '.Classificationstore\KeyConfig\Dao::TABLE_NAME_KEYS.'.description LIKE '.$db->quote('%'.$searchFilterTerm.'%');
+            }
+
+            $conditionParts[] = '('.implode(' OR ', $searchFilterConditions).')';
         }
+
         $condition = implode(' AND ', $conditionParts);
         $list->setCondition($condition);
         $list->setResolveGroupName(true);
@@ -975,7 +1000,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
         if ($ids) {
             $db = \Pimcore\Db::get();
             $mappedData = [];
-            $groupsData = $db->fetchAll('select * from classificationstore_groups g, classificationstore_collectionrelations c where colId IN (:ids) and g.id = c.groupId', [
+            $groupsData = $db->fetchAllAssociative('select * from classificationstore_groups g, classificationstore_collectionrelations c where colId IN (:ids) and g.id = c.groupId', [
                 'ids' => implode(',', array_filter($ids, 'intval')),
             ]);
 
@@ -1561,8 +1586,8 @@ class ClassificationstoreController extends AdminController implements KernelCon
                   ) all_rows) item where id = ' .  $id . ';';
         }
 
-        $db->query('select @rownum := 0;');
-        $result = $db->fetchAll($query);
+        $db->executeQuery('select @rownum := 0;');
+        $result = $db->fetchAllAssociative($query);
 
         $page = (int) $result[0]['page'] ;
 
@@ -1587,5 +1612,26 @@ class ClassificationstoreController extends AdminController implements KernelCon
             'searchRelationsAction',
         ];
         $this->checkActionPermission($event, 'classes', $unrestrictedActions);
+    }
+
+    /**
+     * @return string[]
+     */
+    private function getTranslatedSearchFilterTerms(string $searchTerm): array
+    {
+        $terms = [];
+
+        $user = Admin::getCurrentUser();
+        if ($user instanceof User) {
+            $translationListing = new Listing();
+            $translationListing->setDomain(Translation::DOMAIN_ADMIN);
+            $translationListing->setCondition('language=? AND text LIKE ?', [$user->getLanguage(), '%'.$searchTerm.'%']);
+
+            foreach ($translationListing as $translation) {
+                $terms[] = $translation->getKey();
+            }
+        }
+
+        return $terms;
     }
 }

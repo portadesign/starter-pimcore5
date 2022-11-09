@@ -38,7 +38,7 @@ class InternalModelDaoMappingGeneratorCommand extends AbstractCommand
     /**
      * {@inheritdoc}
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $finder = new Finder();
         $finder
@@ -65,6 +65,8 @@ class InternalModelDaoMappingGeneratorCommand extends AbstractCommand
                 }
             }
         }
+
+        ksort($map);
 
         $mapFile = realpath(__DIR__ . '/../../../config/dao-classmap.php');
         File::putPhpFile($mapFile, to_php_data_file_format($map));

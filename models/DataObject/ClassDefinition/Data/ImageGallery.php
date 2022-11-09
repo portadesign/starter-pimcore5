@@ -301,7 +301,7 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
      */
     private function createEmptyImageGallery($params = [])
     {
-        $imageGallery = new DataObject\Data\ImageGallery(null);
+        $imageGallery = new DataObject\Data\ImageGallery();
 
         if (isset($params['owner'])) {
             $imageGallery->_setOwner($params['owner']);
@@ -497,7 +497,10 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
      */
     public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
-        if ($this->getMandatory() && !$omitMandatoryCheck && ($data === null || empty($data->getItems()) || $data->getItems()[0]->getImage() === null)) {
+        if (
+            $this->getMandatory() && !$omitMandatoryCheck &&
+            ($data === null || empty($data->getItems()) || $data->hasValidImages() === false)
+        ) {
             throw new Model\Element\ValidationException('[ ' . $this->getName() . ' ] At least 1 image should be uploaded!');
         }
 

@@ -99,13 +99,13 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
     }
 
     /**
-     * @param  int|bool|null $lazyLoading
+     * @param bool $lazyLoading
      *
      * @return $this
      */
     public function setLazyLoading($lazyLoading)
     {
-        $this->lazyLoading = $lazyLoading;
+        $this->lazyLoading = (bool) $lazyLoading;
 
         return $this;
     }
@@ -321,7 +321,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function load($object, $params = [])
     {
-        $container = new DataObject\Fieldcollection(null, $this->getName());
+        $container = new DataObject\Fieldcollection([], $this->getName());
         $container->load($object);
 
         if ($container->isEmpty()) {
@@ -336,7 +336,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function delete($object, $params = [])
     {
-        $container = new DataObject\Fieldcollection(null, $this->getName());
+        $container = new DataObject\Fieldcollection([], $this->getName());
         $container->delete($object);
     }
 
@@ -757,7 +757,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function setCollapsed($collapsed)
     {
-        $this->collapsed = $collapsed;
+        $this->collapsed = (bool) $collapsed;
     }
 
     /**
@@ -773,7 +773,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function setCollapsible($collapsible)
     {
-        $this->collapsible = $collapsible;
+        $this->collapsible = (bool) $collapsible;
     }
 
     /**

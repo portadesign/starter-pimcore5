@@ -28,6 +28,7 @@ use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Header\Headers;
 use Symfony\Component\Mime\Header\MailboxListHeader;
 use Symfony\Component\Mime\Part\AbstractPart;
+use Twig\Sandbox\SecurityError;
 
 class Mail extends Email
 {
@@ -240,7 +241,7 @@ class Mail extends Email
      *
      * @param array $options
      *
-     * @return \Pimcore\Mail
+     * @return $this
      */
     public function setHtml2TextOptions(array $options = [])
     {
@@ -262,7 +263,7 @@ class Mail extends Email
     /**
      * Clears list of recipient email addresses
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function clearRecipients()
     {
@@ -279,7 +280,7 @@ class Mail extends Email
     /**
      * Disables email logging
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function disableLogging()
     {
@@ -291,7 +292,7 @@ class Mail extends Email
     /**
      * Enables email logging (by default it's enabled)
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function enableLogging()
     {
@@ -315,7 +316,7 @@ class Mail extends Email
      *
      * @param array $params
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function setParams(array $params)
     {
@@ -332,7 +333,7 @@ class Mail extends Email
      * @param string|int $key
      * @param mixed $value
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function setParam($key, $value)
     {
@@ -382,7 +383,7 @@ class Mail extends Email
      *
      * @param array $params
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function unsetParams(array $params)
     {
@@ -398,7 +399,7 @@ class Mail extends Email
      *
      * @param string|int $key
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function unsetParam($key)
     {
@@ -414,7 +415,7 @@ class Mail extends Email
     /**
      * Sets the settings which are defined in the Document Settings (from,to,cc,bcc,replyTo)
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     private function setDocumentSettings()
     {
@@ -477,7 +478,7 @@ class Mail extends Email
      *
      * @param  MailerInterface|null $mailer
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function send(MailerInterface $mailer = null)
     {
@@ -511,7 +512,7 @@ class Mail extends Email
      *
      * @param MailerInterface|null $mailer
      *
-     * @return \Pimcore\Mail
+     * @return $this
      *
      * @throws \Exception
      */
@@ -651,12 +652,23 @@ class Mail extends Email
      *
      * @return string
      */
-    private function renderParams(string $string): string
+    private function renderParams(string $string, string $context): string
     {
-        $twig = \Pimcore::getContainer()->get('twig');
-        $template = $twig->createTemplate($string);
+        $templatingEngine = \Pimcore::getContainer()->get('pimcore.templating.engine.delegating');
 
-        return $template->render($this->getParams());
+        try {
+            $twig = $templatingEngine->getTwigEnvironment(true);
+            $template = $twig->createTemplate($string);
+
+            return $template->render($this->getParams());
+        } catch (SecurityError $e) {
+            Logger::err((string) $e);
+
+            throw new \Exception(sprintf('Failed rendering the %s: %s. Please check your twig sandbox security policy or contact the administrator.',
+                $context, substr($e->getMessage(), 0, strpos($e->getMessage(), ' in "__string'))));
+        } finally {
+            $templatingEngine->disableSandboxExtensionFromTwigEnvironment();
+        }
     }
 
     /**
@@ -675,7 +687,7 @@ class Mail extends Email
         }
 
         if ($subject) {
-            return $this->renderParams($subject);
+            return $this->renderParams($subject, 'subject');
         }
 
         return '';
@@ -706,7 +718,7 @@ class Mail extends Email
 
         $content = null;
         if ($html) {
-            $content = $this->renderParams($html);
+            $content = $this->renderParams($html, 'body');
 
             // modifying the content e.g set absolute urls...
             $content = MailHelper::embedAndModifyCss($content, $this->getDocument());
@@ -730,7 +742,7 @@ class Mail extends Email
 
         //if the content was manually set with $obj->text(); this content will be used
         if ($text) {
-            $content = $this->renderParams($text);
+            $content = $this->renderParams($text, 'body');
         } else {
             //creating text version from html email
             try {
@@ -818,7 +830,7 @@ class Mail extends Email
      *
      * @internal
      *
-     * @return \Pimcore\Mail
+     * @return $this
      */
     public function preventDebugInformationAppending()
     {
@@ -871,6 +883,12 @@ class Mail extends Email
      */
     public function setBodyText($bodyText, string $charset = 'utf-8')
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.0',
+            sprintf('%s is deprecated, please use text() instead. Will be removed in Pimcore 11', __METHOD__)
+        );
+
         return $this->text($bodyText, $charset);
     }
 
@@ -880,10 +898,16 @@ class Mail extends Email
      * @param string $body
      * @param string $charset
      *
-     * @return \Pimcore\Mail
+     * @return $this
      */
     public function setBodyHtml($body, string $charset = 'utf-8')
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.0',
+            sprintf('%s is deprecated, please use html() instead. Will be removed in Pimcore 11', __METHOD__)
+        );
+
         return $this->html($body, $charset);
     }
 
@@ -918,6 +942,12 @@ class Mail extends Email
      */
     public function createAttachment($data, $mimeType = null, $filename = null)
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.0',
+            sprintf('%s is deprecated, please use attach() instead. Will be removed in Pimcore 11', __METHOD__)
+        );
+
         return $this->attach($data, $filename, $mimeType);
     }
 
@@ -944,7 +974,7 @@ class Mail extends Email
     }
 
     /**
-     * Set the subject of this message.
+     * @deprecated use subject() instead. Will be removed in Pimcore 11
      *
      * @param string $subject
      *
@@ -952,6 +982,12 @@ class Mail extends Email
      */
     public function setSubject($subject)
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.5.4',
+            sprintf('%s is deprecated, please use subject() instead. Will be removed in Pimcore 11', __METHOD__)
+        );
+
         return $this->subject($subject);
     }
 

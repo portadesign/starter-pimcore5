@@ -9,6 +9,7 @@ framework:
         enabled: true
     router:
         strict_requirements: ~
+        utf8: true
     form: ~
     csrf_protection: ~
     validation: { enable_annotations: true }
@@ -20,6 +21,8 @@ framework:
         # use the native PHP session mechanism
         handler_id:  null
         cookie_samesite: 'strict'
+        storage_factory_id: session.storage.factory.native
+        cookie_secure: auto
     php_errors:
         log: true
     assets: ~
@@ -49,6 +52,7 @@ framework:
         default_bus: messenger.bus.pimcore-core
         buses:
             messenger.bus.pimcore-core:
+        reset_on_message: true
 
 # Twig Configuration
 twig:
@@ -74,8 +78,11 @@ doctrine:
                 charset: UTF8MB4
                 logging: false
                 profiling: false
+                options:
+                  !php/const PDO::MYSQL_ATTR_INIT_COMMAND: "SET sql_mode = '';"
                 default_table_options:
                     charset: UTF8MB4
+                    engine: InnoDB
                     collate: utf8mb4_general_ci
 
 # Monolog Configuration
@@ -280,6 +287,18 @@ pimcore:
             303: See Other
             307: Temporary Redirect
 
+    glossary:
+        blocked_tags: [
+              'a', 'script', 'style', 'code', 'pre', 'textarea', 'acronym',
+              'abbr', 'option', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+          ]
+
+    templating_engine:
+        twig:
+            sandbox_security_policy:
+                tags: ['set']
+                filters: ['escape', 'trans']
+                functions: ['path', 'asset']
 presta_sitemap:
     # do not add properties by default
     defaults:

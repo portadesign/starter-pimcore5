@@ -34,6 +34,8 @@ use Exception;
 use Iterator;
 
 /**
+ * @deprecated Will be removed in Pimcore 11.
+ *
  * Provides a property based interface to an array.
  * The data are read-only unless $allowModifications is set to true
  * on construction.
@@ -320,7 +322,7 @@ final class Config implements Countable, Iterator, ArrayAccess
      *
      * @param  Config $merge
      *
-     * @return self
+     * @return $this
      */
     public function merge(Config $merge)
     {
@@ -384,7 +386,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     }
 
     /**
-     * {@inheritdoc}
+     * @return string|false
      */
     public function __toString()
     {

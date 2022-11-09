@@ -30,7 +30,7 @@ class ImageGallery implements \Iterator, OwnerAwareFieldInterface
     /**
      * @param Hotspotimage[] $items
      */
-    public function __construct($items)
+    public function __construct($items = [])
     {
         $this->setItems($items);
         $this->markMeDirty();
@@ -100,5 +100,19 @@ class ImageGallery implements \Iterator, OwnerAwareFieldInterface
         $this->items = $items;
         $this->rewind();
         $this->markMeDirty();
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasValidImages(): bool
+    {
+        foreach ($this->getItems() as $item) {
+            if ($item instanceof \Pimcore\Model\DataObject\Data\Hotspotimage) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

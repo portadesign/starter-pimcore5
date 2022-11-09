@@ -158,7 +158,7 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing implements Paginate
         }
 
         try {
-            $codes = $db->fetchAll($query, array_values($queryParams));
+            $codes = $db->fetchAllAssociative($query, array_values($queryParams));
         } catch (\Exception $e) {
             return false;
         }
@@ -351,7 +351,7 @@ class Listing extends \Pimcore\Model\Listing\AbstractListing implements Paginate
     /**
      * @param array $tokens
      *
-     * @return static
+     * @return $this
      */
     public function setTokens($tokens)
     {
