@@ -172,6 +172,9 @@ class Video extends Model\Asset
         }
 
         if (!$this->getCustomSetting('videoWidth') || !$this->getCustomSetting('videoHeight')) {
+            $this->getDimensions();
+        }
+        if (!$this->getCustomSetting('videoWidth') || !$this->getCustomSetting('videoHeight')) {
             Logger::info('Image thumbnail not yet available, processing is done asynchronously.');
             $this->addToUpdateTaskQueue();
 
