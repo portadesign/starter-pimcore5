@@ -89,14 +89,14 @@ pimcore.bundle.tinymce.editor = Class.create({
             menubar: false,
             plugins: [
                 'autolink', 'lists', 'link', 'image', 'code',
-                'insertdatetime', 'media', 'table', 'help', 'wordcount'
+                'media', 'table', 'help', 'wordcount'
             ],
             content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
             inline: true,
             base_url: '/bundles/pimcoretinymce/build/tinymce',
             suffix: '.min',
             convert_urls: false,
-            extended_valid_elements: 'a[name|href|target|title|pimcore_id|pimcore_type],img[style|longdesc|usemap|src|border|alt=|title|hspace|vspace|width|height|align|pimcore_id|pimcore_type]',
+            extended_valid_elements: 'a[class|name|href|target|title|pimcore_id|pimcore_type],img[class|style|longdesc|usemap|src|border|alt=|title|hspace|vspace|width|height|align|pimcore_id|pimcore_type]',
             init_instance_callback: function (editor) {
                 editor.on('input', function (eChange) {
                     const charCount = tinymce.activeEditor.plugins.wordcount.body.getCharacterCount();
@@ -106,7 +106,7 @@ pimcore.bundle.tinymce.editor = Class.create({
                     document.dispatchEvent(new CustomEvent(pimcore.events.changeWysiwyg, {
                         detail: {
                             e: eChange,
-                            data: tinymce.activeEditor.contentAreaContainer.innerHTML,
+                            data: tinymce.activeEditor.getContent(),
                             context: e.detail.context
                         }
                     }));
@@ -115,7 +115,7 @@ pimcore.bundle.tinymce.editor = Class.create({
                     document.dispatchEvent(new CustomEvent(pimcore.events.changeWysiwyg, {
                         detail: {
                             e: eChange,
-                            data: tinymce.activeEditor.contentAreaContainer.innerHTML,
+                            data: tinymce.activeEditor.getContent(),
                             context: e.detail.context
                         }
                     }));
