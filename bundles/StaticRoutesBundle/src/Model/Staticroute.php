@@ -363,12 +363,12 @@ final class Staticroute extends AbstractModel
             if (isset(self::$basePageIdMappingCache[$this->getBasePage()])) {
                 $basePagePath = self::$basePageIdMappingCache[$this->getBasePage()];
             } else {
-                $document = Document::getById($this->getBasePage());
-                if ($document instanceof Document\Page) {
+                $document = \Pimcore\Model\Document::getById($this->getBasePage());
+                if ($document instanceof \Pimcore\Model\Document\Page) {
                     $basePagePath = $document->getFullPath();
-                } elseif ($document instanceof Document\Link) {
+                } elseif ($document instanceof \Pimcore\Model\Document\Link) {
                     $basePagePath = $document->getHref();
-                } elseif ($document instanceof Document\Hardlink) {
+                } elseif ($document instanceof \Pimcore\Model\Document\Hardlink) {
                     $basePagePath = $document->getFullPath();
                 }
                 self::$basePageIdMappingCache[$this->getBasePage()] = $basePagePath;
