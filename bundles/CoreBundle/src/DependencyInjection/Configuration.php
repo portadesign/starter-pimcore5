@@ -1919,6 +1919,7 @@ final class Configuration implements ConfigurationInterface
                                         ->end()
                                     ->end()
                                 ->end()
+                                ->variableNode('extension')->end()
                             ->end()
                         ->end()
                     ->end()
