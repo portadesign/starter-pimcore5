@@ -16,6 +16,7 @@ namespace Pimcore\Bundle\StaticRoutesBundle\Controller;
 use Pimcore\Bundle\StaticRoutesBundle\Model\Staticroute;
 use Pimcore\Controller\Traits\JsonHelperTrait;
 use Pimcore\Controller\UserAwareController;
+use Pimcore\Model\Document;
 use Pimcore\Model\Exception\ConfigWriteException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -58,9 +59,22 @@ class SettingsController extends UserAwareController
                     throw new ConfigWriteException();
                 }
 
+                if (isset($data["basePage"]) && $data["basePage"]) {
+                    if ($doc = Document::getByPath($data["basePage"])) {
+                        $data["basePage"] = $doc->getId();
+                    }
+                }
+
                 $route->setValues($data);
 
                 $route->save();
+
+                $basePage = $route->getBasePage();
+                if (is_numeric($basePage)) {
+                    if ($doc = Document::getById(intval($basePage))) {
+                        $route->setBasePage($doc->getRealFullPath());
+                    }
+                }
 
                 return $this->jsonResponse(['data' => $route->getObjectVars(), 'success' => true]);
             } elseif ($request->query->getString('xaction') == 'create') {
@@ -71,9 +85,23 @@ class SettingsController extends UserAwareController
 
                 // save route
                 $route = new Staticroute();
+
+                if (isset($data["basePage"]) && $data["basePage"]) {
+                    if ($doc = Document::getByPath($data["basePage"])) {
+                        $data["basePage"] = $doc->getId();
+                    }
+                }
+
                 $route->setValues($data);
 
                 $route->save();
+
+                $basePage = $route->getBasePage();
+                if (is_numeric($basePage)) {
+                    if ($doc = Document::getById(intval($basePage))) {
+                        $route->setBasePage($doc->getRealFullPath());
+                    }
+                }
 
                 $responseData = $route->getObjectVars();
                 $responseData['writeable'] = $route->isWriteable();
@@ -102,6 +130,14 @@ class SettingsController extends UserAwareController
 
             $routes = [];
             foreach ($list->getRoutes() as $routeFromList) {
+                if ($basePage = $routeFromList->getBasePage()) {
+                    if (is_numeric($basePage)) {
+                        if ($doc = Document::getById(intval($basePage))) {
+                            $routeFromList->setBasePage($doc->getRealFullPath());
+                        }
+                    }
+                }
+
                 $route = $routeFromList->getObjectVars();
                 $route['writeable'] = $routeFromList->isWriteable();
                 $route['siteId'] = implode(',', $routeFromList->getSiteId());
