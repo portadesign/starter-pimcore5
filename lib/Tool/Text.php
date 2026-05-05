@@ -17,6 +17,7 @@ use Onnov\DetectEncoding\EncodingDetector;
 use Pimcore\Cache\RuntimeCache;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject\Concrete;
+use Pimcore\Model\DataObject\Localizedfield;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
 use Pimcore\Model\Site;
@@ -179,6 +180,10 @@ class Text
 
                         $newTag = preg_replace($pattern, $replacement, $newTag);
 
+                        if ($matches[1][$i] === 'img' && $element instanceof Asset\Image) {
+                            $newTag = self::applyMetadataAltTitleFromAsset($newTag, $element, $params);
+                        }
+
                         $text = str_replace($oldTag, $newTag, $text);
                     }
                 }
@@ -206,6 +211,45 @@ class Text
         }
 
         return $oldTag;
+    }
+
+    /**
+     * Fill img alt and title from asset metadata, localized by document/object language.
+     * Empty/missing attributes are populated; non-empty values are overridden only when an
+     * object context is present (admin edit), so frontend-rendered manual values are kept.
+     */
+    private static function applyMetadataAltTitleFromAsset(string $tag, Asset\Image $image, array $params): string
+    {
+        $language = null;
+        if (!empty($params['document']) && $params['document'] instanceof Document) {
+            $documentLanguage = $params['document']->getProperty('language');
+            if ($documentLanguage) {
+                $language = $documentLanguage;
+            }
+        } elseif (!empty($params['object']) && $params['object'] instanceof Localizedfield) {
+            $language = $params['object']->getLanguage();
+        }
+
+        $hasObjectContext = !empty($params['object']);
+
+        foreach (['alt', 'title'] as $attr) {
+            $value = $image->getMetadata($attr, $language);
+            if (!$value) {
+                continue;
+            }
+
+            $escaped = htmlspecialchars((string) $value);
+            preg_match('/' . $attr . '="([^"]+)"/', $tag, $existing);
+
+            if (!isset($existing[1])) {
+                $tag = str_replace($attr . '=""', '', $tag);
+                $tag = str_replace('/>', ' ' . $attr . '="' . $escaped . '" />', $tag);
+            } elseif ($hasObjectContext) {
+                $tag = preg_replace('/' . $attr . '="[^"]*"/', $attr . '="' . $escaped . '"', $tag);
+            }
+        }
+
+        return $tag;
     }
 
     private static function getElementsTagsInWysiwyg(string $text): array
