@@ -344,11 +344,12 @@ final class Staticroute extends AbstractModel
     protected function getBasePagePath()
     {
         $basePagePath = null;
-        if ($this->getBasePage()) {
-            if (isset(self::$basePageIdMappingCache[$this->getBasePage()])) {
-                $basePagePath = self::$basePageIdMappingCache[$this->getBasePage()];
+        $basePageId = (int) $this->getBasePage();
+        if ($basePageId) {
+            if (isset(self::$basePageIdMappingCache[$basePageId])) {
+                $basePagePath = self::$basePageIdMappingCache[$basePageId];
             } else {
-                $document = Document::getById($this->getBasePage());
+                $document = Document::getById($basePageId);
                 if ($document instanceof Document\Page) {
                     $basePagePath = $document->getFullPath();
                 } elseif ($document instanceof Document\Link) {
@@ -356,7 +357,7 @@ final class Staticroute extends AbstractModel
                 } elseif ($document instanceof Document\Hardlink) {
                     $basePagePath = $document->getFullPath();
                 }
-                self::$basePageIdMappingCache[$this->getBasePage()] = $basePagePath;
+                self::$basePageIdMappingCache[$basePageId] = $basePagePath;
             }
         }
         return $basePagePath;
