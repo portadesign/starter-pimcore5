@@ -61,6 +61,29 @@ class PublicServicesController extends Controller
                 // assets via rewrite rules
 
                 try {
+                    $storagePath = urldecode(preg_replace('@^/cache-buster\-[\d]+@', '', $request->getPathInfo()));
+                    $frontendPrefix = $this->getParameter('pimcore.config')['assets']['frontend_prefixes']['thumbnail'];
+                    if ($frontendPrefix) {
+                        $storagePath = preg_replace('/^' . preg_quote($frontendPrefix, '/') . '/', '', $storagePath);
+                    }
+
+                    $isPlainFilename = strpbrk((string) $filename, '/\\') === false && !str_contains((string) $filename, '..');
+
+                    if ($isPlainFilename && strlen($storagePath) > 10 && $storage->fileExists($storagePath)) {
+                        $thumbnailStream = $storage->readStream($storagePath);
+                        $lifetime = 86400 * 7;
+
+                        return new StreamedResponse(function () use ($thumbnailStream) {
+                            fpassthru($thumbnailStream);
+                        }, 200, [
+                            'Cache-Control' => 'public, max-age=' . $lifetime,
+                            'Expires' => date('D, d M Y H:i:s T', time() + $lifetime),
+                            'Content-Type' => $storage->mimeType($storagePath),
+                            'Content-Length' => $storage->fileSize($storagePath),
+                            AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER => true,
+                        ]);
+                    }
+
                     $thumbnail = null;
                     $thumbnailStream = null;
 
@@ -75,7 +98,6 @@ class PublicServicesController extends Controller
                         $deferredConfigId = 'thumb_' . $assetId . '__' . md5(urldecode($pathInfo));
                         if ($thumbnailConfigItem = TmpStore::get($deferredConfigId)) {
                             $thumbnailConfig = $thumbnailConfigItem->getData();
-                            TmpStore::delete($deferredConfigId);
 
                             if (!$thumbnailConfig instanceof $thumbnailConfigClass) {
                                 throw new \Exception('Deferred thumbnail config file doesn\'t contain a valid '.$thumbnailConfigClass.' object');

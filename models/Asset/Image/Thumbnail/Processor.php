@@ -358,6 +358,10 @@ class Processor
                     $asset->addThumbnailFileToCache($tmpFsPath, $filename, $config);
                 }
 
+                if (!Config::exists($config->getName())) {
+                    TmpStore::delete('thumb_' . $asset->getId() . '__' . md5($storagePath));
+                }
+
                 $generated = true;
 
                 $pimcoreAssetsConfig = PimcoreConfig::getSystemConfiguration('assets');
