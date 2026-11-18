@@ -18,6 +18,7 @@ namespace Pimcore\Model\Document\Editable;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
 use Pimcore\Model\Element;
+use Pimcore\Model\Element\ElementDescriptor;
 use Pimcore\Tool\Serialize;
 
 /**
@@ -30,7 +31,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
      *
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     protected $id;
 
@@ -39,7 +40,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
      *
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $alt;
 
@@ -48,7 +49,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
      *
      * @internal
      *
-     * @var Asset\Image|null
+     * @var Asset\Image|ElementDescriptor|null
      */
     protected $image;
 
@@ -106,7 +107,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
      *
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $thumbnail;
 
@@ -120,6 +121,8 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
 
     /**
      * {@inheritdoc}
+     *
+     * @return mixed
      */
     public function getData()
     {
@@ -139,6 +142,8 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
 
     /**
      * {@inheritdoc}
+     *
+     * @return array
      */
     public function getDataForResource()
     {
@@ -214,7 +219,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
     }
 
     /**
-     * {@inheritdoc}
+     * @return array
      */
     public function getConfig()
     {
@@ -247,7 +252,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
 
         $image = $this->getImage();
 
-        if ($image instanceof Asset) {
+        if ($image instanceof Asset\Image) {
             $thumbnailName = $this->config['thumbnail'] ?? null;
             if ($thumbnailName || $this->cropPercent) {
                 // create a thumbnail first
@@ -269,8 +274,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
 
                 // autogenerate a name for the thumbnail because it's different from the original
                 if ($autoName) {
-                    $hash = md5(Serialize::serialize($thumbConfig->getItems()));
-                    $thumbConfig->setName($thumbConfig->getName() . '_auto_' . $hash);
+                    $thumbConfig->generateAutoName();
                 }
 
                 $deferred = true;
@@ -450,23 +454,23 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
      */
     public function getImage()
     {
-        if (!$this->image) {
-            $this->image = Asset\Image::getById($this->getId());
+        if (!$this->image instanceof Asset\Image) {
+            $this->image = $this->getId() ? Asset\Image::getById($this->getId()) : null;
         }
 
         return $this->image;
     }
 
     /**
-     * @param Asset\Image|null $image
+     * @param Asset\Image|ElementDescriptor|null $image
      *
-     * @return Model\Document\Editable\Image
+     * @return $this
      */
     public function setImage($image)
     {
         $this->image = $image;
 
-        if ($image instanceof Asset) {
+        if ($image instanceof Asset\Image) {
             $this->setId($image->getId());
         }
 
@@ -474,27 +478,27 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
     }
 
     /**
-     * @param int $id
+     * @param int|null $id
      *
-     * @return Model\Document\Editable\Image
+     * @return $this
      */
     public function setId($id)
     {
-        $this->id = $id;
+        $this->id = $id ? (int)$id : null;
 
         return $this;
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getId()
     {
-        return (int) $this->id;
+        return $this->id;
     }
 
     /**
-     * @param string|array|Asset\Image\Thumbnail\Config $conf
+     * @param array|string|Asset\Image\Thumbnail\Config $conf
      * @param bool $deferred
      *
      * @return Asset\Image\Thumbnail|string
@@ -502,12 +506,11 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
     public function getThumbnail($conf, $deferred = true)
     {
         $image = $this->getImage();
-        if ($image instanceof Asset) {
+        if ($image instanceof Asset\Image) {
             $thumbConfig = $image->getThumbnailConfig($conf);
             if ($thumbConfig && $this->cropPercent) {
                 $this->applyCustomCropping($thumbConfig);
-                $hash = md5(Serialize::serialize($thumbConfig->getItems()));
-                $thumbConfig->setName($thumbConfig->getName() . '_auto_' . $hash);
+                $thumbConfig->generateAutoName();
             }
 
             return $image->getThumbnail($thumbConfig, $deferred);
@@ -518,6 +521,8 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
 
     /**
      * @param Asset\Image\Thumbnail\Config $thumbConfig
+     *
+     * @return void
      */
     private function applyCustomCropping($thumbConfig)
     {
@@ -595,7 +600,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
     }
 
     /**
-     * {@inheritdoc}
+     * @return array
      */
     public function resolveDependencies()
     {
@@ -775,7 +780,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
     }
 
     /**
-     * { @inheritdoc }
+     * {@inheritdoc}
      */
     public function rewriteIds($idMapping) /** : void */
     {
@@ -790,6 +795,9 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
         }
     }
 
+    /**
+     * @return array
+     */
     public function __sleep()
     {
         $finalVars = [];

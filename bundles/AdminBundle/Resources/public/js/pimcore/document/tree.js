@@ -82,10 +82,17 @@ pimcore.document.tree = Class.create({
 
         var itemsPerPage = pimcore.settings['document_tree_paging_limit'];
 
-        rootNodeConfig.text = t("home");
-        rootNodeConfig.id = "" +  rootNodeConfig.id;
+        let rootNodeConfigText = t('home');
+        let rootNodeConfigIconCls = "pimcore_icon_home";
+        if(this.config.customViewId !== undefined && rootNodeConfig.id !== 1) {
+            rootNodeConfigText = rootNodeConfig.key;
+            rootNodeConfigIconCls = rootNodeConfig.iconCls;
+        }
+
+        rootNodeConfig.text = rootNodeConfigText;
+        rootNodeConfig.id = "" + rootNodeConfig.id;
         rootNodeConfig.allowDrag = true;
-        rootNodeConfig.iconCls = "pimcore_icon_home";
+        rootNodeConfig.iconCls = rootNodeConfigIconCls;
         rootNodeConfig.cls = "pimcore_tree_node_root";
         rootNodeConfig.expanded = true;
 
@@ -213,11 +220,6 @@ pimcore.document.tree = Class.create({
 
     onTreeNodeOver: function (targetNode, position, dragData, e, eOpts ) {
         var node = dragData.records[0];
-
-        if (this.nodeRestrictedByCustomviewExtension(node, targetNode)) {
-            return false;
-        }
-
         // check for permission
         try {
             if (node.data.permissions.settings) {
@@ -341,11 +343,6 @@ pimcore.document.tree = Class.create({
             return false;
         }
 
-        if (this.nodeRestrictedByCustomviewExtension(node, newParent)) {
-            Ext.MessageBox.alert(t('missing_permission'), t('element_cannot_be_moved'));
-            return false;
-        }
-
         if(pimcore.elementservice.isDisallowedDocumentKey(newParent.id, node.data.text)) {
             return false;
         }
@@ -420,13 +417,11 @@ pimcore.document.tree = Class.create({
 
                     if (addBlankDocument) {
                         // empty page
-                        if (pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictEmptyPage') === false) {
-                            documentMenu.page.push({
-                                text: "&gt; " + t("blank"),
-                                iconCls: "pimcore_icon_page pimcore_icon_overlay_add",
-                                handler: this.addDocument.bind(this, tree, record, "page")
-                            });
-                        }
+                        documentMenu.page.push({
+                            text: "&gt; " + t("blank"),
+                            iconCls: "pimcore_icon_page pimcore_icon_overlay_add",
+                            handler: this.addDocument.bind(this, tree, record, "page")
+                        });
                     }
 
                     if (addBlankPrintDocuments) {
@@ -445,39 +440,33 @@ pimcore.document.tree = Class.create({
 
                     if (addBlankSnippet) {
                         // empty snippet
-                        if (pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictEmptySnippet') === false) {
-                            documentMenu.snippet.push({
-                                text: "&gt; " + t("blank"),
-                                iconCls: "pimcore_icon_snippet pimcore_icon_overlay_add",
-                                handler: this.addDocument.bind(this, tree, record, "snippet")
-                            });
-                        }
+                        documentMenu.snippet.push({
+                            text: "&gt; " + t("blank"),
+                            iconCls: "pimcore_icon_snippet pimcore_icon_overlay_add",
+                            handler: this.addDocument.bind(this, tree, record, "snippet")
+                        });
                     }
 
                     if (addBlankEmail) {
                         // empty email
-                        if (pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictEmptyEmail') === false) {
-                            documentMenu.email.push({
-                                text: "&gt; " + t("blank"),
-                                iconCls: "pimcore_icon_email pimcore_icon_overlay_add",
-                                handler: this.addDocument.bind(this, tree, record, "email")
-                            });
-                        }
+                        documentMenu.email.push({
+                            text: "&gt; " + t("blank"),
+                            iconCls: "pimcore_icon_email pimcore_icon_overlay_add",
+                            handler: this.addDocument.bind(this, tree, record, "email")
+                        });
                     }
 
                     if (addBlankNewsletter) {
                         // empty newsletter
-                        if (pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictEmptyNewsletter') === false) {
-                            documentMenu.newsletter.push({
-                                text: "&gt; " + t("blank"),
-                                iconCls: "pimcore_icon_newsletter pimcore_icon_overlay_add",
-                                handler: this.addDocument.bind(this, tree, record, "newsletter")
-                            });
-                        }
+                        documentMenu.newsletter.push({
+                            text: "&gt; " + t("blank"),
+                            iconCls: "pimcore_icon_newsletter pimcore_icon_overlay_add",
+                            handler: this.addDocument.bind(this, tree, record, "newsletter")
+                        });
                     }
 
                     //don't add pages below print containers - makes no sense
-                    if(addDocuments && record.data.type != "printcontainer" && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictPage') === false) {
+                    if (addDocuments && record.data.type != "printcontainer") {
                         menu.add(new Ext.menu.Item({
                             text: t('add_page'),
                             iconCls: "pimcore_icon_page pimcore_icon_overlay_add",
@@ -496,7 +485,7 @@ pimcore.document.tree = Class.create({
 
                     }
 
-                    if (addSnippet && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictSnippet') === false) {
+                    if (addSnippet) {
                         menu.add(new Ext.menu.Item({
                             text: t('add_snippet'),
                             iconCls: "pimcore_icon_snippet pimcore_icon_overlay_add",
@@ -508,50 +497,42 @@ pimcore.document.tree = Class.create({
                     //don't add emails, newsletters and links below print containers - makes no sense
                     if (addDocuments && record.data.type != "printcontainer") {
                         if (addLink) {
-                            if (pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictLink') === false) {
-                                menu.add(new Ext.menu.Item({
-                                    text: t('add_link'),
-                                    iconCls: "pimcore_icon_link pimcore_icon_overlay_add",
-                                    handler: this.addDocument.bind(this, tree, record, "link")
-                                }));
-                            }
+                            menu.add(new Ext.menu.Item({
+                                text: t('add_link'),
+                                iconCls: "pimcore_icon_link pimcore_icon_overlay_add",
+                                handler: this.addDocument.bind(this, tree, record, "link")
+                            }));
                         }
 
                         if (addEmail) {
-                            if (pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictEmail') === false) {
-                                menu.add(new Ext.menu.Item({
-                                    text: t('add_email'),
-                                    iconCls: "pimcore_icon_email pimcore_icon_overlay_add",
-                                    menu: documentMenu.email,
-                                    hideOnClick: false
-                                }));
-                            }
+                            menu.add(new Ext.menu.Item({
+                                text: t('add_email'),
+                                iconCls: "pimcore_icon_email pimcore_icon_overlay_add",
+                                menu: documentMenu.email,
+                                hideOnClick: false
+                            }));
                         }
 
                         if (addNewsletter) {
-                            if (pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictNewsletter') === false) {
-                                menu.add(new Ext.menu.Item({
-                                    text: t('add_newsletter'),
-                                    iconCls: "pimcore_icon_newsletter pimcore_icon_overlay_add",
-                                    menu: documentMenu.newsletter,
-                                    hideOnClick: false
-                                }));
-                            }
+                            menu.add(new Ext.menu.Item({
+                                text: t('add_newsletter'),
+                                iconCls: "pimcore_icon_newsletter pimcore_icon_overlay_add",
+                                menu: documentMenu.newsletter,
+                                hideOnClick: false
+                            }));
                         }
                     }
 
                     if (addHardlink) {
-                        if (pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictHardlink') === false) {
-                            menu.add(new Ext.menu.Item({
-                                text: t('add_hardlink'),
-                                iconCls: "pimcore_icon_hardlink pimcore_icon_overlay_add",
-                                handler: this.addDocument.bind(this, tree, record, "hardlink")
-                            }));
-                        }
+                        menu.add(new Ext.menu.Item({
+                            text: t('add_hardlink'),
+                            iconCls: "pimcore_icon_hardlink pimcore_icon_overlay_add",
+                            handler: this.addDocument.bind(this, tree, record, "hardlink")
+                        }));
                     }
                 }
 
-                if (perspectiveCfg.inTreeContextMenu("document.addFolder") && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictFolder') === false) {
+                if (perspectiveCfg.inTreeContextMenu("document.addFolder")) {
 
                     menu.add(new Ext.menu.Item({
                         text: t('create_folder'),
@@ -1181,17 +1162,6 @@ pimcore.document.tree = Class.create({
     },
 
     pasteInfo: function (tree, record, type, enableInheritance, language) {
-        // check extension restrictions
-        var node = tree.getStore().getById(pimcore.cachedDocumentId);
-        if (!node) {
-            Ext.MessageBox.alert(t('error'), t('cross_tree_moves_not_supported'));
-            return false;
-        }
-        if (this.nodeRestrictedByCustomviewExtension(node, record)) {
-            Ext.MessageBox.alert(t('missing_permission'), t('error_pasting_document'));
-            return false;
-        }
-
         pimcore.helpers.addTreeNodeLoadingIndicator("document", record.get('id'));
 
         if (typeof language !== "string") {
@@ -1552,37 +1522,46 @@ pimcore.document.tree = Class.create({
         var parameters = {};
         parameters.id = id;
 
-        Ext.Ajax.request({
-            url: '/admin/' + type + '/save?task=' + task,
-            method: "PUT",
-            params: parameters,
-            success: function (task, response) {
-                try {
-                    var rdata = Ext.decode(response.responseText);
-                    if (rdata && rdata.success) {
-                        var options = {
-                            elementType: "document",
-                            id: record.data.id,
-                            published: task != "unpublish"
-                        };
-                        pimcore.elementservice.setElementPublishedState(options);
-                        pimcore.elementservice.setElementToolbarButtons(options);
-                        pimcore.elementservice.reloadVersions(options);
+        var doc = pimcore.globalmanager.get("document_" + id);
 
-                        pimcore.helpers.showNotification(t("success"), t("successful_" + task + "_document"),
-                            "success");
+        if (doc) {
+            if (task == "publish") {
+                doc.publish(false);
+            } else {
+                doc.unpublish(false);
+            }
+        } else {
+            Ext.Ajax.request({
+                url: '/admin/' + type + '/save?task=' + task,
+                method: "PUT",
+                params: parameters,
+                success: function (task, response) {
+                    try {
+                        var rdata = Ext.decode(response.responseText);
+                        if (rdata && rdata.success) {
+                            var options = {
+                                elementType: "document",
+                                id: record.data.id,
+                                published: task != "unpublish"
+                            };
+                            pimcore.elementservice.setElementPublishedState(options);
+                            pimcore.elementservice.setElementToolbarButtons(options);
+                            pimcore.elementservice.reloadVersions(options);
+
+                            pimcore.helpers.showNotification(t("success"), t("successful_" + task + "_document"),
+                                "success");
+                        }
+                        else {
+                            pimcore.helpers.showNotification(t("error"), t("error_" + task + "_document"),
+                                "error", t(rdata.message));
+                        }
+                    } catch (e) {
+                        pimcore.helpers.showNotification(t("error"), t("error_" + task + "_document"), "error");
                     }
-                    else {
-                        pimcore.helpers.showNotification(t("error"), t("error_" + task + "_document"),
-                            "error", t(rdata.message));
-                    }
-                } catch (e) {
-                    pimcore.helpers.showNotification(t("error"), t("error_" + task + "_document"), "error");
-                }
 
-            }.bind(this, task)
-        });
-
+                }.bind(this, task)
+            });
+        }
     },
 
     addDocumentCreate : function (tree, record, params) {
@@ -1742,15 +1721,5 @@ pimcore.document.tree = Class.create({
         }
 
         return localizedErrorDocumentFields;
-    },
-
-    nodeRestrictedByCustomviewExtension: function(node, targetNode) {
-        var possibleRestrictions = ["page","snippet","folder","link","hardlink","email"];
-        for (var i = 0; i < possibleRestrictions.length; i++) {
-            if (node.data.type === possibleRestrictions[i] && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, targetNode.data.path, 'restrict' + ucfirst(possibleRestrictions[i])) === true) {
-                return true;
-            }
-        }
-        return false;
     }
 });

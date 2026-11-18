@@ -18,6 +18,7 @@ namespace Pimcore\Model\Document\Editable;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
+use Pimcore\Model\DataObject;
 use Pimcore\Model\Document;
 
 /**
@@ -137,18 +138,6 @@ class Link extends Model\Document\Editable implements IdRewriterInterface, Editm
                 'type',
                 'referrerpolicy',
                 'xml:lang',
-                'onblur',
-                'onclick',
-                'ondblclick',
-                'onfocus',
-                'onmousedown',
-                'onmousemove',
-                'onmouseout',
-                'onmouseover',
-                'onmouseup',
-                'onkeydown',
-                'onkeypress',
-                'onkeyup',
             ];
             $defaultAttributes = [];
 
@@ -166,9 +155,9 @@ class Link extends Model\Document\Editable implements IdRewriterInterface, Editm
                         strpos($key, 'aria-') === 0 ||
                         in_array($key, $allowedAttributes))) {
                     if (!empty($this->data[$key]) && !empty($this->config[$key])) {
-                        $attribs[] = $key.'="'. $this->data[$key] .' '. $this->config[$key] .'"';
+                        $attribs[] = $key.'="'. htmlspecialchars($this->data[$key]) .' '. htmlspecialchars($this->config[$key]) .'"';
                     } elseif (!empty($value)) {
-                        $attribs[] = $key.'="'.$value.'"';
+                        $attribs[] = $key.'="'.htmlspecialchars($value).'"';
                     }
                 }
             }
@@ -176,6 +165,12 @@ class Link extends Model\Document\Editable implements IdRewriterInterface, Editm
             $attribs = array_unique($attribs);
 
             if (array_key_exists('attributes', $this->data) && !empty($this->data['attributes'])) {
+                trigger_deprecation(
+                    'pimcore/pimcore',
+                    '10.6',
+                    'Using the "attributes" field in the link editable is deprecated. The field will be removed in Pimcore 11.0.'
+                );
+
                 $attribs[] = $this->data['attributes'];
             }
 
@@ -238,12 +233,11 @@ class Link extends Model\Document\Editable implements IdRewriterInterface, Editm
         $url = $this->data['path'] ?? '';
 
         if (strlen($this->data['parameters'] ?? '') > 0) {
-            $url .= (strpos($url, '?') !== false ? '&' : '?') . str_replace('?', '', $this->getParameters());
+            $url .= (strpos($url, '?') !== false ? '&' : '?') . htmlspecialchars(str_replace('?', '', $this->getParameters()));
         }
 
         if (strlen($this->data['anchor'] ?? '') > 0) {
-            $anchor = $this->getAnchor();
-            $anchor = str_replace('"', urlencode('"'), $anchor);
+            $anchor = str_replace('"', urlencode('"'), htmlspecialchars($this->getAnchor()));
             $url .= '#' . str_replace('#', '', $anchor);
         }
 
@@ -297,6 +291,16 @@ class Link extends Model\Document\Editable implements IdRewriterInterface, Editm
                     }
                 }
             }
+        }
+
+        // sanitize attributes
+        if ($this->getEditmode() === false && isset($this->data['attributes'])) {
+            trigger_deprecation(
+                'pimcore/pimcore',
+                '10.6',
+                'Using the "attributes" field in the link editable is deprecated. The field will be removed in Pimcore 11.0.'
+            );
+            $this->data['attributes'] = htmlspecialchars($this->data['attributes'], HTML_ENTITIES);
         }
 
         // deletes unnecessary attribute, which was set by mistake in earlier versions, see also
@@ -388,6 +392,8 @@ class Link extends Model\Document\Editable implements IdRewriterInterface, Editm
 
     /**
      * @return mixed
+     *
+     * @deprecated This method is deprecated and will be removed in Pimcore 11.
      */
     public function getAttributes()
     {
@@ -489,11 +495,20 @@ class Link extends Model\Document\Editable implements IdRewriterInterface, Editm
                     }
                 } elseif ($this->data['internalType'] == 'asset') {
                     if ($asset = Asset::getById($this->data['internalId'])) {
-                        $key = 'asset_'.$asset->getId();
+                        $key = 'asset_' . $asset->getId();
 
                         $dependencies[$key] = [
                             'id' => $asset->getId(),
                             'type' => 'asset',
+                        ];
+                    }
+                } elseif ($this->data['internalType'] == 'object') {
+                    if ($object = DataObject\Concrete::getById($this->data['internalId'])) {
+                        $key = 'object_' . $object->getId();
+
+                        $dependencies[$key] = [
+                            'id' => $object->getId(),
+                            'type' => 'object',
                         ];
                     }
                 }

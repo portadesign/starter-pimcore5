@@ -62,14 +62,14 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
     /**
      * @internal
      *
-     * @var array
+     * @var array<int, bool>
      */
     protected $activeGroups = [];
 
     /**
      * @internal
      *
-     * @var array
+     * @var array<int, int>
      */
     protected $groupCollectionMapping = [];
 
@@ -111,7 +111,12 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
      */
     public function getItems()
     {
-        return $this->items;
+        $doGetInheritedValues = Model\DataObject::doGetInheritedValues();
+        if(!$doGetInheritedValues) {
+            return $this->items;
+        }
+
+        return $this->getAllDataFromField(fn ($classificationStore, $fieldsArray) => $fieldsArray + $classificationStore->items);
     }
 
     /**
@@ -293,11 +298,16 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
     }
 
     /**
-     * @return array
+     * @return array<int, bool>
      */
     public function getActiveGroups()
     {
-        return $this->activeGroups;
+        $doGetInheritedValues = Model\DataObject::doGetInheritedValues();
+        if(!$doGetInheritedValues) {
+            return $this->activeGroups;
+        }
+
+        return $this->getAllDataFromField(fn ($classificationStore, $fieldsArray) => $classificationStore->activeGroups + $fieldsArray);
     }
 
     private function sanitizeActiveGroups($activeGroups)
@@ -316,7 +326,7 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
     }
 
     /**
-     * @param array $activeGroups
+     * @param array<int, bool> $activeGroups
      */
     public function setActiveGroups($activeGroups)
     {
@@ -463,15 +473,20 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
     }
 
     /**
-     * @return array
+     * @return array<int, int>
      */
     public function getGroupCollectionMappings(): array
     {
-        return $this->groupCollectionMapping;
+        $doGetInheritedValues = Model\DataObject::doGetInheritedValues();
+        if(!$doGetInheritedValues) {
+            return $this->groupCollectionMapping;
+        }
+
+        return $this->getAllDataFromField(fn ($classificationStore, $fieldsArray) => $fieldsArray + $classificationStore->groupCollectionMapping);
     }
 
     /**
-     * @param array $groupCollectionMapping
+     * @param array<int, int> $groupCollectionMapping
      */
     public function setGroupCollectionMappings(array $groupCollectionMapping): void
     {
@@ -496,7 +511,7 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
      */
     public function getGroupCollectionMapping($groupId)
     {
-        return $this->groupCollectionMapping[$groupId] ?? null;
+        return $this->getGroupCollectionMappings()[$groupId] ?? null;
     }
 
     /**
@@ -504,11 +519,33 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
      */
     public function getGroups(): array
     {
-        $activeGroups = $this->getActiveGroups();
+        return Classificationstore::getActiveGroupsWithConfig($this);
+    }
+
+    private function getAllDataFromField(callable $mergeFunction): array
+    {
+        $fieldsArray = $mergeFunction($this, []);
+        $object = $this->getObject();
+        while (!is_null($object) && ($parent = Service::hasInheritableParentObject($object)) !== null) {
+            $fieldsArray = $mergeFunction($parent->{'get' . ucfirst($this->getFieldname())}(), $fieldsArray);
+
+            $object = $parent;
+        }
+
+        return $fieldsArray;
+    }
+
+    /**
+     * @return Model\DataObject\Classificationstore\Group[]
+     */
+    private static function getActiveGroupsWithConfig(Classificationstore $classificationStore): array
+    {
         $groups = [];
+        $activeGroups = $classificationStore->getActiveGroups();
         foreach (array_keys($activeGroups) as $groupId) {
-            $groupConfig = $this->getGroupConfigById($groupId);
-            $groups[] = $this->createGroup($this, $groupConfig);
+            if ($groupConfig = $classificationStore->getGroupConfigById($groupId)) {
+                $groups[] = $classificationStore->createGroup($classificationStore, $groupConfig);
+            }
         }
 
         return $groups;

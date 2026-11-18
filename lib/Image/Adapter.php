@@ -65,7 +65,7 @@ abstract class Adapter
     protected $preserveMetaData = false;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $sourceImageFormat;
 
@@ -513,7 +513,7 @@ abstract class Adapter
      * @param string $format
      * @param bool $force
      *
-     * @return mixed
+     * @return bool
      */
     abstract public function supportsFormat(string $format, bool $force = false);
 

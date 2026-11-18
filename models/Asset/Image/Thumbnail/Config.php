@@ -310,9 +310,9 @@ final class Config extends Model\AbstractModel
     /**
      * @internal
      *
-     * @param string $name
+     * @param string|callable $name
      * @param array $parameters
-     * @param string $media
+     * @param string|null $media
      *
      * @return bool
      */
@@ -338,9 +338,9 @@ final class Config extends Model\AbstractModel
      * @internal
      *
      * @param int $position
-     * @param string $name
+     * @param string|callable $name
      * @param array $parameters
-     * @param string $media
+     * @param string|null $media
      *
      * @return bool
      */
@@ -499,7 +499,7 @@ final class Config extends Model\AbstractModel
     }
 
     /**
-     * @param float $highResolution
+     * @param float|null $highResolution
      */
     public function setHighResolution($highResolution)
     {
@@ -580,8 +580,7 @@ final class Config extends Model\AbstractModel
         }
 
         // set name
-        $hash = md5(Serialize::serialize($pipe));
-        $pipe->setName('auto_' . $hash);
+        $pipe->generateAutoName();
 
         return $pipe;
     }
@@ -667,8 +666,7 @@ final class Config extends Model\AbstractModel
             $pipe->setHighResolution($config['highResolution']);
         }
 
-        $hash = md5(Serialize::serialize($pipe));
-        $pipe->setName('auto_' . $hash);
+        $pipe->generateAutoName();
 
         return $pipe;
     }
@@ -952,7 +950,7 @@ final class Config extends Model\AbstractModel
         $autoFormatThumbnails = [];
 
         foreach ($this->getAutoFormats() as $autoFormat => $autoFormatConfig) {
-            if (Model\Asset\Image\Thumbnail::supportsFormat($autoFormat) && $autoFormatConfig['enabled']) {
+            if ($autoFormatConfig['enabled'] && Model\Asset\Image\Thumbnail::supportsFormat($autoFormat)) {
                 $autoFormatThumbnail = clone $this;
                 $autoFormatThumbnail->setFormat($autoFormat);
                 if (!empty($autoFormatConfig['quality'])) {
@@ -964,5 +962,15 @@ final class Config extends Model\AbstractModel
         }
 
         return $autoFormatThumbnails;
+    }
+
+    /**
+     * @internal
+     */
+    public function generateAutoName(): void
+    {
+        $serialized = Serialize::serialize($this->getItems());
+
+        $this->setName($this->getName() . '_auto_' . md5($serialized));
     }
 }

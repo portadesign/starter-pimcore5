@@ -2366,7 +2366,7 @@ var Ext = Ext || {};
                 return true;
             }
 
-            // Test against whitelist which includes known iterable collection types
+            // Test against allowlist which includes known iterable collection types
             return iterableRe.test(toString.call(value));
         },
 

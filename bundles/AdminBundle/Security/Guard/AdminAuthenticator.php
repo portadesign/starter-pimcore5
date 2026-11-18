@@ -17,13 +17,12 @@ namespace Pimcore\Bundle\AdminBundle\Security\Guard;
 
 use Pimcore\Bundle\AdminBundle\Security\Authentication\Token\LegacyTwoFactorRequiredToken;
 use Pimcore\Bundle\AdminBundle\Security\BruteforceProtectionHandler;
-use Pimcore\Bundle\AdminBundle\Security\User\User;
 use Pimcore\Cache\RuntimeCache;
 use Pimcore\Event\Admin\Login\LoginCredentialsEvent;
 use Pimcore\Event\Admin\Login\LoginFailedEvent;
-use Pimcore\Event\Admin\Login\LoginRedirectEvent;
 use Pimcore\Event\AdminEvents;
 use Pimcore\Model\User as UserModel;
+use Pimcore\Security\User\User;
 use Pimcore\Tool\Admin;
 use Pimcore\Tool\Authentication;
 use Pimcore\Tool\Session;
@@ -136,12 +135,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
             return $response;
         }
 
-        $event = new LoginRedirectEvent('pimcore_admin_login', ['perspective' => strip_tags($request->get('perspective', ''))]);
-        $this->dispatcher->dispatch($event, AdminEvents::LOGIN_REDIRECT);
-
-        $url = $this->router->generate($event->getRouteName(), $event->getRouteParams());
-
-        return new RedirectResponse($url);
+        return new RedirectResponse($this->router->generate('pimcore_admin_login', ['perspective' => strip_tags($request->get('perspective', ''))]));
     }
 
     /**
@@ -331,7 +325,7 @@ class AdminAuthenticator extends AbstractGuardAuthenticator implements LoggerAwa
         } else {
             $url = $this->router->generate('pimcore_admin_index', [
                 '_dc' => time(),
-                'perspective' => strip_tags($request->get('perspective')),
+                'perspective' => strip_tags($request->get('perspective', '')),
             ]);
         }
 

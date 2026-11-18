@@ -18,13 +18,13 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 use Doctrine\DBAL\Connection;
 use Exception;
 use Pimcore\Analytics\Google\Config\SiteConfigProvider;
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
-use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Bundle\AdminBundle\Security\CsrfProtectionHandler;
 use Pimcore\Config;
 use Pimcore\Controller\KernelResponseEventInterface;
 use Pimcore\Event\Admin\IndexActionSettingsEvent;
 use Pimcore\Event\AdminEvents;
+use Pimcore\Extension\Bundle\PimcoreBundleManager;
 use Pimcore\Maintenance\Executor;
 use Pimcore\Maintenance\ExecutorInterface;
 use Pimcore\Model\Document\DocType;
@@ -35,6 +35,7 @@ use Pimcore\Tool;
 use Pimcore\Tool\Admin;
 use Pimcore\Tool\Session;
 use Pimcore\Version;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
@@ -47,7 +48,7 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 /**
  * @internal
  */
-class IndexController extends AdminController implements KernelResponseEventInterface
+class IndexController extends AdminAbstractController implements KernelResponseEventInterface
 {
     /**
      * @var EventDispatcherInterface
@@ -55,11 +56,17 @@ class IndexController extends AdminController implements KernelResponseEventInte
     private $eventDispatcher;
 
     /**
+     * @var PimcoreBundleManager
+     */
+    private $bundleManager;
+
+    /**
      * @param EventDispatcherInterface $eventDispatcher
      */
-    public function __construct(EventDispatcherInterface $eventDispatcher)
+    public function __construct(EventDispatcherInterface $eventDispatcher, PimcoreBundleManager $bundleManager)
     {
         $this->eventDispatcher = $eventDispatcher;
+        $this->bundleManager = $bundleManager;
     }
 
     /**
@@ -131,6 +138,10 @@ class IndexController extends AdminController implements KernelResponseEventInte
      */
     public function statisticsAction(Request $request, Connection $db, KernelInterface $kernel)
     {
+        if (!$request->isXmlHttpRequest()) {
+            throw $this->createAccessDeniedHttpException();
+        }
+
         // DB
         try {
             $tables = $db->fetchAllAssociative('SELECT TABLE_NAME as name,TABLE_ROWS as `rows` from information_schema.TABLES
@@ -148,7 +159,7 @@ class IndexController extends AdminController implements KernelResponseEventInte
         try {
             $data = [
                 'instanceId' => $this->getInstanceId(),
-                'pimcore_major_version' => 10,
+                'pimcore_major_version' => Version::getMajorVersion(),
                 'pimcore_version' => Version::getVersion(),
                 'pimcore_hash' => Version::getRevision(),
                 'php_version' => PHP_VERSION,
@@ -184,8 +195,8 @@ class IndexController extends AdminController implements KernelResponseEventInte
      */
     protected function addPluginAssets(array &$templateParams)
     {
-        $templateParams['pluginJsPaths'] = $this->getBundleManager()->getJsPaths();
-        $templateParams['pluginCssPaths'] = $this->getBundleManager()->getCssPaths();
+        $templateParams['pluginJsPaths'] = $this->bundleManager->getJsPaths();
+        $templateParams['pluginCssPaths'] = $this->bundleManager->getCssPaths();
 
         return $this;
     }

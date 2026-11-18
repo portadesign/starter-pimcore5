@@ -18,12 +18,19 @@ declare(strict_types=1);
 namespace Pimcore\Bundle\AdminBundle\Helper;
 
 use Doctrine\DBAL\Query\QueryBuilder as DoctrineQueryBuilder;
-use Pimcore\Db;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\FilesystemOperator;
+use PhpOffice\PhpSpreadsheet\Reader\Csv;
+use PhpOffice\PhpSpreadsheet\Writer\Exception;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Pimcore\File;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition;
 use Pimcore\Model\DataObject\Objectbrick;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
 /**
  * @internal
@@ -502,7 +509,7 @@ class GridHelperService
     public function prepareListingForGrid(array $requestParams, string $requestedLanguage, $adminUser): DataObject\Listing\Concrete
     {
         $folder = Model\DataObject::getById((int) $requestParams['folderId']);
-        $class = ClassDefinition::getById($requestParams['classId']);
+        $class = ClassDefinition::getById((string) $requestParams['classId']);
         $className = $class->getName();
 
         $listClass = '\\Pimcore\\Model\\DataObject\\' . ucfirst($className) . '\\Listing';
@@ -563,15 +570,16 @@ class GridHelperService
                     if (strpos($orderKey, '?') !== false) {
                         $brickDescriptor = substr($orderKeyParts[0], 1);
                         $brickDescriptor = json_decode($brickDescriptor, true);
-                        $db = Db::get();
-                        $orderKey = $db->quoteIdentifier($brickDescriptor['containerKey'] . '_localized') . '.' . $db->quoteIdentifier($brickDescriptor['brickfield']);
+                        $orderKey = $list->quoteIdentifier($brickDescriptor['containerKey'] . '_localized')
+                            . '.' . $list->quoteIdentifier($brickDescriptor['brickfield']);
                         $doNotQuote = true;
                     } elseif (count($orderKeyParts) === 2) {
-                        $orderKey = $orderKeyParts[0].'.'.$orderKeyParts[1];
+                        $orderKey = $list->quoteIdentifier($orderKeyParts[0])
+                            . '.' . $list->quoteIdentifier($orderKeyParts[1]);
                         $doNotQuote = true;
                     }
                 } else {
-                    $orderKey = $list->getDao()->getTableName().'.'.$orderKey;
+                    $orderKey = $list->getDao()->getTableName() . '.' . $list->quoteIdentifier($orderKey);
                     $doNotQuote = true;
                 }
             }
@@ -839,6 +847,47 @@ class GridHelperService
         $list->setOrderKey($orderKey, $orderKeyQuote);
 
         return $list;
+    }
+
+    /**
+     * @throws FilesystemException
+     * @throws Exception|\PhpOffice\PhpSpreadsheet\Reader\Exception
+     */
+    public function createXlsxExportFile(FilesystemOperator $storage, string $fileHandle, string $csvFile): BinaryFileResponse
+    {
+        $csvReader = new Csv();
+        $csvReader->setDelimiter(';');
+        $csvReader->setSheetIndex(0);
+
+        $csvStream= $storage->readStream($csvFile);
+        if (stream_is_local($csvStream)) {
+            $tempMetaData = stream_get_meta_data($csvStream);
+            $spreadsheet = $csvReader->load($tempMetaData['uri']);
+        } else {
+            $tmpFilePath = File::getLocalTempFilePath('xlsx', false);
+            $dest = fopen($tmpFilePath, 'wb', false, File::getContext());
+            if (!$dest) {
+                throw new \Exception(sprintf('Unable to create temporary file in %s', $tmpFilePath));
+            }
+
+            stream_copy_to_stream($csvStream, $dest);
+            fclose($dest);
+
+            $spreadsheet = $csvReader->load($tmpFilePath);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $xlsxFilename = PIMCORE_SYSTEM_TEMP_DIRECTORY. '/' .$fileHandle. '.xlsx';
+        $writer->save($xlsxFilename);
+
+        $response = new BinaryFileResponse($xlsxFilename);
+        $response->headers->set('Content-Type', 'application/xlsx');
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, 'export.xlsx');
+        $response->deleteFileAfterSend(true);
+
+        $storage->delete($csvFile);
+
+        return $response;
     }
 
     /**

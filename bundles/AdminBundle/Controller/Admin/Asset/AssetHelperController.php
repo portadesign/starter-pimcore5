@@ -17,9 +17,7 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin\Asset;
 
 use League\Flysystem\FilesystemException;
 use League\Flysystem\UnableToReadFile;
-use PhpOffice\PhpSpreadsheet\Reader\Csv;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Bundle\AdminBundle\Helper\GridHelperService;
 use Pimcore\Db;
 use Pimcore\Event\AdminEvents;
@@ -33,6 +31,7 @@ use Pimcore\Model\GridConfigFavourite;
 use Pimcore\Model\GridConfigShare;
 use Pimcore\Model\Metadata;
 use Pimcore\Model\User;
+use Pimcore\Security\SecurityHelper;
 use Pimcore\Tool;
 use Pimcore\Tool\Storage;
 use Pimcore\Version;
@@ -42,7 +41,6 @@ use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
@@ -52,7 +50,7 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  *
  * @internal
  */
-class AssetHelperController extends AdminController
+class AssetHelperController extends AdminAbstractController
 {
     /**
      * @param int $userId
@@ -706,7 +704,7 @@ class AssetHelperController extends AdminController
     }
 
     /**
-     * @Route("/get-export-jobs", name="pimcore_admin_asset_assethelper_getexportjobs", methods={"GET"})
+     * @Route("/get-export-jobs", name="pimcore_admin_asset_assethelper_getexportjobs", methods={"POST"})
      *
      * @param Request $request
      * @param GridHelperService $gridHelperService
@@ -916,41 +914,19 @@ class AssetHelperController extends AdminController
      * @Route("/download-xlsx-file", name="pimcore_admin_asset_assethelper_downloadxlsxfile", methods={"GET"})
      *
      * @param Request $request
+     * @param GridHelperService $gridHelperService
      *
      * @return BinaryFileResponse
      */
-    public function downloadXlsxFileAction(Request $request)
+    public function downloadXlsxFileAction(Request $request, GridHelperService $gridHelperService)
     {
         $storage = Storage::get('temp');
         $fileHandle = \Pimcore\File::getValidFilename($request->get('fileHandle'));
         $csvFile = $this->getCsvFile($fileHandle);
 
         try {
-            $csvStream= $storage->readStream($csvFile);
-
-            $csvReader = new Csv();
-            $csvReader->setDelimiter(';');
-            $csvReader->setSheetIndex(0);
-
-            $temp = tmpfile();
-            stream_copy_to_stream($csvStream, $temp, null, 0);
-            $tempMetaData = stream_get_meta_data($temp);
-            //TODO: use this method and storage->read() to avoid the extra temp file, is not available in the current version. See: https://github.com/PHPOffice/PhpSpreadsheet/pull/2792
-            //$spreadsheet = $csvReader->loadSpreadsheetFromString($csvData);
-            $spreadsheet = $csvReader->load($tempMetaData['uri']);
-            $writer = new Xlsx($spreadsheet);
-            $xlsxFilename = PIMCORE_SYSTEM_TEMP_DIRECTORY. '/' .$fileHandle. '.xlsx';
-            $writer->save($xlsxFilename);
-
-            $response = new BinaryFileResponse($xlsxFilename);
-            $response->headers->set('Content-Type', 'application/xlsx');
-            $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, 'export.xlsx');
-            $response->deleteFileAfterSend(true);
-
-            $storage->delete($csvFile);
-
-            return $response;
-        } catch (FilesystemException | UnableToReadFile $exception) {
+            return $gridHelperService->createXlsxExportFile($storage, $fileHandle, $csvFile);
+        } catch (\Exception | FilesystemException | UnableToReadFile $exception) {
             // handle the error
             throw $this->createNotFoundException('XLSX file not found');
         }
@@ -986,9 +962,10 @@ class AssetHelperController extends AdminController
             if (!in_array($uniqueKey, $tmp) && !in_array($item->getName(), $defaultMetadataNames)) {
                 $tmp[] = $uniqueKey;
                 $item->expand();
+                $name = SecurityHelper::convertHtmlSpecialChars($item->getName());
                 $metadataItems[] = [
-                    'title' => $item->getName(),
-                    'name' => $item->getName(),
+                    'title' => $name,
+                    'name' => $name,
                     'subtype' => $item->getTargetSubtype(),
                     'datatype' => 'data',
                     'fieldtype' => $item->getType(),
@@ -1015,7 +992,7 @@ class AssetHelperController extends AdminController
     }
 
     /**
-     * @Route("/get-batch-jobs", name="pimcore_admin_asset_assethelper_getbatchjobs", methods={"GET"})
+     * @Route("/get-batch-jobs", name="pimcore_admin_asset_assethelper_getbatchjobs", methods={"POST"})
      *
      * @param Request $request
      *

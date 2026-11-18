@@ -673,6 +673,19 @@ class PimcoreBundleManager
         foreach ($this->getActiveBundles() as $bundle) {
             $paths = $bundle->$getter();
 
+            if (!empty($paths) && !$bundle instanceof PimcoreBundleAdminClassicInterface) {
+                trigger_deprecation(
+                    'pimcore/pimcore',
+                    '10.6',
+                    sprintf(
+                        'Calling %s::%s without implementing the %s is deprecated and won\'t be possible in Pimcore 11.',
+                        get_class($bundle),
+                        $getter,
+                        PimcoreBundleAdminClassicInterface::class
+                    )
+                );
+            }
+
             foreach ($paths as $path) {
                 if ($path instanceof RouteReferenceInterface) {
                     $result[] = $this->router->generate(

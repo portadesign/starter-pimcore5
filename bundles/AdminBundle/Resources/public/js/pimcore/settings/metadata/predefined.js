@@ -81,6 +81,12 @@ pimcore.settings.metadata.predefined = Class.create({
             }
         );
 
+        this.store.getProxy().getReader().setMessageProperty('message');
+        this.store.getProxy().on('exception', function (proxy, response, operation) {
+            pimcore.helpers.showNotification(t("error"), t(operation.getError()), "error");
+            this.store.load();
+        }.bind(this));
+
         this.store.addListener('exception', function(proxy, mode, action, options, response) {
             Ext.Msg.show({
                 title: t("error"),
@@ -132,13 +138,13 @@ pimcore.settings.metadata.predefined = Class.create({
                 sortable: true
             },
             {text: t("name"), width: 200, sortable: true, dataIndex: 'name',
-                getEditor: function() { return new Ext.form.TextField({}); }
+                getEditor: function() { return new Ext.form.TextField(); }
             },
             {text: t("group"), width: 200, sortable: true, dataIndex: 'group',
-                getEditor: function() { return new Ext.form.TextField({}); }
+                getEditor: function() { return new Ext.form.TextField(); }
             },
             {text: t("description"), sortable: true, dataIndex: 'description',
-                getEditor: function() { return new Ext.form.TextArea({}); },
+                getEditor: function() { return new Ext.form.TextArea(); },
                 renderer: function (value, metaData, record, rowIndex, colIndex, store) {
                     if (empty(value)) {
                         return "";
@@ -209,7 +215,9 @@ pimcore.settings.metadata.predefined = Class.create({
                     tooltip: t('delete'),
                     handler: function (grid, rowIndex) {
                         let data = grid.getStore().getAt(rowIndex);
-                        pimcore.helpers.deleteConfirm(t('predefined_metadata'), data.data.name, function () {
+                        pimcore.helpers.deleteConfirm(t('predefined_metadata'),
+                            Ext.util.Format.htmlEncode(data.data.name),
+                            function () {
                             grid.getStore().removeAt(rowIndex);
                         }.bind(this));
                     }.bind(this)

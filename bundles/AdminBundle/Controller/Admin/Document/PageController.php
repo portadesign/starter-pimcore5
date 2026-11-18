@@ -22,6 +22,7 @@ use Pimcore\Document\Editable\EditmodeEditableDefinitionCollector;
 use Pimcore\Document\StaticPageGenerator;
 use Pimcore\Http\Request\Resolver\DocumentResolver;
 use Pimcore\Http\Request\Resolver\EditmodeResolver;
+use Pimcore\Localization\LocaleService;
 use Pimcore\Messenger\GeneratePagePreviewMessage;
 use Pimcore\Model\Document;
 use Pimcore\Model\Document\Targeting\TargetingDocumentInterface;
@@ -29,6 +30,7 @@ use Pimcore\Model\Element;
 use Pimcore\Model\Redirect;
 use Pimcore\Model\Schedule\Task;
 use Pimcore\Templating\Renderer\EditableRenderer;
+use Pimcore\Tool\Frontend;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -84,8 +86,8 @@ class PageController extends DocumentControllerBase
         $this->addTranslationsData($page, $data);
         $this->minimizeProperties($page, $data);
 
-        if ($page->getContentMasterDocument()) {
-            $data['contentMasterDocumentPath'] = $page->getContentMasterDocument()->getRealFullPath();
+        if ($page->getContentMainDocument()) {
+            $data['contentMainDocumentPath'] = $page->getContentMainDocument()->getRealFullPath();
         }
 
         if ($page->getStaticGeneratorEnabled()) {
@@ -292,8 +294,25 @@ class PageController extends DocumentControllerBase
         ]);
 
         if ($list->getTotalCount() > 0) {
-            $success = false;
-            $message[] = 'URL path already exists.';
+            $checkDocument = Document::getById($docId);
+            $checkSite     = Frontend::getSiteForDocument($checkDocument);
+            $checkSiteId   = empty($checkSite) ? 0 : $checkSite->getId();
+
+            foreach ($list as $document) {
+                if (empty($document)) {
+                    continue;
+                }
+
+                $site   = Frontend::getSiteForDocument($document);
+                $siteId = empty($site) ? 0 : $site->getId();
+
+                if ($siteId === $checkSiteId) {
+                    $success   = false;
+                    $message[] = 'URL path already exists.';
+
+                    break;
+                }
+            }
         }
 
         return $this->adminJson([
@@ -390,6 +409,7 @@ class PageController extends DocumentControllerBase
      * @param Environment $twig
      * @param EditableRenderer $editableRenderer
      * @param DocumentResolver $documentResolver
+     * @param LocaleService $localeService
      *
      * @return JsonResponse
      *
@@ -402,7 +422,8 @@ class PageController extends DocumentControllerBase
         EditmodeEditableDefinitionCollector $definitionCollector,
         Environment $twig,
         EditableRenderer $editableRenderer,
-        DocumentResolver $documentResolver
+        DocumentResolver $documentResolver,
+        LocaleService $localeService
     ): JsonResponse {
         $blockStateStackData = json_decode($request->get('blockStateStack'), true);
         $blockStateStack->loadArray($blockStateStackData);
@@ -422,6 +443,9 @@ class PageController extends DocumentControllerBase
         // we can't use EditmodeResolver::setForceEditmode() here, because it would also render included documents in editmode
         // so we use the attribute as a workaround
         $request->attributes->set(EditmodeResolver::ATTRIBUTE_EDITMODE, true);
+
+        // setting locale manually here before rendering, to make sure editables use the right locale from document
+        $localeService->setLocale($document->getProperty('language'));
 
         $areaBlockConfig = json_decode($request->get('areablockConfig'), true);
         /** @var Document\Editable\Areablock $areablock */

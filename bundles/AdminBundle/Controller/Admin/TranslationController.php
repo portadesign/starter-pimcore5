@@ -15,8 +15,9 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
+use Doctrine\DBAL\Exception\SyntaxErrorException;
 use Doctrine\DBAL\Query\QueryBuilder as DoctrineQueryBuilder;
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\File;
 use Pimcore\Localization\LocaleServiceInterface;
 use Pimcore\Logger;
@@ -47,8 +48,10 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  *
  * @internal
  */
-class TranslationController extends AdminController
+class TranslationController extends AdminAbstractController
 {
+    protected const PLACEHOLDER_NAME = 'placeHolder';
+
     /**
      * @Route("/import", name="pimcore_admin_translation_import", methods={"POST"})
      *
@@ -183,9 +186,9 @@ class TranslationController extends AdminController
         $list->setOrder('asc');
         $list->setOrderKey($tableName . '.key', false);
 
-        $condition = $this->getGridFilterCondition($request, $tableName, false, $admin);
-        if ($condition) {
-            $list->setCondition($condition);
+        $conditions = $this->getGridFilterCondition($request, $tableName, false, $admin);
+        if (!empty($conditions)) {
+            $list->setCondition($conditions['condition'], $conditions['params']);
         }
 
         $filters = $this->getGridFilterCondition($request, $tableName, true, $admin);
@@ -195,7 +198,12 @@ class TranslationController extends AdminController
         }
 
         $this->extendTranslationQuery($joins, $list, $tableName, $filters);
-        $list->load();
+
+        try {
+            $list->load();
+        } catch (SyntaxErrorException $syntaxErrorException) {
+            throw new \InvalidArgumentException('Check your arguments.');
+        }
 
         $translations = [];
         $translationObjects = $list->getTranslations();
@@ -396,7 +404,10 @@ class TranslationController extends AdminController
             } elseif ($request->get('xaction') == 'create') {
                 $t = Translation::getByKey($data['key'], $domain);
                 if ($t) {
-                    throw new \Exception($translator->trans('identifier_already_exists', [], $domain));
+                    return $this->adminJson([
+                        'message' => 'identifier_already_exists',
+                        'success' => false,
+                    ]);
                 }
 
                 $t = new Translation();
@@ -432,6 +443,7 @@ class TranslationController extends AdminController
 
             $list->setOrder('asc');
             $list->setOrderKey($tableName . '.key', false);
+            $list->setLanguages($validLanguages);
 
             $sortingSettings = \Pimcore\Bundle\AdminBundle\Helper\QueryParams::extractSortingSettings(
                 array_merge($request->request->all(), $request->query->all())
@@ -457,19 +469,24 @@ class TranslationController extends AdminController
             $list->setLimit($request->get('limit'));
             $list->setOffset($request->get('start'));
 
-            $condition = $this->getGridFilterCondition($request, $tableName, false, $admin);
+            $conditions = $this->getGridFilterCondition($request, $tableName, false, $admin);
             $filters = $this->getGridFilterCondition($request, $tableName, true, $admin);
 
             if ($filters) {
                 $joins = array_merge($joins, $filters['joins']);
             }
-            if ($condition) {
-                $list->setCondition($condition);
+
+            if (!empty($conditions)) {
+                $list->setCondition($conditions['condition'], $conditions['params']);
             }
 
             $this->extendTranslationQuery($joins, $list, $tableName, $filters);
 
-            $list->load();
+            try {
+                $list->load();
+            } catch (SyntaxErrorException $syntaxErrorException) {
+                throw new \InvalidArgumentException('Check your arguments.');
+            }
 
             $translations = [];
             $searchString = $request->get('searchString');
@@ -571,11 +588,13 @@ class TranslationController extends AdminController
      * @param Request $request
      * @param string $tableName
      * @param bool $languageMode
+     * @param bool $admin
      *
-     * @return array|null|string
+     * @return array
      */
     protected function getGridFilterCondition(Request $request, $tableName, $languageMode = false, $admin = false)
     {
+        $placeHolderCount = 0;
         $joins = [];
         $conditions = [];
         $validLanguages = $admin ? Tool\Admin::getLanguages() : $this->getAdminUser()->getAllowedLanguagesForViewingWebsiteTranslations();
@@ -589,6 +608,7 @@ class TranslationController extends AdminController
             $operatorField = 'operator';
 
             $filters = $this->decodeJson($filterJson);
+
             foreach ($filters as $filter) {
                 $operator = '=';
                 $field = null;
@@ -598,6 +618,7 @@ class TranslationController extends AdminController
                 if (in_array(ltrim($fieldname, '_'), $validLanguages)) {
                     $fieldname = ltrim($fieldname, '_');
                 }
+                $fieldname = str_replace('--', '', $fieldname);
 
                 if (!$languageMode && in_array($fieldname, $validLanguages)
                     || $languageMode && !in_array($fieldname, $validLanguages)) {
@@ -630,7 +651,7 @@ class TranslationController extends AdminController
                 }
 
                 if ($field && $value) {
-                    $condition = $field . ' ' . $operator . ' ' . $db->quote($value);
+                    $condition = $db->quoteIdentifier($field) . ' ' . $operator . ' ' . $db->quote($value);
 
                     if ($languageMode) {
                         $conditions[$fieldname] = $condition;
@@ -638,31 +659,48 @@ class TranslationController extends AdminController
                             'language' => $fieldname,
                         ];
                     } else {
-                        $conditionFilters[] = $condition;
+                        $placeHolderName = self::PLACEHOLDER_NAME . $placeHolderCount;
+                        $placeHolderCount++;
+                        $conditionFilters[] = [
+                            'condition' => $field . ' ' . $operator . ' :' . $placeHolderName,
+                            'field' => $placeHolderName,
+                            'value' => $value,
+                        ];
                     }
                 }
             }
         }
 
         if ($request->get('searchString')) {
-            $filterTerm = $db->quote('%' . mb_strtolower($request->get('searchString')) . '%');
-            $conditionFilters[] = '(lower(' . $tableName . '.key) LIKE ' . $filterTerm . ' OR lower(' . $tableName . '.text) LIKE ' . $filterTerm . ')';
+            $conditionFilters[] = [
+                'condition' => '(lower(' . $tableName . '.key) LIKE :filterTerm OR lower(' . $tableName . '.text) LIKE :filterTerm)',
+                'field' => 'filterTerm',
+                'value' => '%' . mb_strtolower($request->get('searchString')) . '%',
+            ];
         }
 
         if ($languageMode) {
-            $result = [
+            return [
                 'joins' => $joins,
                 'conditions' => $conditions,
             ];
+        }
 
-            return $result;
-        } else {
-            if (!empty($conditionFilters)) {
-                return implode(' AND ', $conditionFilters);
+        if(!empty($conditionFilters)) {
+            $conditions = [];
+            $params = [];
+            foreach($conditionFilters as $conditionFilter) {
+                $conditions[] = $conditionFilter['condition'];
+                $params[$conditionFilter['field']] = $conditionFilter['value'];
             }
 
-            return null;
+            $conditionFilters = [
+                'condition' => implode(' AND ', $conditions),
+                'params' => $params,
+            ];
         }
+
+        return $conditionFilters;
     }
 
     /**
@@ -1135,8 +1173,7 @@ class TranslationController extends AdminController
                     fclose($f);
                 }
             } catch (\Exception $e) {
-                Logger::error('Word Export: ' . $e->getMessage());
-                Logger::error((string) $e);
+                Logger::error('Word Export: ' . $e);
 
                 throw $e;
             }

@@ -22,11 +22,11 @@ use DeepCopy\Matcher\PropertyNameMatcher;
 use DeepCopy\Matcher\PropertyTypeMatcher;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Query\QueryBuilder as DoctrineQueryBuilder;
-use League\Csv\EscapeFormula;
 use Pimcore;
 use Pimcore\Db;
 use Pimcore\Event\SystemEvents;
 use Pimcore\File;
+use Pimcore\Helper\CsvFormulaFormatter;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
@@ -34,6 +34,7 @@ use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\AbstractObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\DataObject\Concrete;
+use Pimcore\Model\DataObject\ObjectAwareFieldInterface;
 use Pimcore\Model\Dependency;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element\DeepCopy\MarshalMatcher;
@@ -52,10 +53,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 class Service extends Model\AbstractModel
 {
-    /**
-     * @var EscapeFormula|null
-     */
-    private static ?EscapeFormula $formatter = null;
+    private static ?CsvFormulaFormatter $formatter = null;
 
     /**
      * @internal
@@ -265,7 +263,7 @@ class Service extends Model\AbstractModel
     }
 
     /**
-     * @static
+     * @param ElementInterface|null $element
      *
      * @return bool
      */
@@ -445,6 +443,12 @@ class Service extends Model\AbstractModel
      */
     public static function getSaveCopyName($type, $sourceKey, $target)
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.0',
+            'The Service::getSaveCopyName() method is deprecated, use Service::getSafeCopyName() instead.'
+        );
+
         return self::getSafeCopyName($sourceKey, $target);
     }
 
@@ -504,7 +508,7 @@ class Service extends Model\AbstractModel
 
     /**
      * @param  string $type
-     * @param  int $id
+     * @param  int|string $id
      * @param  array|bool $force
      *
      * @return Asset|AbstractObject|Document|null
@@ -856,10 +860,10 @@ class Service extends Model\AbstractModel
 
                 if ($originalElement) {
                     //do not override filename for Assets https://github.com/pimcore/pimcore/issues/8316
-//                    if ($data instanceof Asset) {
-//                        /** @var Asset $originalElement */
-//                        $data->setFilename($originalElement->getFilename());
-//                    } else
+                    //                    if ($data instanceof Asset) {
+                    //                        /** @var Asset $originalElement */
+                    //                        $data->setFilename($originalElement->getFilename());
+                    //                    } else
                     if ($data instanceof Document) {
                         /** @var Document $originalElement */
                         $data->setKey($originalElement->getKey());
@@ -875,6 +879,12 @@ class Service extends Model\AbstractModel
             if ($data instanceof Model\AbstractModel) {
                 $properties = $data->getObjectVars();
                 foreach ($properties as $name => $value) {
+                    //do not renew object reference of ObjectAwareFieldInterface - as object might point to a
+                    //specific version of the object and must not be reloaded with DB version of object
+                    if (($data instanceof ObjectAwareFieldInterface || $data instanceof DataObject\Localizedfield) && $name === 'object') {
+                        continue;
+                    }
+
                     $data->setObjectVar($name, self::renewReferences($value, false, $name), true);
                 }
             } else {
@@ -1114,6 +1124,8 @@ class Service extends Model\AbstractModel
 
         // replace all 4 byte unicode characters
         $key = preg_replace('/[\x{10000}-\x{10FFFF}]/u', '-', $key);
+        // replace left to right marker characters ( lrm )
+        $key = preg_replace('/(\x{200e}|\x{200f})/u', '-', $key);
         // replace slashes with a hyphen
         $key = str_replace('/', '-', $key);
 
@@ -1133,9 +1145,8 @@ class Service extends Model\AbstractModel
             $key = ltrim($key, '. ');
         }
 
-        $key = mb_substr($key, 0, 255);
-
-        return $key;
+        // key should not end (or start) with space after cut
+        return trim(mb_substr($key, 0, 255));
     }
 
     /**
@@ -1506,6 +1517,8 @@ class Service extends Model\AbstractModel
      */
     public static function saveElementToSession($element, $postfix = '', $clone = true)
     {
+        self::loadAllFields($element);
+
         if ($clone) {
             $context = [
                 'source' => __METHOD__,
@@ -1528,6 +1541,7 @@ class Service extends Model\AbstractModel
                 );
             }
 
+            $copier->addFilter(new Model\Version\SetDumpStateFilter(true), new \DeepCopy\Matcher\PropertyMatcher(Model\Element\ElementDumpStateInterface::class, Model\Element\ElementDumpStateInterface::DUMP_STATE_PROPERTY_NAME));
             $element = $copier->copy($element);
         }
 
@@ -1535,7 +1549,6 @@ class Service extends Model\AbstractModel
         $tmpStoreKey = self::getSessionKey($elementType, $element->getId(), $postfix);
         $tag = $elementType . '-session' . $postfix;
 
-        self::loadAllFields($element);
         $element->setInDumpState(true);
         $serializedData = Serialize::serialize($element);
 
@@ -1633,7 +1646,7 @@ class Service extends Model\AbstractModel
     public static function escapeCsvRecord(array $rowData): array
     {
         if (self::$formatter === null) {
-            self::$formatter = new EscapeFormula("'", ['=', '-', '+', '@']);
+            self::$formatter = new CsvFormulaFormatter("'", ['=', '-', '+', '@']);
         }
         $rowData = self::$formatter->escapeRecord($rowData);
 
@@ -1642,9 +1655,22 @@ class Service extends Model\AbstractModel
 
     /**
      * @internal
+     */
+    public static function unEscapeCsvField(string $value): string
+    {
+        if (self::$formatter === null) {
+            self::$formatter = new CsvFormulaFormatter("'", ['=', '-', '+', '@']);
+        }
+        $value = self::$formatter->unEscapeField($value);
+
+        return $value;
+    }
+
+    /**
+     * @internal
      *
      * @param string $type
-     * @param int|string $id
+     * @param int|string|null $id
      *
      * @return string
      */

@@ -15,12 +15,12 @@
 
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList;
 
-use Monolog\Logger;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Exception\InvalidConfigException;
 use Pimcore\Bundle\EcommerceFrameworkBundle\FilterService\FilterType\Findologic\SelectCategory;
 use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\Config\FindologicConfigInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\AbstractCategory;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\IndexableInterface;
+use Psr\Log\LoggerInterface;
 
 class DefaultFindologic implements ProductListInterface
 {
@@ -75,7 +75,7 @@ class DefaultFindologic implements ProductListInterface
     protected $offset = 0;
 
     /**
-     * @var AbstractCategory
+     * @var AbstractCategory|null
      */
     protected $category;
 
@@ -92,7 +92,7 @@ class DefaultFindologic implements ProductListInterface
     protected $response;
 
     /**
-     * @var array<string,\stdClass>
+     * @var array|null
      */
     protected $groupedValues;
 
@@ -117,17 +117,17 @@ class DefaultFindologic implements ProductListInterface
     protected $conditionPriceTo = null;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $order;
 
     /**
-     * @var string | array
+     * @var string|array
      */
     protected $orderKey;
 
     /**
-     * @var Logger
+     * @var LoggerInterface
      */
     protected $logger;
 
@@ -157,7 +157,9 @@ class DefaultFindologic implements ProductListInterface
         $this->referer = $_SERVER['HTTP_REFERER'];
     }
 
-    /** @inheritDoc */
+    /**
+     * {@inheritDoc}
+     */
     public function getProducts()
     {
         if ($this->products === null) {
@@ -227,7 +229,7 @@ class DefaultFindologic implements ProductListInterface
 
     /**
      * @param string $fieldname
-     * @param string $condition
+     * @param array|string $condition
      */
     public function addRelationCondition($fieldname, $condition)
     {
@@ -273,7 +275,7 @@ class DefaultFindologic implements ProductListInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOrder()
     {
@@ -795,7 +797,7 @@ class DefaultFindologic implements ProductListInterface
     }
 
     /**
-     * @return Logger
+     * @return LoggerInterface
      */
     protected function getLogger()
     {

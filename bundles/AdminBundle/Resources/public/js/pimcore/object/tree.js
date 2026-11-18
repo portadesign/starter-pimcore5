@@ -77,10 +77,17 @@ pimcore.object.tree = Class.create({
 
         var itemsPerPage = pimcore.settings['object_tree_paging_limit'];
 
-        rootNodeConfig.text = t("home");
-        rootNodeConfig.id = "" +  rootNodeConfig.id;
+        let rootNodeConfigText = t('home');
+        let rootNodeConfigIconCls = "pimcore_icon_home";
+        if(this.config.customViewId !== undefined && rootNodeConfig.id !== 1) {
+            rootNodeConfigText = rootNodeConfig.key;
+            rootNodeConfigIconCls = rootNodeConfig.iconCls;
+        }
+
+        rootNodeConfig.text = rootNodeConfigText;
+        rootNodeConfig.id = "" + rootNodeConfig.id;
         rootNodeConfig.allowDrag = true;
-        rootNodeConfig.iconCls = "pimcore_icon_home";
+        rootNodeConfig.iconCls = rootNodeConfigIconCls;
         rootNodeConfig.cls = "pimcore_tree_node_root";
         rootNodeConfig.expanded = true;
 
@@ -230,10 +237,6 @@ pimcore.object.tree = Class.create({
     onTreeNodeOver: function (targetNode, position, dragData, e, eOpts ) {
         var node = dragData.records[0];
 
-        if (this.nodeRestrictedByCustomviewExtension(node, targetNode)) {
-            return false;
-        }
-
         //dropping variants not allowed on folder
         if(node.data.type == 'variant' && targetNode.data.type == 'folder'){
             return false;
@@ -260,6 +263,13 @@ pimcore.object.tree = Class.create({
     },
 
     onTreeNodesDrop: function (node, data, overModel, dropPosition, eOpts) {
+        if (typeof this.treeNodeMoveParameter.oldParent.getOwnerTree !== "function") {
+            Ext.Array.each(data.records, function (record) {
+                if (this.onTreeNodeBeforeMove(record, record.parentNode, overModel)) {
+                    this.onTreeNodeMove(record, record.parentNode, overModel, 0);
+                }
+            }.bind(this));
+        }
 
         if (typeof this.treeNodeMoveParameter.oldParent.getOwnerTree !== "function") {
             return;
@@ -376,17 +386,11 @@ pimcore.object.tree = Class.create({
             return false;
         }
 
-        if (this.nodeRestrictedByCustomviewExtension(node, newParent)) {
-            Ext.MessageBox.alert(t('missing_permission'), t('element_cannot_be_moved'));
-            return false;
-        }
-
         // check permissions
         if (node.data.permissions.settings) {
             tree.loadMask.show();
             return true;
         }
-
         return false;
     },
 
@@ -451,10 +455,6 @@ pimcore.object.tree = Class.create({
                     }
                 }
 
-                if (pimcore.helpers.isObjectContextMenuClassRestricted(perspectiveCfg, record, classRecord.get("id"))) {
-                    return;
-                }
-
                 tmpMenuEntry = {
                     text: classRecord.get("translatedText"),
                     iconCls: "pimcore_icon_object pimcore_icon_overlay_add",
@@ -515,7 +515,7 @@ pimcore.object.tree = Class.create({
 
             if (record.data.permissions.create) {
                 if (!isVariant) {
-                    if (perspectiveCfg.inTreeContextMenu("object.add") && objectMenu.objects.length > 0) {
+                    if (perspectiveCfg.inTreeContextMenu("object.add")) {
                         menu.add(new Ext.menu.Item({
                             text: t('add_object'),
                             iconCls: "pimcore_icon_object pimcore_icon_overlay_add",
@@ -525,7 +525,7 @@ pimcore.object.tree = Class.create({
                     }
                 }
 
-                if (record.data.allowVariants) {
+                if (record.data.allowVariants && perspectiveCfg.inTreeContextMenu("object.add")) {
                     menu.add(new Ext.menu.Item({
                         text: t("add_variant"),
                         iconCls: "pimcore_icon_variant",
@@ -535,7 +535,7 @@ pimcore.object.tree = Class.create({
 
                 if (!isVariant) {
 
-                    if (perspectiveCfg.inTreeContextMenu("object.addFolder") && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictFolder') === false) {
+                    if (perspectiveCfg.inTreeContextMenu("object.addFolder")) {
                         menu.add(new Ext.menu.Item({
                             text: t('create_folder'),
                             iconCls: "pimcore_icon_folder pimcore_icon_overlay_add",
@@ -782,7 +782,7 @@ pimcore.object.tree = Class.create({
 
                     let currentSortMethod = record.data.sortBy;
 
-                    if (currentSortMethod !== "key" || user.admin || user.isAllowed("objects_sort_method")) {
+                    if (currentSortMethod === "key" || user.admin || user.isAllowed("objects_sort_method")) {
                         sortByItems.push({
                             text: t('by_key'),
                             iconCls: "pimcore_icon_alphabetical_sorting_az",
@@ -795,7 +795,7 @@ pimcore.object.tree = Class.create({
                         });
                     }
 
-                    if (currentSortMethod !== "index" || user.admin || user.isAllowed("objects_sort_method")) {
+                    if (currentSortMethod === "index" || user.admin || user.isAllowed("objects_sort_method")) {
                         sortByItems.push({
                             text: t('by_index'),
                             iconCls: "pimcore_icon_index_sorting",
@@ -977,17 +977,6 @@ pimcore.object.tree = Class.create({
 
     pasteInfo: function (tree, record, type) {
         //this.attributes.reference.tree.loadMask.show();
-
-        // check extension restrictions
-        var node = tree.getStore().getById(pimcore.cachedObjectId);
-        if (!node) {
-            Ext.MessageBox.alert(t('error'), t('cross_tree_moves_not_supported'));
-            return false;
-        }
-        if (this.nodeRestrictedByCustomviewExtension(node, record)) {
-            Ext.MessageBox.alert(t('missing_permission'), t('error_pasting_object'));
-            return false;
-        }
 
         pimcore.helpers.addTreeNodeLoadingIndicator("object", record.data.id);
 
@@ -1245,21 +1234,5 @@ pimcore.object.tree = Class.create({
         pimcore.helpers.searchAndMove(record.data.id, function() {
             pimcore.elementservice.refreshNode(record);
         }.bind(this), "object");
-    },
-
-    nodeRestrictedByCustomviewExtension: function(node, targetNode) {
-        if (node.data.type === 'folder' && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, targetNode.data.path, 'restrictFolder') === true) {
-            return true;
-        }
-        if (node.data.type === 'object') {
-            var classStore = pimcore.globalmanager.get("object_types_store");
-            var classRecord = classStore.getAt(classStore.find('text', node.data.className));
-            var classId = classRecord.getId();
-            if (pimcore.helpers.isObjectContextMenuClassRestricted(this.perspectiveCfg, targetNode, classId)) {
-                return true;
-            }
-        }
-        return false;
     }
-
 });

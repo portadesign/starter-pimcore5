@@ -92,7 +92,7 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
     /**
      * @param int|string|null $id
      *
-     * @return Video
+     * @return $this
      */
     public function setId($id)
     {
@@ -261,7 +261,7 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return mixed
      */
     protected function getDataEditmode()
     {
@@ -461,6 +461,34 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
     }
 
     /**
+     * @return string
+     */
+    private function getWidthWithUnit()
+    {
+        $width = $this->getWidth();
+
+        if (is_numeric($width)) {
+            $width .= 'px';
+        }
+
+        return $width;
+    }
+
+    /**
+     * @return string
+     */
+    private function getHeightWithUnit()
+    {
+        $height = $this->getHeight();
+
+        if (is_numeric($height)) {
+            $height .= 'px';
+        }
+
+        return $height;
+    }
+
+    /**
      * @return int|string
      */
     public function getHeight()
@@ -520,8 +548,6 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
     }
 
     /**
-     * @param Asset\Video $asset
-     *
      * @return Asset\Image\Thumbnail|Asset\Video\ImageThumbnail
      */
     private function getPosterThumbnailImage(Asset\Video $asset)
@@ -573,8 +599,22 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
     private function getErrorCode($message = '')
     {
         $width = $this->getWidth();
-        if (strpos($this->getWidth(), '%') === false) {
-            $width = ((int)$this->getWidth() - 1) . 'px';
+        // If contains at least one digit (0-9), then assume it is a value that can be calculated,
+        // otherwise it is likely be `auto`,`inherit`,etc..
+        if (preg_match('/[\d]/', $width)) {
+            // when is numeric, assume there are no length units nor %, and considering the value as pixels
+            if (is_numeric($width)) {
+                $width .= 'px';
+            }
+            $width = 'calc(' . $width . ' - 1px)';
+        }
+
+        $height = $this->getHeight();
+        if (preg_match('/[\d]/', $height)) {
+            if (is_numeric($height)) {
+                $height .= 'px';
+            }
+            $height = 'calc(' . $height . ' - 1px)';
         }
 
         // only display error message in debug mode
@@ -584,7 +624,7 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
 
         $code = '
         <div id="pimcore_video_' . $this->getName() . '" class="pimcore_editable_video">
-            <div class="pimcore_editable_video_error" style="text-align:center; width: ' . $width . '; height: ' . ($this->getHeight() - 1) . 'px; border:1px solid #000; background: url(/bundles/pimcoreadmin/img/filetype-not-supported.svg) no-repeat center center #fff;">
+            <div class="pimcore_editable_video_error" style="text-align:center; width: ' . $width . '; height: ' . $height . '; border:1px solid #000; background: url(/bundles/pimcoreadmin/img/filetype-not-supported.svg) no-repeat center center #fff;">
                 ' . $message . '
             </div>
         </div>';
@@ -887,27 +927,6 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
         $code = '';
         $video = $this->getVideoAsset();
         if ($video) {
-            $duration = ceil($video->getDuration());
-
-            $durationParts = ['PT'];
-
-            // hours
-            if ($duration / 3600 >= 1) {
-                $hours = floor($duration / 3600);
-                $durationParts[] = $hours . 'H';
-                $duration = $duration - $hours * 3600;
-            }
-
-            // minutes
-            if ($duration / 60 >= 1) {
-                $minutes = floor($duration / 60);
-                $durationParts[] = $minutes . 'M';
-                $duration = $duration - $minutes * 60;
-            }
-
-            $durationParts[] = $duration . 'S';
-            $durationString = implode('', $durationParts);
-
             $code .= '<div id="pimcore_video_' . $this->getName() . '" class="pimcore_editable_video">' . "\n";
 
             $uploadDate = new \DateTime();
@@ -919,11 +938,15 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
                 'name' => $this->getTitle(),
                 'description' => $this->getDescription(),
                 'uploadDate' => $uploadDate->format('Y-m-d\TH:i:sO'),
-                'duration' => $durationString,
                 //'contentUrl' => Tool::getHostUrl() . $urls['mp4'],
                 //"embedUrl" => "http://www.example.com/videoplayer.swf?video=123",
                 //"interactionCount" => "1234",
             ];
+            $duration = $video->getDuration();
+
+            if ($duration !== null) {
+                $jsonLd['duration'] = $this->getDurationString($duration);
+            }
 
             if (!$thumbnail) {
                 $thumbnail = $video->getImageThumbnail([]);
@@ -977,7 +1000,7 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
                 $attributesString .= ' ' . $key;
                 if (!empty($value)) {
                     $quoteChar = '"';
-                    if (strpos($value, '"')) {
+                    if (is_string($value) && strpos($value, '"')) {
                         $quoteChar = "'";
                     }
                     $attributesString .= '=' . $quoteChar . $value . $quoteChar;
@@ -1003,6 +1026,30 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
         }
 
         return $code;
+    }
+
+    private function getDurationString(float $duration): string
+    {
+        $duration = ceil($duration);
+        $durationParts = ['PT'];
+
+        // hours
+        if ($duration / 3600 >= 1) {
+            $hours = floor($duration / 3600);
+            $durationParts[] = $hours . 'H';
+            $duration = $duration - $hours * 3600;
+        }
+
+        // minutes
+        if ($duration / 60 >= 1) {
+            $minutes = floor($duration / 60);
+            $durationParts[] = $minutes . 'M';
+            $duration = $duration - $minutes * 60;
+        }
+
+        $durationParts[] = $duration . 'S';
+
+        return implode('', $durationParts);
     }
 
     /**
@@ -1033,7 +1080,7 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
                 }
             </style>
             <div class="pimcore_editable_video_progress" id="' . $uid . '">
-                <img src="' . $thumbnail . '" style="width: ' . $this->getWidth() . 'px; height: ' . $this->getHeight() . 'px;">
+                <img src="' . $thumbnail . '" style="width: ' . $this->getWidthWithUnit() . '; height: ' . $this->getHeightWithUnit() . ';">
                 <div class="pimcore_editable_video_progress_status"></div>
             </div>
         </div>';
@@ -1047,18 +1094,8 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
     private function getEmptyCode(): string
     {
         $uid = 'video_' . uniqid();
-        $width = $this->getWidth();
-        $height = $this->getHeight();
 
-        if (is_numeric($width)) {
-            $width .= 'px';
-        }
-
-        if (is_numeric($height)) {
-            $height .= 'px';
-        }
-
-        return '<div id="pimcore_video_' . $this->getName() . '" class="pimcore_editable_video"><div class="pimcore_editable_video_empty" id="' . $uid . '" style="width: ' . $width . '; height: ' . $height . ';"></div></div>';
+        return '<div id="pimcore_video_' . $this->getName() . '" class="pimcore_editable_video"><div class="pimcore_editable_video_empty" id="' . $uid . '" style="width: ' . $this->getWidthWithUnit() . '; height: ' . $this->getHeightWithUnit() . ';"></div></div>';
     }
 
     private function updateAllowedTypesFromConfig(array $config): void
@@ -1153,7 +1190,7 @@ class Video extends Model\Document\Editable implements IdRewriterInterface
     }
 
     /**
-     * { @inheritdoc }
+     * {@inheritdoc}
      */
     public function rewriteIds($idMapping) /** : void */
     {

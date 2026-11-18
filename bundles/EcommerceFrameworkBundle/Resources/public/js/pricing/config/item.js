@@ -133,14 +133,16 @@ pimcore.bundle.EcommerceFramework.pricing.config.item = Class.create({
                     name: "label." + lang,
                     fieldLabel: t("label"),
                     width: 350,
-                    value: data.label[ lang ]
+                    value: data.label[ lang ],
+                    renderer: Ext.util.Format.htmlEncode
                 }, {
                     xtype: "textarea",
                     name: "description." + lang,
                     fieldLabel: t("description"),
                     width: 500,
                     height: 100,
-                    value: data.description[ lang ]
+                    value: data.description[ lang ],
+                    renderer: Ext.util.Format.htmlEncode
                 }]
             };
 
@@ -706,7 +708,12 @@ pimcore.bundle.EcommerceFramework.pricing.conditions = {
                 format: 'd.m.Y',
                 altFormats: 'U',
                 value: data.starting,
-                width: 400
+                width: 400,
+                onChange: function (value) {
+                    if (Ext.String.hasHtmlCharacters(value)) {
+                        this.setValue(null);
+                    }
+                },
             },{
                 xtype:'datefield',
                 fieldLabel: t("to"),
@@ -714,7 +721,12 @@ pimcore.bundle.EcommerceFramework.pricing.conditions = {
                 format: 'd.m.Y',
                 altFormats: 'U',
                 value: data.ending,
-                width: 400
+                width: 400,
+                onChange: function (value) {
+                    if (Ext.String.hasHtmlCharacters(value)) {
+                        this.setValue(null);
+                    }
+                },
             }],
             listeners: {
 
@@ -1109,11 +1121,11 @@ pimcore.bundle.EcommerceFramework.pricing.conditions = {
             bodyStyle: "padding: 10px 30px 10px 30px; min-height:40px;",
             tbar: this.getTopBar(niceName, myId, panel, data, "bundle_ecommerce_pricing_icon_conditionVoucherToken"),
             items: [
-                new pimcore.bundle.EcommerceFramework.pricing.config.objects(data.whiteList, {
+                new pimcore.bundle.EcommerceFramework.pricing.config.objects(data.allowList, {
                     classes: [
                         "OnlineShopVoucherSeries"
                     ],
-                    name: "whiteList",
+                    name: "allowList",
                     title: "White List",
                     visibleFields: "path",
                     height: 200,

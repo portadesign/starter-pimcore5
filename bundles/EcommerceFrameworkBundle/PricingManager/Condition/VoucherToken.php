@@ -25,9 +25,23 @@ class VoucherToken implements ConditionInterface
     /**
      * @var int[]
      */
+    protected $allowListIds = [];
+
+    /**
+     * @var \stdClass[]
+     */
+    protected $allowList = [];
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
+     * @var int[]
+     */
     protected $whiteListIds = [];
 
     /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @var \stdClass[]
      */
     protected $whiteList = [];
@@ -61,9 +75,14 @@ class VoucherToken implements ConditionInterface
         return false;
     }
 
+    /**
+     * @param string $code
+     *
+     * @return bool
+     */
     public function checkVoucherCode($code)
     {
-        if (in_array(VoucherServiceToken::getByCode($code)->getVoucherSeriesId(), $this->whiteListIds)) {
+        if (in_array(VoucherServiceToken::getByCode($code)->getVoucherSeriesId(), $this->allowListIds)) {
             return true;
         }
 
@@ -78,13 +97,13 @@ class VoucherToken implements ConditionInterface
         // basic
         $json = [
             'type' => 'VoucherToken',
-            'whiteList' => [],
+            'allowList' => [],
             'error_messages' => $this->getErrorMessagesRaw(),
         ];
 
         // add categories
-        foreach ($this->getWhiteList() as $series) {
-            $json['whiteList'][] = [
+        foreach ($this->getAllowList() as $series) {
+            $json['allowList'][] = [
                 $series->id,
                 $series->path,
             ];
@@ -102,21 +121,21 @@ class VoucherToken implements ConditionInterface
     {
         $json = json_decode($string);
 
-        $whiteListIds = [];
-        $whiteList = [];
+        $allowListIds = [];
+        $allowList = [];
 
-        foreach ($json->whiteList as $series) {
+        foreach ($json->allowList as $series) {
             $seriesId = $series->id;
             if ($seriesId) {
-                $whiteListIds[] = $seriesId;
-                $whiteList[] = $series;
+                $allowListIds[] = $seriesId;
+                $allowList[] = $series;
             }
         }
 
         $this->setErrorMessagesRaw((array)$json->error_messages);
 
-        $this->setWhiteListIds($whiteListIds);
-        $this->setWhiteList($whiteList);
+        $this->setAllowListIds($allowListIds);
+        $this->setAllowList($allowList);
 
         return $this;
     }
@@ -134,33 +153,99 @@ class VoucherToken implements ConditionInterface
     /**
      * @return int[]
      */
-    public function getWhiteListIds()
+    public function getAllowListIds()
     {
-        return $this->whiteListIds;
+        return $this->allowListIds;
     }
 
     /**
-     * @param int[] $whiteListIds
+     * @param int[] $allowListIds
      */
-    public function setWhiteListIds($whiteListIds)
+    public function setAllowListIds($allowListIds)
     {
-        $this->whiteListIds = $whiteListIds;
+        $this->allowListIds = $allowListIds;
     }
 
     /**
      * @return \stdClass[]
      */
-    public function getWhiteList()
+    public function getAllowList()
     {
-        return $this->whiteList;
+        return $this->allowList;
     }
 
     /**
+     * @param \stdClass[] $allowList
+     */
+    public function setAllowList($allowList)
+    {
+        $this->allowList = $allowList;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
+     * @return int[]
+     */
+    public function getWhiteListIds()
+    {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('White', 'Allow', __METHOD__))
+        );
+
+        return $this->getAllowListIds() + $this->whiteListIds;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
+     * @param int[] $whiteListIds
+     */
+    public function setWhiteListIds($whiteListIds)
+    {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('White', 'Allow', __METHOD__))
+        );
+
+        $this->whiteListIds = $whiteListIds;
+        $this->setAllowListIds($whiteListIds);
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
+     * @return \stdClass[]
+     */
+    public function getWhiteList()
+    {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('White', 'Allow', __METHOD__))
+        );
+
+        return $this->getAllowList() + $this->whiteList;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param \stdClass[] $whiteList
      */
     public function setWhiteList($whiteList)
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('White', 'Allow', __METHOD__))
+        );
+
         $this->whiteList = $whiteList;
+        $this->setAllowList($whiteList);
     }
 
     /**

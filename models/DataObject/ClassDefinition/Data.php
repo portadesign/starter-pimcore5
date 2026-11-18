@@ -50,7 +50,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     public $noteditable;
 
     /**
-     * @var int|null
+     * @var bool
      */
     public $index;
 
@@ -70,6 +70,8 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     public $permissions;
 
     /**
+     * @deprecated Will be removed with Pimcore 11
+     *
      * @var string
      */
     public $datatype = 'data';
@@ -306,6 +308,8 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
+     * @deprecated Will be removed with Pimcore 11
+     *
      * @return string
      */
     public function getDatatype()
@@ -314,6 +318,8 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
+     * @deprecated Will be removed with Pimcore 11
+     *
      * @param string $datatype
      *
      * @return $this
@@ -354,7 +360,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @return int|null
+     * @return bool
      */
     public function getIndex()
     {
@@ -362,13 +368,13 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param int|null $index
+     * @param bool $index
      *
      * @return $this
      */
     public function setIndex($index)
     {
-        $this->index = $index;
+        $this->index = (bool) $index;
 
         return $this;
     }
@@ -454,7 +460,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param bool|int|null $invisible
+     * @param bool $invisible
      *
      * @return $this
      */
@@ -474,7 +480,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param bool|int|null $visibleGridView
+     * @param bool $visibleGridView
      *
      * @return $this
      */
@@ -494,7 +500,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param bool|int|null $visibleSearch
+     * @param bool $visibleSearch
      *
      * @return $this
      */
@@ -1160,12 +1166,13 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
 
         $dataParamDoc = 'mixed $data';
         $reflectionMethod = new \ReflectionMethod($this, 'addListingFilter');
-        if (preg_match('/@param\s+([^\s]+)\s+\$data(.*)/', $reflectionMethod->getDocComment(), $dataParam)) {
+        $docComment = $reflectionMethod->getDocComment();
+        if ($docComment && preg_match('/@param\s+([^\s]+)\s+\$data(.*)/', $docComment, $dataParam)) {
             $dataParamDoc = $dataParam[1].' $data '.$dataParam[2];
         }
 
         $operatorParamDoc = 'string $operator SQL comparison operator, e.g. =, <, >= etc. You can use "?" as placeholder, e.g. "IN (?)"';
-        if (preg_match('/@param\s+([^\s]+)\s+\$operator(.*)/', $reflectionMethod->getDocComment(), $dataParam)) {
+        if ($docComment && preg_match('/@param\s+([^\s]+)\s+\$operator(.*)/', $docComment, $dataParam)) {
             $operatorParamDoc = $dataParam[1].' $operator '.$dataParam[2];
         }
 
@@ -1355,7 +1362,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
                                     $items = $container->getItems();
                                 }
 
-                                if ($items && count($items) > $originalIndex) {
+                                if ($items && (count($items) > $originalIndex || count($items) > --$originalIndex)) {
                                     $item = $items[$originalIndex];
 
                                     if ($context['containerType'] === 'block') {
@@ -1437,14 +1444,52 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param DataObject\ClassDefinition\Data $masterDefinition
+     * @param DataObject\ClassDefinition\Data $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition)
     {
         // implement in child classes
     }
 
     /**
+     * @deprecated will be removed in Pimcore 11
+     *
+     * @param DataObject\ClassDefinition\Data $masterDefinition
+     */
+    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
+    {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
+    }
+
+    /**
+     * @param DataObject\ClassDefinition\Data $mainDefinition
+     */
+    public function adoptMainDefinition(DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        $vars = get_object_vars($this);
+        $protectedFields = ['noteditable', 'invisible'];
+        foreach ($vars as $name => $value) {
+            if (!in_array($name, $protectedFields)) {
+                unset($this->$name);
+            }
+        }
+        $vars = get_object_vars($mainDefinition);
+        foreach ($vars as $name => $value) {
+            if (!in_array($name, $protectedFields)) {
+                $this->$name = $value;
+            }
+        }
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param DataObject\ClassDefinition\Data $masterDefinition
      */
     public function adoptMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)

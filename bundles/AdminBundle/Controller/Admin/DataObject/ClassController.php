@@ -15,8 +15,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\DataObject;
 
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
-use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Controller\KernelControllerEventInterface;
 use Pimcore\Db;
 use Pimcore\Event\AdminEvents;
@@ -27,19 +26,22 @@ use Pimcore\Model\Document;
 use Pimcore\Model\Translation;
 use Pimcore\Tool\Session;
 use Symfony\Component\EventDispatcher\GenericEvent;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @Route("/class", name="pimcore_admin_dataobject_class_")
  *
  * @internal
  */
-class ClassController extends AdminController implements KernelControllerEventInterface
+class ClassController extends AdminAbstractController implements KernelControllerEventInterface
 {
     /**
      * @Route("/get-document-types", name="getdocumenttypes", methods={"GET"})
@@ -90,6 +92,15 @@ class ClassController extends AdminController implements KernelControllerEventIn
      */
     public function getTreeAction(Request $request)
     {
+        try {
+            // we need to check objects permission for listing in pimcore.model.objecttypes ext model
+            $this->checkPermission('objects');
+        } catch (AccessDeniedHttpException $e) {
+            Logger::log('[Startup] Object types are not loaded as "objects" permission is missing');
+            //return empty string to avoid error on startup
+            return $this->adminJson([]);
+        }
+
         $defaultIcon = '/bundles/pimcoreadmin/img/flat-color-icons/class.svg';
 
         $classesList = new DataObject\ClassDefinition\Listing();
@@ -455,6 +466,14 @@ class ClassController extends AdminController implements KernelControllerEventIn
             $class->rename($values['name']);
         }
 
+        if ($values['compositeIndices']) {
+            foreach ($values['compositeIndices'] as $index => $compositeIndex) {
+                if ($compositeIndex['index_key'] !== ($sanitizedKey = preg_replace('/[^a-za-z0-9_\-+]/', '', $compositeIndex['index_key']))) {
+                    $values['compositeIndices'][$index]['index_key'] = $sanitizedKey;
+                }
+            }
+        }
+
         unset($values['creationDate']);
         unset($values['userOwner']);
         unset($values['layoutDefinitions']);
@@ -657,7 +676,7 @@ class ClassController extends AdminController implements KernelControllerEventIn
             if (isset($mapping[$class->getId()])) {
                 $classMapping = $mapping[$class->getId()];
                 $resultList[] = [
-                    'type' => 'master',
+                    'type' => 'main',
                     'id' => $class->getId() . '_' . 0,
                     'name' => $class->getName(),
                 ];
@@ -2035,10 +2054,11 @@ class ClassController extends AdminController implements KernelControllerEventIn
      * @Route("/video-supported-types", name="videosupportedTypestypes")
      *
      * @param Request $request
+     * @param TranslatorInterface $translator
      *
      * @return Response
      */
-    public function videoAllowedTypesAction(Request $request)
+    public function videoAllowedTypesAction(Request $request, TranslatorInterface $translator)
     {
         $videoDef = new DataObject\ClassDefinition\Data\Video();
         $res = [];
@@ -2046,7 +2066,7 @@ class ClassController extends AdminController implements KernelControllerEventIn
         foreach ($videoDef->getSupportedTypes() as $type) {
             $res[] = [
                 'key' => $type,
-                'value' => $this->trans($type),
+                'value' => $translator->trans($type, [], 'admin'),
             ];
         }
 

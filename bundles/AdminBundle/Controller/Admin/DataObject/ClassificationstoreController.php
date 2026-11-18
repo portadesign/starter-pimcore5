@@ -15,7 +15,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\DataObject;
 
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Controller\KernelControllerEventInterface;
 use Pimcore\Db;
 use Pimcore\Model\DataObject;
@@ -24,6 +24,7 @@ use Pimcore\Model\DataObject\Classificationstore;
 use Pimcore\Model\Translation;
 use Pimcore\Model\Translation\Listing;
 use Pimcore\Model\User;
+use Pimcore\Security\SecurityHelper;
 use Pimcore\Tool\Admin;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,16 +36,10 @@ use Symfony\Component\Routing\Annotation\Route;
  *
  * @internal
  */
-class ClassificationstoreController extends AdminController implements KernelControllerEventInterface
+class ClassificationstoreController extends AdminAbstractController implements KernelControllerEventInterface
 {
     /**
-     * Delete collection with the group-relations
-     *
      * @Route("/delete-collection", name="deletecollection", methods={"DELETE"})
-     *
-     * @param Request $request
-     *
-     * @return JsonResponse
      */
     public function deleteCollectionAction(Request $request): JsonResponse
     {
@@ -133,7 +128,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
      */
     public function createGroupAction(Request $request): JsonResponse
     {
-        $name = $request->get('name');
+        $name = SecurityHelper::convertHtmlSpecialChars($request->get('name'));
         $storeId = $request->get('storeId');
         $config = Classificationstore\GroupConfig::getByName($name, $storeId);
 
@@ -160,7 +155,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
      */
     public function createStoreAction(Request $request): JsonResponse
     {
-        $name = $request->get('name');
+        $name = SecurityHelper::convertHtmlSpecialChars($request->get('name'));
 
         $config = Classificationstore\StoreConfig::getByName($name);
 
@@ -186,7 +181,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
      */
     public function createCollectionAction(Request $request): JsonResponse
     {
-        $name = $request->get('name');
+        $name = SecurityHelper::convertHtmlSpecialChars($request->get('name'));
         $storeId = $request->get('storeId');
         $config = Classificationstore\CollectionConfig::getByName($name, $storeId);
 
@@ -371,7 +366,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
             $config->save();
 
-            return $this->adminJson(['success' => true, 'data' => $config]);
+            return $this->adminJson(['success' => true, 'data' => $this->getConfigItem($config)]);
         }
 
         return $this->adminJson(['success' => false]);
@@ -533,7 +528,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
             $config->save();
 
-            return $this->adminJson(['success' => true, 'data' => $config]);
+            return $this->adminJson(['success' => true, 'data' => $this->getConfigItem($config)]);
         }
 
         return $this->adminJson(['success' => false]);
@@ -1327,7 +1322,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
         $data = [];
         foreach ($configList as $config) {
-            $item = $this->getConfigItem($config);
+            $item = $this->getKeyConfigItem($config);
             $data[] = $item;
         }
         $rootElement['data'] = $data;
@@ -1363,7 +1358,7 @@ class ClassificationstoreController extends AdminController implements KernelCon
             }
 
             $config->save();
-            $item = $this->getConfigItem($config);
+            $item = $this->getKeyConfigItem($config);
 
             return $this->adminJson(['success' => true, 'data' => $item]);
         }
@@ -1371,31 +1366,16 @@ class ClassificationstoreController extends AdminController implements KernelCon
         return $this->adminJson(['success' => false]);
     }
 
-    /**
-     * @param Classificationstore\KeyConfig $config
-     *
-     * @return array
-     */
-    protected function getConfigItem($config): array
+    protected function getConfigItem(Classificationstore\KeyConfig|Classificationstore\CollectionConfig|Classificationstore\GroupConfig $config): array
     {
         $name = $config->getName();
 
-        $groupDescription = null;
         $item = [
             'storeId' => $config->getStoreId(),
             'id' => $config->getId(),
             'name' => $name,
             'description' => $config->getDescription(),
-            'type' => $config->getType() ? $config->getType() : 'input',
-            'definition' => $config->getDefinition(),
         ];
-
-        if ($config->getDefinition()) {
-            $definition = json_decode($config->getDefinition(), true);
-            if ($definition) {
-                $item['title'] = $definition['title'];
-            }
-        }
 
         if ($config->getCreationDate()) {
             $item['creationDate'] = $config->getCreationDate();
@@ -1403,6 +1383,23 @@ class ClassificationstoreController extends AdminController implements KernelCon
 
         if ($config->getModificationDate()) {
             $item['modificationDate'] = $config->getModificationDate();
+        }
+
+        return $item;
+    }
+
+    protected function getKeyConfigItem(Classificationstore\KeyConfig $config): array
+    {
+        $item = $this->getConfigItem($config);
+        $item['type'] = $config->getType() ? $config->getType() : 'input';
+        $definition = $config->getDefinition();
+        $item['definition'] = $definition;
+
+        if ($definition) {
+            $definition = json_decode($definition, true);
+            if ($definition) {
+                $item['title'] = $definition['title'];
+            }
         }
 
         return $item;

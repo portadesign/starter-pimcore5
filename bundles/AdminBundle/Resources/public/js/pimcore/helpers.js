@@ -14,6 +14,14 @@
 /*global localStorage */
 pimcore.registerNS("pimcore.helpers.x");
 
+pimcore.helpers.sanitizeEmail = function (email) {
+    return email.replace(/[^a-zA-Z0-9_\-@.+]/g,'');
+};
+
+pimcore.helpers.sanitizeUrlSlug = function (slug) {
+    return slug.replace(/[^a-z0-9-_+/]/gi, '');
+};
+
 pimcore.helpers.registerKeyBindings = function (bindEl, ExtJS) {
 
     if (!ExtJS) {
@@ -949,7 +957,7 @@ pimcore.helpers.openMemorizedTabs = function () {
     }
 };
 
-pimcore.helpers.assetSingleUploadDialog = function (parent, parentType, success, failure, context) {
+pimcore.helpers.assetSingleUploadDialog = function (parent, parentType, success, failure, context, uploadAssetType) {
 
     var params = {};
     params['parent' + ucfirst(parentType)] = parent;
@@ -957,6 +965,10 @@ pimcore.helpers.assetSingleUploadDialog = function (parent, parentType, success,
     var url = Routing.generate('pimcore_admin_asset_addassetcompatibility', params);
     if (context) {
         url += "&context=" + Ext.encode(context);
+    }
+
+    if(uploadAssetType) {
+        url += "&uploadAssetType=" + uploadAssetType;
     }
 
     pimcore.helpers.uploadDialog(url, 'Filedata', success, failure);
@@ -1020,7 +1032,12 @@ pimcore.helpers.uploadDialog = function (url, filename, success, failure, descri
             iconCls: 'pimcore_icon_upload'
         },
         listeners: {
-            change: function () {
+            change: function (fileUploadField) {
+                if(fileUploadField.fileInputEl.dom.files[0].size > pimcore.settings["upload_max_filesize"]) {
+                    pimcore.helpers.showNotification(t("error"), t("file_is_bigger_that_upload_limit") + " " + fileUploadField.fileInputEl.dom.files[0].name, "error");
+                    return;
+                }
+
                 uploadForm.getForm().submit({
                     url: url,
                     params: {
@@ -1068,7 +1085,7 @@ pimcore.helpers.getClassForIcon = function (icon) {
 
     var content = styleContainer.dom.innerHTML;
     var classname = "pimcore_dynamic_class_for_icon_" + uniqid();
-    content += ("." + classname + " { background: url(" + icon + ") left center no-repeat !important; background-size: 100% 100% !important; }\n");
+    content += ("." + classname + " { background: url(" + icon + ") left center no-repeat !important; background-size: contain !important; }\n");
     styleContainer.dom.innerHTML = content;
 
     return classname;
@@ -1797,7 +1814,8 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
                     linkTypeField.setValue("direct");
                 }
             }
-        }
+        },
+        renderer: Ext.util.Format.htmlEncode
     });
 
 
@@ -1856,7 +1874,8 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
                             {
                                 fieldLabel: t('text'),
                                 name: 'text',
-                                value: data.text
+                                value: data.text,
+                                renderer: Ext.util.Format.htmlEncode
                             },
                             {
                                 xtype: "fieldcontainer",
@@ -1905,17 +1924,20 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
                                     {
                                         fieldLabel: t('parameters'),
                                         name: 'parameters',
-                                        value: data.parameters
+                                        value: data.parameters,
+                                        renderer: Ext.util.Format.htmlEncode
                                     },
                                     {
                                         fieldLabel: t('anchor'),
                                         name: 'anchor',
-                                        value: data.anchor
+                                        value: data.anchor,
+                                        renderer: Ext.util.Format.htmlEncode
                                     },
                                     {
                                         fieldLabel: t('title'),
                                         name: 'title',
-                                        value: data.title
+                                        value: data.title,
+                                        renderer: Ext.util.Format.htmlEncode
                                     }
                                 ]
                             }
@@ -1930,30 +1952,35 @@ pimcore.helpers.editmode.openLinkEditPanel = function (data, callback) {
                             {
                                 fieldLabel: t('accesskey'),
                                 name: 'accesskey',
-                                value: data.accesskey
+                                value: data.accesskey,
+                                renderer: Ext.util.Format.htmlEncode
                             },
                             {
                                 fieldLabel: t('relation'),
                                 name: 'rel',
                                 width: 300,
-                                value: data.rel
+                                value: data.rel,
+                                renderer: Ext.util.Format.htmlEncode
                             },
                             {
                                 fieldLabel: ('tabindex'),
                                 name: 'tabindex',
-                                value: data.tabindex
+                                value: data.tabindex,
+                                renderer: Ext.util.Format.htmlEncode
                             },
                             {
                                 fieldLabel: t('class'),
                                 name: 'class',
                                 width: 300,
-                                value: data["class"]
+                                value: data["class"],
+                                renderer: Ext.util.Format.htmlEncode
                             },
                             {
                                 fieldLabel: t('attributes') + ' (key="value")',
                                 name: 'attributes',
                                 width: 300,
-                                value: data["attributes"]
+                                value: data["attributes"],
+                                renderer: Ext.util.Format.htmlEncode
                             }
                         ]
                     }
@@ -2285,7 +2312,7 @@ pimcore.helpers.showAbout = function () {
     html += '<br><b>Version: ' + pimcore.settings.version + '</b>';
     html += '<br><b>Git Hash: <a href="https://github.com/pimcore/pimcore/commit/' + pimcore.settings.build + '" target="_blank">' + pimcore.settings.build + '</a></b>';
     html += '<br><br>&copy; by pimcore GmbH (<a href="https://pimcore.com/" target="_blank">pimcore.com</a>)';
-    html += '<br><br><a href="https://github.com/pimcore/pimcore/blob/10.x/LICENSE.md" target="_blank">License</a> | ';
+    html += '<br><br><a href="https://github.com/pimcore/pimcore/blob/10.5/LICENSE.md" target="_blank">License</a> | ';
     html += '<a href="https://pimcore.com/en/about/contact" target="_blank">Contact</a>';
     html += '<img src="/bundles/pimcoreadmin/img/austria-heart.svg" style="position:absolute;top:172px;right:45px;width:32px;">';
     html += '</div>';
@@ -3245,55 +3272,47 @@ pimcore.helpers.deleteConfirm = function (title, name, deleteCallback) {
                 }
             }
         }.bind(this))
-}
-pimcore.helpers.getMatchingElementRestrictions = function(perspectiveConfig, path) {
-    var matchingExtensions = [];
-    if (perspectiveConfig.hasOwnProperty('extension') && perspectiveConfig.extension.hasOwnProperty('elementRestrictions')) {
-        for (var key in perspectiveConfig.extension.elementRestrictions) {
-            if (!perspectiveConfig.extension.elementRestrictions.hasOwnProperty(key)) continue;
-            if (!perspectiveConfig.extension.elementRestrictions[key].hasOwnProperty('path')) continue;
-            if (!path.match(perspectiveConfig.extension.elementRestrictions[key].path.replace(/\//g,'\\/'))) continue;
-            matchingExtensions.push(perspectiveConfig.extension.elementRestrictions[key]);
-        }
-    }
-
-    return matchingExtensions;
 };
 
-pimcore.helpers.isObjectContextMenuOptionRestricted = function(perspectiveConfig, path, option) {
-    var matchingExtensions = pimcore.helpers.getMatchingElementRestrictions(perspectiveConfig, path);
-
-    for (var extKey in matchingExtensions) {
-        if (!matchingExtensions.hasOwnProperty(extKey)) {
-            continue;
-        }
-        if (matchingExtensions[extKey].hasOwnProperty(option)) {
-            return true;
+pimcore.helpers.treeDragDropValidate = function (node, oldParent, newParent) {
+    const disabledLayoutTypes = ['accordion', 'text', 'iframe', 'button']
+    if (newParent.data.editor) {
+        if (disabledLayoutTypes.includes(newParent.data.editor.type)) {
+            return false;
         }
     }
 
-    return false;
+    if (newParent.data.root) {
+        return false;
+    }
+
+    return true;
 };
 
-pimcore.helpers.isObjectContextMenuClassRestricted = function(perspectiveConfig, record, classId) {
-    var cvForbidden = [];
-    var cvAllowed = [];
-    var className = (record.data.hasOwnProperty('className')) ? record.data.className : 'folder';
-    var matchingExtensions = pimcore.helpers.getMatchingElementRestrictions(perspectiveConfig, record.data.path);
+// Sends an Ajax request, it is recommended to be used when doing simple calls or to third-party services, in contrast to Ext.Ajax.request which, by default, sends extra info (eg. custom headers) that are usually needed to be working within Pimcore interface.
+pimcore.helpers.sendRequest = function (
+    method,
+    url,
+    successCallback = function (response) {},
+    failureCallback = function (response) {},
+    alwaysCallback = function (response) {}
+) {
+    const request = new XMLHttpRequest();
 
-    for (var extKey in matchingExtensions) {
-        if (!matchingExtensions.hasOwnProperty(extKey)) continue;
-        if (matchingExtensions[extKey].hasOwnProperty('forbiddenClasses')) {
-            //merges with duplicates, should not matter
-            cvForbidden = cvForbidden.concat(matchingExtensions[extKey].forbiddenClasses.split(","));
+    request.onload = function() {
+        if (this.status >= 200 && this.status < 400) {
+            successCallback(this);
+        } else {
+            failureCallback(this);
         }
-        if (matchingExtensions[extKey].hasOwnProperty('conditionallyAllowedClasses')) {
-            var conditionallyAllowedClasses = JSON.parse(matchingExtensions[extKey].conditionallyAllowedClasses);
-            if (in_array(classId, conditionallyAllowedClasses[className])) {
-                cvAllowed.push(classId);
-            }
-        }
+        alwaysCallback(this);
+    };
+
+    request.onerror = function () {
+        failureCallback(this);
+        alwaysCallback(this);
     }
 
-    return (in_array(classId, cvForbidden) && !in_array(classId, cvAllowed));
+    request.open(method, url);
+    request.send();
 };

@@ -16,9 +16,9 @@
 namespace Pimcore\Bundle\AdminBundle\Security\Authenticator;
 
 use Pimcore\Bundle\AdminBundle\Security\Authentication\Token\TwoFactorRequiredToken;
-use Pimcore\Bundle\AdminBundle\Security\User\User;
 use Pimcore\Cache\RuntimeCache;
 use Pimcore\Model\User as UserModel;
+use Pimcore\Security\User\User;
 use Pimcore\Tool\Admin;
 use Pimcore\Tool\Authentication;
 use Pimcore\Tool\Session;
@@ -68,13 +68,16 @@ abstract class AdminAbstractAuthenticator extends AbstractAuthenticator implemen
      */
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        if ($exception instanceof TooManyLoginAttemptsAuthenticationException) {
-            return new Response(strtr($exception->getMessageKey(), $exception->getMessageData()));
-        }
-
-        $url = $this->router->generate(AdminLoginAuthenticator::PIMCORE_ADMIN_LOGIN, [
+        $requestParameters = [
             'auth_failed' => 'true',
-        ]);
+        ];
+
+        if ($exception instanceof TooManyLoginAttemptsAuthenticationException) {
+            $requestParameters = [
+                'too_many_attempts' => $this->translator->trans($exception->getMessageKey(), $exception->getMessageData(), 'admin'),
+            ];
+        }
+        $url = $this->router->generate(AdminLoginAuthenticator::PIMCORE_ADMIN_LOGIN, $requestParameters);
 
         return new RedirectResponse($url);
     }
@@ -116,7 +119,7 @@ abstract class AdminAbstractAuthenticator extends AbstractAuthenticator implemen
         } else {
             $url = $this->router->generate('pimcore_admin_index', [
                 '_dc' => time(),
-                'perspective' => strip_tags($request->get('perspective')),
+                'perspective' => strip_tags($request->get('perspective', '')),
             ]);
         }
 

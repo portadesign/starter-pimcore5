@@ -25,7 +25,7 @@ use Pimcore\Model\Element;
 /**
  * @method DataObject\Data\ObjectMetadata\Dao getDao()
  */
-class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implements IdRewriterInterface, PreGetDataInterface, LayoutDefinitionEnrichmentInterface
+class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implements IdRewriterInterface, PreGetDataInterface, LayoutDefinitionEnrichmentInterface, ClassSavedInterface
 {
     use DataObject\Traits\ElementWithMetadataComparisonTrait;
     use DataObject\ClassDefinition\Data\Extension\PositionSortTrait;
@@ -416,6 +416,10 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
                     throw new Element\ValidationException('Invalid object relation to object [' . $id . '] in field ' . $this->getName() . ' , tried to assign ' . $o->getId());
                 }
             }
+
+            if ($this->getMaxItems() && count($data) > $this->getMaxItems()) {
+                throw new Element\ValidationException('Number of allowed relations in field `' . $this->getName() . '` exceeded (max. ' . $this->getMaxItems() . ')');
+            }
         }
     }
 
@@ -469,25 +473,12 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
      */
     public function save($object, $params = [])
     {
-        if (!DataObject::isDirtyDetectionDisabled() && $object instanceof Element\DirtyIndicatorInterface) {
-            if ($object instanceof DataObject\Localizedfield) {
-                if ($object->getObject() instanceof Element\DirtyIndicatorInterface) {
-                    if (!$object->hasDirtyFields()) {
-                        return;
-                    }
-                }
-            } else {
-                if ($this->supportsDirtyDetection()) {
-                    if (!$object->isFieldDirty($this->getName())) {
-                        return;
-                    }
-                }
-            }
+        if ($this->skipSaveCheck($object, $params)) {
+            return;
         }
 
         $objectsMetadata = $this->getDataFromObjectParam($object, $params);
 
-        $classId = null;
         $objectId = null;
 
         if ($object instanceof DataObject\Concrete) {
@@ -753,7 +744,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
      * @param DataObject\ClassDefinition $class
      * @param array $params
      */
-    public function classSaved($class, $params = [])
+    public function classSaved($class/**, $params = []**/)
     {
         /** @var DataObject\Data\ObjectMetadata $temp */
         $temp = \Pimcore::getContainer()->get('pimcore.model.factory')
@@ -792,13 +783,28 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     /**
      * {@inheritdoc}
      */
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        if ($mainDefinition instanceof self) {
+            $this->allowedClassId = $mainDefinition->getAllowedClassId();
+            $this->visibleFields = $mainDefinition->getVisibleFields();
+            $this->columns = $mainDefinition->getColumns();
+        }
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     * {@inheritdoc}
+     */
     public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
     {
-        if ($masterDefinition instanceof self) {
-            $this->allowedClassId = $masterDefinition->getAllowedClassId();
-            $this->visibleFields = $masterDefinition->getVisibleFields();
-            $this->columns = $masterDefinition->getColumns();
-        }
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
     }
 
     /**
@@ -824,6 +830,10 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
 
         if (!$this->visibleFields) {
             return $this;
+        }
+
+        if (!isset($context['purpose'])) {
+            $context['purpose'] = 'layout';
         }
 
         $this->visibleFieldDefinitions = [];
@@ -863,8 +873,15 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
                 $this->visibleFieldDefinitions[$field]['fieldtype'] = $fd->getFieldType();
                 $this->visibleFieldDefinitions[$field]['noteditable'] = true;
 
-                if ($fd instanceof DataObject\ClassDefinition\Data\Select || $fd instanceof DataObject\ClassDefinition\Data\Multiselect) {
-                    if ($fd->getOptionsProviderClass()) {
+                if (
+                    $fd instanceof DataObject\ClassDefinition\Data\Select
+                    || $fd instanceof DataObject\ClassDefinition\Data\Multiselect
+                    || $fd instanceof DataObject\ClassDefinition\Data\BooleanSelect
+                ) {
+                    if (
+                        $fd instanceof DataObject\ClassDefinition\Data\Select
+                        || $fd instanceof DataObject\ClassDefinition\Data\Multiselect
+                    ) {
                         $this->visibleFieldDefinitions[$field]['optionsProviderClass'] = $fd->getOptionsProviderClass();
                     }
 
@@ -939,7 +956,14 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     }
 
     /**
-     * {@inheritdoc}
+     * @internal
+     *
+     * @param mixed $originalData
+     * @param mixed $data
+     * @param Concrete $object
+     * @param array $params
+     *
+     * @return array
      */
     protected function processDiffDataForEditMode($originalData, $data, $object = null, $params = [])
     {

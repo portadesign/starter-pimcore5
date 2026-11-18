@@ -572,7 +572,12 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
 
         foreach ($this->getFieldDefinitions() as $fd) {
             //TODO Pimcore 11 remove method_exists call
-            if (!$fd instanceof DataContainerAwareInterface && method_exists($fd, 'classSaved')) {
+            if (!$fd instanceof DataContainerAwareInterface && ($fd instanceof ClassSavedInterface || method_exists($fd, 'classSaved'))) {
+                if (!$fd instanceof ClassSavedInterface) {
+                    trigger_deprecation('pimcore/pimcore', '10.6',
+                        sprintf('Usage of method_exists is deprecated since version 10.6 and will be removed in Pimcore 11.' .
+                        'Implement the %s interface instead.', ClassSavedInterface::class));
+                }
                 $fd->classSaved($class, $params);
             }
         }
@@ -707,11 +712,10 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         }
 
         $enrichedFieldDefinitions = [];
-        if (is_array($this->fieldDefinitionsCache)) {
-            foreach ($this->fieldDefinitionsCache as $key => $fieldDefinition) {
-                $fieldDefinition = $this->doEnrichFieldDefinition($fieldDefinition, $context);
-                $enrichedFieldDefinitions[$key] = $fieldDefinition;
-            }
+
+        foreach ($this->fieldDefinitionsCache ?? [] as $key => $fieldDefinition) {
+            $fieldDefinition = $this->doEnrichFieldDefinition($fieldDefinition, $context);
+            $enrichedFieldDefinitions[$key] = $fieldDefinition;
         }
 
         return $enrichedFieldDefinitions;
@@ -1445,6 +1449,11 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         return null;
     }
 
+    /**
+     * @param array $data
+     *
+     * @return static
+     */
     public static function __set_state($data)
     {
         $obj = new static();

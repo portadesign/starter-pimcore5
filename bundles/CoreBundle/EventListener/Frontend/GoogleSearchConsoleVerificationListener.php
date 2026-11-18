@@ -52,8 +52,8 @@ class GoogleSearchConsoleVerificationListener implements EventSubscriberInterfac
 
         $conf = \Pimcore\Config::getReportConfig();
 
-        if (!is_null($conf->get('webmastertools')) && isset($conf->get('webmastertools')->sites)) {
-            $sites = $conf->get('webmastertools')->sites->toArray();
+        if (!is_null($conf->get('google_search_console')) && isset($conf->get('google_search_console')->sites)) {
+            $sites = $conf->get('google_search_console')->sites->toArray();
 
             if (is_array($sites)) {
                 foreach ($sites as $site) {

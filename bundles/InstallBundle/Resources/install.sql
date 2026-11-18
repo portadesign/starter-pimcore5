@@ -33,6 +33,7 @@ CREATE TABLE `assets` (
   `mimetype` varchar(190) DEFAULT NULL,
   `creationDate` INT(11) UNSIGNED DEFAULT NULL,
   `modificationDate` INT(11) UNSIGNED DEFAULT NULL,
+  `dataModificationDate` INT(11) UNSIGNED DEFAULT NULL,
   `userOwner` int(11) unsigned DEFAULT NULL,
   `userModification` int(11) unsigned DEFAULT NULL,
   `customSettings` longtext,
@@ -204,7 +205,7 @@ CREATE TABLE `documents_page` (
   `description` varchar(383) DEFAULT NULL,
   `metaData` text,
   `prettyUrl` varchar(255) DEFAULT NULL,
-  `contentMasterDocumentId` int(11) DEFAULT NULL,
+  `contentMainDocumentId` int(11) DEFAULT NULL,
   `targetGroupIds` varchar(255) NOT NULL DEFAULT '',
   `missingRequiredEditable` tinyint(1) unsigned DEFAULT NULL,
   `staticGeneratorEnabled` tinyint(1) unsigned DEFAULT NULL,
@@ -219,7 +220,7 @@ CREATE TABLE `documents_snippet` (
   `id` int(11) unsigned NOT NULL DEFAULT '0',
   `controller` varchar(500) DEFAULT NULL,
   `template` varchar(255) DEFAULT NULL,
-  `contentMasterDocumentId` int(11) DEFAULT NULL,
+  `contentMainDocumentId` int(11) DEFAULT NULL,
   `missingRequiredEditable` tinyint(1) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_documents_snippet_documents` FOREIGN KEY (`id`) REFERENCES `documents` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
@@ -243,7 +244,7 @@ CREATE TABLE `documents_printpage` (
   `template` varchar(255) DEFAULT NULL,
   `lastGenerated` int(11) DEFAULT NULL,
   `lastGenerateMessage` text,
-  `contentMasterDocumentId` int(11) DEFAULT NULL,
+  `contentMainDocumentId` int(11) DEFAULT NULL,
   `missingRequiredEditable` tinyint(1) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_documents_printpage_documents` FOREIGN KEY (`id`) REFERENCES `documents` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
@@ -264,8 +265,8 @@ CREATE TABLE `edit_lock` (
 ) DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `email_blacklist`;
-CREATE TABLE `email_blacklist` (
+DROP TABLE IF EXISTS `email_blocklist`;
+CREATE TABLE `email_blocklist` (
   `address` varchar(190) NOT NULL DEFAULT '',
   `creationDate` int(11) unsigned DEFAULT NULL,
   `modificationDate` int(11) unsigned DEFAULT NULL,
@@ -357,11 +358,13 @@ CREATE TABLE `notes` (
 
 DROP TABLE IF EXISTS `notes_data`;
 CREATE TABLE `notes_data` (
+  `auto_id` int(11) NOT NULL AUTO_INCREMENT,
   `id` int(11) NOT NULL,
   `name` varchar(255) NOT NULL,
   `type` enum('text','date','document','asset','object','bool') DEFAULT NULL,
   `data` text,
-  PRIMARY KEY (`id`, `name`)
+  PRIMARY KEY (`auto_id`),
+  UNIQUE KEY `UNIQ_E5A8E5E2BF3967505E237E06` (`id`,`name`)
 ) DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `objects`;
@@ -646,6 +649,7 @@ CREATE TABLE `users` (
   `docTypes` text DEFAULT NULL,
   `classes` text DEFAULT NULL,
   `twoFactorAuthentication` varchar(255) DEFAULT NULL,
+  `provider` varchar(255) DEFAULT NULL,
 	`activePerspective` VARCHAR(255) NULL DEFAULT NULL,
 	`perspectives` LONGTEXT NULL DEFAULT NULL,
 	`websiteTranslationLanguagesEdit` LONGTEXT NULL DEFAULT NULL,
@@ -901,6 +905,7 @@ CREATE TABLE `gridconfigs` (
 	`creationDate` INT(11) NULL,
 	`modificationDate` INT(11) NULL,
 	`shareGlobally` TINYINT(1) NULL,
+	`setAsFavourite` TINYINT(1) NULL,
 	PRIMARY KEY (`id`),
 	INDEX `ownerId` (`ownerId`),
 	INDEX `classId` (`classId`),

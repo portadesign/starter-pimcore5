@@ -131,7 +131,7 @@ class Multiselect extends Data implements
     public $dynamicOptions = false;
 
     /**
-     * @return array
+     * @return array|null
      */
     public function getOptions()
     {
@@ -239,7 +239,7 @@ class Multiselect extends Data implements
     /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
-     * @param array|null $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
@@ -257,9 +257,9 @@ class Multiselect extends Data implements
     /**
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
-     * @param string|null $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return array|null
      */
@@ -275,9 +275,9 @@ class Multiselect extends Data implements
     /**
      * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
-     * @param array $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return string|null
      */
@@ -293,9 +293,9 @@ class Multiselect extends Data implements
     /**
      * @see Data::getDataForEditmode
      *
-     * @param array|null $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return string|null
      */
@@ -311,9 +311,9 @@ class Multiselect extends Data implements
     /**
      * @param array $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
-     * @return array|string
+     * @return array|string|null
      */
     public function getDataForGrid($data, $object = null, $params = [])
     {
@@ -348,11 +348,11 @@ class Multiselect extends Data implements
     /**
      * @see Data::getDataFromEditmode
      *
-     * @param string $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
-     * @return string
+     * @return mixed
      */
     public function getDataFromEditmode($data, $object = null, $params = [])
     {
@@ -360,14 +360,28 @@ class Multiselect extends Data implements
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function getDiffDataFromEditmode($data, $object = null, $params = []): ?array
+    {
+        $data = $data[0]['data'];
+        if (is_string($data) && $data !== '') {
+            return explode(',', $data);
+        }
+
+        return null;
+    }
+
+    /**
      * @see Data::getVersionPreview
      *
-     * @param array|null $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
-     * @return string|null
+     * @return string|null (will be string)
      */
+    #[\ReturnTypeWillChange]
     public function getVersionPreview($data, $object = null, $params = [])
     {
         if (is_array($data)) {
@@ -422,9 +436,9 @@ class Multiselect extends Data implements
     /**
      * returns sql query statement to filter according to this data types value(s)
      *
-     * @param  string $value
-     * @param  string $operator
-     * @param  array $params
+     * @param mixed $value
+     * @param string $operator
+     * @param array $params
      *
      * @return string
      */
@@ -446,11 +460,12 @@ class Multiselect extends Data implements
      * @param string $operator
      * @param array $params optional params used to change the behavior
      *
-     * @return string|null
+     * @return string|null (will be string)
      */
+    #[\ReturnTypeWillChange]
     public function getFilterConditionExt($value, $operator, $params = [])
     {
-        if ($operator === '=') {
+        if ($operator === '=' || $operator === 'LIKE') {
             $name = $params['name'] ? $params['name'] : $this->name;
 
             $db = \Pimcore\Db::get();
@@ -467,7 +482,9 @@ class Multiselect extends Data implements
                 return $key . ' LIKE ' . implode(' OR ' . $key . ' LIKE ', $values);
             }
 
-            $value = "'%,".$value.",%'";
+            $value = $operator === '='
+                ? "'%,".$value.",%'"
+                : "'%,%".$value."%,%'";
 
             return $key.' LIKE '.$value.' ';
         }
@@ -488,7 +505,7 @@ class Multiselect extends Data implements
      *
      * @param array|null $data
      * @param DataObject\Concrete|null $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return array|string
      */
@@ -522,12 +539,29 @@ class Multiselect extends Data implements
     }
 
     /**
+     * @param DataObject\ClassDefinition\Data\Multiselect $mainDefinition (will be DataObject\ClassDefinition\Data)
+     */
+    #[\ReturnTypeWillChange]
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        $this->maxItems = $mainDefinition->maxItems;
+        $this->options = $mainDefinition->options;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param DataObject\ClassDefinition\Data\Multiselect $masterDefinition
      */
     public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
     {
-        $this->maxItems = $masterDefinition->maxItems;
-        $this->options = $masterDefinition->options;
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
     }
 
     /**
@@ -580,8 +614,8 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @param array|null $existingData
-     * @param array $removeData
+     * @param mixed $existingData
+     * @param mixed $removeData
      *
      * @return array
      */
@@ -605,8 +639,8 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @param array|null $value1
-     * @param array|null $value2
+     * @param mixed $value1
+     * @param mixed $value2
      *
      * @return bool
      */
@@ -717,7 +751,7 @@ class Multiselect extends Data implements
     }
 
     /**
-     * { @inheritdoc }
+     * {@inheritdoc}
      */
     public function enrichFieldDefinition(/** array */ $context = []) /** : static */
     {

@@ -47,13 +47,20 @@ final class Config
             $containerConfig = \Pimcore::getContainer()->getParameter('pimcore.config');
             $config = $containerConfig[self::CONFIG_ID]['definitions'];
 
+            $storageConfig = LocationAwareConfigRepository::getStorageConfigurationCompatibilityLayer(
+                $containerConfig,
+                self::CONFIG_ID,
+                'PIMCORE_CONFIG_STORAGE_DIR_PERSPECTIVES',
+                'PIMCORE_WRITE_TARGET_PERSPECTIVES'
+            );
+
             self::$locationAwareConfigRepository = new LocationAwareConfigRepository(
                 $config,
                 'pimcore_perspectives',
-                $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_PERSPECTIVES'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/perspectives',
-                'PIMCORE_WRITE_TARGET_PERSPECTIVES',
+                $storageConfig,
                 null,
-                self::LEGACY_FILE,
+                null,
+                self::LEGACY_FILE
             );
         }
 
@@ -271,9 +278,9 @@ final class Config
      */
     protected static function getRuntimeElementTreeConfig($name)
     {
-        $masterConfig = self::get()->toArray();
+        $mainConfig = self::get()->toArray();
 
-        $config = $masterConfig[$name] ?? [];
+        $config = $mainConfig[$name] ?? [];
 
         $tmpResult = $config['elementTree'] ?? [];
 
@@ -352,7 +359,7 @@ final class Config
     public static function getAvailablePerspectives($user)
     {
         $currentConfigName = null;
-        $masterConfig = self::get()->toArray();
+        $mainConfig = self::get()->toArray();
 
         if ($user instanceof User) {
             if ($user->isAdmin()) {
@@ -373,9 +380,9 @@ final class Config
                         $perspectives = $userOrRoleToCheck->getPerspectives();
                         if ($perspectives) {
                             foreach ($perspectives as $perspectiveName) {
-                                $masterDef = $masterConfig[$perspectiveName] ?? null;
-                                if ($masterDef) {
-                                    $config[$perspectiveName] = $masterDef;
+                                $mainDef = $mainConfig[$perspectiveName] ?? null;
+                                if ($mainDef) {
+                                    $config[$perspectiveName] = $mainDef;
                                 }
                             }
                         }
@@ -391,9 +398,9 @@ final class Config
                 $validPerspectiveNames = array_keys($config);
 
                 // sort the stuff
-                foreach ($masterConfig as $masterConfigName => $masterConfiguration) {
-                    if (in_array($masterConfigName, $validPerspectiveNames)) {
-                        $tmpConfig[$masterConfigName] = $masterConfiguration;
+                foreach ($mainConfig as $mainConfigName => $mainConfiguration) {
+                    if (in_array($mainConfigName, $validPerspectiveNames)) {
+                        $tmpConfig[$mainConfigName] = $mainConfiguration;
                     }
                 }
                 $config = $tmpConfig;

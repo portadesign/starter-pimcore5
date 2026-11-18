@@ -20,6 +20,7 @@ namespace Pimcore\Routing\Dynamic;
 use Pimcore\Bundle\CoreBundle\EventListener\Frontend\ElementListener;
 use Pimcore\Config;
 use Pimcore\Http\Request\Resolver\SiteResolver;
+use Pimcore\Http\RequestHelper;
 use Pimcore\Model\DataObject;
 use Pimcore\Routing\DataObjectRoute;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
@@ -36,19 +37,27 @@ final class DataObjectRouteHandler implements DynamicRouteHandlerInterface
     private $siteResolver;
 
     /**
+     * @var RequestHelper
+     */
+    private $requestHelper;
+
+    /**
      * @var Config
      */
     private $config;
 
     /**
      * @param SiteResolver $siteResolver
+     * @param RequestHelper $requestHelper
      * @param Config $config
      */
     public function __construct(
         SiteResolver $siteResolver,
+        RequestHelper $requestHelper,
         Config $config
     ) {
         $this->siteResolver = $siteResolver;
+        $this->requestHelper = $requestHelper;
         $this->config = $config;
     }
 
@@ -58,10 +67,10 @@ final class DataObjectRouteHandler implements DynamicRouteHandlerInterface
     public function getRouteByName(string $name)
     {
         if (preg_match('/^data_object_(\d+)_(\d+)_(.*)$/', $name, $match)) {
-            $slug = DataObject\Data\UrlSlug::resolveSlug($match[3], $match[2]);
+            $slug = DataObject\Data\UrlSlug::resolveSlug($match[3], (int) $match[2]);
             if ($slug && $slug->getObjectId() == $match[1]) {
                 /** @var DataObject\Concrete $object * */
-                $object = DataObject::getById($match[1]);
+                $object = DataObject::getById((int) $match[1]);
                 if ($object instanceof DataObject\Concrete && $object->isPublished()) {
                     return $this->buildRouteForFromSlug($slug, $object);
                 }
@@ -80,9 +89,14 @@ final class DataObjectRouteHandler implements DynamicRouteHandlerInterface
         $slug = DataObject\Data\UrlSlug::resolveSlug($context->getOriginalPath(), $site ? $site->getId() : 0);
         if ($slug) {
             $object = DataObject::getById($slug->getObjectId());
-            if ($object instanceof DataObject\Concrete && $object->isPublished()) {
-                $route = $this->buildRouteForFromSlug($slug, $object);
-                $collection->add($route->getRouteKey(), $route);
+
+            if ($object instanceof DataObject\Concrete) {
+                $doBuildRoute = $object->isPublished() || $this->requestHelper->isObjectPreviewRequestByAdmin($context->getRequest());
+
+                if ($doBuildRoute) {
+                    $route = $this->buildRouteForFromSlug($slug, $object);
+                    $collection->add($route->getRouteKey(), $route);
+                }
             }
         }
     }

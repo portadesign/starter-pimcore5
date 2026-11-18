@@ -30,6 +30,26 @@ class TargetGroup extends Model\DataObject\ClassDefinition\Data\Select
      */
     public $fieldtype = 'targetGroup';
 
+    public function __wakeup(): void
+    {
+        $this->init();
+    }
+
+    /**
+     * @internal
+     *
+     * @return $this
+     */
+    private function init(): static
+    {
+        $options = $this->getOptions();
+        if (empty($options)) {
+            $this->configureOptions();
+        }
+
+        return $this;
+    }
+
     /**
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
@@ -37,7 +57,7 @@ class TargetGroup extends Model\DataObject\ClassDefinition\Data\Select
      * @param null|Model\DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return null|string|int
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
@@ -59,10 +79,11 @@ class TargetGroup extends Model\DataObject\ClassDefinition\Data\Select
      * @param Model\DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return null|string
+     * @return null|string|int
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
+        $this->init();
         if (!empty($data)) {
             try {
                 $this->checkValidity($data, true, $params);
@@ -123,8 +144,7 @@ class TargetGroup extends Model\DataObject\ClassDefinition\Data\Select
     public static function __set_state($data)
     {
         $obj = parent::__set_state($data);
-        $options = $obj->getOptions();
-        if (\Pimcore::inAdmin() || empty($options)) {
+        if (\Pimcore::inAdmin()) {
             $obj->configureOptions();
         }
 

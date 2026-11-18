@@ -39,6 +39,7 @@ use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Bundle\WebProfilerBundle\WebProfilerBundle;
 use Symfony\Cmf\Bundle\RoutingBundle\CmfRoutingBundle;
+use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Config\Resource\FileExistenceResource;
 use Symfony\Component\Config\Resource\FileResource;
@@ -49,6 +50,7 @@ use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpKernel\Bundle\BundleInterface;
 use Symfony\Component\HttpKernel\Kernel as SymfonyKernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
+use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
 
 abstract class Kernel extends SymfonyKernel
 {
@@ -57,6 +59,8 @@ abstract class Kernel extends SymfonyKernel
 
         registerBundles as microKernelRegisterBundles;
     }
+
+    private const CONFIG_LOCATION = 'config_location';
 
     /**
      * @deprecated will be removed in Pimcore 11
@@ -181,31 +185,31 @@ abstract class Kernel extends SymfonyKernel
         $configArray = [
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_IMAGE_THUMBNAILS',
-                'defaultStorageDirectoryName' => 'image-thumbnails',
+                'defaultStorageDirectoryName' => 'image_thumbnails',
             ],
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_VIDEO_THUMBNAILS',
-                'defaultStorageDirectoryName' => 'video-thumbnails',
+                'defaultStorageDirectoryName' => 'video_thumbnails',
             ],
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_CUSTOM_REPORTS',
-                'defaultStorageDirectoryName' => 'custom-reports',
+                'defaultStorageDirectoryName' => 'custom_reports',
             ],
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_DOCUMENT_TYPES',
-                'defaultStorageDirectoryName' => 'document-types',
+                'defaultStorageDirectoryName' => 'document_types',
             ],
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_WEB_TO_PRINT',
-                'defaultStorageDirectoryName' => 'web-to-print',
+                'defaultStorageDirectoryName' => 'web_to_print',
             ],
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_PREDEFINED_PROPERTIES',
-                'defaultStorageDirectoryName' => 'predefined-properties',
+                'defaultStorageDirectoryName' => 'predefined_properties',
             ],
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_PREDEFINED_ASSET_METADATA',
-                'defaultStorageDirectoryName' => 'predefined-asset-metadata',
+                'defaultStorageDirectoryName' => 'predefined_asset_metadata',
             ],
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_STATICROUTES',
@@ -217,18 +221,52 @@ abstract class Kernel extends SymfonyKernel
             ],
             [
                 'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_CUSTOM_VIEWS',
-                'defaultStorageDirectoryName' => 'custom-views',
+                'defaultStorageDirectoryName' => 'custom_views',
             ],
         ];
 
-        foreach ($configArray as $config) {
-            $configDir = rtrim($_SERVER[$config['storageDirectoryEnvVariableName']] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/' . $config['defaultStorageDirectoryName'], '/\\');
-            $configDir = "$configDir/";
-            if (is_dir($configDir)) {
-                // @phpstan-ignore-next-line
-                $loader->import($configDir);
+        $loader->load(function (ContainerBuilder $container) use ($loader, $configArray) {
+            $containerConfig = $container->getExtensionConfig('pimcore');
+            $containerConfig = array_merge(...$containerConfig);
+
+            $processor = new Processor();
+            // @phpstan-ignore-next-line
+            $configuration = $container->getExtension('pimcore')->getConfiguration($containerConfig, $container);
+            $containerConfig = $processor->processConfiguration($configuration, ['pimcore' => $containerConfig]);
+
+            $resolvingBag = $container->getParameterBag();
+            $containerConfig = $resolvingBag->resolveValue($containerConfig);
+
+            if (!array_key_exists(self::CONFIG_LOCATION, $containerConfig)) {
+                return;
             }
+
+            foreach ($configArray as $config) {
+                $configKey = $config['defaultStorageDirectoryName'];
+                if (!isset($containerConfig[self::CONFIG_LOCATION][$configKey])) {
+                    continue;
+                }
+
+                $configDir = rtrim(self::getStorageDirectoryFromSymfonyConfig($containerConfig, $configKey, $config['storageDirectoryEnvVariableName']), '/\\');
+                $configDir = "$configDir/";
+                if (is_dir($configDir)) {
+                    // @phpstan-ignore-next-line
+                    $loader->import($configDir);
+                }
+            }
+        });
+    }
+
+    private static function getStorageDirectoryFromSymfonyConfig(array $config, string $configKey, string $storageDir): string
+    {
+        if (isset($_SERVER[$storageDir])) {
+            trigger_deprecation('pimcore/pimcore', '10.6',
+                sprintf('Setting storage directory (%s) in the .env file is deprecated, instead use the symfony config. It will be removed in Pimcore 11.', $storageDir));
+
+            return $_SERVER[$storageDir];
         }
+
+        return $config[self::CONFIG_LOCATION][$configKey]['write_target']['options']['directory'];
     }
 
     /**
@@ -393,6 +431,7 @@ abstract class Kernel extends SymfonyKernel
             new FrameworkBundle(),
             new SecurityBundle(),
             new TwigBundle(),
+            new TwigExtraBundle(),
             new MonologBundle(),
             new DoctrineBundle(),
             new DoctrineMigrationsBundle(),

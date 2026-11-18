@@ -15,6 +15,9 @@
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data\Extension;
 
+/**
+ * @deprecated Will be removed with Pimcore 11. Please implement getColumnType() on your data-type class instead.
+ */
 trait ColumnType
 {
     /**

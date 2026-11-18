@@ -76,7 +76,7 @@ class Dao extends Model\Dao\AbstractDao
     {
         $context = $this->model->getContext();
         if ($context) {
-            $containerType = $context['containerType'];
+            $containerType = $context['containerType'] ?? null;
             if ($containerType == 'objectbrick') {
                 $containerKey = $context['containerKey'];
 
@@ -425,7 +425,7 @@ class Dao extends Model\Dao\AbstractDao
                     if ($context['containerType'] === 'objectbrick') {
                         $inheritanceRelationContext = [
                             'ownertype' => 'localizedfield',
-                            'ownername' => '/objectbrick~' . $context['fieldname'] . '//localizedfield~localizedfield',
+                            'ownername' => '/objectbrick~' . $context['fieldname'] . '/' . $context['containerKey'] . '/localizedfield~localizedfield',
                         ];
                     } else {
                         $inheritanceRelationContext = [
@@ -561,7 +561,7 @@ class Dao extends Model\Dao\AbstractDao
 
         if ($container instanceof DataObject\Fieldcollection\Definition) {
             $objectId = $object->getId();
-            $index = $context['index'] ?? null;
+            $index = $context['index'] ?? $context['containerKey'] ?? null;
             $containerName = $context['fieldname'];
             if (!$context['containerType']) {
                 throw new \Exception('no container type set');

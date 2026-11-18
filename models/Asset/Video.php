@@ -67,7 +67,7 @@ class Video extends Model\Asset
     /**
      * @internal
      *
-     * @param string|Video\Thumbnail\Config $config
+     * @param null|string|Video\Thumbnail\Config $config
      *
      * @return Video\Thumbnail\Config|null
      *
@@ -124,8 +124,7 @@ class Video extends Model\Asset
                     return $customSetting[$thumbnail->getName()];
                 }
             } catch (\Exception $e) {
-                Logger::error("Couldn't create thumbnail of video " . $this->getRealFullPath());
-                Logger::error((string) $e);
+                Logger::error("Couldn't create thumbnail of video " . $this->getRealFullPath() . ': ' . $e);
             }
         }
 
@@ -139,7 +138,7 @@ class Video extends Model\Asset
      */
     private function enrichThumbnailPath($path)
     {
-        $fullPath = rtrim($this->getRealPath(), '/') . $path;
+        $fullPath = rtrim($this->getRealPath(), '/') . '/' . ltrim($path, '/');
 
         if (Tool::isFrontend()) {
             $path = urlencode_ignore_slash($fullPath);
@@ -222,7 +221,7 @@ class Video extends Model\Asset
     }
 
     /**
-     * @return int|null
+     * @return float|null
      */
     public function getDuration()
     {

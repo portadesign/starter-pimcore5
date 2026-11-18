@@ -116,6 +116,12 @@ final class DocumentRouteHandler implements DynamicRouteHandlerInterface
      */
     public function addDirectRouteDocumentType($type)
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.1',
+            'The DocumentRouteHandler::addDirectRouteDocumentType() method is deprecated, use pimcore.routing.direct_route_document_types config instead.'
+        );
+
         if (!in_array($type, $this->getDirectRouteDocumentTypes())) {
             $this->directRouteDocumentTypes[] = $type;
         }
@@ -127,7 +133,7 @@ final class DocumentRouteHandler implements DynamicRouteHandlerInterface
     public function getRouteByName(string $name)
     {
         if (preg_match('/^document_(\d+)$/', $name, $match)) {
-            $document = Document::getById($match[1]);
+            $document = Document::getById((int) $match[1]);
 
             if ($this->isDirectRouteDocument($document)) {
                 return $this->buildRouteForDocument($document);

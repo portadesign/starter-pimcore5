@@ -15,6 +15,7 @@ services:
             $unauthenticatedRoutes: '%pimcore.admin.unauthenticated_routes%'
 
     Pimcore\Bundle\AdminBundle\EventListener\CsrfProtectionListener: ~
+
     #
     # EXCEPTION HANDLING
     #
@@ -24,19 +25,21 @@ services:
     #
     # GRID CONFIG CLEANUP
     #
+
     Pimcore\Bundle\AdminBundle\EventListener\GridConfigListener: ~
 
     #
     # IMPORT CONFIG CLEANUP
     #
-    Pimcore\Bundle\AdminBundle\EventListener\ImportConfigListener: ~
 
+    Pimcore\Bundle\AdminBundle\EventListener\ImportConfigListener: ~
 
     #
     # MISC
     #
 
     Pimcore\Bundle\AdminBundle\EventListener\AdminSessionBagListener: ~
+
     Pimcore\Bundle\AdminBundle\EventListener\HttpCacheListener: ~
 
     Pimcore\Bundle\AdminBundle\EventListener\CustomAdminEntryPointCheckListener:

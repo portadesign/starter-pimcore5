@@ -20,6 +20,7 @@ use Pimcore\Cache\RuntimeCache;
 use Pimcore\Event\DocumentEvents;
 use Pimcore\Event\FrontendEvents;
 use Pimcore\Event\Model\DocumentEvent;
+use Pimcore\Loader\ImplementationLoader\Exception\UnsupportedException;
 use Pimcore\Logger;
 use Pimcore\Model\Document\Hardlink\Wrapper\WrapperInterface;
 use Pimcore\Model\Document\Listing;
@@ -226,7 +227,7 @@ class Document extends Element\AbstractElement
     }
 
     /**
-     * @param int $id
+     * @param int|string $id
      * @param array|bool $force
      *
      * @return static|null
@@ -262,20 +263,38 @@ class Document extends Element\AbstractElement
                 return null;
             }
 
-            $className = 'Pimcore\\Model\\Document\\' . ucfirst($document->getType());
+            try {
+                // Getting classname from document resolver
 
-            // this is the fallback for custom document types using prefixes
-            // so we need to check if the class exists first
-            if (!Tool::classExists($className)) {
-                $oldStyleClass = 'Document_' . ucfirst($document->getType());
-                if (Tool::classExists($oldStyleClass)) {
-                    $className = $oldStyleClass;
+                if(!$className = \Pimcore::getContainer()->get('pimcore.class.resolver.document')->resolve($document->getType())) {
+                    throw new UnsupportedException();
+                }
+            } catch(UnsupportedException $ex) {
+                trigger_deprecation(
+                    'pimcore/pimcore',
+                    '10.6.0',
+                    sprintf('%s - Loading documents via fixed namespace is deprecated and will be removed in Pimcore 11. Use pimcore:type_definitions instead', $ex->getMessage())
+                );
+                /**
+                 * @deprecated since Pimcore 10.6 and will be removed in Pimcore 11. Use type_definitions instead
+                 */
+                $className = 'Pimcore\\Model\\Document\\' . ucfirst($document->getType());
+
+                // this is the fallback for custom document types using prefixes
+                // so we need to check if the class exists first
+                if (!Tool::classExists($className)) {
+                    $oldStyleClass = 'Document_' . ucfirst($document->getType());
+                    if (Tool::classExists($oldStyleClass)) {
+                        $className = $oldStyleClass;
+                    }
                 }
             }
 
-            if (get_class($document) !== $className) {
-                /** @var Document $document */
-                $document = self::getModelFactory()->build($className);
+            /** @var Document $newDocument */
+            $newDocument = self::getModelFactory()->build($className);
+
+            if (get_class($document) !== get_class($newDocument)) {
+                $document = $newDocument;
                 $document->getDao()->getById($id);
             }
 
@@ -822,7 +841,7 @@ class Document extends Element\AbstractElement
 
         // check if this document is also the site root, if so return /
         try {
-            if (!$link && \Pimcore\Tool::isFrontend() && Site::isSiteRequest()) {
+            if (!$link && Tool::isFrontend() && Site::isSiteRequest()) {
                 $site = Site::getCurrentSite();
                 if ($site instanceof Site) {
                     if ($site->getRootDocument()->getId() == $this->getId()) {
@@ -835,7 +854,8 @@ class Document extends Element\AbstractElement
         }
 
         $requestStack = \Pimcore::getContainer()->get('request_stack');
-        $masterRequest = $requestStack->getMainRequest();
+        $mainRequest = $requestStack->getMainRequest();
+        $request = $requestStack->getCurrentRequest();
 
         // @TODO please forgive me, this is the dirtiest hack I've ever made :(
         // if you got confused by this functionality drop me a line and I'll buy you some beers :)
@@ -846,49 +866,56 @@ class Document extends Element\AbstractElement
         // the hardlink there are snippets embedded and this snippets have links pointing to a document which is also
         // inside the hardlink scope, but this is an ID link, so we cannot rewrite the link the usual way because in the
         // snippet / link we don't know anymore that whe a inside a hardlink wrapped document
-        if (!$link && \Pimcore\Tool::isFrontend() && Site::isSiteRequest() && !FrontendTool::isDocumentInCurrentSite($this)) {
-            if ($masterRequest && ($masterDocument = $masterRequest->get(DynamicRouter::CONTENT_KEY))) {
-                if ($masterDocument instanceof WrapperInterface) {
-                    $hardlinkPath = '';
-                    $hardlink = $masterDocument->getHardLinkSource();
-                    $hardlinkTarget = $hardlink->getSourceDocument();
-
-                    if ($hardlinkTarget) {
-                        $hardlinkPath = preg_replace('@^' . preg_quote(Site::getCurrentSite()->getRootPath(), '@') . '@', '', $hardlink->getRealFullPath());
-
-                        $link = preg_replace('@^' . preg_quote($hardlinkTarget->getRealFullPath(), '@') . '@',
-                            $hardlinkPath, $this->getRealFullPath());
-                    }
-
-                    if (strpos($this->getRealFullPath(), Site::getCurrentSite()->getRootDocument()->getRealFullPath()) === false && strpos($link, $hardlinkPath) === false) {
-                        $link = null;
-                    }
-                }
+        if (!$link && Tool::isFrontend()) {
+            $differentDomain = false;
+            $site = FrontendTool::getSiteForDocument($this);
+            if (Tool::isFrontendRequestByAdmin() && $site instanceof Site) {
+                $differentDomain = $site->getMainDomain() != $request->getHost();
             }
 
-            if (!$link) {
-                $config = \Pimcore\Config::getSystemConfiguration('general');
-                $request = $requestStack->getCurrentRequest();
-                $scheme = 'http://';
-                if ($request) {
-                    $scheme = $request->getScheme() . '://';
-                }
+            if ((Site::isSiteRequest() && !FrontendTool::isDocumentInCurrentSite($this))
+                || $differentDomain) {
+                if ($mainRequest && ($mainDocument = $mainRequest->get(DynamicRouter::CONTENT_KEY))) {
+                    if ($mainDocument instanceof WrapperInterface) {
+                        $hardlinkPath = '';
+                        $hardlink = $mainDocument->getHardLinkSource();
+                        $hardlinkTarget = $hardlink->getSourceDocument();
 
-                /** @var Site $site */
-                if ($site = FrontendTool::getSiteForDocument($this)) {
-                    if ($site->getMainDomain()) {
-                        // check if current document is the root of the different site, if so, preg_replace below doesn't work, so just return /
-                        if ($site->getRootDocument()->getId() == $this->getId()) {
-                            $link = $scheme . $site->getMainDomain() . '/';
-                        } else {
-                            $link = $scheme . $site->getMainDomain() .
-                                preg_replace('@^' . $site->getRootPath() . '/@', '/', $this->getRealFullPath());
+                        if ($hardlinkTarget) {
+                            $hardlinkPath = preg_replace('@^' . preg_quote(Site::getCurrentSite()->getRootPath(), '@') . '@', '', $hardlink->getRealFullPath());
+
+                            $link = preg_replace('@^' . preg_quote($hardlinkTarget->getRealFullPath(), '@') . '@',
+                                $hardlinkPath, $this->getRealFullPath());
+                        }
+
+                        if (strpos($this->getRealFullPath(), Site::getCurrentSite()->getRootDocument()->getRealFullPath()) === false && strpos($link, $hardlinkPath) === false) {
+                            $link = null;
                         }
                     }
                 }
 
-                if (!$link && !empty($config['domain']) && !($this instanceof WrapperInterface)) {
-                    $link = $scheme . $config['domain'] . $this->getRealFullPath();
+                if (!$link) {
+                    $config = \Pimcore\Config::getSystemConfiguration('general');
+                    $scheme = 'http://';
+                    if ($request) {
+                        $scheme = $request->getScheme() . '://';
+                    }
+
+                    if ($site) {
+                        if ($site->getMainDomain()) {
+                            // check if current document is the root of the different site, if so, preg_replace below doesn't work, so just return /
+                            if ($site->getRootDocument()->getId() == $this->getId()) {
+                                $link = $scheme . $site->getMainDomain() . '/';
+                            } else {
+                                $link = $scheme . $site->getMainDomain() .
+                                    preg_replace('@^' . $site->getRootPath() . '/@', '/', $this->getRealFullPath());
+                            }
+                        }
+                    }
+
+                    if (!$link && !empty($config['domain']) && !($this instanceof WrapperInterface)) {
+                        $link = $scheme . $config['domain'] . $this->getRealFullPath();
+                    }
                 }
             }
         }
@@ -897,8 +924,8 @@ class Document extends Element\AbstractElement
             $link = $this->getPath() . $this->getKey();
         }
 
-        if ($masterRequest) {
-            // caching should only be done when master request is available as it is done for performance reasons
+        if ($mainRequest) {
+            // caching should only be done when main request is available as it is done for performance reasons
             // of the web frontend, without a request object there's no need to cache anything
             // for details also see https://github.com/pimcore/pimcore/issues/5707
             $this->fullPathCache = $link;
@@ -916,7 +943,7 @@ class Document extends Element\AbstractElement
      */
     private function prepareFrontendPath($path)
     {
-        if (\Pimcore\Tool::isFrontend()) {
+        if (Tool::isFrontend()) {
             $path = urlencode_ignore_slash($path);
 
             $event = new GenericEvent($this, [
@@ -944,7 +971,7 @@ class Document extends Element\AbstractElement
     {
         // check for site, if so rewrite the path for output
         try {
-            if (\Pimcore\Tool::isFrontend() && Site::isSiteRequest()) {
+            if (Tool::isFrontend() && Site::isSiteRequest()) {
                 $site = Site::getCurrentSite();
                 if ($site instanceof Site) {
                     if ($site->getRootDocument() instanceof Document\Page && $site->getRootDocument() !== $this) {

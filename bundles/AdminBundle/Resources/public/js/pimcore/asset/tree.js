@@ -68,10 +68,17 @@ pimcore.asset.tree = Class.create({
 
         var itemsPerPage = pimcore.settings['asset_tree_paging_limit'];
 
-        rootNodeConfig.text = t("home");
+        let rootNodeConfigText = t('home');
+        let rootNodeConfigIconCls = "pimcore_icon_home";
+        if(this.config.customViewId !== undefined && rootNodeConfig.id !== 1) {
+            rootNodeConfigText = rootNodeConfig.key;
+            rootNodeConfigIconCls = rootNodeConfig.iconCls;
+        }
+
+        rootNodeConfig.text = rootNodeConfigText;
         rootNodeConfig.allowDrag = true;
-        rootNodeConfig.id = "" +  rootNodeConfig.id;
-        rootNodeConfig.iconCls = "pimcore_icon_home";
+        rootNodeConfig.id = "" + rootNodeConfig.id;
+        rootNodeConfig.iconCls = rootNodeConfigIconCls;
         rootNodeConfig.cls = "pimcore_tree_node_root";
         rootNodeConfig.expanded = true;
 
@@ -416,11 +423,6 @@ pimcore.asset.tree = Class.create({
         if (node.getOwnerTree() != targetNode.getOwnerTree()) {
             return false;
         }
-
-        if (this.nodeRestrictedByCustomviewExtension(node, targetNode)) {
-            return false;
-        }
-
         // check for permission
         try {
             if (node.data.permissions.settings) {
@@ -494,11 +496,6 @@ pimcore.asset.tree = Class.create({
         // check new parent's permission
         if(!newParent.data.permissions.create){
             Ext.MessageBox.alert(' ', t('element_cannot_be_moved'));
-            return false;
-        }
-
-        if (this.nodeRestrictedByCustomviewExtension(node, newParent)) {
-            Ext.MessageBox.alert(t('missing_permission'), t('element_cannot_be_moved'));
             return false;
         }
 
@@ -597,9 +594,9 @@ pimcore.asset.tree = Class.create({
                             });
                         }
 
-                        if (perspectiveCfg.inTreeContextMenu("asset.add.importFromServer")) {
+                        if (perspectiveCfg.inTreeContextMenu("asset.add.importFromServer") && pimcore.currentuser.admin) {
                             menuItems.push({
-                                text: t("import_from_server"),
+                                text: t("import_from_server") + '<sup class="deprecation" title="' + t("deprecated") + '">*</sup>',
                                 handler: this.importFromServer.bind(this, tree, record),
                                 iconCls: "pimcore_icon_import_server"
                             });
@@ -607,7 +604,7 @@ pimcore.asset.tree = Class.create({
 
                         if (perspectiveCfg.inTreeContextMenu("asset.add.uploadFromUrl")) {
                             menuItems.push({
-                                text: t("import_from_url"),
+                                text: t("import_from_url") + '<sup class="deprecation" title="' + t("deprecated") + '">*</sup>',
                                 handler: this.importFromUrl.bind(this, tree, record),
                                 iconCls: "pimcore_icon_world pimcore_icon_overlay_add"
                             });
@@ -623,7 +620,7 @@ pimcore.asset.tree = Class.create({
                         }
                     }
 
-                    if (perspectiveCfg.inTreeContextMenu("asset.addFolder") && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, record.data.path, 'restrictFolder') === false) {
+                    if (perspectiveCfg.inTreeContextMenu("asset.addFolder")) {
                         menu.add(new Ext.menu.Item({
                             text: t('create_folder'),
                             iconCls: "pimcore_icon_folder pimcore_icon_overlay_add",
@@ -923,17 +920,6 @@ pimcore.asset.tree = Class.create({
     },
 
     pasteInfo: function (tree, record, type) {
-        // check extension restrictions
-        var node = tree.getStore().getById(pimcore.cachedAssetId);
-        if (!node) {
-            Ext.MessageBox.alert(t('error'), t('cross_tree_moves_not_supported'));
-            return false;
-        }
-        if (this.nodeRestrictedByCustomviewExtension(node, record)) {
-            Ext.MessageBox.alert(t('missing_permission'), t('error_pasting_asset'));
-            return false;
-        }
-
         pimcore.helpers.addTreeNodeLoadingIndicator("asset", record.id);
 
         Ext.Ajax.request({
@@ -1383,15 +1369,5 @@ pimcore.asset.tree = Class.create({
         };
 
         pimcore.elementservice.deleteElement(options);
-    },
-
-    nodeRestrictedByCustomviewExtension: function(node, targetNode) {
-        var possibleRestrictions = ["audio","document","folder","image","text","unknown","video"];
-        for (var i = 0; i < possibleRestrictions.length; i++) {
-            if (node.data.type === possibleRestrictions[i] && pimcore.helpers.isObjectContextMenuOptionRestricted(this.perspectiveCfg, targetNode.data.path, 'restrict' + ucfirst(possibleRestrictions[i])) === true) {
-                return true;
-            }
-        }
-        return false;
     }
 });

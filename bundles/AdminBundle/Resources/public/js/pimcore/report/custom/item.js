@@ -902,7 +902,7 @@ pimcore.report.custom.item = Class.create({
         let m = this.getValues();
         let error = false;
 
-        ['group', 'groupIconClass', 'iconClass', 'reportClass'].forEach(function (name) {
+        ['groupIconClass', 'iconClass', 'reportClass'].forEach(function (name) {
             if(m[name].length && !m[name].match(/^[_a-zA-Z]+[_a-zA-Z0-9-.\s]*$/)) {
                 error = name;
             }
@@ -931,12 +931,13 @@ pimcore.report.custom.item = Class.create({
     },
 
     saveOnComplete: function () {
-        this.parentPanel.tree.getStore().load();
         pimcore.helpers.showNotification(t("success"), t("saved_successfully"), "success");
 
         Ext.MessageBox.confirm(t("info"), t("reload_pimcore_changes"), function (buttonValue) {
             if (buttonValue == "yes") {
                 window.location.reload();
+            } else {
+                this.parentPanel.tree.getStore().load();
             }
         }.bind(this));
     }

@@ -32,7 +32,7 @@ use Pimcore\Model\DataObject\OnlineShopVoucherSeries;
 use Pimcore\Model\DataObject\OnlineShopVoucherToken;
 
 /**
- * @property \Pimcore\Model\DataObject\Fieldcollection\Data\VoucherTokenTypePattern $configuration
+ * @property VoucherTokenTypePattern $configuration
  */
 class Pattern extends AbstractTokenManager implements ExportableTokenManagerInterface
 {
@@ -227,7 +227,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
      * may be reached several queries are generated.
      * returns the generated voucher codes if it was successfully - otherwise false
      *
-     * @return bool | array  - bool failed - array if codes are generated
+     * @return bool | array | string  - bool failed - array if codes are generated
      */
     public function insertOrUpdateVoucherSeries()
     {
@@ -460,8 +460,8 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
                 if ($this->tokenExists($checkTokens, $insertCheckTokens)) {
                     $checkTokenCount--;
                     unset($checkTokens[$token]);
-                // Check if the length of the checkTokens Array matches the defined step range
-                // so the the checkTokens get matched against the database.
+                    // Check if the length of the checkTokens Array matches the defined step range
+                    // so the the checkTokens get matched against the database.
                 } elseif ($checkTokenCount == $tokenCheckStep) {
                     // Check if any of the tokens in the temporary array checkTokens already exists,
                     // if not so, merge the checkTokens array with the array of tokens to insert and
@@ -541,14 +541,23 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
 
         /** @var PaginatorInterface $paginator */
         $paginator = \Pimcore::getContainer()->get(\Knp\Component\Pager\PaginatorInterface::class);
+
+        $page = (int)($params['page'] ?? 1);
+        $perPage = (int)($params['tokensPerPage'] ?? 25);
+
+        $total = count($tokens);
+
+        $availablePages = (int) ceil($total / $perPage);
+        $page = min($page, $availablePages);
+
         $paginator = $paginator->paginate(
             $tokens,
-            $params['page'] ?? 1,
-            isset($params['tokensPerPage']) ? (int)$params['tokensPerPage'] : 25
+            $page ?: 1,
+            $perPage
         );
 
         $viewParamsBag['paginator'] = $paginator;
-        $viewParamsBag['count'] = count($tokens);
+        $viewParamsBag['count'] = $total;
 
         $viewParamsBag['msg']['error'] = $params['error'] ?? null;
         $viewParamsBag['msg']['success'] = $params['success'] ?? null;
@@ -638,7 +647,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
      */
 
     /**
-     * @return \Pimcore\Model\DataObject\Fieldcollection\Data\VoucherTokenTypePattern
+     * @return VoucherTokenTypePattern
      */
     public function getConfiguration()
     {
@@ -646,7 +655,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
     }
 
     /**
-     * @param \Pimcore\Model\DataObject\Fieldcollection\Data\VoucherTokenTypePattern $configuration
+     * @param VoucherTokenTypePattern $configuration
      */
     public function setConfiguration($configuration)
     {
@@ -661,6 +670,9 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
         return $this->characterPools;
     }
 
+    /**
+     * @return string
+     */
     public function getCharacterPool()
     {
         return $this->characterPools[$this->configuration->getCharacterType()];
@@ -693,7 +705,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
     }
 
     /**
-     * @param string|int|null $seriesId
+     * @param int|null $seriesId
      */
     public function setSeriesId($seriesId)
     {
@@ -701,7 +713,7 @@ class Pattern extends AbstractTokenManager implements ExportableTokenManagerInte
     }
 
     /**
-     * @return string|int|null
+     * @return int|null
      */
     public function getSeriesId()
     {

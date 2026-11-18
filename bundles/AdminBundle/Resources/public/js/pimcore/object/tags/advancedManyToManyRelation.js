@@ -40,20 +40,31 @@ pimcore.object.tags.advancedManyToManyRelation = Class.create(pimcore.object.tag
 
         var fields = [];
 
-        fields.push("id");
-        fields.push("path");
-        fields.push("inheritedFields");
-        fields.push("metadata");
-        fields.push("type");
-        fields.push("subtype");
+        fields.push({name: "id"});
+        fields.push({name:"path"});
+        fields.push({name:"inheritedFields"});
+        fields.push({name:"metadata"});
+        fields.push({name:"type"});
+        fields.push({name:"subtype"});
 
         var i;
 
         for (i = 0; i < this.fieldConfig.columns.length; i++) {
-            fields.push(this.fieldConfig.columns[i].key);
+            let defaultValue = null;
+            switch(this.fieldConfig.columns[i].type.toLowerCase()){
+                case "bool":
+                case "columnbool":
+                    defaultValue = this.fieldConfig.columns[i].value ? (this.fieldConfig.columns[i].value).toLowerCase() == "true" : null;
+                    break;
+                case "text":
+                case "number":
+                    defaultValue = this.fieldConfig.columns[i].value;
+                    break;
+            }
+            fields.push({name: this.fieldConfig.columns[i].key, defaultValue: defaultValue});
         }
 
-        fields.push("rowId");
+        fields.push({name: "rowId"});
 
         var modelName = 'ObjectsMultihrefMetadataEntry';
         if (!Ext.ClassManager.isCreated(modelName)) {
@@ -113,10 +124,14 @@ pimcore.object.tags.advancedManyToManyRelation = Class.create(pimcore.object.tag
             var renderer = null;
             var listeners = null;
 
-            if (this.fieldConfig.columns[i].type == "number" && !readOnly) {
-                cellEditor = function () {
-                    return new Ext.form.NumberField({});
-                };
+            if (this.fieldConfig.columns[i].type == "number") {
+                if(!readOnly) {
+                    cellEditor = function () {
+                        return new Ext.form.NumberField({});
+                    };
+                }
+
+                renderer = Ext.util.Format.numberRenderer();
             } else if (this.fieldConfig.columns[i].type == "text" && !readOnly) {
                 cellEditor = function () {
                     return new Ext.form.TextField({});
@@ -744,7 +759,7 @@ pimcore.object.tags.advancedManyToManyRelation = Class.create(pimcore.object.tag
 
         // check max amount in field
         if (this.fieldConfig["maxItems"] && this.fieldConfig["maxItems"] >= 1) {
-            if (this.store.getCount() >= this.fieldConfig.maxItems) {
+            if ((this.store.getData().getSource() || this.store.getData()).count() >= this.fieldConfig.maxItems) {
                 Ext.Msg.alert(t("error"), t("limit_reached"));
                 return true;
             }
@@ -788,6 +803,12 @@ pimcore.object.tags.advancedManyToManyRelation = Class.create(pimcore.object.tag
     },
 
     uploadDialog: function () {
+        if (!this.fieldConfig.allowMultipleAssignments || (this.fieldConfig["maxItems"] && this.fieldConfig["maxItems"] >= 1)) {
+            if (this.fieldConfig.maxItems && (this.store.getData().getSource() || this.store.getData()).count() >= this.fieldConfig.maxItems) {
+                Ext.Msg.alert(t("error"), t("limit_reached"));
+                return true;
+            }
+        }
         pimcore.helpers.assetSingleUploadDialog(this.fieldConfig.assetUploadPath, "path", function (res) {
             try {
                 var data = Ext.decode(res.response.responseText);

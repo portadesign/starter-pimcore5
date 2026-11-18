@@ -65,7 +65,7 @@ pimcore.document.edit = Class.create({
                 cls: "pimcore_button_black",
                 enableToggle: true,
                 hidden: true,
-                disabled: this.document.data.contentMasterDocumentId,
+                disabled: this.document.data.contentMainDocumentId,
                 toggleHandler: function () {
                     var el = this.areaToolbarTrigger.areaToolbarElement;
                     if(el.getLocalX() < 0) {
@@ -234,7 +234,7 @@ pimcore.document.edit = Class.create({
                             }.bind(this)
                         );
                     } else {
-                        this.reload(true);
+                        this.reload();
                         this.updateTargetGroupText(this.targetGroup.getValue());
                     }
                 }.bind(this)

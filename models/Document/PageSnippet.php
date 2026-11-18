@@ -71,6 +71,13 @@ abstract class PageSnippet extends Model\Document
      *
      * @var null|int
      */
+    protected $contentMainDocumentId;
+
+    /**
+     * @internal
+     *
+     * @var null|int
+     */
     protected $contentMasterDocumentId;
 
     /**
@@ -78,7 +85,7 @@ abstract class PageSnippet extends Model\Document
      *
      * @var bool
      */
-    protected bool $supportsContentMaster = true;
+    protected bool $supportsContentMain = true;
 
     /**
      * @internal
@@ -107,6 +114,23 @@ abstract class PageSnippet extends Model\Document
      * @var array
      */
     protected $inheritedEditables = [];
+
+    private static bool $getInheritedValues = false;
+
+    public function __construct()
+    {
+        $this->contentMasterDocumentId = & $this->contentMainDocumentId;
+    }
+
+    public static function setGetInheritedValues(bool $getInheritedValues): void
+    {
+        self::$getInheritedValues = $getInheritedValues;
+    }
+
+    public static function getGetInheritedValues(): bool
+    {
+        return self::$getInheritedValues;
+    }
 
     /**
      * {@inheritdoc}
@@ -256,11 +280,11 @@ abstract class PageSnippet extends Model\Document
             $dependencies[] = $editable->resolveDependencies();
         }
 
-        if ($this->getContentMasterDocument() instanceof Document) {
-            $masterDocumentId = $this->getContentMasterDocument()->getId();
+        if ($this->getContentMainDocument() instanceof Document) {
+            $mainDocumentId = $this->getContentMainDocument()->getId();
             $dependencies[] = [
-                'document_' . $masterDocumentId => [
-                    'id' => $masterDocumentId,
+                'document_' . $mainDocumentId => [
+                    'id' => $mainDocumentId,
                     'type' => 'document',
                 ],
             ];
@@ -389,28 +413,71 @@ abstract class PageSnippet extends Model\Document
             return $editables[$name];
         }
 
+        $inheritedEditable = null;
         if (array_key_exists($name, $this->inheritedEditables)) {
-            return $this->inheritedEditables[$name];
+            $inheritedEditable = $this->inheritedEditables[$name];
         }
 
-        // check for content master document (inherit data)
-        if ($contentMasterDocument = $this->getContentMasterDocument()) {
-            if ($contentMasterDocument instanceof self) {
-                $inheritedEditable = $contentMasterDocument->getEditable($name);
+        if (!$inheritedEditable) {
+            // check for content main document (inherit data)
+            $contentMainDocument = $this->getContentMainDocument();
+            if ($contentMainDocument instanceof self && $contentMainDocument->getId() != $this->getId()) {
+                $inheritedEditable = $contentMainDocument->getEditable($name);
                 if ($inheritedEditable) {
                     $inheritedEditable = clone $inheritedEditable;
                     $inheritedEditable->setInherited(true);
                     $this->inheritedEditables[$name] = $inheritedEditable;
-
-                    return $inheritedEditable;
                 }
             }
         }
 
-        return null;
+        return $inheritedEditable;
     }
 
     /**
+     * @param int|string|null $contentMainDocumentId
+     *
+     * @return $this
+     *
+     * @throws \Exception
+     */
+    public function setContentMainDocumentId($contentMainDocumentId/*, bool $validate*/)
+    {
+        // this is that the path is automatically converted to ID => when setting directly from admin UI
+        if (!is_numeric($contentMainDocumentId) && !empty($contentMainDocumentId)) {
+            if ($contentMainDocument = Document\PageSnippet::getByPath($contentMainDocumentId)) {
+                $contentMainDocumentId = $contentMainDocument->getId();
+            } else {
+                // Content main document was deleted or don't exist
+                $contentMainDocumentId = null;
+            }
+        }
+
+        // Don't set the content main document if the document is already part of the main document chain
+        if ($contentMainDocumentId) {
+            if ($currentContentMainDocument = Document\PageSnippet::getById($contentMainDocumentId)) {
+                $validate = \func_get_args()[1] ?? false;
+                $maxDepth = 20;
+                do {
+                    if ($currentContentMainDocument->getId() === $this->getId()) {
+                        throw new \Exception('This document is already part of the main document chain, please choose a different one.');
+                    }
+                    $currentContentMainDocument = $currentContentMainDocument->getContentMainDocument();
+                } while ($currentContentMainDocument && $maxDepth-- > 0 && $validate);
+            } else {
+                // Content main document was deleted or don't exist
+                $contentMainDocumentId = null;
+            }
+        }
+
+        $this->contentMainDocumentId = $contentMainDocumentId;
+
+        return $this;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param int|string|null $contentMasterDocumentId
      *
      * @return $this
@@ -419,34 +486,13 @@ abstract class PageSnippet extends Model\Document
      */
     public function setContentMasterDocumentId($contentMasterDocumentId/*, bool $validate*/)
     {
-        // this is that the path is automatically converted to ID => when setting directly from admin UI
-        if (!is_numeric($contentMasterDocumentId) && !empty($contentMasterDocumentId)) {
-            if ($contentMasterDocument = Document\PageSnippet::getByPath($contentMasterDocumentId)) {
-                $contentMasterDocumentId = $contentMasterDocument->getId();
-            } else {
-                // Content master document was deleted or don't exist
-                $contentMasterDocumentId = null;
-            }
-        }
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
 
-        // Don't set the content master document if the document is already part of the master document chain
-        if ($contentMasterDocumentId) {
-            if ($currentContentMasterDocument = Document\PageSnippet::getById($contentMasterDocumentId)) {
-                $validate = \func_get_args()[1] ?? false;
-                $maxDepth = 20;
-                do {
-                    if ($currentContentMasterDocument->getId() === $this->getId()) {
-                        throw new \Exception('This document is already part of the master document chain, please choose a different one.');
-                    }
-                    $currentContentMasterDocument = $currentContentMasterDocument->getContentMasterDocument();
-                } while ($currentContentMasterDocument && $maxDepth-- > 0 && $validate);
-            } else {
-                // Content master document was deleted or don't exist
-                $contentMasterDocumentId = null;
-            }
-        }
-
-        $this->contentMasterDocumentId = $contentMasterDocumentId;
+        $this->setContentMainDocumentId($contentMasterDocumentId);
 
         return $this;
     }
@@ -454,21 +500,53 @@ abstract class PageSnippet extends Model\Document
     /**
      * @return int|null
      */
+    public function getContentMainDocumentId()
+    {
+        return $this->contentMainDocumentId;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
+     * @return int|null
+     */
     public function getContentMasterDocumentId()
     {
-        return $this->contentMasterDocumentId;
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        return $this->getContentMainDocumentId();
     }
 
     /**
      * @return Document\PageSnippet|null
      */
-    public function getContentMasterDocument()
+    public function getContentMainDocument()
     {
-        if ($masterDocumentId = $this->getContentMasterDocumentId()) {
-            return Document\PageSnippet::getById($masterDocumentId);
+        if ($mainDocumentId = $this->getContentMainDocumentId()) {
+            return Document\PageSnippet::getById($mainDocumentId);
         }
 
         return null;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
+     * @return Document\PageSnippet|null
+     */
+    public function getContentMasterDocument()
+    {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        return $this->getContentMainDocument();
     }
 
     /**
@@ -476,15 +554,33 @@ abstract class PageSnippet extends Model\Document
      *
      * @return $this
      */
-    public function setContentMasterDocument($document)
+    public function setContentMainDocument($document)
     {
         if ($document instanceof self) {
-            $this->setContentMasterDocumentId($document->getId(), true);
+            $this->setContentMainDocumentId($document->getId(), true);
         } else {
-            $this->setContentMasterDocumentId(null);
+            $this->setContentMainDocumentId(null);
         }
 
         return $this;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
+     * @param Document\PageSnippet|null $document
+     *
+     * @return $this
+     */
+    public function setContentMasterDocument($document)
+    {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        return $this->setContentMainDocument($document);
     }
 
     /**
@@ -503,7 +599,15 @@ abstract class PageSnippet extends Model\Document
     public function getEditables(): array
     {
         if ($this->editables === null) {
-            $this->setEditables($this->getDao()->getEditables());
+            $documentEditables = $this->getDao()->getEditables();
+
+            if (self::getGetInheritedValues() && $this->supportsContentMain() && $this->getContentMainDocument()) {
+                $contentMainEditables = $this->getContentMainDocument()->getEditables();
+                $documentEditables = array_merge($contentMainEditables, $documentEditables);
+                $this->inheritedEditables = $documentEditables;
+            }
+
+            $this->setEditables($documentEditables);
         }
 
         return $this->editables;
@@ -650,9 +754,9 @@ abstract class PageSnippet extends Model\Document
      *
      * @return bool
      */
-    public function supportsContentMaster(): bool
+    public function supportsContentMain(): bool
     {
-        return $this->supportsContentMaster;
+        return $this->supportsContentMain;
     }
 
     /**
@@ -726,5 +830,21 @@ abstract class PageSnippet extends Model\Document
     public function setStaticGeneratorLifetime(?int $staticGeneratorLifetime): void
     {
         $this->staticGeneratorLifetime = $staticGeneratorLifetime;
+    }
+
+    public function __wakeup()
+    {
+        $propertyMappings = [
+            'contentMasterDocumentId' => 'contentMainDocumentId',
+        ];
+
+        foreach ($propertyMappings as $oldProperty => $newProperty) {
+            if ($this->$newProperty === null) {
+                $this->$newProperty = $this->$oldProperty;
+                $this->$oldProperty = & $this->$newProperty;
+            }
+        }
+
+        parent::__wakeup();
     }
 }

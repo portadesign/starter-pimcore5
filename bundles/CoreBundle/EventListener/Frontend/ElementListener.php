@@ -15,7 +15,6 @@
 
 namespace Pimcore\Bundle\CoreBundle\EventListener\Frontend;
 
-use Pimcore\Bundle\AdminBundle\Security\User\UserLoader;
 use Pimcore\Bundle\CoreBundle\EventListener\Traits\PimcoreContextAwareTrait;
 use Pimcore\Cache\RuntimeCache;
 use Pimcore\Config;
@@ -28,6 +27,7 @@ use Pimcore\Model\Document;
 use Pimcore\Model\Staticroute;
 use Pimcore\Model\User;
 use Pimcore\Model\Version;
+use Pimcore\Security\User\UserLoader;
 use Pimcore\Targeting\Document\DocumentTargetingConfigurator;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -219,10 +219,10 @@ class ElementListener implements EventSubscriberInterface, LoggerAwareInterface
 
         // for version preview
         if ($request->get('pimcore_version')) {
-            // TODO there was a check with a registry flag here - check if the master request handling is sufficient
-            if ($version = Version::getById((int) $request->get('pimcore_version'))) {
-                $document = $version->getData();
-
+            // TODO there was a check with a registry flag here - check if the main request handling is sufficient
+            $version = Version::getById((int) $request->get('pimcore_version'));
+            if ($documentVersion = $version?->getData()) {
+                $document = $documentVersion;
                 $this->logger->debug('Loading version {version} for document {document} from pimcore_version parameter', [
                     'version' => $version->getId(),
                     'document' => $document->getFullPath(),

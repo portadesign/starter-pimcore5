@@ -183,8 +183,20 @@ class Folder extends Model\Asset
                         break;
                     }
 
-                    $tile = imagecreatefromstring(stream_get_contents($tileThumb->getStream()));
-                    imagecopyresampled($collage, $tile, $offsetLeft, $offsetTop, 0, 0, $squareDimension, $squareDimension, $tileThumb->getWidth(), $tileThumb->getHeight());
+                    $stream = $tileThumb->getStream();
+
+                    if (null === $stream) {
+                        break;
+                    }
+
+                    $width = $tileThumb->getWidth();
+                    $height = $tileThumb->getHeight();
+                    if (!$width || !$height) {
+                        break;
+                    }
+
+                    $tile = imagecreatefromstring(stream_get_contents($stream));
+                    imagecopyresampled($collage, $tile, $offsetLeft, $offsetTop, 0, 0, $squareDimension, $squareDimension, $width, $height);
 
                     $count++;
                     if ($count % $colums === 0) {
@@ -200,7 +212,6 @@ class Folder extends Model\Asset
                 if (filesize($localFile) > 0) {
                     $storage->write($cacheFilePath, file_get_contents($localFile));
                 }
-                unlink($localFile);
 
                 return $storage->readStream($cacheFilePath);
             }

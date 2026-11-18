@@ -419,6 +419,7 @@ class Installer
         $this->markMigrationsAsDone();
 
         $this->clearKernelCacheDir($kernel);
+        $this->dispatchStepEvent('complete');
 
         return $errors;
     }
@@ -634,6 +635,10 @@ class Installer
         }
 
         $db->executeQuery('SET FOREIGN_KEY_CHECKS=1;');
+
+        // close connections and collection garbage ... in order to avoid too many connections error
+        // when installing demos
+        \Pimcore::collectGarbage();
 
         return $errors;
     }

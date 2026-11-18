@@ -16,12 +16,12 @@
 namespace Pimcore\Bundle\AdminBundle\Controller\ExtensionManager;
 
 use ForceUTF8\Encoding;
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
-use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Cache\Symfony\CacheClearer;
 use Pimcore\Controller\KernelControllerEventInterface;
 use Pimcore\Extension\Bundle\Exception\BundleNotFoundException;
 use Pimcore\Extension\Bundle\PimcoreBundleInterface;
+use Pimcore\Extension\Bundle\PimcoreBundleManager;
 use Pimcore\Extension\Document\Areabrick\AreabrickInterface;
 use Pimcore\Extension\Document\Areabrick\AreabrickManagerInterface;
 use Pimcore\Logger;
@@ -29,29 +29,27 @@ use Pimcore\Routing\RouteReferenceInterface;
 use Pimcore\Tool\AssetsInstaller;
 use SensioLabs\AnsiConverter\AnsiToHtmlConverter;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @deprecated will be removed in Pimcore 11
  *
  * @internal
  */
-class ExtensionManagerController extends AdminController implements KernelControllerEventInterface
+class ExtensionManagerController extends AdminAbstractController implements KernelControllerEventInterface
 {
-    /**
-     * @var AreabrickManagerInterface
-     */
-    private $areabrickManager;
-
     public function __construct(
-        AreabrickManagerInterface $areabrickManager
+        protected AreabrickManagerInterface $areabrickManager,
+        protected PimcoreBundleManager $bundleManager,
+        protected TranslatorInterface $translator
     ) {
-        $this->areabrickManager = $areabrickManager;
     }
 
     /**
@@ -119,7 +117,7 @@ class ExtensionManagerController extends AdminController implements KernelContro
             $updates[$id] = $options;
         }
 
-        $this->getBundleManager()->setStates($updates);
+        $this->bundleManager->setStates($updates);
 
         return $this->adminJson([
             'extensions' => $this->getBundleList(array_keys($updates)),
@@ -154,7 +152,7 @@ class ExtensionManagerController extends AdminController implements KernelContro
         ];
 
         if ($type === 'bundle') {
-            $this->getBundleManager()->setState($id, ['enabled' => $enable]);
+            $this->bundleManager->setState($id, ['enabled' => $enable]);
             $reload = true;
 
             $message = $this->installAssets($assetsInstaller, $enable);
@@ -248,17 +246,17 @@ class ExtensionManagerController extends AdminController implements KernelContro
     private function handleInstallation(Request $request, $install = true)
     {
         try {
-            $bundle = $this->getBundleManager()->getActiveBundle($request->get('id'), false);
+            $bundle = $this->bundleManager->getActiveBundle($request->get('id'), false);
 
             if ($install) {
-                $this->getBundleManager()->install($bundle);
+                $this->bundleManager->install($bundle);
             } else {
-                $this->getBundleManager()->uninstall($bundle);
+                $this->bundleManager->uninstall($bundle);
             }
 
             $data = [
                 'success' => true,
-                'reload' => $this->getBundleManager()->needsReloadAfterInstall($bundle),
+                'reload' => $this->bundleManager->needsReloadAfterInstall($bundle),
             ];
 
             if (!empty($message = $this->getInstallerOutput($bundle))) {
@@ -286,7 +284,7 @@ class ExtensionManagerController extends AdminController implements KernelContro
      */
     private function getBundleList(array $filter = [])
     {
-        $bm = $this->getBundleManager();
+        $bm = $this->bundleManager;
 
         $results = [];
         foreach ($bm->getEnabledBundleNames() as $className) {
@@ -375,7 +373,7 @@ class ExtensionManagerController extends AdminController implements KernelContro
      */
     private function buildBundleInfo(PimcoreBundleInterface $bundle, $enabled = false, $installed = false)
     {
-        $bm = $this->getBundleManager();
+        $bm = $this->bundleManager;
 
         $state = $bm->getState($bundle);
 
@@ -462,8 +460,8 @@ class ExtensionManagerController extends AdminController implements KernelContro
         return [
             'id' => $brick->getId(),
             'type' => 'areabrick',
-            'name' => $this->trans($brick->getName()),
-            'description' => $this->trans($brick->getDescription()),
+            'name' => $this->translator->trans($brick->getName(), [], 'admin'),
+            'description' => $this->translator->trans($brick->getDescription(), [], 'admin'),
             'installable' => false,
             'uninstallable' => false,
             'installed' => true,
@@ -474,11 +472,11 @@ class ExtensionManagerController extends AdminController implements KernelContro
 
     private function getInstallerOutput(PimcoreBundleInterface $bundle, bool $decorated = false)
     {
-        if (!$this->getBundleManager()->isEnabled($bundle)) {
+        if (!$this->bundleManager->isEnabled($bundle)) {
             return null;
         }
 
-        $installer = $this->getBundleManager()->getInstaller($bundle);
+        $installer = $this->bundleManager->getInstaller($bundle);
         if (null !== $installer) {
             $output = $installer->getOutput();
             if ($output instanceof BufferedOutput) {

@@ -32,7 +32,9 @@ use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data\ManyToManyObjectRelation;
 use Pimcore\Model\DataObject\ClassDefinition\Data\Relations\AbstractRelations;
 use Pimcore\Model\DataObject\ClassDefinition\Data\ReverseObjectRelation;
+use Pimcore\Model\DataObject\ClassDefinition\PreviewGeneratorInterface;
 use Pimcore\Model\Element;
+use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\Schedule\Task;
 use Pimcore\Model\Version;
 use Pimcore\Tool;
@@ -43,6 +45,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
@@ -72,6 +75,8 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      * @var array
      */
     private array $metaData = [];
+
+    private array $classFieldDefinitions = [];
 
     /**
      * @Route("/tree-get-childs-by-id", name="treegetchildsbyid", methods={"GET"})
@@ -235,7 +240,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     }
 
     /**
-     * @param DataObject\AbstractObject $element
+     * @param ElementInterface $element
      *
      * @return array
      *
@@ -243,6 +248,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     protected function getTreeNodeConfig($element): array
     {
+        /** @var DataObject $child */
         $child = $element;
 
         $tmpObject = [
@@ -365,12 +371,13 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      *
      * @param Request $request
      * @param EventDispatcherInterface $eventDispatcher
+     * @param PreviewGeneratorInterface $defaultPreviewGenerator
      *
      * @return JsonResponse
      *
      * @throws \Exception
      */
-    public function getAction(Request $request, EventDispatcherInterface $eventDispatcher): JsonResponse
+    public function getAction(Request $request, EventDispatcherInterface $eventDispatcher, PreviewGeneratorInterface $defaultPreviewGenerator): JsonResponse
     {
         $objectId = (int)$request->get('id');
         $objectFromDatabase = DataObject\Concrete::getById($objectId);
@@ -403,8 +410,11 @@ class DataObjectController extends ElementControllerBase implements KernelContro
              *  ------------------------------------------------------------- */
             $objectData['idPath'] = Element\Service::getIdPath($objectFromDatabase);
 
-            $previewGenerator = $objectFromDatabase->getClass()->getPreviewGenerator();
             $linkGeneratorReference = $objectFromDatabase->getClass()->getLinkGeneratorReference();
+            $previewGenerator = $objectFromDatabase->getClass()->getPreviewGenerator();
+            if (empty($previewGenerator) && !empty($linkGeneratorReference)) {
+                $previewGenerator = $defaultPreviewGenerator;
+            }
 
             $objectData['hasPreview'] = false;
             if ($objectFromDatabase->getClass()->getPreviewUrl() || $linkGeneratorReference || $previewGenerator) {
@@ -481,7 +491,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
             $this->addAdminStyle($object, ElementAdminStyleEvent::CONTEXT_EDITOR, $objectData['general']);
 
-            $currentLayoutId = $request->get('layoutId', 0);
+            $currentLayoutId = $request->get('layoutId');
 
             $validLayouts = DataObject\Service::getValidLayouts($object);
 
@@ -498,7 +508,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                 $currentLayoutId = null;
             }
 
-            //master layout has id 0 so we check for is_null()
+            //main layout has id 0 so we check for is_null()
             if ($currentLayoutId === null && !empty($validLayouts)) {
                 if (count($validLayouts) === 1) {
                     $firstLayout = reset($validLayouts);
@@ -522,6 +532,25 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                 foreach ($validLayouts as $validLayout) {
                     $objectData['validLayouts'][] = ['id' => $validLayout->getId(), 'name' => $validLayout->getName()];
                 }
+
+                usort($objectData['validLayouts'], static function ($layoutData1, $layoutData2) {
+                    if ($layoutData2['id'] === '-1') {
+                        return 1;
+                    }
+
+                    if ($layoutData1['id'] === '-1') {
+                        return -1;
+                    }
+
+                    if ($layoutData2['id'] === '0') {
+                        return 1;
+                    }
+                    if ($layoutData1['id'] === '0') {
+                        return -1;
+                    }
+
+                    return strcasecmp($layoutData1['name'], $layoutData2['name']);
+                });
 
                 $user = Tool\Admin::getCurrentUser();
 
@@ -548,10 +577,47 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
             DataObject\Service::removeElementFromSession('object', $object->getId());
 
+            if ($data['layout'] ?? false) {
+                $layoutArray = json_decode($this->encodeJson($data['layout']), true);
+                $this->classFieldDefinitions = json_decode($this->encodeJson($object->getClass()->getFieldDefinitions()), true);
+                $this->injectValuesForCustomLayout($layoutArray);
+                $data['layout'] = $layoutArray;
+            }
+
             return $this->adminJson($data);
         }
 
         throw $this->createAccessDeniedHttpException();
+    }
+
+    private function injectValuesForCustomLayout(array &$layout): void
+    {
+        foreach ($layout['children'] as &$child) {
+            if ($child['datatype'] === 'layout') {
+                $this->injectValuesForCustomLayout($child);
+            } else {
+                foreach ($this->classFieldDefinitions[$child['name']] as $key => $value) {
+                    if (array_key_exists($key, $child) && ($child[$key] === null || $child[$key] === '' || (is_array($child[$key]) && empty($child[$key])))) {
+                        $child[$key] = $value;
+                    }
+                }
+            }
+        }
+
+        //TODO remove in Pimcore 11
+        if (isset($layout['childs'])) {
+            foreach ($layout['childs'] as &$child) {
+                if ($child['datatype'] === 'layout') {
+                    $this->injectValuesForCustomLayout($child);
+                } else {
+                    foreach ($this->classFieldDefinitions[$child['name']] as $key => $value) {
+                        if (array_key_exists($key, $child) && ($child[$key] === null || $child[$key] === '' || (is_array($child[$key]) && empty($child[$key])))) {
+                            $child[$key] = $value;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -1233,7 +1299,11 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                         DataObject::OBJECT_TYPE_VARIANT,
                         DataObject::OBJECT_TYPE_FOLDER,
                     ]
-                ).'\') ORDER BY o_index LIMIT '. $updatedObject->getParent()->getChildAmount() .')
+                ).'\') ORDER BY o_index LIMIT '. $updatedObject->getParent()->getChildAmount([
+                            DataObject::OBJECT_TYPE_OBJECT,
+                            DataObject::OBJECT_TYPE_VARIANT,
+                            DataObject::OBJECT_TYPE_FOLDER,
+                        ]) .')
                             SELECT @n := IF(@n = ? - 1,@n + 2,@n + 1) AS newIndex, o_id
                             FROM cte,
                             (SELECT @n := -1) variable
@@ -1282,6 +1352,10 @@ class DataObjectController extends ElementControllerBase implements KernelContro
     public function saveAction(Request $request)
     {
         $objectFromDatabase = DataObject\Concrete::getById((int) $request->get('id'));
+
+        if (!$objectFromDatabase instanceof DataObject\Concrete) {
+            return $this->adminJson(['success' => false, 'message' => 'Could not find object']);
+        }
 
         // set the latest available version for editmode
         $object = $this->getLatestVersion($objectFromDatabase);
@@ -1398,7 +1472,7 @@ class DataObjectController extends ElementControllerBase implements KernelContro
             ]);
         } elseif ($request->get('task') == 'session') {
             //TODO https://github.com/pimcore/pimcore/issues/9536
-            DataObject\Service::saveElementToSession($object, '', false);
+            DataObject\Service::saveElementToSession($object, '', true);
 
             return $this->adminJson(['success' => true]);
         } elseif ($request->get('task') == 'scheduler') {
@@ -1564,11 +1638,12 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      */
     public function publishVersionAction(Request $request)
     {
-        $version = Model\Version::getById((int) $request->get('id'));
-        if (!$version) {
-            throw $this->createNotFoundException();
+        $id = (int)$request->get('id');
+        $version = Model\Version::getById($id);
+        $object = $version?->loadData();
+        if (!$object) {
+            throw $this->createNotFoundException('Version with id [' . $id . "] doesn't exist");
         }
-        $object = $version->loadData();
 
         $currentObject = DataObject::getById($object->getId());
         if ($currentObject->isAllowed('publish')) {
@@ -1609,17 +1684,17 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
         $id = (int)$request->get('id');
         $version = Model\Version::getById($id);
-        $object = $version->loadData();
-
-        if (method_exists($object, 'getLocalizedFields')) {
-            /** @var DataObject\Localizedfield $localizedFields */
-            $localizedFields = $object->getLocalizedFields();
-            $localizedFields->setLoadedAllLazyData();
-        }
-
-        DataObject::setDoNotRestoreKeyAndPath(false);
+        $object = $version?->loadData();
 
         if ($object) {
+            if (method_exists($object, 'getLocalizedFields')) {
+                /** @var DataObject\Localizedfield $localizedFields */
+                $localizedFields = $object->getLocalizedFields();
+                $localizedFields->setLoadedAllLazyData();
+            }
+
+            DataObject::setDoNotRestoreKeyAndPath(false);
+
             if ($object->isAllowed('versions')) {
                 return $this->render('@PimcoreAdmin/Admin/DataObject/DataObject/previewVersion.html.twig',
                     [
@@ -1654,7 +1729,11 @@ class DataObjectController extends ElementControllerBase implements KernelContro
         $id2 = (int)$to;
 
         $version1 = Model\Version::getById($id1);
-        $object1 = $version1->loadData();
+        $object1 = $version1?->loadData();
+
+        if (!$object1) {
+            throw $this->createNotFoundException('Version with id [' . $id1 . "] doesn't exist");
+        }
 
         if (method_exists($object1, 'getLocalizedFields')) {
             /** @var DataObject\Localizedfield $localizedFields1 */
@@ -1663,7 +1742,11 @@ class DataObjectController extends ElementControllerBase implements KernelContro
         }
 
         $version2 = Model\Version::getById($id2);
-        $object2 = $version2->loadData();
+        $object2 = $version2?->loadData();
+
+        if (!$object2) {
+            throw $this->createNotFoundException('Version with id [' . $id2 . "] doesn't exist");
+        }
 
         if (method_exists($object2, 'getLocalizedFields')) {
             /** @var DataObject\Localizedfield $localizedFields2 */
@@ -1673,22 +1756,18 @@ class DataObjectController extends ElementControllerBase implements KernelContro
 
         DataObject::setDoNotRestoreKeyAndPath(false);
 
-        if ($object1 && $object2) {
-            if ($object1->isAllowed('versions') && $object2->isAllowed('versions')) {
-                return $this->render('@PimcoreAdmin/Admin/DataObject/DataObject/diffVersions.html.twig',
-                    [
-                        'object1' => $object1,
-                        'versionNote1' => $version1->getNote(),
-                        'object2' => $object2,
-                        'versionNote2' => $version2->getNote(),
-                        'validLanguages' => Tool::getValidLanguages(),
-                    ]);
-            }
-
-            throw $this->createAccessDeniedException('Permission denied, version ids [' . $id1 . ', ' . $id2 . ']');
+        if ($object1->isAllowed('versions') && $object2->isAllowed('versions')) {
+            return $this->render('@PimcoreAdmin/Admin/DataObject/DataObject/diffVersions.html.twig',
+                [
+                    'object1' => $object1,
+                    'versionNote1' => $version1->getNote(),
+                    'object2' => $object2,
+                    'versionNote2' => $version2->getNote(),
+                    'validLanguages' => Tool::getValidLanguages(),
+                ]);
         }
 
-        throw $this->createNotFoundException('Version with ids [' . $id1 . ', ' . $id2 . "] doesn't exist");
+        throw $this->createAccessDeniedException('Permission denied, version ids [' . $id1 . ', ' . $id2 . ']');
     }
 
     /**
@@ -1942,10 +2021,11 @@ class DataObjectController extends ElementControllerBase implements KernelContro
      * @Route("/preview", name="preview", methods={"GET"})
      *
      * @param Request $request
+     * @param PreviewGeneratorInterface $defaultPreviewGenerator
      *
      * @return Response|RedirectResponse
      */
-    public function previewAction(Request $request)
+    public function previewAction(Request $request, PreviewGeneratorInterface $defaultPreviewGenerator)
     {
         $id = $request->get('id');
         $object = DataObject\Service::getElementFromSession('object', $id);
@@ -1967,22 +2047,35 @@ class DataObjectController extends ElementControllerBase implements KernelContro
                 $url = str_replace('%_locale', $this->getAdminUser()->getLanguage(), $url);
             } elseif ($previewService = $object->getClass()->getPreviewGenerator()) {
                 $url = $previewService->generatePreviewUrl($object, array_merge(['preview' => true, 'context' => $this], $request->query->all()));
-            } elseif ($linkGenerator = $object->getClass()->getLinkGenerator()) {
-                $url = $linkGenerator->generate($object, ['preview' => true, 'context' => $this]);
+            } elseif ($object->getClass()->getLinkGenerator()) {
+                $parameters = [
+                    'preview' => true,
+                    'context' => $this,
+                ];
+
+                $url = $defaultPreviewGenerator->generatePreviewUrl($object, array_merge($parameters, $request->query->all()));
             }
 
             if (!$url) {
-                return new Response("Preview not available, it seems that there's a problem with this object.");
+                throw new NotFoundHttpException('Cannot render preview due to empty URL');
             }
 
-            // replace all remainaing % signs
-            $url = str_replace('%', '%25', $url);
+            // replace all remaining % signs which are not an url encoded characters
+            $url = preg_replace('/%(?![0-9A-F]{2})/i', '%25', $url);
 
             $urlParts = parse_url($url);
 
-            return $this->redirect($urlParts['path'] . '?pimcore_object_preview=' . $id . '&_dc=' . time() . (isset($urlParts['query']) ? '&' . $urlParts['query'] : ''));
+            $redirectParameters = array_filter([
+                'pimcore_object_preview' => $id,
+                'site' => $request->query->getInt(PreviewGeneratorInterface::PARAMETER_SITE),
+                'dc' => time(),
+            ]);
+
+            $redirectUrl = $urlParts['path'] . '?' . http_build_query($redirectParameters) . (isset($urlParts['query']) ? '&' . $urlParts['query'] : '');
+
+            return $this->redirect($redirectUrl);
         } else {
-            return new Response("Preview not available, it seems that there's a problem with this object.");
+            throw new NotFoundHttpException(sprintf('Expected an object of type "%s", got "%s"', DataObject\Concrete::class, get_debug_type($object)));
         }
     }
 

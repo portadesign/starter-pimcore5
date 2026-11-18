@@ -46,7 +46,7 @@ class Link implements OwnerAwareFieldInterface
     protected $internal;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $direct;
 
@@ -164,7 +164,7 @@ class Link implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getDirect()
     {
@@ -172,11 +172,11 @@ class Link implements OwnerAwareFieldInterface
     }
 
     /**
-     * @param string $direct
+     * @param string|null $direct
      *
      * @return $this
      */
-    public function setDirect($direct)
+    public function setDirect($direct = null)
     {
         $this->direct = $direct;
         $this->markMeDirty();
@@ -479,7 +479,7 @@ class Link implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return Document|Asset|DataObject|null
+     * @return DataObject|Asset|Document|null
      */
     public function getElement()
     {
@@ -516,10 +516,16 @@ class Link implements OwnerAwareFieldInterface
     /**
      * @deprecated use getElement() instead - will be removed in Pimcore 11
      *
-     * @return Asset|DataObject|Document|null
+     * @return DataObject|Asset|Document|null
      */
     public function getObject()
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.0',
+            'The Link::getObject() method is deprecated, use Link::getElement() instead.'
+        );
+
         return $this->getElement();
     }
 
@@ -530,6 +536,12 @@ class Link implements OwnerAwareFieldInterface
      */
     public function setObject($object)
     {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.0',
+            'The Link::setObject() method is deprecated, use Link::setElement() instead.'
+        );
+
         return $this->setElement($object);
     }
 

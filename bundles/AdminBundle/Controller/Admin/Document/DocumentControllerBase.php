@@ -15,7 +15,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin\Document;
 
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Bundle\AdminBundle\Controller\Traits\ApplySchedulerDataTrait;
 use Pimcore\Bundle\AdminBundle\Controller\Traits\DocumentTreeConfigTrait;
 use Pimcore\Controller\KernelControllerEventInterface;
@@ -37,7 +37,7 @@ use Symfony\Component\Routing\Annotation\Route;
 /**
  * @internal
  */
-abstract class DocumentControllerBase extends AdminController implements KernelControllerEventInterface
+abstract class DocumentControllerBase extends AdminAbstractController implements KernelControllerEventInterface
 {
     use ApplySchedulerDataTrait;
     use DocumentTreeConfigTrait;
@@ -162,6 +162,11 @@ abstract class DocumentControllerBase extends AdminController implements KernelC
         if ($request->get('settings')) {
             if ($document->isAllowed('settings')) {
                 $settings = $this->decodeJson($request->get('settings'));
+
+                if (array_key_exists('prettyUrl', $settings)) {
+                    $settings['prettyUrl'] = htmlspecialchars($settings['prettyUrl']);
+                }
+
                 $document->setValues($settings);
             }
         }
@@ -335,9 +340,9 @@ abstract class DocumentControllerBase extends AdminController implements KernelC
     }
 
     /**
-     * This is used for pages and snippets to change the master document (which is not saved with the normal save button)
+     * This is used for pages and snippets to change the main document (which is not saved with the normal save button)
      *
-     * @Route("/change-master-document", name="changemasterdocument", methods={"PUT"})
+     * @Route("/change-main-document", name="changemaindocument", methods={"PUT"})
      *
      * @param Request $request
      *
@@ -345,12 +350,12 @@ abstract class DocumentControllerBase extends AdminController implements KernelC
      *
      * @throws \Exception
      */
-    public function changeMasterDocumentAction(Request $request): JsonResponse
+    public function changeMainDocumentAction(Request $request): JsonResponse
     {
         $doc = Model\Document\PageSnippet::getById((int) $request->get('id'));
         if ($doc instanceof Model\Document\PageSnippet) {
             $doc->setEditables([]);
-            $doc->setContentMasterDocumentId($request->get('contentMasterDocumentPath'), true);
+            $doc->setContentMainDocumentId($request->get('contentMainDocumentPath'), true);
             $doc->saveVersion();
         }
 
@@ -442,7 +447,11 @@ abstract class DocumentControllerBase extends AdminController implements KernelC
             && $document->isAllowed(self::TASK_SAVE):
                 if ($document instanceof Model\Document\PageSnippet) {
                     $this->setValuesToDocument($request, $document);
-                    $version = $document->saveVersion(true, true, null, $task === self::TASK_AUTOSAVE);
+                    if ($task === self::TASK_AUTOSAVE || $document->isPublished()) {
+                        $version = $document->saveVersion(true, true, null, $task === self::TASK_AUTOSAVE);
+                    } else {
+                        $document->save();
+                    }
                 }
 
                 break;

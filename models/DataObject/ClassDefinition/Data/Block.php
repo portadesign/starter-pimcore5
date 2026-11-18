@@ -132,7 +132,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
-     * @param array $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
      * @param array $params
      *
@@ -196,9 +196,9 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     /**
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
-     * @param string $data
+     * @param mixed $data
      * @param DataObject\Concrete|null $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return array|null
      */
@@ -289,9 +289,9 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     /**
      * @see Data::getDataForEditmode
      *
-     * @param array|null $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return array
      */
@@ -337,9 +337,9 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     /**
      * @see Data::getDataFromEditmode
      *
-     * @param array $data
+     * @param mixed $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return array
      */
@@ -473,9 +473,9 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     /**
      * @see Data::getVersionPreview
      *
-     * @param array|null $data
+     * @param mixed $data
      * @param DataObject\Concrete|null $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return string
      */
@@ -505,7 +505,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      *
      * @param array|null $data
      * @param DataObject\Concrete|null $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return string
      */
@@ -519,18 +519,34 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     }
 
     /**
-     * @param Model\DataObject\ClassDefinition\Data\Block $masterDefinition
+     * @param Model\DataObject\ClassDefinition\Data\Block $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(Model\DataObject\ClassDefinition\Data $masterDefinition)
+    public function synchronizeWithMainDefinition(Model\DataObject\ClassDefinition\Data $mainDefinition)
     {
-        $this->disallowAddRemove = $masterDefinition->disallowAddRemove;
-        $this->disallowReorder = $masterDefinition->disallowReorder;
-        $this->collapsible = $masterDefinition->collapsible;
-        $this->collapsed = $masterDefinition->collapsed;
+        $this->disallowAddRemove = $mainDefinition->disallowAddRemove;
+        $this->disallowReorder = $mainDefinition->disallowReorder;
+        $this->collapsible = $mainDefinition->collapsible;
+        $this->collapsed = $mainDefinition->collapsed;
     }
 
     /**
-     * @param DataObject\Data\BlockElement[][]|null $data
+     * @param Model\DataObject\ClassDefinition\Data\Block $masterDefinition
+     *
+     *@deprecated will be removed in Pimcore 11
+     */
+    public function synchronizeWithMasterDefinition(Model\DataObject\ClassDefinition\Data $masterDefinition)
+    {
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
+    }
+
+    /**
+     * @param mixed $data
      *
      * @return bool
      */
@@ -665,11 +681,10 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
         }
 
         $enrichedFieldDefinitions = [];
-        if (is_array($this->fieldDefinitionsCache)) {
-            foreach ($this->fieldDefinitionsCache as $key => $fieldDefinition) {
-                $fieldDefinition = $this->doEnrichFieldDefinition($fieldDefinition, $context);
-                $enrichedFieldDefinitions[$key] = $fieldDefinition;
-            }
+
+        foreach ($this->fieldDefinitionsCache ?? [] as $key => $fieldDefinition) {
+            $fieldDefinition = $this->doEnrichFieldDefinition($fieldDefinition, $context);
+            $enrichedFieldDefinitions[$key] = $fieldDefinition;
         }
 
         return $enrichedFieldDefinitions;
@@ -768,7 +783,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     }
 
     /**
-     * @param array|null $data
+     * @param mixed $data
      *
      * @return array
      */
@@ -902,7 +917,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     }
 
     /**
-     * { @inheritdoc }
+     * {@inheritdoc}
      */
     public function preSetData(/** mixed */ $container, /**  mixed */ $data, /** array */ $params = []) // : mixed
     {
@@ -942,7 +957,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
 
     /**
      * {@inheritdoc}
-     */
+     **/
     public function load($container, $params = [])
     {
         $field = $this->getName();
@@ -1126,6 +1141,9 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
                                 $fd->performMultipleAssignmentCheck($data);
                             }
 
+                            if ($fd instanceof Link) {
+                                $params['resetInvalidFields'] = true;
+                            }
                             $fd->checkValidity($data, false, $params);
                         } catch (Model\Element\ValidationException $ve) {
                             $ve->addContext($this->getName() . '-' . $idx);
@@ -1297,6 +1315,11 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
         return null;
     }
 
+    /**
+     * @param array $data
+     *
+     * @return static
+     */
     public static function __set_state($data)
     {
         $obj = new static();

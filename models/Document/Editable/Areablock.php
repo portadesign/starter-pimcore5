@@ -51,14 +51,14 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     /**
      * @internal
      *
-     * @var array
+     * @var array|null
      */
     protected $currentIndex;
 
     /**
      * @internal
      *
-     * @var bool
+     * @var bool|null
      */
     protected $blockStarted;
 
@@ -365,7 +365,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param bool $return
      */
     public function start($return = false)
     {
@@ -397,7 +397,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param bool $return
      */
     public function end($return = false)
     {
@@ -416,7 +416,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param Document\Editable\Area\Info $info
      */
     public function blockStart($info = null)
     {

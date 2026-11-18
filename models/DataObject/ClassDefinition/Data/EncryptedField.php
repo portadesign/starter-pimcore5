@@ -110,12 +110,11 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
 
     /**
      * @param mixed $data
-     * @param Model\DataObject\Concrete $object
+     * @param Model\DataObject\Concrete|null $object
      * @param array $params
      *
      * @return string
      *
-     * @throws \Defuse\Crypto\Exception\BadFormatException
      * @throws \Defuse\Crypto\Exception\EnvironmentIsBrokenException
      */
     private function encrypt($data, $object, $params = [])
@@ -143,7 +142,7 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
 
     /**
      * @param string|null $data
-     * @param Model\DataObject\Concrete $object
+     * @param Model\DataObject\Concrete|null $object
      * @param array $params
      *
      * @return string|null
@@ -296,6 +295,8 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
     }
 
     /**
+     * @deprecated Will be removed with Pimcore 11
+     *
      * @param Model\DataObject\ClassDefinition\Data\EncryptedField $masterDefinition
      */
     public function synchronizeWithMasterDefinition(Model\DataObject\ClassDefinition\Data $masterDefinition)

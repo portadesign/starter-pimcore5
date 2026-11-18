@@ -316,12 +316,28 @@ class BooleanSelect extends Data implements
     }
 
     /**
+     * @param DataObject\ClassDefinition\Data\BooleanSelect $mainDefinition
+     */
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        $this->options = $mainDefinition->options;
+        $this->width = $mainDefinition->width;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param DataObject\ClassDefinition\Data\BooleanSelect $masterDefinition
      */
     public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
     {
-        $this->options = $masterDefinition->options;
-        $this->width = $masterDefinition->width;
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
     }
 
     /**
@@ -345,6 +361,12 @@ class BooleanSelect extends Data implements
         return $this;
     }
 
+    /**
+     * @param int $value
+     * @param string $label
+     *
+     * @return void
+     */
     public function setOptionsEntry($value, $label)
     {
         if (!is_array($this->options)) {
@@ -374,6 +396,11 @@ class BooleanSelect extends Data implements
         return $this->noLabel;
     }
 
+    /**
+     * @param string $noLabel
+     *
+     * @return $this
+     */
     public function setNoLabel($noLabel)
     {
         $this->noLabel = $noLabel;
@@ -390,6 +417,11 @@ class BooleanSelect extends Data implements
         return $this->emptyLabel;
     }
 
+    /**
+     * @param string $emptyLabel
+     *
+     * @return $this
+     */
     public function setEmptyLabel($emptyLabel)
     {
         $this->emptyLabel = $emptyLabel;
@@ -461,17 +493,6 @@ class BooleanSelect extends Data implements
         }
 
         return null;
-    }
-
-    /**
-     * @param mixed $oldValue
-     * @param mixed $newValue
-     *
-     * @return bool
-     */
-    public function isEqual($oldValue, $newValue): bool
-    {
-        return $oldValue === $newValue;
     }
 
     /**

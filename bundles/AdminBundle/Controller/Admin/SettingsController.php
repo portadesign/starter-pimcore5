@@ -15,7 +15,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Cache;
 use Pimcore\Cache\Core\CoreCacheHandler;
 use Pimcore\Cache\Symfony\CacheClearer;
@@ -25,6 +25,7 @@ use Pimcore\Event\SystemEvents;
 use Pimcore\File;
 use Pimcore\Helper\StopMessengerWorkersTrait;
 use Pimcore\Localization\LocaleServiceInterface;
+use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
 use Pimcore\Model\Document;
@@ -46,21 +47,27 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Yaml\Yaml;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @Route("/settings")
  *
  * @internal
  */
-class SettingsController extends AdminController
+class SettingsController extends AdminAbstractController
 {
     use StopMessengerWorkersTrait;
 
     private const CUSTOM_LOGO_PATH = 'custom-logo.image';
+
+    public function __construct(protected TranslatorInterface $translator)
+    {
+    }
 
     /**
      * @Route("/display-custom-logo", name="pimcore_settings_display_custom_logo", methods={"GET"})
@@ -223,7 +230,7 @@ class SettingsController extends AdminController
             if ($filter = $request->get('filter')) {
                 $list->setFilter(function (Metadata\Predefined $predefined) use ($filter) {
                     foreach ($predefined->getObjectVars() as $value) {
-                        if (stripos($value, $filter) !== false) {
+                        if (stripos((string)$value, $filter) !== false) {
                             return true;
                         }
                     }
@@ -343,7 +350,7 @@ class SettingsController extends AdminController
                             $cellValues = is_array($value) ? $value : [$value];
 
                             foreach ($cellValues as $cellValue) {
-                                if (stripos($cellValue, $filter) !== false) {
+                                if (stripos((string)$cellValue, $filter) !== false) {
                                     return true;
                                 }
                             }
@@ -404,14 +411,12 @@ class SettingsController extends AdminController
         $valueArray['general']['valid_language'] = explode(',', $valueArray['general']['valid_languages']);
 
         //for "wrong" legacy values
-        if (is_array($valueArray['general']['valid_language'])) {
-            foreach ($valueArray['general']['valid_language'] as $existingValue) {
-                if (!in_array($existingValue, $validLanguages)) {
-                    $languageOptions[] = [
-                        'language' => $existingValue,
-                        'display' => $existingValue,
-                    ];
-                }
+        foreach ($valueArray['general']['valid_language'] as $existingValue) {
+            if (!in_array($existingValue, $validLanguages)) {
+                $languageOptions[] = [
+                    'language' => $existingValue,
+                    'display' => $existingValue,
+                ];
             }
         }
 
@@ -859,22 +864,9 @@ class SettingsController extends AdminController
                     throw new ConfigWriteException();
                 }
 
-                if (isset($data["basePage"]) && $data["basePage"]) {
-                    if ($doc = Document::getByPath($data["basePage"])) {
-                        $data["basePage"] = $doc->getId();
-                    }
-                }
-
                 $route->setValues($data);
 
                 $route->save();
-
-                $basePage = $route->getBasePage();
-                if (is_numeric($basePage)) {
-                    if ($doc = Document::getById(intval($basePage))) {
-                        $route->setBasePage($doc->getRealFullPath());
-                    }
-                }
 
                 return $this->adminJson(['data' => $route->getObjectVars(), 'success' => true]);
             } elseif ($request->get('xaction') == 'create') {
@@ -885,23 +877,9 @@ class SettingsController extends AdminController
 
                 // save route
                 $route = new Staticroute();
-
-                if (isset($data["basePage"]) && $data["basePage"]) {
-                    if ($doc = Document::getByPath($data["basePage"])) {
-                        $data["basePage"] = $doc->getId();
-                    }
-                }
-
                 $route->setValues($data);
 
                 $route->save();
-
-                $basePage = $route->getBasePage();
-                if (is_numeric($basePage)) {
-                    if ($doc = Document::getById(intval($basePage))) {
-                        $route->setBasePage($doc->getRealFullPath());
-                    }
-                }
 
                 $responseData = $route->getObjectVars();
                 $responseData['writeable'] = $route->isWriteable();
@@ -930,14 +908,6 @@ class SettingsController extends AdminController
 
             $routes = [];
             foreach ($list->getRoutes() as $routeFromList) {
-                if ($basePage = $routeFromList->getBasePage()) {
-                    if (is_numeric($basePage)) {
-                        if ($doc = Document::getById(intval($basePage))) {
-                            $routeFromList->setBasePage($doc->getRealFullPath());
-                        }
-                    }
-                }
-
                 $route = $routeFromList->getObjectVars();
                 $route['writeable'] = $routeFromList->isWriteable();
                 if (is_array($routeFromList->getSiteId())) {
@@ -1101,6 +1071,15 @@ class SettingsController extends AdminController
      */
     public function getAvailableSitesAction(Request $request)
     {
+        try {
+            // we need to check documents permission for listing purposes in sites ext model & url-slugs
+            $this->checkPermission('documents');
+        } catch (AccessDeniedHttpException $e) {
+            Logger::log('[Startup] Sites are not loaded as "documents" permission is missing');
+            //return empty string to avoid error on startup
+            return $this->adminJson([]);
+        }
+
         $excludeMainSite = $request->get('excludeMainSite');
 
         $sitesList = new Model\Site\Listing();
@@ -1112,7 +1091,7 @@ class SettingsController extends AdminController
                 'rootId' => 1,
                 'domains' => '',
                 'rootPath' => '/',
-                'domain' => $this->trans('main_site'),
+                'domain' => $this->translator->trans('main_site'),
             ];
         }
 
@@ -1168,17 +1147,18 @@ class SettingsController extends AdminController
      * @Route("/thumbnail-adapter-check", name="pimcore_admin_settings_thumbnailadaptercheck", methods={"GET"})
      *
      * @param Request $request
+     * @param TranslatorInterface $translator
      *
      * @return Response
      */
-    public function thumbnailAdapterCheckAction(Request $request)
+    public function thumbnailAdapterCheckAction(Request $request, TranslatorInterface $translator)
     {
         $content = '';
 
         $instance = \Pimcore\Image::getInstance();
         if ($instance instanceof \Pimcore\Image\Adapter\GD) {
             $content = '<span style="color: red; font-weight: bold;padding: 10px;margin:0 0 20px 0;border:1px solid red;display:block;">' .
-                $this->trans('important_use_imagick_pecl_extensions_for_best_results_gd_is_just_a_fallback_with_less_quality') .
+                $translator->trans('important_use_imagick_pecl_extensions_for_best_results_gd_is_just_a_fallback_with_less_quality', [], 'admin') .
                 '</span>';
         }
 
@@ -1399,16 +1379,17 @@ class SettingsController extends AdminController
      * @Route("/video-thumbnail-adapter-check", name="pimcore_admin_settings_videothumbnailadaptercheck", methods={"GET"})
      *
      * @param Request $request
+     * @param TranslatorInterface $translator
      *
      * @return Response
      */
-    public function videoThumbnailAdapterCheckAction(Request $request)
+    public function videoThumbnailAdapterCheckAction(Request $request, TranslatorInterface $translator)
     {
         $content = '';
 
         if (!\Pimcore\Video::isAvailable()) {
             $content = '<span style="color: red; font-weight: bold;padding: 10px;margin:0 0 20px 0;border:1px solid red;display:block;">' .
-                $this->trans('php_cli_binary_and_or_ffmpeg_binary_setting_is_missing') .
+                $translator->trans('php_cli_binary_and_or_ffmpeg_binary_setting_is_missing', [], 'admin') .
                 '</span>';
         }
 
@@ -1589,7 +1570,7 @@ class SettingsController extends AdminController
                 $type = $item['type'];
                 unset($item['type']);
 
-                $pipe->addItem($type, $item, $mediaName);
+                $pipe->addItem($type, $item, htmlspecialchars($mediaName));
             }
         }
 

@@ -28,6 +28,8 @@ class StructuredTable extends Data implements ResourcePersistenceAwareInterface,
     use Data\Extension\PositionSortTrait;
 
     /**
+     * @deprecated Will be removed with Pimcore 11
+     *
      * Static type of this element
      *
      * @var string
@@ -544,14 +546,30 @@ class StructuredTable extends Data implements ResourcePersistenceAwareInterface,
     }
 
     /**
+     * @param DataObject\ClassDefinition\Data\StructuredTable $mainDefinition
+     */
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        $this->labelWidth = $mainDefinition->labelWidth;
+        $this->labelFirstCell = $mainDefinition->labelFirstCell;
+        $this->cols = $mainDefinition->cols;
+        $this->rows = $mainDefinition->rows;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param DataObject\ClassDefinition\Data\StructuredTable $masterDefinition
      */
     public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
     {
-        $this->labelWidth = $masterDefinition->labelWidth;
-        $this->labelFirstCell = $masterDefinition->labelFirstCell;
-        $this->cols = $masterDefinition->cols;
-        $this->rows = $masterDefinition->rows;
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
     }
 
     /**

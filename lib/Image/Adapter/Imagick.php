@@ -25,12 +25,12 @@ use Pimcore\Model\Asset;
 class Imagick extends Adapter
 {
     /**
-     * @var string
+     * @var string|null
      */
     protected static $RGBColorProfile;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected static $CMYKColorProfile;
 
@@ -45,7 +45,7 @@ class Imagick extends Adapter
     protected $imagePath;
 
     /**
-     * @var array
+     * @var array<string, bool>
      */
     protected static $supportedFormatsCache = [];
 
@@ -155,8 +155,7 @@ class Imagick extends Adapter
                 //}
             }
         } catch (\Exception $e) {
-            Logger::error('Unable to load image: ' . $imagePath);
-            Logger::error($e->getMessage());
+            Logger::error('Unable to load image ' . $imagePath . ': ' . $e);
 
             return false;
         }
@@ -349,7 +348,7 @@ class Imagick extends Adapter
             for ($i = 0; $i < $width; $i++) {
                 for ($j = 0; $j < $height; $j++) {
                     $pixel = $this->resource->getImagePixelColor($i, $j);
-                    $color = $pixel->getColor(true); // get the real alpha not just 1/0
+                    $color = $pixel->getColor(1); // get the real alpha not just 1/0
                     if ($color['a'] < 1) { // if there's an alpha pixel, return true
                         return true;
                     }
@@ -837,7 +836,7 @@ class Imagick extends Adapter
             }
 
             $newImage->evaluateImage(\Imagick::EVALUATE_MULTIPLY, $alpha, \Imagick::CHANNEL_ALPHA);
-            $this->resource->compositeImage($newImage, constant('Imagick::' . $composite), $x, $y);
+            $this->resource->compositeImage($newImage, constant('Imagick::' . $composite), (int)$x, (int)$y);
         }
 
         $this->postModify();
@@ -922,7 +921,12 @@ class Imagick extends Adapter
     }
 
     /**
-     * {@inheritdoc}
+     * @param float $radius
+     * @param float $sigma
+     * @param float $amount
+     * @param float $threshold
+     *
+     * @return $this
      */
     public function sharpen($radius = 0, $sigma = 1.0, $amount = 1.0, $threshold = 0.05)
     {
@@ -977,7 +981,9 @@ class Imagick extends Adapter
     }
 
     /**
-     * {@inheritdoc}
+     * @param string $imagePath
+     *
+     * @return bool
      */
     public function isVectorGraphic($imagePath = null)
     {

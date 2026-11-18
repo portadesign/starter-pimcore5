@@ -18,6 +18,7 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
     dirty: false,
     addedTypes: {},
     preventDelete: {},
+    inheritedCount: 0,
 
     initialize: function (data, fieldConfig) {
 
@@ -236,7 +237,12 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
             if (!this.layoutDefinitions[type]) {
                 return;
             }
-            if (this.fieldConfig.maxItems && this.getCurrentElementsCount() >= this.fieldConfig.maxItems) {
+
+            if(blockData && blockData.inherited) {
+                this.inheritedCount++;
+            }
+
+            if (this.fieldConfig.maxItems && this.getCurrentElementsCount() >= this.fieldConfig.maxItems + this.inheritedCount) {
                 Ext.Msg.alert(t("error"), t("limit_reached"));
                 return;
             }
@@ -291,16 +297,14 @@ pimcore.object.tags.objectbricks = Class.create(pimcore.object.tags.abstract, {
                     afterrender: function (childConfig, dataProvider, manuallyAdded, panel) {
                         if (!panel.__tabpanel_initialized) {
                             var copy = Ext.decode(Ext.encode(childConfig));
-                            var children = this.getRecursiveLayout(copy, null, {
+                            var children = this.getRecursiveLayout(copy, this.fieldConfig.noteditable, {
                                 containerType: "objectbrick",
                                 containerKey: type,
                                 ownerName: this.fieldConfig.name,
                                 applyDefaults: manuallyAdded
                             }, false, true, dataProvider);
-                            if (this.fieldConfig.noteditable && children) {
-                                children.forEach(function (record) {
-                                    record.disabled = true;
-                                });
+                            if (this.fieldConfig.noteditable){
+                                panel.mask();
                             }
 
                             if (children) {

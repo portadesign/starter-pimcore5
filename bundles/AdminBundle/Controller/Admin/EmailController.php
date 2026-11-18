@@ -15,7 +15,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Http\RequestHelper;
 use Pimcore\Logger;
 use Pimcore\Mail;
@@ -33,7 +33,7 @@ use Symfony\Component\Routing\Annotation\Route;
  *
  * @internal
  */
-class EmailController extends AdminController
+class EmailController extends AdminAbstractController
 {
     /**
      * @Route("/email-logs", name="pimcore_admin_email_emaillogs", methods={"GET", "POST"})
@@ -440,7 +440,7 @@ class EmailController extends AdminController
     }
 
     /**
-     * @Route("/blacklist", name="pimcore_admin_email_blacklist", methods={"POST"})
+     * @Route("/blocklist", name="pimcore_admin_email_blocklist", methods={"POST"})
      *
      * @param Request $request
      *
@@ -448,7 +448,7 @@ class EmailController extends AdminController
      *
      * @throws \Exception
      */
-    public function blacklistAction(Request $request)
+    public function blocklistAction(Request $request)
     {
         if (!$this->getAdminUser()->isAllowed('emails')) {
             throw new \Exception("Permission denied, user needs 'emails' permission.");
@@ -458,20 +458,24 @@ class EmailController extends AdminController
             $data = $this->decodeJson($request->get('data'));
 
             if (is_array($data)) {
-                foreach ($data as &$value) {
+                foreach ($data as $key => &$value) {
                     if (is_string($value)) {
+                        if ($key === 'address') {
+                            $value = filter_var($value, FILTER_SANITIZE_EMAIL);
+                        }
+
                         $value = trim($value);
                     }
                 }
             }
 
             if ($request->get('xaction') == 'destroy') {
-                $address = Tool\Email\Blacklist::getByAddress($data['address']);
+                $address = Tool\Email\Blocklist::getByAddress($data['address']);
                 $address->delete();
 
                 return $this->adminJson(['success' => true, 'data' => []]);
             } elseif ($request->get('xaction') == 'update') {
-                $address = Tool\Email\Blacklist::getByAddress($data['address']);
+                $address = Tool\Email\Blocklist::getByAddress($data['address']);
                 $address->setValues($data);
                 $address->save();
 
@@ -479,7 +483,7 @@ class EmailController extends AdminController
             } elseif ($request->get('xaction') == 'create') {
                 unset($data['id']);
 
-                $address = new Tool\Email\Blacklist();
+                $address = new Tool\Email\Blocklist();
                 $address->setValues($data);
                 $address->save();
 
@@ -488,7 +492,7 @@ class EmailController extends AdminController
         } else {
             // get list of routes
 
-            $list = new Tool\Email\Blacklist\Listing();
+            $list = new Tool\Email\Blocklist\Listing();
 
             $list->setLimit($request->get('limit'));
             $list->setOffset($request->get('start'));

@@ -128,8 +128,8 @@ class Builder
      */
     public function getNavigation($activeDocument = null, $navigationRootDocument = null, $htmlMenuIdPrefix = null, $pageCallback = null, $cache = true, ?int $maxDepth = null, ?int $cacheLifetime = null)
     {
-        //TODO Pimcore 11: remove the `if (func_num_args() > 1)` block to remove the BC layer
-        if (func_num_args() > 1) {
+        //TODO Pimcore 11: remove the `if (...)` block to remove the BC layer
+        if (func_num_args() > 1 || ($activeDocument !== null && !is_array($activeDocument))) {
             trigger_deprecation('pimcore/pimcore', '10.5', 'Calling Pimcore\Navigation\Builder::getNavigation() using extra arguments is deprecated and will be removed in Pimcore 11.' .
             'Instead, specify the arguments as an array');
         } else {
@@ -407,7 +407,7 @@ class Builder
                 continue;
             }
 
-            if (($child instanceof Document\Folder || $child instanceof Document\Page || $child instanceof Document\Link) && $child->getProperty('navigation_name')) {
+            if ($child instanceof Document\Folder || $child instanceof Document\Page || $child instanceof Document\Link) {
                 $path = $child->getFullPath();
                 if ($child instanceof Document\Link) {
                     $path = $child->getHref();
@@ -429,7 +429,7 @@ class Builder
                 $page->setRelation($child->getProperty('navigation_relation'));
                 $page->setDocument($child);
 
-                if ($child->getProperty('navigation_exclude') || !$child->getPublished()) {
+                if (trim((string)$child->getProperty('navigation_name')) === '' || $child->getProperty('navigation_exclude') || !$child->getPublished()) {
                     $page->setVisible(false);
                 }
 

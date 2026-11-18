@@ -19,6 +19,7 @@ use League\Flysystem\FilesystemException;
 use Pimcore\Config as PimcoreConfig;
 use Pimcore\File;
 use Pimcore\Helper\TemporaryFileHelperTrait;
+use Pimcore\Image\Adapter;
 use Pimcore\Logger;
 use Pimcore\Messenger\OptimizeImageMessage;
 use Pimcore\Model\Asset;
@@ -99,8 +100,13 @@ class Processor
      *
      * @throws \Exception
      */
-    public static function process(Asset $asset, Config $config, $fileSystemPath = null, $deferred = false, &$generated = false)
-    {
+    public static function process(
+        Asset $asset,
+        Config $config,
+        $fileSystemPath = null,
+        $deferred = false,
+        &$generated = false
+    ) {
         $generated = false;
         $format = strtolower($config->getFormat());
         // Optimize if allowed to strip info.
@@ -185,14 +191,16 @@ class Processor
         if ($statusCacheEnabled && $deferred) {
             $modificationDate = $asset->getDao()->getCachedThumbnailModificationDate($config->getName(), $filename);
         } else {
-            if ($storage->fileExists($storagePath)) {
+            try {
                 $modificationDate = $storage->lastModified($storagePath);
+            } catch (FilesystemException $e) {
+                // nothing to do
             }
         }
 
         if ($modificationDate) {
             try {
-                if ($modificationDate >= $asset->getModificationDate()) {
+                if ($modificationDate >= $asset->getDataModificationDate()) {
                     return [
                         'src' => $storagePath,
                         'type' => 'thumbnail',
@@ -203,6 +211,11 @@ class Processor
                     // the local tmp-file to the real storage a bit further down doesn't work, as it has a
                     // check for race-conditions & locking, so it needs to check for the existence of the thumbnail
                     $storage->delete($storagePath);
+
+                    // refresh the thumbnail cache, if the asset modification date is modified
+                    // this is necessary because the thumbnail cache is not cleared automatically
+                    // when the original asset is modified
+                    $asset->getDao()->deleteFromThumbnailCache($config->getName());
                 }
             } catch (FilesystemException $e) {
                 // nothing to do
@@ -243,6 +256,7 @@ class Processor
                 $fileExists = true;
             }
         } catch (\Exception $e) {
+            Logger::debug($e->getMessage());
         }
 
         if ($fileExists === false) {
@@ -261,7 +275,9 @@ class Processor
                 }
 
                 if (is_resource($fileSystemPath)) {
+                    $fileSystemPathStream = $fileSystemPath;
                     $fileSystemPath = self::getLocalFileFromStream($fileSystemPath);
+                    @fclose($fileSystemPathStream);
                 }
 
                 if (!file_exists($fileSystemPath)) {
@@ -323,98 +339,7 @@ class Processor
                     }
                 }
 
-                if (is_array($transformations) && count($transformations) > 0) {
-                    $sourceImageWidth = PHP_INT_MAX;
-                    $sourceImageHeight = PHP_INT_MAX;
-                    if ($asset instanceof Asset\Image) {
-                        $sourceImageWidth = $asset->getWidth();
-                        $sourceImageHeight = $asset->getHeight();
-                    }
-
-                    $highResFactor = $config->getHighResolution();
-                    $imageCropped = false;
-
-                    $calculateMaxFactor = function ($factor, $original, $new) {
-                        $newFactor = $factor * $original / $new;
-                        if ($newFactor < 1) {
-                            // don't go below factor 1
-                            $newFactor = 1;
-                        }
-
-                        return $newFactor;
-                    };
-
-                    // sorry for the goto/label - but in this case it makes life really easier and the code more readable
-                    prepareTransformations:
-
-                    foreach ($transformations as &$transformation) {
-                        if (!empty($transformation) && !isset($transformation['isApplied'])) {
-                            $arguments = [];
-
-                            if (is_string($transformation['method'])) {
-                                $mapping = self::$argumentMapping[$transformation['method']];
-
-                                if (is_array($transformation['arguments'])) {
-                                    foreach ($transformation['arguments'] as $key => $value) {
-                                        $position = array_search($key, $mapping);
-                                        if ($position !== false) {
-                                            // high res calculations if enabled
-                                            if (!in_array($transformation['method'], ['cropPercent']) && in_array($key,
-                                                ['width', 'height', 'x', 'y'])) {
-                                                if ($highResFactor && $highResFactor > 1) {
-                                                    $value *= $highResFactor;
-                                                    $value = (int)ceil($value);
-
-                                                    if (!isset($transformation['arguments']['forceResize']) || !$transformation['arguments']['forceResize']) {
-                                                        // check if source image is big enough otherwise adjust the high-res factor
-                                                        if (in_array($key, ['width', 'x'])) {
-                                                            if ($sourceImageWidth < $value) {
-                                                                $highResFactor = $calculateMaxFactor(
-                                                                    $highResFactor,
-                                                                    $sourceImageWidth,
-                                                                    $value
-                                                                );
-                                                                goto prepareTransformations;
-                                                            }
-                                                        } elseif (in_array($key, ['height', 'y'])) {
-                                                            if ($sourceImageHeight < $value) {
-                                                                $highResFactor = $calculateMaxFactor(
-                                                                    $highResFactor,
-                                                                    $sourceImageHeight,
-                                                                    $value
-                                                                );
-                                                                goto prepareTransformations;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            // inject the focal point
-                                            if ($transformation['method'] == 'cover' && $key == 'positioning' && $asset->getCustomSetting('focalPointX')) {
-                                                $value = [
-                                                    'x' => $asset->getCustomSetting('focalPointX'),
-                                                    'y' => $asset->getCustomSetting('focalPointY'),
-                                                ];
-                                            }
-
-                                            $arguments[$position] = $value;
-                                        }
-                                    }
-                                }
-                            }
-
-                            ksort($arguments);
-                            if (!is_string($transformation['method']) && is_callable($transformation['method'])) {
-                                $transformation['method']($image);
-                            } elseif (method_exists($image, $transformation['method'])) {
-                                call_user_func_array([$image, $transformation['method']], $arguments);
-                            }
-
-                            $transformation['isApplied'] = true;
-                        }
-                    }
-                }
+                self::applyTransformations($image, $asset, $config, $transformations);
 
                 if ($optimizedFormat) {
                     $format = $image->getContentOptimizedFormat();
@@ -428,33 +353,35 @@ class Processor
                     fclose($stream);
                 }
 
-                if ($statusCacheEnabled) {
-                    if ($imageInfo = @getimagesize($tmpFsPath)) {
-                        $asset->getDao()->addToThumbnailCache($config->getName(), $filename, filesize($tmpFsPath), $imageInfo[0], $imageInfo[1]);
-                    }
+                if ($statusCacheEnabled && $asset instanceof Asset\Image) {
+                    //update thumbnail dimensions to cache
+                    $asset->addThumbnailFileToCache($tmpFsPath, $filename, $config);
                 }
-
-                unlink($tmpFsPath);
 
                 $generated = true;
 
-                $isImageOptimizersEnabled = PimcoreConfig::getSystemConfiguration('assets')['image']['thumbnails']['image_optimizers']['enabled'];
+                $pimcoreAssetsConfig = PimcoreConfig::getSystemConfiguration('assets');
+                $isImageOptimizersEnabled = $pimcoreAssetsConfig['image']['thumbnails']['image_optimizers']['enabled'];
                 if ($optimizedFormat && $optimizeContent && $isImageOptimizersEnabled) {
                     \Pimcore::getContainer()->get('messenger.bus.pimcore-core')->dispatch(
                         new OptimizeImageMessage($storagePath)
                     );
                 }
 
-                Logger::debug('Thumbnail ' . $storagePath . ' generated in ' . (microtime(true) - $startTime) . ' seconds');
+                Logger::debug('Thumbnail ' . $storagePath . ' generated in ' .
+                    (microtime(true) - $startTime) . ' seconds');
             } else {
-                Logger::debug('Thumbnail ' . $storagePath . ' already generated, waiting on lock for ' . (microtime(true) - $startTime) . ' seconds');
+                Logger::debug('Thumbnail ' . $storagePath . ' already generated, waiting on lock for ' .
+                    (microtime(true) - $startTime) . ' seconds');
             }
             $lock->release();
         }
 
-        // quick bugfix / workaround, it seems that imagemagick / image optimizers creates sometimes empty PNG chunks (total size 33 bytes)
+        // quick bugfix / workaround,
+        //it seems that imagemagick / image optimizers creates sometimes empty PNG chunks (total size 33 bytes)
         // no clue why it does so as this is not continuous reproducible, and this is the only fix we can do for now
-        // if the file is corrupted the file will be created on the fly when requested by the browser (because it's deleted here)
+        // if the file is corrupted the file will be created on the fly
+        //when requested by the browser (because it's deleted here)
         if ($storage->fileExists($storagePath) && $storage->fileSize($storagePath) < 50) {
             $storage->delete($storagePath);
             $asset->getDao()->deleteFromThumbnailCache($config->getName(), $filename);
@@ -470,6 +397,118 @@ class Processor
             'type' => 'thumbnail',
             'storagePath' => $storagePath,
         ];
+    }
+
+    /**
+     * @param Adapter $image
+     * @param Asset $asset
+     * @param Config $config
+     * @param array|null $transformations
+     *
+     * @return void
+     */
+    private static function applyTransformations(Adapter $image, Asset $asset, Config $config, ?array $transformations): void
+    {
+        if (is_array($transformations) && !empty($transformations)) {
+            $sourceImageWidth = PHP_INT_MAX;
+            $sourceImageHeight = PHP_INT_MAX;
+            if ($asset instanceof Asset\Image) {
+                $sourceImageWidth = $asset->getWidth();
+                $sourceImageHeight = $asset->getHeight();
+            }
+
+            $highResFactor = $config->getHighResolution();
+
+            $calculateMaxFactor = function ($factor, $original, $new) {
+                $newFactor = $factor * $original / $new;
+                if ($newFactor < 1) {
+                    // don't go below factor 1
+                    $newFactor = 1;
+                }
+
+                return $newFactor;
+            };
+
+            // sorry for the goto/label - but in this case it makes life really easier and the code more readable
+            prepareTransformations:
+
+            foreach ($transformations as &$transformation) {
+                if (!empty($transformation) && !isset($transformation['isApplied'])) {
+                    $arguments = [];
+
+                    if (is_string($transformation['method'])) {
+                        $mapping = self::$argumentMapping[$transformation['method']];
+
+                        if (is_array($transformation['arguments'])) {
+                            foreach ($transformation['arguments'] as $key => $value) {
+                                $position = array_search($key, $mapping);
+                                if ($position !== false) {
+                                    // high res calculations if enabled
+                                    if (!in_array($transformation['method'], ['cropPercent']) && in_array($key,
+                                        ['width', 'height', 'x', 'y'])) {
+                                        if ($highResFactor && $highResFactor > 1) {
+                                            $value *= $highResFactor;
+                                            $value = (int)ceil($value);
+
+                                            if (!isset($transformation['arguments']['forceResize']) ||
+                                                !$transformation['arguments']['forceResize']) {
+                                                // check if source image is big enough otherwise adjust high-res factor
+                                                if (in_array($key, ['width', 'x'])) {
+                                                    if ($sourceImageWidth < $value) {
+                                                        $highResFactor = $calculateMaxFactor(
+                                                            $highResFactor,
+                                                            $sourceImageWidth,
+                                                            $value
+                                                        );
+                                                        goto prepareTransformations;
+                                                    }
+                                                } elseif (in_array($key, ['height', 'y'])) {
+                                                    if ($sourceImageHeight < $value) {
+                                                        $highResFactor = $calculateMaxFactor(
+                                                            $highResFactor,
+                                                            $sourceImageHeight,
+                                                            $value
+                                                        );
+                                                        goto prepareTransformations;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // inject the focal point
+                                    if ($transformation['method'] == 'cover' &&
+                                        $key == 'positioning' &&
+                                        $asset->getCustomSetting('focalPointX')) {
+                                        $value = [
+                                            'x' => $asset->getCustomSetting('focalPointX'),
+                                            'y' => $asset->getCustomSetting('focalPointY'),
+                                        ];
+                                    }
+
+                                    $arguments[$position] = $value;
+                                }
+                            }
+                        }
+                    }
+
+                    ksort($arguments);
+                    if (!is_string($transformation['method']) && is_callable($transformation['method'])) {
+                        trigger_deprecation(
+                            'pimcore/pimcore',
+                            '10.6',
+                            'Using Callable in thumbnail transformations is deprecated and will not work on Pimcore 11.'
+                        );
+
+                        $transformation['method']($image);
+                    } elseif (method_exists($image, $transformation['method'])) {
+                        call_user_func_array([$image, $transformation['method']], $arguments);
+                    }
+
+                    $transformation['isApplied'] = true;
+                }
+            }
+        }
     }
 
     /**

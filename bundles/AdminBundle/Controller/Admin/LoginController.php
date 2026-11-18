@@ -15,7 +15,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Bundle\AdminBundle\Controller\BruteforceProtectedControllerInterface;
 use Pimcore\Bundle\AdminBundle\Security\Authenticator\AdminLoginAuthenticator;
 use Pimcore\Bundle\AdminBundle\Security\BruteforceProtectionHandler;
@@ -26,9 +26,11 @@ use Pimcore\Controller\KernelResponseEventInterface;
 use Pimcore\Event\Admin\Login\LoginRedirectEvent;
 use Pimcore\Event\Admin\Login\LostPasswordEvent;
 use Pimcore\Event\AdminEvents;
+use Pimcore\Extension\Bundle\PimcoreBundleManager;
 use Pimcore\Http\ResponseHelper;
 use Pimcore\Logger;
 use Pimcore\Model\User;
+use Pimcore\Security\SecurityHelper;
 use Pimcore\Tool;
 use Pimcore\Tool\Authentication;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -36,6 +38,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
@@ -43,14 +46,18 @@ use Symfony\Component\Security\Core\Security;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Symfony\Contracts\Translation\LocaleAwareInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @internal
  */
-class LoginController extends AdminController implements BruteforceProtectedControllerInterface, KernelControllerEventInterface, KernelResponseEventInterface
+class LoginController extends AdminAbstractController implements BruteforceProtectedControllerInterface, KernelControllerEventInterface, KernelResponseEventInterface
 {
     public function __construct(
         protected ResponseHelper $responseHelper,
+        protected TranslatorInterface $translator,
+        protected PimcoreBundleManager $bundleManager,
+        protected EventDispatcherInterface $eventDispatcher,
     ) {
     }
 
@@ -71,8 +78,8 @@ class LoginController extends AdminController implements BruteforceProtectedCont
             }
         }
 
-        if ($this->getTranslator() instanceof LocaleAwareInterface) {
-            $this->getTranslator()->setLocale($locale);
+        if ($this->translator instanceof LocaleAwareInterface) {
+            $this->translator->setLocale($locale);
         }
     }
 
@@ -92,8 +99,14 @@ class LoginController extends AdminController implements BruteforceProtectedCont
      */
     public function loginAction(Request $request, CsrfProtectionHandler $csrfProtection, Config $config)
     {
+        $queryParams = $request->query->all();
         if ($request->get('_route') === 'pimcore_admin_login_fallback') {
-            return $this->redirectToRoute('pimcore_admin_login', $request->query->all(), Response::HTTP_MOVED_PERMANENTLY);
+            return $this->redirectToRoute('pimcore_admin_login', $queryParams, Response::HTTP_MOVED_PERMANENTLY);
+        }
+
+        $redirectUrl = $this->dispatchLoginRedirect($queryParams);
+        if ($this->generateUrl('pimcore_admin_login', $queryParams) != $redirectUrl) {
+            return new RedirectResponse($redirectUrl);
         }
 
         $csrfProtection->regenerateCsrfToken();
@@ -112,6 +125,9 @@ class LoginController extends AdminController implements BruteforceProtectedCont
 
         $params['csrfTokenRefreshInterval'] = ((int)$session_gc_maxlifetime - 60) * 1000;
 
+        if ($request->get('too_many_attempts')) {
+            $params['error'] = SecurityHelper::convertHtmlSpecialChars($request->get('too_many_attempts'));
+        }
         if ($request->get('auth_failed')) {
             $params['error'] = 'error_auth_failed';
         }
@@ -167,31 +183,45 @@ class LoginController extends AdminController implements BruteforceProtectedCont
     /**
      * @Route("/login/lostpassword", name="pimcore_admin_login_lostpassword")
      */
-    public function lostpasswordAction(Request $request, ?BruteforceProtectionHandler $bruteforceProtectionHandler, CsrfProtectionHandler $csrfProtection, Config $config, EventDispatcherInterface $eventDispatcher)
+    public function lostpasswordAction(Request $request, ?BruteforceProtectionHandler $bruteforceProtectionHandler, CsrfProtectionHandler $csrfProtection, Config $config, RateLimiterFactory $resetPasswordLimiter)
     {
         $params = $this->buildLoginPageViewParams($config);
         $error = null;
 
         if ($request->getMethod() === 'POST' && $username = $request->get('username')) {
             $user = User::getByName($username);
-
-            if ($user instanceof User) {
-                if (!$user->isActive()) {
-                    $error = 'user_inactive';
-                }
-
-                if (!$user->getEmail()) {
-                    $error = 'user_no_email_address';
-                }
-
-                if (!$user->getPassword()) {
-                    $error = 'user_no_password';
-                }
-            } else {
+            if (!$user instanceof User) {
                 $error = 'user_unknown';
             }
 
-            if (!$error && $user instanceof User) {
+            // TODO Pimcore 11: remove this BC layer, only the RateLimiter would be valid
+            if ($bruteforceProtectionHandler) {
+                try {
+                    $bruteforceProtectionHandler->checkProtection($username, $request);
+                } catch (\Exception $e) {
+                    $error = 'user_reset_password_too_many_attempts';
+                }
+            } else {
+                $limiter = $resetPasswordLimiter->create($request->getClientIp());
+
+                if (false === $limiter->consume(1)->isAccepted()) {
+                    $error = 'user_reset_password_too_many_attempts';
+                }
+            }
+
+            if (!$error) {
+                if (!$user->isActive()) {
+                    $error = 'user_inactive';
+                }
+                if (!$user->getEmail()) {
+                    $error = 'user_no_email_address';
+                }
+                if (!$user->getPassword()) {
+                    $error = 'user_no_password';
+                }
+            }
+
+            if (!$error) {
                 $token = Authentication::generateToken($user->getName());
 
                 $loginUrl = $this->generateUrl('pimcore_admin_login_check', [
@@ -201,7 +231,7 @@ class LoginController extends AdminController implements BruteforceProtectedCont
 
                 try {
                     $event = new LostPasswordEvent($user, $loginUrl);
-                    $eventDispatcher->dispatch($event, AdminEvents::LOGIN_LOSTPASSWORD);
+                    $this->eventDispatcher->dispatch($event, AdminEvents::LOGIN_LOSTPASSWORD);
 
                     // only send mail if it wasn't prevented in event
                     if ($event->getSendMail()) {
@@ -229,42 +259,45 @@ class LoginController extends AdminController implements BruteforceProtectedCont
 
         $csrfProtection->regenerateCsrfToken();
 
+        if ($error) {
+            $params['reset_error'] = 'Please make sure you are entering a correct input.';
+            if ($error === 'user_reset_password_too_many_attempts') {
+                $params['reset_error'] = 'Too many attempts. Please retry later.';
+            }
+        }
+
         return $this->render('@PimcoreAdmin/Admin/Login/lostpassword.html.twig', $params);
     }
 
     /**
      * @Route("/login/deeplink", name="pimcore_admin_login_deeplink")
      */
-    public function deeplinkAction(Request $request, EventDispatcherInterface $eventDispatcher)
+    public function deeplinkAction(Request $request)
     {
         // check for deeplink
         $queryString = $_SERVER['QUERY_STRING'];
 
         if (preg_match('/(document|asset|object)_([0-9]+)_([a-z]+)/', $queryString, $deeplink)) {
             $deeplink = $deeplink[0];
-            $perspective = strip_tags($request->get('perspective'));
+            $perspective = strip_tags($request->get('perspective', ''));
 
             if (strpos($queryString, 'token')) {
-                $event = new LoginRedirectEvent('pimcore_admin_login', [
+                $url = $this->dispatchLoginRedirect([
                     'deeplink' => $deeplink,
                     'perspective' => $perspective,
                 ]);
-                $eventDispatcher->dispatch($event, AdminEvents::LOGIN_REDIRECT);
-
-                $url = $this->generateUrl($event->getRouteName(), $event->getRouteParams());
                 $url .= '&' . $queryString;
 
                 return $this->redirect($url);
             } elseif ($queryString) {
-                $event = new LoginRedirectEvent('pimcore_admin_login', [
+                $url = $this->dispatchLoginRedirect([
                     'deeplink' => 'true',
                     'perspective' => $perspective,
                 ]);
-                $eventDispatcher->dispatch($event, AdminEvents::LOGIN_REDIRECT);
 
                 return $this->render('@PimcoreAdmin/Admin/Login/deeplink.html.twig', [
                     'tab' => $deeplink,
-                    'redirect' => $this->generateUrl($event->getRouteName(), $event->getRouteParams()),
+                    'redirect' => $url,
                 ]);
             }
         }
@@ -274,7 +307,7 @@ class LoginController extends AdminController implements BruteforceProtectedCont
     {
         return [
             'config' => $config,
-            'pluginCssPaths' => $this->getBundleManager()->getCssPaths(),
+            'pluginCssPaths' => $this->bundleManager->getCssPaths(),
         ];
     }
 
@@ -337,5 +370,13 @@ class LoginController extends AdminController implements BruteforceProtectedCont
         }
 
         return $supported;
+    }
+
+    private function dispatchLoginRedirect(array $routeParams = []): string
+    {
+        $event = new LoginRedirectEvent('pimcore_admin_login', $routeParams);
+        $this->eventDispatcher->dispatch($event, AdminEvents::LOGIN_REDIRECT);
+
+        return $this->generateUrl($event->getRouteName(), $event->getRouteParams());
     }
 }

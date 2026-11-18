@@ -17,7 +17,7 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Types\Types;
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Bundle\AdminBundle\Helper\QueryParams;
 use Pimcore\Controller\KernelControllerEventInterface;
 use Pimcore\Log\Handler\ApplicationLoggerDb;
@@ -33,7 +33,7 @@ use Symfony\Component\Routing\Annotation\Route;
 /**
  * @internal
  */
-class LogController extends AdminController implements KernelControllerEventInterface
+class LogController extends AdminAbstractController implements KernelControllerEventInterface
 {
     /**
      * @param ControllerEvent $event
@@ -67,26 +67,15 @@ class LogController extends AdminController implements KernelControllerEventInte
         ));
 
         if ($sortingSettings['orderKey']) {
-            $qb->orderBy($sortingSettings['orderKey'], $sortingSettings['order']);
+            $qb->orderBy($db->quoteIdentifier($sortingSettings['orderKey']), $sortingSettings['order']);
         } else {
             $qb->orderBy('id', 'DESC');
         }
 
         $priority = $request->get('priority');
-        if ($priority !== '-1' && ($priority == '0' || $priority)) {
-            $levels = [];
-
-            // add every level until the filtered one
-            foreach (['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug'] as $level) {
-                $levels[] = $level;
-
-                if ($priority === $level) {
-                    break;
-                }
-            }
-
-            $qb->andWhere($qb->expr()->in('priority', ':priority'));
-            $qb->setParameter('priority', $levels, Connection::PARAM_STR_ARRAY);
+        if(!empty($priority)) {
+            $qb->andWhere($qb->expr()->eq('priority', ':priority'));
+            $qb->setParameter('priority', $priority);
         }
 
         if ($fromDate = $this->parseDateObject($request->get('fromDate'), $request->get('fromTime'))) {
@@ -137,7 +126,7 @@ class LogController extends AdminController implements KernelControllerEventInte
                 'pid' => $row['pid'],
                 'message' => $row['message'],
                 'timestamp' => $row['timestamp'],
-                'priority' => $this->getPriorityName($row['priority']),
+                'priority' => $row['priority'],
                 'fileobject' => $fileobject,
                 'relatedobject' => $row['relatedobject'],
                 'relatedobjecttype' => $row['relatedobjecttype'],
@@ -181,18 +170,6 @@ class LogController extends AdminController implements KernelControllerEventInte
     }
 
     /**
-     * @param int $priority
-     *
-     * @return string
-     */
-    private function getPriorityName($priority)
-    {
-        $p = ApplicationLoggerDb::getPriorities();
-
-        return $p[$priority];
-    }
-
-    /**
      * @Route("/log/priority-json", name="pimcore_admin_log_priorityjson", methods={"GET"})
      *
      * @param Request $request
@@ -201,7 +178,7 @@ class LogController extends AdminController implements KernelControllerEventInte
      */
     public function priorityJsonAction(Request $request)
     {
-        $priorities[] = ['key' => '-1', 'value' => '-'];
+        $priorities[] = ['key' => '', 'value' => '-'];
         foreach (ApplicationLoggerDb::getPriorities() as $key => $p) {
             $priorities[] = ['key' => $key, 'value' => $p];
         }
@@ -241,12 +218,8 @@ class LogController extends AdminController implements KernelControllerEventInte
         $storage = Storage::get('application_log');
 
         if ($storage->fileExists($filePath)) {
-            $fileData = $storage->readStream($filePath);
-            $response = new StreamedResponse(
-                static function () use ($fileData) {
-                    echo stream_get_contents($fileData);
-                }
-            );
+            $fileHandle = $storage->readStream($filePath);
+            $response = $this->getResponseForFileHandle($fileHandle);
             $response->headers->set('Content-Type', 'text/plain');
         } else {
             // Fallback to local path when file is not found in flysystem that might still be using the constant
@@ -266,13 +239,8 @@ class LogController extends AdminController implements KernelControllerEventInte
             }
 
             if (file_exists($filePath)) {
-                $response = new StreamedResponse(
-                    static function () use ($filePath) {
-                        $handle = fopen($filePath, 'rb');
-                        fpassthru($handle);
-                        fclose($handle);
-                    }
-                );
+                $fileHandle = fopen($filePath, 'rb');
+                $response = $this->getResponseForFileHandle($fileHandle);
                 $response->headers->set('Content-Type', 'text/plain');
             } else {
                 $response = new Response();
@@ -283,5 +251,22 @@ class LogController extends AdminController implements KernelControllerEventInte
         }
 
         return $response;
+    }
+
+    /**
+     * @param resource $fileHandle
+     *
+     * @return StreamedResponse
+     */
+    private function getResponseForFileHandle($fileHandle)
+    {
+        return new StreamedResponse(
+            static function () use ($fileHandle) {
+                while (!feof($fileHandle)) {
+                    echo fread($fileHandle, 8192);
+                }
+                fclose($fileHandle);
+            }
+        );
     }
 }

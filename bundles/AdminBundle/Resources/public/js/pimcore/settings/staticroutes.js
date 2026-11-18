@@ -60,7 +60,6 @@ pimcore.settings.staticroutes = Class.create({
             url,
             [
                 {name:'id'},
-                {name:'basePage'},
                 {name:'name'},
                 {name:'pattern', allowBlank:false},
                 {name:'reverse', allowBlank:true},
@@ -97,14 +96,11 @@ pimcore.settings.staticroutes = Class.create({
 
         var typesColumns = [
             {text:t("name"), flex:50, sortable:true, dataIndex:'name',
-                editor:new Ext.form.TextField({})},
-            {text: t("base_page")+" ("+t("optional")+")", flex: 100, sortable: false, dataIndex: 'basePage',
-                editor: new Ext.form.TextField({}),
-                tdCls: "input_drop_target"},
+                editor:new Ext.form.TextField()},
             {text:t("pattern"), flex:100, sortable:true, dataIndex:'pattern',
-                editor:new Ext.form.TextField({})},
+                editor:new Ext.form.TextField()},
             {text:t("reverse"), flex:100, sortable:true, dataIndex:'reverse',
-                editor:new Ext.form.TextField({})},
+                editor:new Ext.form.TextField()},
             {text:t("controller"), flex:200, sortable:false, dataIndex:'controller',
                 editor:new Ext.form.ComboBox({
                     store:new Ext.data.JsonStore({
@@ -134,11 +130,11 @@ pimcore.settings.staticroutes = Class.create({
                     }
                 })},
             {text:t("variables"), flex:50, sortable:false, dataIndex:'variables',
-                editor:new Ext.form.TextField({})},
+                editor:new Ext.form.TextField()},
             {text:t("defaults"), flex:50, sortable:false, dataIndex:'defaults',
-                editor:new Ext.form.TextField({})},
+                editor:new Ext.form.TextField()},
             {text:t("site_ids"), flex:100, sortable:true, dataIndex:"siteId",
-                editor:new Ext.form.TextField({}),
+                editor:new Ext.form.TextField(),
                 tooltip: t("site_ids_tooltip")
             },
             {text:t("priority"), flex:50, sortable:true, dataIndex:'priority', editor:new Ext.form.ComboBox({
@@ -147,7 +143,7 @@ pimcore.settings.staticroutes = Class.create({
                 triggerAction:"all"
             })},
             {text:t("methods"), flex:50, sortable:false, dataIndex:'methods',
-                editor:new Ext.form.TextField({}),
+                editor:new Ext.form.TextField(),
             },
             {text: t("creationDate"), sortable: true, dataIndex: 'creationDate', editable: false,
                 hidden: true,
@@ -190,10 +186,15 @@ pimcore.settings.staticroutes = Class.create({
                             return;
                         }
 
-                        pimcore.helpers.deleteConfirm(t('staticroute'), data.data.name, function () {
-                            grid.getStore().removeAt(rowIndex);
-                            this.updateRows();
-                        }.bind(this));
+                        const decodedName = Ext.util.Format.htmlDecode(data.data.name);
+
+                        pimcore.helpers.deleteConfirm(
+                            t('staticroute'),
+                            Ext.util.Format.htmlEncode(decodedName),
+                            function () {
+                                grid.getStore().removeAt(rowIndex);
+                            }.bind(this)
+                        );
                     }.bind(this)
                 }]
             }
@@ -252,66 +253,13 @@ pimcore.settings.staticroutes = Class.create({
                 forceFit:true,
                 getRowClass: function (record, rowIndex) {
                     return record.data.writeable ? '' : 'pimcore_grid_row_disabled';
-                },
-                listeners: {
-                    rowupdated: this.updateRows.bind(this),
-                    refresh: this.updateRows.bind(this)
                 }
             }
         });
 
-        this.store.on("update", this.updateRows.bind(this));
-        this.grid.on("viewready", this.updateRows.bind(this));
-
         return this.grid;
     },
 
-    updateRows: function () {
-        var rows = Ext.get(this.grid.getEl().dom).query(".x-grid-row");
-
-        for (var i = 0; i < rows.length; i++) {
-
-            var dd = new Ext.dd.DropZone(rows[i], {
-                ddGroup: "element",
-
-                getTargetFromEvent: function(e) {
-                    return this.getEl();
-                },
-
-                onNodeOver : function(target, dd, e, data) {
-                    try {
-                        var record = data.records[0];
-                        var data = record.data;
-
-                        if(in_array(data.type,["page","link","hardlink"])) {
-                            return Ext.dd.DropZone.prototype.dropAllowed;
-                        } else {
-                            return Ext.dd.DropZone.prototype.dropNotAllowed;
-                        }
-                    } catch (e) {
-                        console.log(e);
-                    }
-                },
-
-                onNodeDrop : function(myRowIndex, target, dd, e, data) {
-                    try {
-                        var record = data.records[0];
-                        var data = record.data;
-                        if (in_array(data.type, ["page", "link", "hardlink"])) {
-                            var rec = this.grid.getStore().getAt(myRowIndex);
-                            rec.set("basePage", data.path);
-                            this.updateRows();
-                            return true;
-                        }
-                    } catch (e) {
-                        console.log(e);
-                    }
-                    return false;
-
-                }.bind(this, i)
-            });
-        }
-    },
 
     onAdd:function (btn, ev) {
         var u = {
@@ -319,7 +267,5 @@ pimcore.settings.staticroutes = Class.create({
         };
 
         this.grid.store.add(u);
-
-        this.updateRows();
     }
 });

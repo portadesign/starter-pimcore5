@@ -15,7 +15,8 @@ pimcore.registerNS("pimcore.object.fieldcollection");
 pimcore.object.fieldcollection = Class.create({
 
     forbiddenNames: [
-        "abstract", "class", "data", "folder", "list", "permissions", "resource", "concrete", "interface", "default"
+        "abstract", "class", "data", "folder", "list", "permissions", "resource", "dao", "concrete", "items",
+        "object", "interface", "default"
     ],
 
     initialize: function () {
@@ -89,7 +90,8 @@ pimcore.object.fieldcollection = Class.create({
                         {
                             text: t("add"),
                             iconCls: "pimcore_icon_fieldcollection pimcore_icon_overlay_add",
-                            handler: this.addField.bind(this)
+                            handler: this.addField.bind(this),
+                            disabled: !pimcore.settings['class-definition-writeable']
                         }
                     ]
                 }
@@ -124,7 +126,8 @@ pimcore.object.fieldcollection = Class.create({
     getTreeNodeListeners: function () {
         var treeNodeListeners = {
             'itemclick' : this.onTreeNodeClick.bind(this),
-            "itemcontextmenu": this.onTreeNodeContextmenu.bind(this)
+            "itemcontextmenu": this.onTreeNodeContextmenu.bind(this),
+            "beforeitemmove": this.onTreeNodeBeforeMove.bind(this),
         };
 
         return treeNodeListeners;
@@ -176,10 +179,15 @@ pimcore.object.fieldcollection = Class.create({
         menu.add(new Ext.menu.Item({
             text: t('delete'),
             iconCls: "pimcore_icon_fieldcollection pimcore_icon_overlay_delete",
-            handler: this.deleteField.bind(this, tree, record)
+            handler: this.deleteField.bind(this, tree, record),
+            disabled: !pimcore.settings['class-definition-writeable']
         }));
 
         menu.showAt(e.pageX, e.pageY);
+    },
+
+    onTreeNodeBeforeMove: function (node, oldParent, newParent, index, eOpts ) {
+        return pimcore.helpers.treeDragDropValidate(node, oldParent, newParent);
     },
 
     addField: function () {
@@ -189,7 +197,7 @@ pimcore.object.fieldcollection = Class.create({
 
     addFieldComplete: function (button, value, object) {
 
-        var isValidName = /^[a-zA-Z]+$/;
+        var isValidName = /^[a-zA-Z][a-zA-Z0-9]*$/;
 
         if (button == "ok" && value.length > 2 && isValidName.test(value) && !in_arrayi(value, this.forbiddenNames)) {
             Ext.Ajax.request({

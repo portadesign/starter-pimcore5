@@ -78,8 +78,8 @@ class Dao extends Model\Dao\AbstractDao
 
         if (empty($id)) {
             throw new Model\Exception\NotFoundException(sprintf(
-                'Data object class definition with with name "%s" does not exist.', $name
-            ));
+                'Data object class definition with name "%s" does not exist.', $name
+            ), 0, $e ?? null);
         }
 
         return $id;
@@ -154,6 +154,7 @@ class Dao extends Model\Dao\AbstractDao
               `position` varchar(70) NOT NULL DEFAULT '0',
               INDEX `forward_lookup` (`src_id`, `ownertype`, `ownername`, `position`),
               INDEX `reverse_lookup` (`dest_id`, `type`),
+              INDEX `fieldname` (`fieldname`),
 			  CONSTRAINT `".self::getForeignKeyName($objectDatastoreTableRelation, 'src_id').'` FOREIGN KEY (`src_id`) REFERENCES objects (`o_id`) ON DELETE CASCADE
         ) DEFAULT CHARSET=utf8mb4;');
 
@@ -293,6 +294,9 @@ class Dao extends Model\Dao\AbstractDao
             $brickTable = current($table);
             $this->db->executeQuery('DROP TABLE `'.$brickTable.'`');
         }
+
+        $this->db->executeQuery('DROP TABLE IF EXISTS object_classificationstore_data_'.$this->model->getId());
+        $this->db->executeQuery('DROP TABLE IF EXISTS object_classificationstore_groups_'.$this->model->getId());
 
         // clean slug table
         DataObject\Data\UrlSlug::handleClassDeleted($this->model->getId());

@@ -270,7 +270,7 @@ class DocumentController extends ElementControllerBase implements KernelControll
 
                 // check for a docType
                 $docType = Document\DocType::getById($request->get('docTypeId'));
-                if ($docType && $docType->getId()) {
+                if ($docType) {
                     $createValues['template'] = $docType->getTemplate();
                     $createValues['controller'] = $docType->getController();
                     $createValues['staticGeneratorEnabled'] = $docType->getStaticGeneratorEnabled();
@@ -289,7 +289,7 @@ class DocumentController extends ElementControllerBase implements KernelControll
                 }
 
                 if ($request->get('inheritanceSource')) {
-                    $createValues['contentMasterDocumentId'] = $request->get('inheritanceSource');
+                    $createValues['contentMainDocumentId'] = $request->get('inheritanceSource');
                 }
 
                 switch ($request->get('type')) {
@@ -796,11 +796,12 @@ class DocumentController extends ElementControllerBase implements KernelControll
      */
     public function versionToSessionAction(Request $request)
     {
-        $version = Version::getById((int) $request->get('id'));
-        if (!$version) {
-            throw $this->createNotFoundException();
+        $id = (int)$request->get('id');
+        $version = Version::getById($id);
+        $document = $version?->loadData();
+        if (!$document) {
+            throw $this->createNotFoundException('Version with id [' . $id . "] doesn't exist");
         }
-        $document = $version->loadData();
         Document\Service::saveElementToSession($document);
 
         return new Response();
@@ -817,11 +818,12 @@ class DocumentController extends ElementControllerBase implements KernelControll
     {
         $this->versionToSessionAction($request);
 
-        $version = Version::getById((int) $request->get('id'));
-        if (!$version) {
-            throw $this->createNotFoundException();
+        $id = (int)$request->get('id');
+        $version = Version::getById($id);
+        $document = $version?->loadData();
+        if (!$document) {
+            throw $this->createNotFoundException('Version with id [' . $id . "] doesn't exist");
         }
-        $document = $version->loadData();
 
         $currentDocument = Document::getById($document->getId());
         if ($currentDocument->isAllowed('publish')) {
@@ -1142,7 +1144,11 @@ class DocumentController extends ElementControllerBase implements KernelControll
         }
 
         $versionFrom = Version::getById($from);
-        $docFrom = $versionFrom->loadData();
+        $docFrom = $versionFrom?->loadData();
+
+        if (!$docFrom) {
+            throw $this->createNotFoundException('Version with id [' . $from . "] doesn't exist");
+        }
 
         $prefix = Config::getSystemConfiguration('documents')['preview_url_prefix'];
         if (empty($prefix)) {

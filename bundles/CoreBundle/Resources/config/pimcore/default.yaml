@@ -53,6 +53,11 @@ framework:
         buses:
             messenger.bus.pimcore-core:
         reset_on_message: true
+    rate_limiter:
+        reset_password:
+            policy: 'fixed_window'
+            limit: 5
+            interval: '5 minutes'
 
 # Twig Configuration
 twig:
@@ -107,7 +112,7 @@ pimcore:
 
     security:
         encoder_factories:
-            Pimcore\Bundle\AdminBundle\Security\User\User: pimcore_admin.security.password_encoder_factory
+            Pimcore\Security\User\User: pimcore_admin.security.password_encoder_factory
 
     bundles:
         search_paths:
@@ -197,6 +202,18 @@ pimcore:
                     - \Object_Class_Layout_
 
     documents:
+        type_definitions:
+            map:
+                folder: \Pimcore\Model\Document\Folder
+                page: \Pimcore\Model\Document\Page
+                snippet: \Pimcore\Model\Document\Snippet
+                link: \Pimcore\Model\Document\Link
+                hardlink: \Pimcore\Model\Document\Hardlink
+                email: \Pimcore\Model\Document\Email
+                newsletter: \Pimcore\Model\Document\Newsletter
+                printpage: \Pimcore\Model\Document\Printpage
+                printcontainer: \Pimcore\Model\Document\Printcontainer
+
         editables:
             prefixes:
                 - \Pimcore\Model\Document\Editable\
@@ -297,7 +314,7 @@ pimcore:
         twig:
             sandbox_security_policy:
                 tags: ['set']
-                filters: ['escape', 'trans']
+                filters: ['escape', 'trans', 'default']
                 functions: ['path', 'asset']
 presta_sitemap:
     # do not add properties by default

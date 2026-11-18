@@ -56,7 +56,7 @@ final class RedirectHandler implements LoggerAwareInterface
     private $siteResolver;
 
     /**
-     * @var Redirect[]
+     * @var null|Redirect[]
      */
     private $redirects;
 
@@ -89,7 +89,7 @@ final class RedirectHandler implements LoggerAwareInterface
      * @param bool $override
      * @param Site|null $sourceSite
      *
-     * @return RedirectResponse|null
+     * @return Response|null
      *
      * @throws \Exception
      */
@@ -127,7 +127,7 @@ final class RedirectHandler implements LoggerAwareInterface
      * @param RedirectUrlPartResolver $partResolver
      * @param Site|null $sourceSite
      *
-     * @return RedirectResponse|null
+     * @return Response|null
      *
      * @throws \Exception
      */
@@ -171,7 +171,7 @@ final class RedirectHandler implements LoggerAwareInterface
      * @param Request $request
      * @param array $matches
      *
-     * @return RedirectResponse|null
+     * @return Response|null
      *
      * @throws \Exception
      */
@@ -244,7 +244,12 @@ final class RedirectHandler implements LoggerAwareInterface
         }
 
         $statusCode = $redirect->getStatusCode() ?: Response::HTTP_MOVED_PERMANENTLY;
-        $response = new RedirectResponse($url, $statusCode);
+        $response = new Response(null, $statusCode);
+
+        if ($response->isRedirect()) {
+            $response = new RedirectResponse($url, $statusCode);
+        }
+
         $response->headers->set(self::RESPONSE_HEADER_NAME_ID, (string) $redirect->getId());
 
         // log all redirects to the redirect log
@@ -261,7 +266,7 @@ final class RedirectHandler implements LoggerAwareInterface
      */
     private function getRegexRedirects()
     {
-        if (null !== $this->redirects && is_array($this->redirects)) {
+        if (is_array($this->redirects)) {
             return $this->redirects;
         }
 

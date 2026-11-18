@@ -20,12 +20,16 @@ use Pimcore\Event\DocumentEvents;
 use Pimcore\Event\Model\PrintConfigEvent;
 use Pimcore\Logger;
 use Pimcore\Model\Document;
+use Pimcore\Tool\Console;
 use Pimcore\Web2Print\Processor;
 use Spiritix\Html2Pdf\Converter;
 use Spiritix\Html2Pdf\Input\StringInput;
 use Spiritix\Html2Pdf\Output\FileOutput;
 use Spiritix\Html2Pdf\Output\StringOutput;
 
+/**
+ * @deprecated will be removed in Pimcore 11 and replaced by Processor\Chromium
+ */
 class HeadlessChrome extends Processor
 {
     private $nodePath = '';
@@ -91,6 +95,20 @@ class HeadlessChrome extends Processor
     public function getPdfFromString($html, $params = [], $returnFilePath = false)
     {
         $params = $params ?: $this->getDefaultOptions();
+
+        $event = new PrintConfigEvent($this, [
+            'params' => $params,
+            'html' => $html,
+        ]);
+
+        \Pimcore::getEventDispatcher()->dispatch($event, DocumentEvents::PRINT_MODIFY_PROCESSING_CONFIG);
+
+        ['html' => $html, 'params' => $params] = $event->getArguments();
+
+        if (!class_exists(StringInput::class)) {
+            throw new \UnexpectedValueException('Please install spiritix/php-chrome-html2pdf via Composer to use Headless Chrome PDF conversion');
+        }
+
         $input = new StringInput();
         $input->setHtml($html);
 
@@ -98,6 +116,8 @@ class HeadlessChrome extends Processor
         $converter = new Converter($input, $output);
         if ($this->nodePath) {
             $converter->setNodePath($this->nodePath);
+        } elseif ($nodePath = Console::getExecutable('node')) {
+            $converter->setNodePath($nodePath);
         }
         $converter->setOptions($params);
 

@@ -18,6 +18,10 @@ services:
         class: Symfony\Component\Serializer\Serializer
         public: true
         arguments: ['@?', '@?']
+        deprecated:
+            package: 'pimcore/pimcore'
+            version: '10.6'
+            message: 'Using the service id "%service_id%" is deprecated and will be removed in Pimcore 11. use Pimcore\Serializer\Serializer instead.'
 
     pimcore_admin.serializer:
         alias: Pimcore\Admin\Serializer
@@ -27,8 +31,16 @@ services:
         class: Symfony\Component\Serializer\Encoder\JsonEncoder
         tags:
             -  { name: pimcore_admin.serializer.encoder }
+        deprecated:
+            package: 'pimcore/pimcore'
+            version: '10.6'
+            message: 'Using the service id "%service_id%" is deprecated and will be removed in Pimcore 11.'
 
     pimcore_admin.serializer.normalizer.reference_loop:
-        class: Pimcore\Bundle\AdminBundle\Serializer\Normalizer\ReferenceLoopNormalizer
+        class: Pimcore\Serializer\Normalizer\ReferenceLoopNormalizer
         tags:
             -  { name: pimcore_admin.serializer.normalizer }
+        deprecated:
+            package: 'pimcore/pimcore'
+            version: '10.6'
+            message: 'Using the service id "%service_id%" is deprecated and will be removed in Pimcore 11.'

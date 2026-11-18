@@ -19,12 +19,10 @@ pimcore.settings.website = Class.create({
         this.getTabPanel();
     },
 
-
     activate:function () {
         var tabPanel = Ext.getCmp("pimcore_panel_tabs");
         tabPanel.setActiveItem("pimcore_website_settings");
     },
-
 
     getTabPanel:function () {
 
@@ -83,7 +81,7 @@ pimcore.settings.website = Class.create({
                         var input = field;
                         var proxy = this.store.getProxy();
                         proxy.extraParams.filter = input.getValue();
-                        this.store.load();
+                        this.store.loadPage(1);
                     }
                 }.bind(this)
             }
@@ -114,7 +112,7 @@ pimcore.settings.website = Class.create({
                 flex: 100,
                 editable: true,
                 sortable: true,
-                editor: new Ext.form.TextField({})
+                editor: new Ext.form.TextField()
             },
             {
                 text: t('language'),
@@ -133,10 +131,14 @@ pimcore.settings.website = Class.create({
                 dataIndex: 'data',
                 flex: 300,
                 editable: true,
-                editor: new Ext.form.TextField({}),
+                editor: new Ext.form.TextField(),
                 renderer: this.getCellRenderer.bind(this),
             },
-            {text: t("site"), flex: 100, sortable:true, dataIndex: "siteId",
+            {
+                text: t("site"),
+                flex: 100,
+                sortable:true,
+                dataIndex: "siteId",
                 editor: new Ext.form.ComboBox({
                     store: pimcore.globalmanager.get("sites"),
                     valueField: "id",
@@ -198,7 +200,7 @@ pimcore.settings.website = Class.create({
                 icon:"/bundles/pimcoreadmin/img/flat-color-icons/delete.svg",
                 handler:function (grid, rowIndex) {
                     let data = grid.getStore().getAt(rowIndex);
-                    pimcore.helpers.deleteConfirm(t('website_settings'), data.data.name, function () {
+                    pimcore.helpers.deleteConfirm(t('website_settings'), Ext.util.Format.htmlEncode(data.data.name), function () {
                         grid.getStore().removeAt(rowIndex);
                     }.bind(this));
                 }.bind(this)
@@ -503,7 +505,6 @@ pimcore.settings.website = Class.create({
         this.add(customKey.getValue(), customType.getValue(), false, false, false, true);
         this.customKeyField.setValue(null);
     },
-
 
     add: function (key, type, value, config, inherited, inheritable) {
 

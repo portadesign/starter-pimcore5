@@ -28,6 +28,11 @@ use Pimcore\Model;
 use Pimcore\Model\Paginator\PaginateListingInterface;
 use ReturnTypeWillChange;
 
+trigger_deprecation('pimcore/pimcore', '10.6', 'The "%s" class is deprecated and will be removed in Pimcore 11.', Cse::class);
+
+/**
+ * @deprecated since Pimcore 10.6 and will be removed in Pimcore 11
+ */
 class Cse implements PaginateListingInterface
 {
     /**
@@ -208,7 +213,7 @@ class Cse implements PaginateListingInterface
 
                             foreach ($regexes as $regex) {
                                 if (preg_match($regex, $item['pagemap']['cse_image'][0]['src'], $matches)) {
-                                    if ($id = $matches[1]) {
+                                    if ($id = (int) $matches[1]) {
                                         break;
                                     }
                                 }

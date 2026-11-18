@@ -61,6 +61,12 @@ class Single extends AbstractTokenManager implements ExportableTokenManagerInter
         return true;
     }
 
+    /**
+     * @param int $duration
+     * @param int|null $seriesId
+     *
+     * @return bool
+     */
     public function cleanupReservations($duration = 0, $seriesId = null)
     {
         return Reservation::cleanUpReservations($duration, $seriesId);
@@ -83,13 +89,22 @@ class Single extends AbstractTokenManager implements ExportableTokenManagerInter
         if ($codes) {
             /** @var PaginatorInterface $paginator */
             $paginator = \Pimcore::getContainer()->get(\Knp\Component\Pager\PaginatorInterface::class);
+
+            $page = (int)($params['page'] ?? 1);
+            $perPage = (int)($params['tokensPerPage'] ?? 25);
+
+            $total = count($codes);
+
+            $availablePages = (int) ceil($total / $perPage);
+            $page = min($page, $availablePages);
+
             $paginator = $paginator->paginate(
                 (array)$codes,
-                $params['page'] ?? 1,
-                isset($params['tokensPerPage']) ? (int)$params['tokensPerPage'] : 25
+                $page ?: 1,
+                $perPage
             );
             $viewParamsBag['paginator'] = $paginator;
-            $viewParamsBag['count'] = count($codes);
+            $viewParamsBag['count'] = $total;
         }
 
         $viewParamsBag['msg']['error'] = $params['error'] ?? null;
@@ -170,6 +185,12 @@ class Single extends AbstractTokenManager implements ExportableTokenManagerInter
         return Token\Listing::getCodes($this->seriesId, $params);
     }
 
+    /**
+     * @param array $data
+     * @param int|null $usagePeriod
+     *
+     * @return void
+     */
     protected function prepareUsageStatisticData(&$data, $usagePeriod)
     {
         $now = new \DateTime();

@@ -327,7 +327,19 @@ class Input extends Data implements
     public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
         if (!$omitMandatoryCheck && $this->getRegex() && strlen($data) > 0) {
-            if (!preg_match('#' . $this->getRegex() . '#' . implode('', $this->getRegexFlags()), $data)) {
+            $throwException = false;
+            if (in_array('g', $this->getRegexFlags())) {
+                $flags = str_replace('g', '', implode('', $this->getRegexFlags()));
+                if (!preg_match_all('#' . $this->getRegex() . '#' . $flags, $data)) {
+                    $throwException = true;
+                }
+            } else {
+                if (!preg_match('#' . $this->getRegex() . '#' . implode('', $this->getRegexFlags()), $data)) {
+                    $throwException = true;
+                }
+            }
+
+            if ($throwException) {
                 throw new Model\Element\ValidationException('Value in field [ ' . $this->getName() . " ] doesn't match input validation '" . $this->getRegex() . "'");
             }
         }
@@ -336,11 +348,27 @@ class Input extends Data implements
     }
 
     /**
+     * @param Model\DataObject\ClassDefinition\Data\Input $mainDefinition
+     */
+    public function synchronizeWithMainDefinition(Model\DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        $this->columnLength = $mainDefinition->columnLength;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param Model\DataObject\ClassDefinition\Data\Input $masterDefinition
      */
     public function synchronizeWithMasterDefinition(Model\DataObject\ClassDefinition\Data $masterDefinition)
     {
-        $this->columnLength = $masterDefinition->columnLength;
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
     }
 
     /**

@@ -245,7 +245,7 @@ class Select extends Data implements
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string|null
+     * @return null|string|int
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
@@ -261,7 +261,7 @@ class Select extends Data implements
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string|null
+     * @return null|string|int
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
@@ -289,7 +289,7 @@ class Select extends Data implements
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return null|string|int
      */
     public function getDataForEditmode($data, $object = null, $params = [])
     {
@@ -303,7 +303,7 @@ class Select extends Data implements
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return null|string|int
      */
     public function getDataFromEditmode($data, $object = null, $params = [])
     {
@@ -321,7 +321,7 @@ class Select extends Data implements
      */
     public function getVersionPreview($data, $object = null, $params = [])
     {
-        return htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars((string)$data, ENT_QUOTES, 'UTF-8');
     }
 
     /**
@@ -392,15 +392,31 @@ class Select extends Data implements
     }
 
     /**
+     * @param DataObject\ClassDefinition\Data\Select $mainDefinition
+     */
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        $this->options = $mainDefinition->options;
+        $this->columnLength = $mainDefinition->columnLength;
+        $this->defaultValue = $mainDefinition->defaultValue;
+        $this->optionsProviderClass = $mainDefinition->optionsProviderClass;
+        $this->optionsProviderData = $mainDefinition->optionsProviderData;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param DataObject\ClassDefinition\Data\Select $masterDefinition
      */
     public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
     {
-        $this->options = $masterDefinition->options;
-        $this->columnLength = $masterDefinition->columnLength;
-        $this->defaultValue = $masterDefinition->defaultValue;
-        $this->optionsProviderClass = $masterDefinition->optionsProviderClass;
-        $this->optionsProviderData = $masterDefinition->optionsProviderData;
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
     }
 
     /**
@@ -632,5 +648,16 @@ class Select extends Data implements
     public function getPhpdocReturnType(): ?string
     {
         return 'string|null';
+    }
+
+    /**
+     * @param mixed $oldValue
+     * @param mixed $newValue
+     *
+     * @return bool
+     */
+    public function isEqual($oldValue, $newValue): bool
+    {
+        return $oldValue == $newValue;
     }
 }

@@ -95,39 +95,6 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * Save document and all child documents
-     *
-     * @param Document $document
-     * @param int $collectGarbageAfterIteration
-     * @param int $saved
-     *
-     * @throws \Exception
-     */
-    private static function saveRecursive($document, $collectGarbageAfterIteration = 25, &$saved = 0)
-    {
-        if ($document instanceof Document) {
-            $document->save();
-            $saved++;
-            if ($saved % $collectGarbageAfterIteration === 0) {
-                \Pimcore::collectGarbage();
-            }
-        }
-
-        foreach ($document->getChildren() as $child) {
-            if (!$child->hasChildren()) {
-                $child->save();
-                $saved++;
-                if ($saved % $collectGarbageAfterIteration === 0) {
-                    \Pimcore::collectGarbage();
-                }
-            }
-            if ($child->hasChildren()) {
-                self::saveRecursive($child, $collectGarbageAfterIteration, $saved);
-            }
-        }
-    }
-
-    /**
      * @param  Document $target
      * @param  Document $source
      *
@@ -198,12 +165,13 @@ class Service extends Model\Element\Service
      * @param Document $source
      * @param bool $enableInheritance
      * @param bool $resetIndex
+     * @param string|null $language
      *
      * @return Document
      *
      * @throws \Exception
      */
-    public function copyAsChild($target, $source, $enableInheritance = false, $resetIndex = false, $language = false)
+    public function copyAsChild($target, $source, $enableInheritance = false, $resetIndex = false, $language = null)
     {
         if ($source instanceof Document\PageSnippet) {
             $source->getEditables();
@@ -241,9 +209,10 @@ class Service extends Model\Element\Service
             $new->setPrettyUrl(null);
         }
 
-        if ($enableInheritance && ($new instanceof Document\PageSnippet) && $new->supportsContentMaster()) {
+        if ($enableInheritance && ($new instanceof Document\PageSnippet) && $new->supportsContentMain()) {
             $new->setEditables([]);
-            $new->setContentMasterDocumentId($source->getId(), true);
+            $new->setMissingRequiredEditable(false);
+            $new->setContentMainDocumentId($source->getId(), true);
         }
 
         if ($language) {
@@ -427,21 +396,21 @@ class Service extends Model\Element\Service
             if (array_key_exists('enableInheritance', $params) && $params['enableInheritance']) {
                 $editables = $document->getEditables();
                 $changedEditables = [];
-                $contentMaster = $document->getContentMasterDocument();
-                if ($contentMaster instanceof Document\PageSnippet) {
-                    $contentMasterEditables = $contentMaster->getEditables();
-                    foreach ($contentMasterEditables as $contentMasterEditable) {
+                $contentMain = $document->getContentMainDocument();
+                if ($contentMain instanceof Document\PageSnippet) {
+                    $contentMainEditables = $contentMain->getEditables();
+                    foreach ($contentMainEditables as $contentMainEditable) {
                         //TODO Pimcore 11: remove method_exists BC layer
-                        if ($contentMasterEditable instanceof IdRewriterInterface || method_exists($contentMasterEditable, 'rewriteIds')) {
-                            if (!$contentMasterEditable instanceof IdRewriterInterface) {
+                        if ($contentMainEditable instanceof IdRewriterInterface || method_exists($contentMainEditable, 'rewriteIds')) {
+                            if (!$contentMainEditable instanceof IdRewriterInterface) {
                                 trigger_deprecation('pimcore/pimcore', '10.3',
                                     sprintf('Usage of method_exists is deprecated since version 10.3 and will be removed in Pimcore 11.' .
                                         'Implement the %s interface instead.', IdRewriterInterface::class));
                             }
-                            $editable = clone $contentMasterEditable;
+                            $editable = clone $contentMainEditable;
                             $editable->rewriteIds($rewriteConfig);
 
-                            if (Serialize::serialize($editable) != Serialize::serialize($contentMasterEditable)) {
+                            if (Serialize::serialize($editable) != Serialize::serialize($contentMainEditable)) {
                                 $changedEditables[] = $editable;
                             }
                         }
@@ -650,10 +619,10 @@ class Service extends Model\Element\Service
      */
     public static function generatePagePreview($id, $request = null, $hostUrl = null)
     {
-        $success = false;
-
-        /** @var Page $doc */
-        $doc = Document::getById($id);
+        $doc = Document\Page::getById($id);
+        if (!$doc) {
+            return false;
+        }
         if (!$hostUrl) {
             $hostUrl = Config::getSystemConfiguration('documents')['preview_url_prefix'];
             if (empty($hostUrl)) {
@@ -684,10 +653,10 @@ class Service extends Model\Element\Service
 
                 unlink($tmpFile);
 
-                $success = true;
+                return true;
             }
         }
 
-        return $success;
+        return false;
     }
 }

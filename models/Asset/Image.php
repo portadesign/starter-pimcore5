@@ -194,7 +194,6 @@ class Image extends Model\Asset
             $imagick->writeImage($tmpFile);
             $imageBase64 = base64_encode(file_get_contents($tmpFile));
             $imagick->destroy();
-            unlink($tmpFile);
 
             $svg = <<<EOT
 <?xml version="1.0" encoding="utf-8"?>
@@ -277,7 +276,7 @@ EOT;
      *
      * @internal
      *
-     * @param string|array|Image\Thumbnail\Config $config
+     * @param string|array|Image\Thumbnail\Config|null $config
      *
      * @return Image\Thumbnail\Config|null
      */
@@ -551,7 +550,10 @@ EOT;
              *
              * @see http://foone.org/apng/
              */
-            $isAnimated = strpos(substr($fileContent, 0, strpos($fileContent, 'IDAT')), 'acTL') !== false;
+            $posIDAT = strpos($fileContent, 'IDAT');
+            if ($posIDAT !== false) {
+                $isAnimated = str_contains(substr($fileContent, 0, $posIDAT), 'acTL');
+            }
         }
 
         return $isAnimated;

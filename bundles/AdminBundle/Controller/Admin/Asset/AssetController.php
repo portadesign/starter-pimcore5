@@ -27,13 +27,17 @@ use Pimcore\Db\Helper;
 use Pimcore\Event\Admin\ElementAdminStyleEvent;
 use Pimcore\Event\AdminEvents;
 use Pimcore\Event\AssetEvents;
+use Pimcore\Event\Model\Asset\ResolveUploadTargetEvent;
 use Pimcore\File;
 use Pimcore\Loader\ImplementationLoader\Exception\UnsupportedException;
 use Pimcore\Logger;
 use Pimcore\Messenger\AssetPreviewImageMessage;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
+use Pimcore\Model\DataObject\ClassDefinition\Data\ManyToManyRelation;
+use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\Element;
+use Pimcore\Model\Element\ValidationException;
 use Pimcore\Model\Metadata;
 use Pimcore\Model\Schedule\Task;
 use Pimcore\Tool;
@@ -50,6 +54,7 @@ use Symfony\Component\Mime\MimeTypes;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @Route("/asset")
@@ -490,8 +495,11 @@ class AssetController extends ElementControllerBase implements KernelControllerE
         $context = $request->get('context');
         if ($context) {
             $context = json_decode($context, true);
-            $context = $context ? $context : [];
-            $event = new \Pimcore\Event\Model\Asset\ResolveUploadTargetEvent($parentId, $filename, $context);
+            $context = $context ?: [];
+
+            $this->validateManyToManyRelationAssetType($context, $filename, $sourcePath);
+
+            $event = new ResolveUploadTargetEvent($parentId, $filename, $context);
             \Pimcore::getEventDispatcher()->dispatch($event, AssetEvents::RESOLVE_UPLOAD_TARGET);
             $filename = Element\Service::getValidKey($event->getFilename(), 'asset');
             $parentId = $event->getParentId();
@@ -518,6 +526,17 @@ class AssetController extends ElementControllerBase implements KernelControllerE
             throw new \Exception('File is empty!');
         } elseif (!is_file($sourcePath)) {
             throw new \Exception('Something went wrong, please check upload_max_filesize and post_max_size in your php.ini as well as the write permissions of your temporary directories.');
+        }
+
+        // check if there is a requested type and if matches the asset type of the uploaded file
+        $uploadAssetType = $request->get('uploadAssetType');
+        if ($uploadAssetType) {
+            $mimetype = MimeTypes::getDefault()->guessMimeType($sourcePath);
+            $assetType = Asset::getTypeFromMimeMapping($mimetype, $filename);
+
+            if ($uploadAssetType !== $assetType) {
+                throw new \Exception("Mime type $mimetype does not match with asset type: $uploadAssetType");
+            }
         }
 
         if ($request->get('allowOverwrite') && Asset\Service::pathExists($parentAsset->getRealFullPath().'/'.$filename)) {
@@ -572,12 +591,13 @@ class AssetController extends ElementControllerBase implements KernelControllerE
      * @Route("/replace-asset", name="pimcore_admin_asset_replaceasset", methods={"POST", "PUT"})
      *
      * @param Request $request
+     * @param TranslatorInterface $translator
      *
      * @return JsonResponse
      *
      * @throws \Exception
      */
-    public function replaceAssetAction(Request $request)
+    public function replaceAssetAction(Request $request, TranslatorInterface $translator)
     {
         $asset = Asset::getById((int) $request->get('id'));
 
@@ -588,7 +608,7 @@ class AssetController extends ElementControllerBase implements KernelControllerE
         if ($newType != $asset->getType()) {
             return $this->adminJson([
                 'success' => false,
-                'message' => sprintf($this->trans('asset_type_change_not_allowed', [], 'admin'), $asset->getType(), $newType),
+                'message' => sprintf($translator->trans('asset_type_change_not_allowed', [], 'admin'), $asset->getType(), $newType),
             ]);
         }
 
@@ -1077,8 +1097,13 @@ class AssetController extends ElementControllerBase implements KernelControllerE
      */
     public function publishVersionAction(Request $request)
     {
-        $version = Model\Version::getById((int) $request->get('id'));
-        $asset = $version->loadData();
+        $id = (int)$request->get('id');
+        $version = Model\Version::getById($id);
+        $asset = $version?->loadData();
+
+        if (!$asset) {
+            throw $this->createNotFoundException('Version with id [' . $id . "] doesn't exist");
+        }
 
         $currentAsset = Asset::getById($asset->getId());
         if ($currentAsset->isAllowed('publish')) {
@@ -1108,10 +1133,10 @@ class AssetController extends ElementControllerBase implements KernelControllerE
     {
         $id = (int)$request->get('id');
         $version = Model\Version::getById($id);
-        if (!$version) {
-            throw $this->createNotFoundException('Version not found');
+        $asset = $version?->loadData();
+        if (!$asset) {
+            throw $this->createNotFoundException('Version with id [' . $id . "] doesn't exist");
         }
-        $asset = $version->loadData();
 
         if (!$asset->isAllowed('versions')) {
             throw $this->createAccessDeniedHttpException('Permission denied, version id [' . $id . ']');
@@ -1385,8 +1410,7 @@ class AssetController extends ElementControllerBase implements KernelControllerE
                 'x' => $request->get('cropLeft'),
             ]);
 
-            $hash = md5(Tool\Serialize::serialize(array_merge($request->request->all(), $request->query->all())));
-            $thumbnailConfig->setName($thumbnailConfig->getName() . '_auto_' . $hash);
+            $thumbnailConfig->generateAutoName();
         }
 
         $thumbnail = $image->getThumbnail($thumbnailConfig);
@@ -2086,10 +2110,10 @@ class AssetController extends ElementControllerBase implements KernelControllerE
                 $userIds = $this->getAdminUser()->getRoles();
                 $userIds[] = $this->getAdminUser()->getId();
                 $conditionFilters[] = ' (
-                                                    (select list from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(CONCAT(path, filename),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
-                                                    OR
-                                                    (select list from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(cpath,CONCAT(path, filename))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
-                                                 )';
+                    (select list from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(CONCAT(path, filename),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                    OR
+                    (select list from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(cpath,CONCAT(path, filename))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                )';
             }
 
             $condition = implode(' AND ', $conditionFilters);
@@ -2154,23 +2178,30 @@ class AssetController extends ElementControllerBase implements KernelControllerE
 
                 $db = \Pimcore\Db::get();
                 $conditionFilters = [];
-
                 $selectedIds = $request->get('selectedIds', []);
 
                 if (!empty($selectedIds)) {
                     $selectedIds = explode(',', $selectedIds);
+
+                    $quotedSelectedIds = [];
+                    foreach ($selectedIds as $selectedId) {
+                        if ($selectedId) {
+                            $quotedSelectedIds[] = $db->quote($selectedId);
+                        }
+                    }
+
                     //add a condition if id numbers are specified
-                    $conditionFilters[] = 'id IN (' . implode(',', $selectedIds) . ')';
+                    $conditionFilters[] = 'id IN (' . implode(',', $quotedSelectedIds) . ')';
                 }
                 $conditionFilters[] = "type != 'folder' AND path LIKE " . $db->quote(Helper::escapeLike($parentPath) . '/%');
                 if (!$this->getAdminUser()->isAdmin()) {
                     $userIds = $this->getAdminUser()->getRoles();
                     $userIds[] = $this->getAdminUser()->getId();
                     $conditionFilters[] = ' (
-                                                    (select list from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(CONCAT(path, filename),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
-                                                    OR
-                                                    (select list from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(cpath,CONCAT(path, filename))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
-                                                 )';
+                        (select list from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(CONCAT(path, filename),cpath)=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                        OR
+                        (select list from users_workspaces_asset where userId in (' . implode(',', $userIds) . ') and LOCATE(cpath,CONCAT(path, filename))=1  ORDER BY LENGTH(cpath) DESC LIMIT 1)=1
+                    )';
                 }
 
                 $condition = implode(' AND ', $conditionFilters);
@@ -2233,10 +2264,11 @@ class AssetController extends ElementControllerBase implements KernelControllerE
      * @Route("/import-zip", name="pimcore_admin_asset_importzip", methods={"POST"})
      *
      * @param Request $request
+     * @param TranslatorInterface $translator
      *
      * @return Response
      */
-    public function importZipAction(Request $request)
+    public function importZipAction(Request $request, TranslatorInterface $translator)
     {
         $jobId = uniqid();
         $filesPerJob = 5;
@@ -2294,7 +2326,7 @@ class AssetController extends ElementControllerBase implements KernelControllerE
         } else {
             return $this->adminJson([
                 'success' => false,
-                'message' => $this->trans('could_not_open_zip_file'),
+                'message' => $translator->trans('could_not_open_zip_file', [], 'admin'),
             ]);
         }
     }
@@ -2324,7 +2356,7 @@ class AssetController extends ElementControllerBase implements KernelControllerE
             for ($i = $offset; $i < ($offset + $limit); $i++) {
                 $path = $zip->getNameIndex($i);
 
-                if (str_starts_with($path, '__MACOSX/')) {
+                if (str_starts_with($path, '__MACOSX/') || str_ends_with($path, '/Thumbs.db')) {
                     continue;
                 }
 
@@ -2429,12 +2461,29 @@ class AssetController extends ElementControllerBase implements KernelControllerE
      */
     public function importServerFilesAction(Request $request)
     {
+        if(!Tool\Admin::getCurrentUser()->isAdmin()) {
+            throw $this->createAccessDeniedException('Permission denied. You don\'t have the rights to import files from the server!');
+        }
+
         $assetFolder = Asset::getById((int) $request->get('parentId'));
         if (!$assetFolder) {
             throw $this->createNotFoundException('Parent asset not found');
         }
-        $serverPath = PIMCORE_PROJECT_ROOT . $request->get('serverPath');
+
+        $serverPath = realpath(PIMCORE_PROJECT_ROOT . $request->get('serverPath'));
+        if(!str_starts_with($serverPath, rtrim(str_replace('../', '', PIMCORE_PROJECT_ROOT), './'))) {
+            throw $this->createAccessDeniedException('Please do not navigate out of the web root directory!');
+        }
+
         $files = explode('::', $request->get('files'));
+
+        // prevent directory traversal
+        foreach ($files as $file) {
+            $absolutePath = realpath($serverPath.$file);
+            if (!str_starts_with($absolutePath, $serverPath)) {
+                throw $this->createAccessDeniedException('Please do not navigate out of the web root directory!');
+            }
+        }
 
         foreach ($files as $file) {
             $absolutePath = $serverPath . $file;
@@ -2819,5 +2868,36 @@ class AssetController extends ElementControllerBase implements KernelControllerE
         ]);
 
         $this->_assetService = new Asset\Service($this->getAdminUser());
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function validateManyToManyRelationAssetType(array $context, string $filename, string $sourcePath): void
+    {
+        if (isset($context['containerType'], $context['objectId'], $context['fieldname'])
+            && 'object' === $context['containerType']
+            && $object = Concrete::getById($context['objectId'])
+        ) {
+            $fieldDefinition = $object->getClass()?->getFieldDefinition($context['fieldname']);
+            if (!$fieldDefinition instanceof ManyToManyRelation) {
+                return;
+            }
+
+            $mimeType = MimeTypes::getDefault()->guessMimeType($sourcePath);
+            $type = Asset::getTypeFromMimeMapping($mimeType, $filename);
+
+            $allowedAssetTypes = $fieldDefinition->getAssetTypes();
+            $allowedAssetTypes = array_column($allowedAssetTypes, 'assetTypes');
+
+            if (
+                !(
+                    $fieldDefinition->getAssetsAllowed()
+                    && ($allowedAssetTypes === [] || in_array($type, $allowedAssetTypes, true))
+                )
+            ) {
+                throw new ValidationException(sprintf('Invalid relation in field `%s` [type: %s]', $context['fieldname'], $type));
+            }
+        }
     }
 }

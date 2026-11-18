@@ -23,6 +23,7 @@ use Pimcore\Messenger\VersionDeleteMessage;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data\LazyLoadingSupportInterface;
+use Pimcore\Model\DataObject\ClassDefinition\Data\Link;
 use Pimcore\Model\DataObject\ClassDefinition\Data\Relations\AbstractRelations;
 use Pimcore\Model\DataObject\Exception\InheritanceParentNotFoundException;
 use Pimcore\Model\Element\DirtyIndicatorInterface;
@@ -139,6 +140,9 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
 
                     //check throws Exception
                     try {
+                        if ($fd instanceof Link) {
+                            $params['resetInvalidFields'] = true;
+                        }
                         $fd->checkValidity($value, $omitMandatoryCheck, $params);
                     } catch (\Exception $e) {
                         if ($this->getClass()->getAllowInherit() && $fd->supportsInheritance() && $fd->isEmpty($value)) {
@@ -708,6 +712,9 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
         // if the class is newer then better disable the dirty detection. This should fix issues with the query table if
         // the inheritance enabled flag has been changed in the meantime
         if ($this->getClass()->getModificationDate() >= $this->getModificationDate() && $this->getId()) {
+            DataObject::disableDirtyDetection();
+        } elseif ($this->getClass()->getAllowInherit() && $this->isFieldDirty('parentId')) {
+            // if inherit is enabled and the data object is moved the query table should be updated
             DataObject::disableDirtyDetection();
         }
 

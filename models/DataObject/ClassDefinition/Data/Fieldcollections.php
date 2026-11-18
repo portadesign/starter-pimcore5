@@ -534,10 +534,16 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
         // getter, no inheritance here, that's the only difference
         $key = $this->getName();
 
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+            $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
+        } else {
+            $typeDeclaration = '';
+        }
+
         $code = '/**' . "\n";
         $code .= '* @return ' . $this->getPhpdocReturnType() . "\n";
         $code .= '*/' . "\n";
-        $code .= 'public function get' . ucfirst($key) . '()' . "\n";
+        $code .= 'public function get' . ucfirst($key) . '()' . $typeDeclaration . "\n";
         $code .= '{' . "\n";
 
         $code .= $this->getPreGetValueHookCode($key);
@@ -546,9 +552,9 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
         // TODO else part should not be needed at all as preGetData is always there
         // if ($this instanceof PreGetDataInterface || method_exists($this, 'preGetData')) {
         $code .= "\t" . '$data = $this->getClass()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n";
-//        } else {
-//            $code .= "\t" . '$data = $this->' . $key . ";\n";
-//        }
+        //        } else {
+        //            $code .= "\t" . '$data = $this->' . $key . ";\n";
+        //        }
 
         $code .= "\t" . 'return $data;' . "\n";
         $code .= "}\n\n";
@@ -656,13 +662,29 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
     }
 
     /**
+     * @param DataObject\ClassDefinition\Data\Fieldcollections $mainDefinition
+     */
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        $this->allowedTypes = $mainDefinition->allowedTypes;
+        $this->lazyLoading = $mainDefinition->lazyLoading;
+        $this->maxItems = $mainDefinition->maxItems;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param DataObject\ClassDefinition\Data\Fieldcollections $masterDefinition
      */
     public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
     {
-        $this->allowedTypes = $masterDefinition->allowedTypes;
-        $this->lazyLoading = $masterDefinition->lazyLoading;
-        $this->maxItems = $masterDefinition->maxItems;
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
     }
 
     /**
@@ -681,9 +703,14 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
 
                     foreach ($fieldDefinition as $fd) {
                         //TODO Pimcore 11 remove method_exists call
-                        if (!$fd instanceof DataContainerAwareInterface && method_exists($fd, 'classSaved')) {
+                        if (!$fd instanceof DataContainerAwareInterface && ($fd instanceof ClassSavedInterface || method_exists($fd, 'classSaved'))) {
+                            if (!$fd instanceof ClassSavedInterface) {
+                                trigger_deprecation('pimcore/pimcore', '10.6',
+                                    sprintf('Usage of method_exists is deprecated since version 10.6 and will be removed in Pimcore 11.' .
+                                    'Implement the %s interface instead.', ClassSavedInterface::class));
+                            }
                             // defer creation
-                            $fd->classSaved($class);
+                            $fd->classSaved($class, $params);
                         }
                     }
 

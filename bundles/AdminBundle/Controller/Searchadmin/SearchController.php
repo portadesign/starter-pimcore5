@@ -15,7 +15,8 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Searchadmin;
 
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Doctrine\DBAL\Exception\SyntaxErrorException;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Bundle\AdminBundle\Controller\Traits\AdminStyleTrait;
 use Pimcore\Bundle\AdminBundle\Helper\GridHelperService;
 use Pimcore\Config;
@@ -38,7 +39,7 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  *
  * @internal
  */
-class SearchController extends AdminController
+class SearchController extends AdminAbstractController
 {
     use AdminStyleTrait;
 
@@ -50,8 +51,11 @@ class SearchController extends AdminController
      * @return JsonResponse
      *
      * @todo: $conditionTypeParts could be undefined
+     *
      * @todo: $conditionSubtypeParts could be undefined
+     *
      * @todo: $conditionClassnameParts could be undefined
+     *
      * @todo: $data could be undefined
      */
     public function findAction(Request $request, EventDispatcherInterface $eventDispatcher, GridHelperService $gridHelperService)
@@ -74,9 +78,9 @@ class SearchController extends AdminController
 
         $query = $this->filterQueryParam($allParams['query'] ?? '');
 
-        $types = explode(',', $allParams['type'] ?? '');
-        $subtypes = explode(',', $allParams['subtype'] ?? '');
-        $classnames = explode(',', $allParams['class'] ?? '');
+        $types = explode(',', preg_replace('/[^a-z,]/i', '', $allParams['type'] ?? ''));
+        $subtypes = explode(',', preg_replace('/[^a-z,]/i', '', $allParams['subtype'] ?? ''));
+        $classnames = explode(',', preg_replace('/[^a-z0-9_,]/i', '', $allParams['class'] ?? ''));
 
         $offset = (int)$allParams['start'];
         $limit = (int)$allParams['limit'];
@@ -108,13 +112,15 @@ class SearchController extends AdminController
         $bricks = [];
         if (!empty($allParams['fields'])) {
             $fields = $allParams['fields'];
+            //remove sql comments
+            $fields = str_replace('--', '', $fields);
 
             foreach ($fields as $f) {
                 $parts = explode('~', $f);
                 if (substr($f, 0, 1) == '~') {
                     //                    $type = $parts[1];
-//                    $field = $parts[2];
-//                    $keyid = $parts[3];
+                    //                    $field = $parts[2];
+                    //                    $keyid = $parts[3];
                     // key value, ignore for now
                 } elseif (count($parts) > 1) {
                     $bricks[$parts[0]] = $parts[0];
@@ -233,10 +239,8 @@ class SearchController extends AdminController
             }
         }
 
-        if (count($conditionParts) > 0) {
-            $condition = implode(' AND ', $conditionParts);
-            $searcherList->setCondition($condition);
-        }
+        $condition = implode(' AND ', $conditionParts);
+        $searcherList->setCondition($condition);
 
         $searcherList->setOffset($offset);
         $searcherList->setLimit($limit);
@@ -309,7 +313,11 @@ class SearchController extends AdminController
             $searcherList = $beforeListLoadEvent->getArgument('list');
         }
 
-        $hits = $searcherList->load();
+        try {
+            $hits = $searcherList->load();
+        } catch (SyntaxErrorException $syntaxErrorException) {
+            throw new \InvalidArgumentException('Check your arguments.');
+        }
 
         $elements = [];
         foreach ($hits as $hit) {
@@ -408,7 +416,7 @@ class SearchController extends AdminController
             }
         }
 
-        //if allowedTypes is still empty after getting the workspaces, it means that there are no any master permissions set
+        //if allowedTypes is still empty after getting the workspaces, it means that there are no any main permissions set
         // by setting a `false` condition in the query makes sure that nothing would be displayed.
         if (!$allowedTypes) {
             $allowedTypes = ['false'];

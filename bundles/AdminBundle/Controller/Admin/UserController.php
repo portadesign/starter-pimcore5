@@ -17,16 +17,18 @@ namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\PngWriter;
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
-use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Controller\KernelControllerEventInterface;
 use Pimcore\Logger;
+use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\Element;
 use Pimcore\Model\User;
 use Pimcore\Tool;
 use Scheb\TwoFactorBundle\Security\TwoFactor\Provider\Google\GoogleAuthenticatorInterface;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
@@ -34,11 +36,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @internal
  */
-class UserController extends AdminController implements KernelControllerEventInterface
+class UserController extends AdminAbstractController implements KernelControllerEventInterface
 {
     /**
      * @Route("/user/tree-get-childs-by-id", name="pimcore_admin_user_treegetchildsbyid", methods={"GET"})
@@ -277,20 +280,22 @@ class UserController extends AdminController implements KernelControllerEventInt
      * @Route("/user/update", name="pimcore_admin_user_update", methods={"PUT"})
      *
      * @param Request $request
+     * @param TranslatorInterface $translator
      *
      * @return JsonResponse
      *
      * @throws \Exception
      */
-    public function updateAction(Request $request)
+    public function updateAction(Request $request, TranslatorInterface $translator)
     {
         $user = User\UserRole::getById((int)$request->get('id'));
+        $currentUserIsAdmin = $this->getAdminUser()->isAdmin();
 
         if (!$user) {
             throw $this->createNotFoundException();
         }
 
-        if ($user instanceof User && $user->isAdmin() && !$this->getAdminUser()->isAdmin()) {
+        if ($user instanceof User && $user->isAdmin() && !$currentUserIsAdmin) {
             throw $this->createAccessDeniedHttpException('Only admin users are allowed to modify admin users');
         }
 
@@ -323,7 +328,7 @@ class UserController extends AdminController implements KernelControllerEventInt
 
             // only admins are allowed to create admin users
             // if the logged in user isn't an admin, set admin always to false
-            if ($user instanceof User && !$this->getAdminUser()->isAdmin()) {
+            if ($user instanceof User && !$currentUserIsAdmin) {
                 $user->setAdmin(false);
             }
 
@@ -345,7 +350,7 @@ class UserController extends AdminController implements KernelControllerEventInt
                     $newWorkspaces = [];
                     foreach ($spaces as $space) {
                         if (in_array($space['path'], $processedPaths[$type])) {
-                            throw new \Exception('Error saving workspaces as multiple entries found for path "' . $space['path'] .'" in '.$this->trans((string)$type) . 's');
+                            throw new \Exception('Error saving workspaces as multiple entries found for path "' . $space['path'] .'" in '.$translator->trans((string)$type, [], 'admin') . 's');
                         }
 
                         $element = Element\Service::getElementByPath($type, $space['path']);
@@ -374,6 +379,7 @@ class UserController extends AdminController implements KernelControllerEventInt
                 $tmpArray[] = json_decode($item, true);
             }
             $tmpArray = array_values(array_filter($tmpArray));
+            $tmpArray = User::strictKeybinds($tmpArray);
             $tmpArray = json_encode($tmpArray);
 
             $user->setKeyBindings($tmpArray);
@@ -796,6 +802,15 @@ class UserController extends AdminController implements KernelControllerEventInt
             throw $this->createAccessDeniedHttpException('Only admin users are allowed to modify admin users');
         }
 
+        //Check if uploaded file is an image
+        $avatarFile = $request->files->get('Filedata');
+
+        $assetType = Asset::getTypeFromMimeMapping($avatarFile->getMimeType(), $avatarFile);
+
+        if (!$avatarFile instanceof UploadedFile || $assetType !== 'image') {
+            throw new \Exception('Unsupported file format.');
+        }
+
         $userObj->setImage($_FILES['Filedata']['tmp_name']);
 
         // set content-type to text/html, otherwise (when application/json is sent) chrome will complain in
@@ -943,33 +958,34 @@ class UserController extends AdminController implements KernelControllerEventInt
      * @Route("/user/get-token-login-link", name="pimcore_admin_user_gettokenloginlink", methods={"GET"})
      *
      * @param Request $request
+     * @param TranslatorInterface $translator
      *
      * @return JsonResponse
      *
      * @throws \Exception
      */
-    public function getTokenLoginLinkAction(Request $request)
+    public function getTokenLoginLinkAction(Request $request, TranslatorInterface $translator)
     {
         $user = User::getById((int) $request->get('id'));
 
         if (!$user) {
             return $this->adminJson([
                 'success' => false,
-                'message' => $this->trans('login_token_invalid_user_error'),
+                'message' => $translator->trans('login_token_invalid_user_error', [], 'admin'),
             ], Response::HTTP_NOT_FOUND);
         }
 
         if ($user->isAdmin() && !$this->getAdminUser()->isAdmin()) {
             return $this->adminJson([
                 'success' => false,
-                'message' => $this->trans('login_token_as_admin_non_admin_user_error'),
+                'message' => $translator->trans('login_token_as_admin_non_admin_user_error', [], 'admin'),
             ], Response::HTTP_FORBIDDEN);
         }
 
         if (empty($user->getPassword())) {
             return $this->adminJson([
                 'success' => false,
-                'message' => $this->trans('login_token_no_password_error'),
+                'message' => $translator->trans('login_token_no_password_error', [], 'admin'),
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -1152,12 +1168,13 @@ class UserController extends AdminController implements KernelControllerEventInt
      * @Route("/user/invitationlink", name="pimcore_admin_user_invitationlink", methods={"POST"})
      *
      * @param Request $request
+     * @param TranslatorInterface $translator
      *
      * @return JsonResponse
      *
      * @throws \Exception
      */
-    public function invitationLinkAction(Request $request)
+    public function invitationLinkAction(Request $request, TranslatorInterface $translator)
     {
         $success = false;
         $message = '';
@@ -1196,7 +1213,7 @@ class UserController extends AdminController implements KernelControllerEventInt
                     $mail->send();
 
                     $success = true;
-                    $message = sprintf($this->trans('invitation_link_sent'), $user->getEmail());
+                    $message = sprintf($translator->trans('invitation_link_sent', [], 'admin'), $user->getEmail());
                 } catch (\Exception $e) {
                     $message .= 'could not send email';
                 }

@@ -73,7 +73,7 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
     }
 
     /**
-     * {@inheritdoc}
+     * @param string $name
      *
      * @return bool
      */
@@ -83,7 +83,8 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
     }
 
     /**
-     * {@inheritdoc}
+     * @param string $name
+     * @param array $parameters
      *
      * @return string
      */
@@ -167,7 +168,7 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
     }
 
     /**
-     * Tries to get the current route name from current or master request
+     * Tries to get the current route name from current or main request
      *
      * @return string|null
      */
@@ -197,7 +198,7 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
     }
 
     /**
-     * {@inheritdoc}
+     * @param string $pathinfo
      *
      * @return array
      */

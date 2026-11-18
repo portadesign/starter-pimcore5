@@ -75,8 +75,8 @@ class SnippetController extends DocumentControllerBase
             $snippet->getScheduledTasks()
         );
 
-        if ($snippet->getContentMasterDocument()) {
-            $data['contentMasterDocumentPath'] = $snippet->getContentMasterDocument()->getRealFullPath();
+        if ($snippet->getContentMainDocument()) {
+            $data['contentMainDocumentPath'] = $snippet->getContentMainDocument()->getRealFullPath();
         }
 
         return $this->preSendDataActions($data, $snippet, $draftVersion);
@@ -129,11 +129,14 @@ class SnippetController extends DocumentControllerBase
         } else {
             $this->saveToSession($snippet);
 
-            $draftData = [
-                'id' => $version->getId(),
-                'modificationDate' => $version->getDate(),
-                'isAutoSave' => $version->isAutoSave(),
-            ];
+            $draftData = [];
+            if ($version) {
+                $draftData = [
+                    'id' => $version->getId(),
+                    'modificationDate' => $version->getDate(),
+                    'isAutoSave' => $version->isAutoSave(),
+                ];
+            }
 
             return $this->adminJson(['success' => true, 'draft' => $draftData]);
         }

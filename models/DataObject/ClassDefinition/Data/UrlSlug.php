@@ -93,7 +93,7 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
      *
      * @param mixed $data
      * @param null|Model\DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return array
      */
@@ -129,7 +129,7 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
      *
      * @param mixed $data
      * @param null|Model\DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return Model\DataObject\Data\UrlSlug[]
      */
@@ -155,8 +155,8 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
 
     /**
      * @param float $data
-     * @param Model\DataObject\Concrete $object
-     * @param mixed $params
+     * @param Model\DataObject\Concrete|null $object
+     * @param array $params
      *
      * @return Model\DataObject\Data\UrlSlug[]
      */
@@ -177,7 +177,8 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
         if (is_array($data)) {
             /** @var Model\DataObject\Data\UrlSlug $item */
             foreach ($data as $item) {
-                $slug = $item->getSlug();
+                $matches = [];
+                $slug = htmlspecialchars($item->getSlug());
                 $foundSlug = true;
 
                 if (strlen($slug) > 0) {
@@ -190,8 +191,8 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
                         throw new Model\Element\ValidationException('Slug must be at least 2 characters long and start with slash');
                     }
 
-                    if (strpos($slug, '//') !== false || !filter_var('https://example.com' . $slug, FILTER_VALIDATE_URL)) {
-                        throw new Model\Element\ValidationException('Slug "' . $slug . '" is not valid');
+                    if(preg_match_all('([?#])', $item->getSlug(), $matches)) {
+                        throw new Model\Element\ValidationException('Slug contains reserved characters! [' . implode(' ', array_unique($matches[0])) . ']');
                     }
                 }
             }
@@ -276,8 +277,8 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
                             }
 
                             // if now exception is thrown then the slug is owned by a diffrent object/field
-                            throw new \Exception('Unique constraint violated. Slug alreay used by object '
-                                . $existingSlug->getFieldname() . ', fieldname: ' . $existingSlug->getFieldname());
+                            throw new \Exception('Unique constraint violated. Slug "' . $slug['slug'] . '" is already used by object '
+                                . $existingSlug->getObjectId() . ', fieldname: ' . $existingSlug->getFieldname());
                         }
                     }
 
@@ -428,11 +429,27 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
     }
 
     /**
+     * @param Model\DataObject\ClassDefinition\Data\UrlSlug $mainDefinition
+     */
+    public function synchronizeWithMainDefinition(Model\DataObject\ClassDefinition\Data $mainDefinition)
+    {
+        $this->action = $mainDefinition->action;
+    }
+
+    /**
+     * @deprecated will be removed in Pimcore 11
+     *
      * @param Model\DataObject\ClassDefinition\Data\UrlSlug $masterDefinition
      */
     public function synchronizeWithMasterDefinition(Model\DataObject\ClassDefinition\Data $masterDefinition)
     {
-        $this->action = $masterDefinition->action;
+        trigger_deprecation(
+            'pimcore/pimcore',
+            '10.6.0',
+            sprintf('%s is deprecated and will be removed in Pimcore 11. Use %s instead.', __METHOD__, str_replace('Master', 'Main', __METHOD__))
+        );
+
+        $this->synchronizeWithMainDefinition($masterDefinition);
     }
 
     /**
@@ -487,7 +504,7 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
     }
 
     /**
-     * @param Model\DataObject\Data\UrlSlug[]|null $data
+     * @param mixed $data
      *
      * @return bool
      */
@@ -507,7 +524,7 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
     }
 
     /**
-     * @param array $data
+     * @param array|null $data
      * @param Model\DataObject\Concrete $object
      * @param array $params
      * @param string $lineBreak
@@ -536,9 +553,9 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
     }
 
     /**
-     * @param Model\DataObject\Data\UrlSlug[]|null $data
-     * @param Model\DataObject\Concrete $object
-     * @param mixed $params
+     * @param mixed $data
+     * @param Model\DataObject\Concrete|null $object
+     * @param array $params
      *
      * @return string
      */
@@ -549,8 +566,8 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
 
     /**
      * @param null|Model\DataObject\Data\UrlSlug[] $data
-     * @param Model\DataObject\Concrete $object
-     * @param mixed $params
+     * @param Model\DataObject\Concrete|null $object
+     * @param array $params
      *
      * @return array
      */
@@ -570,9 +587,9 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
     /**
      * returns sql query statement to filter according to this data types value(s)
      *
-     * @param  string $value
-     * @param  string $operator
-     * @param  array $params
+     * @param mixed $value
+     * @param string $operator
+     * @param array $params
      *
      * @return string
      *
@@ -629,7 +646,7 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
     }
 
     /**
-     * { @inheritdoc }
+     * {@inheritdoc}
      */
     public function preGetData(/** mixed */ $container, /** array */ $params = []) // : mixed
     {
@@ -678,7 +695,7 @@ class UrlSlug extends Data implements CustomResourcePersistingInterface, LazyLoa
     }
 
     /**
-     * { @inheritdoc }
+     * {@inheritdoc}
      */
     public function preSetData(/** mixed */ $container, /**  mixed */ $data, /** array */ $params = []) // : mixed
     {

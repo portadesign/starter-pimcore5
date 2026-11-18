@@ -15,7 +15,7 @@
 
 namespace Pimcore\Bundle\AdminBundle\Controller\Admin;
 
-use Pimcore\Bundle\AdminBundle\Controller\AdminController;
+use Pimcore\Bundle\AdminBundle\Controller\AdminAbstractController;
 use Pimcore\Config;
 use Pimcore\Controller\Config\ControllerDataProvider;
 use Pimcore\Db;
@@ -37,7 +37,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  *
  * @internal
  */
-class MiscController extends AdminController
+class MiscController extends AdminAbstractController
 {
     /**
      * @Route("/get-available-controller-references", name="pimcore_admin_misc_getavailablecontroller_references", methods={"GET"})
@@ -58,7 +58,9 @@ class MiscController extends AdminController
         }, $controllerReferences);
 
         return $this->adminJson([
+            'success' => true,
             'data' => $result,
+            'total' => count($result),
         ]);
     }
 
@@ -135,8 +137,18 @@ class MiscController extends AdminController
             $allowedFileTypes = ['js', 'css'];
             $scripts = explode(',', $request->get('scripts'));
 
-            if ($request->get('scriptPath')) {
-                $scriptPath = PIMCORE_WEB_ROOT . $request->get('scriptPath');
+            $scriptPath = $request->get('scriptPath');
+            if ($scriptPath) {
+                $scriptPath = realpath(PIMCORE_WEB_ROOT . $scriptPath);
+                if(!$scriptPath) {
+                    throw $this->createNotFoundException('Directory not found!');
+                }
+
+                if(!str_starts_with($scriptPath, rtrim(str_replace('../', '', PIMCORE_WEB_ROOT), './'))) {
+                    throw $this->createAccessDeniedException('Scripts not found! Please do not navigate out of the web root directory!');
+                }
+
+                $scriptPath .= '/';
             } else {
                 $scriptPath = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/';
             }

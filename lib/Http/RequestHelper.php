@@ -15,6 +15,7 @@
 
 namespace Pimcore\Http;
 
+use Pimcore\Tool\Authentication;
 use Symfony\Component\HttpFoundation\Exception\SessionNotFoundException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -124,12 +125,12 @@ class RequestHelper
      */
     public function getMainRequest(): Request
     {
-        $masterRequest = $this->requestStack->getMainRequest();
-        if (null === $masterRequest) {
+        $mainRequest = $this->requestStack->getMainRequest();
+        if (null === $mainRequest) {
             throw new \LogicException('There is no main request available.');
         }
 
-        return $masterRequest;
+        return $mainRequest;
     }
 
     /**
@@ -166,19 +167,26 @@ class RequestHelper
             return false;
         }
 
-        $excludePatterns = [
-            "/^\/admin.*/",
-            "/^\/install.*/",
-            "/^\/plugin.*/",
-        ];
-
-        foreach ($excludePatterns as $pattern) {
-            if (preg_match($pattern, $request->getRequestUri())) {
-                return false;
-            }
+        if (preg_match('@^/admin.*@', $request->getRequestUri())) {
+            return false;
         }
 
         return true;
+    }
+
+    /**
+     * Can be used to check if a user is trying to access the object preview and is allowed to do so.
+     *
+     * @param Request|null $request
+     *
+     * @return bool
+     */
+    public function isObjectPreviewRequestByAdmin(Request $request = null): bool
+    {
+        $request = $this->getRequest($request);
+
+        return $request->query->has('pimcore_object_preview')
+            && Authentication::isValidUser(Authentication::authenticateSession($request));
     }
 
     /**

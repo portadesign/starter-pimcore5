@@ -18,7 +18,7 @@ declare(strict_types=1);
 namespace Pimcore\Bundle\AdminBundle\Security\Firewall;
 
 use Pimcore\Bundle\AdminBundle\Security\Authentication\Token\PreAuthenticatedAdminToken;
-use Pimcore\Bundle\AdminBundle\Security\User\User;
+use Pimcore\Security\User\User;
 use Pimcore\Tool\Authentication;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\Security\Core\Authentication\AuthenticationManagerInterface;
@@ -26,6 +26,8 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 
 /**
+ * @deprecated will be removed in Pimcore 11
+ *
  * Checks if there's an existing admin session and stores its token on the security token storage.
  *
  * @package Pimcore\Bundle\AdminBundle\Security\Firewall
